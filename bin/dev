@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+
+ENV["PORT"] ||= "3000"
+VERBOSE = ARGV.include?("--verbose") || ARGV.include?("-v") || ENV["VERBOSE"]
+RAILS_ARGS = ARGV - %w[--verbose -v]
+PROCFILE = "Procfile.dev"
+Process.exec(*%w[bin/rails server], *RAILS_ARGS) unless File.exist?(PROCFILE)
+
+Signal.trap("INT") { }
+
+if system(*%w[gem list --no-installed --exact --silent foreman])
+  puts "Installing foreman..."
+  system(*%w[gem install foreman])
+end
+
+begin
+  in_r, in_w = IO.pipe
+  foreman_pid = Process.spawn(
+    *%w[foreman start -f Procfile.dev -m all=1,web=0 --env /dev/null],
+    in: in_r,
+    out: (VERBOSE ? STDOUT : "/dev/null"),
+    err: (VERBOSE ? STDOUT : "/dev/null"),
+    pgroup: true,
+  )
+  foreman_pgid = Process.getpgid(foreman_pid)
+  pid = Process.spawn(*%w[bin/rails server], *RAILS_ARGS)
+
+  Process.wait(pid)
+  pid = nil
+ensure
+  if foreman_pgid
+    Process.kill("INT", -foreman_pgid)
+    Process.wait(-foreman_pgid)
+  end
+  begin
+    Process.kill("KILL", pid) if pid
+  rescue Errno::ESRCH
+  end
+  in_w&.close
+  in_r&.close
+end

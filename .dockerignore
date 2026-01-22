@@ -1,0 +1,120 @@
+# See https://docs.docker.com/engine/reference/builder/#dockerignore-file for more about ignoring files.
+
+# Ignore git directory.
+/.git/
+/.gitignore
+
+# Ignore development files
+/.devcontainer
+
+# Ignore CI service files.
+/.github
+
+# Ignore Kamal files
+/.kamal
+
+# Ignore Docker-related files
+/.dockerignore
+/Dockerfile*
+
+# Vibe coding
+/.claude
+/AGENTS.md
+/CLAUDE.md
+
+# Docs
+/docs
+/lib/tavern_kit/docs
+
+# Below contents are synced from .gitignore
+
+/.yardoc
+/_yardoc/
+/doc/
+/pkg/
+/spec/reports/
+.DS_Store
+
+# IDE and Editor specific
+/.idea
+/.cursor
+/.ruby-lsp
+/.vscode
+
+# Ignore bundler config.
+/.bundle
+
+# MCP temp files
+/.playwright-mcp
+
+# Ignore node_modules
+/node_modules
+
+# Simple-cov
+/coverage/
+
+# Ignore pid files, but keep the directory.
+/tmp/pids/*
+!/tmp/pids/
+!/tmp/pids/.keep
+
+# Ignore socket files, but keep the directory.
+/tmp/sockets/*
+!/tmp/sockets/
+!/tmp/sockets/.keep
+
+# Ignore all environment files.
+/.env*
+!/.env*.erb
+!/.env*.sample
+
+# Ignore all logfiles and tempfiles.
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# Ignore storage (uploaded files in development and any SQLite databases).
+/storage/*
+!/storage/.keep
+/tmp/storage/*
+!/tmp/storage/
+!/tmp/storage/.keep
+
+# Ignore SQLite database files.
+/db/*.sqlite3
+/db/*.sqlite3-*
+
+# Ignore all default key files.
+/config/master.key
+/config/credentials/*.key
+/config/credentials.yml.enc
+/config/credentials/*.yml.enc
+
+# Ignore local settings files
+/config/settings.local.yml
+/config/settings/*.local.yml
+/config/environments/*.local.yml
+
+# Ignore environment specified config files
+/config/deploy.yml
+/compose.yaml
+
+# Assets pipeline
+/app/assets/builds/*
+!/app/assets/builds/.keep
+/public/assets
+
+# Gem
+/lib/tavern_kit/.bundle/
+/lib/tavern_kit/.yardoc
+/lib/tavern_kit/_yardoc/
+/lib/tavern_kit/coverage/
+/lib/tavern_kit/doc/
+/lib/tavern_kit/pkg/
+/lib/tavern_kit/spec/reports/
+/lib/tavern_kit/tmp/
+/lib/tavern_kit/*.gem
+
+# Local resources
+/resources

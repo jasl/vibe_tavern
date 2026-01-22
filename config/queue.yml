@@ -1,0 +1,31 @@
+default: &default
+  dispatchers:
+    - polling_interval: 1
+      batch_size: 500
+  workers:
+    # Default queue for general background jobs (imports, cleanup, etc.)
+    - queues: [default]
+      threads: <%= ENV.fetch("DEFAULT_QUEUE_JOB_THREADS", 3) %>
+      processes: <%= ENV.fetch("DEFAULT_QUEUE_JOB_CONCURRENCY", 1) %>
+      polling_interval: 0.1
+
+    # Uploads queue for large file imports (characters, lorebooks, etc.)
+    - queues: [uploads]
+      threads: <%= ENV.fetch("UPLOAD_QUEUE_JOB_THREADS", 2) %>
+      processes: <%= ENV.fetch("UPLOAD_QUEUE_JOB_CONCURRENCY", 1) %>
+      polling_interval: 0.1
+
+    # LLM queue for AI generation jobs (higher concurrency for I/O-bound API calls)
+    - queues: [llm]
+      threads: <%= ENV.fetch("LLM_QUEUE_JOB_THREADS", 5) %>
+      processes: <%= ENV.fetch("LLM_QUEUE_JOB_CONCURRENCY", 1) %>
+      polling_interval: 0.1
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default
