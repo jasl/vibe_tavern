@@ -1,0 +1,128 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Lint: files must end with exactly ONE newline and have no trailing blank lines.
+#
+# Why:
+# - `.editorconfig` can ensure a final newline exists, but it does NOT prevent multiple
+#   blank lines at EOF.
+# - Extra EOF blank lines are noise and often introduced accidentally by editors/agents.
+#
+# Usage:
+#   ruby bin/lint-eof            # check (exit 1 on violation)
+#   ruby bin/lint-eof --fix      # auto-fix violations in-place
+#
+# Notes:
+# - Scans git-tracked files by default (ignores generated/untracked noise).
+# - Skips binary files (null byte detection).
+
+require "open3"
+
+ROOT = File.expand_path("..", __dir__)
+
+FIX = ARGV.delete("--fix")
+HELP = ARGV.delete("--help") || ARGV.delete("-h")
+
+if HELP
+  warn <<~USAGE
+    Usage:
+      ruby bin/lint-eof [--fix]
+  USAGE
+  exit 0
+end
+
+def git_tracked_files(root)
+  stdout, status = Open3.capture2("git", "ls-files", "-z", chdir: root)
+  return nil unless status.success?
+
+  stdout.split("\x00").reject(&:empty?)
+end
+
+def binary?(bytes)
+  bytes.include?("\x00")
+end
+
+def normalize_newlines(bytes)
+  # Convert CRLF/CR to LF for consistent checks and to match `.editorconfig` (end_of_line=lf).
+  bytes.gsub("\r\n", "\n").gsub("\r", "\n")
+end
+
+def violation_reason(normalized)
+  # Skip whitespace-only files; enforcing "last non-blank line must exist" is noisy for placeholders.
+  return nil if normalized.strip.empty?
+
+  return "missing final newline" unless normalized.end_with?("\n")
+
+  lines = normalized.split("\n", -1) # keep trailing empty segments
+  # ends_with?("\n") ensures the last element is "" (terminator for final newline)
+  lines.pop
+
+  return "trailing blank line(s) at EOF" if lines.last&.strip&.empty?
+
+  nil
+end
+
+def fix_content(normalized)
+  # If whitespace-only, normalize to a single newline (keeps file "text" with one newline).
+  return "\n" if normalized.strip.empty?
+
+  lines = normalized.split("\n", -1)
+  # Drop any trailing terminators (there might be multiple newline chars at EOF)
+  lines.pop while lines.last == ""
+  # Drop whitespace-only lines at EOF
+  lines.pop while lines.last && lines.last.strip.empty?
+  "#{lines.join("\n")}\n"
+end
+
+files = git_tracked_files(ROOT)
+if files.nil?
+  warn "WARN: git not available; falling back to recursive scan (may include generated files)."
+  files = Dir.glob("**/*", File::FNM_DOTMATCH, base: ROOT).reject do |p|
+    p.start_with?(".git/") ||
+      p.start_with?("node_modules/") ||
+      p.start_with?("tmp/") ||
+      p.start_with?("log/") ||
+      p.start_with?("storage/") ||
+      p.start_with?("vendor/")
+  end
+end
+
+violations = []
+
+files.each do |rel|
+  path = File.join(ROOT, rel)
+  next unless File.file?(path)
+
+  bytes = File.binread(path)
+  next if binary?(bytes)
+
+  normalized = normalize_newlines(bytes)
+  reason = violation_reason(normalized)
+  next unless reason
+
+  if FIX
+    fixed = fix_content(normalized)
+    next if fixed == normalized
+
+    File.write(path, fixed, mode: "wb")
+  end
+
+  violations << [rel, reason]
+end
+
+if violations.empty?
+  puts "OK: EOF newline / trailing blank lines"
+  exit 0
+end
+
+if FIX
+  puts "FIXED: #{violations.size} file(s)"
+  exit 0
+end
+
+warn "EOF lint failed (#{violations.size} file(s)):"
+violations.each do |rel, reason|
+  warn "  - #{rel}: #{reason}"
+end
+warn "\nRun: ruby bin/lint-eof --fix"
+exit 1

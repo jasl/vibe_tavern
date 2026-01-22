@@ -1,0 +1,124 @@
+name: "tavern"
+
+x-app: &default-app
+  build:
+    context: .
+    dockerfile: ./Dockerfile
+  env_file: ".env"
+  environment:
+    RAILS_DB_URL_BASE: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db
+    RAILS_ENV: production
+    # Migrator specified
+    SKIP_DEMO_DATA: 1
+  entrypoint: []
+  volumes:
+    - app-storage:/rails/storage
+
+services:
+  db:
+    image: pgvector/pgvector:pg18-trixie
+    restart: unless-stopped
+    networks:
+      - default
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      PGDATA: /var/lib/postgresql/data/18
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  migrator:
+    <<: *default-app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    command:
+      - "./bin/rails"
+      - "db:prepare"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    <<: *default-app
+    depends_on:
+      db:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    ports:
+      - '8080:80'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/up || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command:
+      - "./bin/thrust"
+      - "./bin/rails"
+      - "server"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  jobs:
+    <<: *default-app
+    depends_on:
+      db:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    command:
+      - "./bin/jobs"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres-data:
+  app-storage:
