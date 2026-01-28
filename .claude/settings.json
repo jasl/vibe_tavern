@@ -12,7 +12,6 @@
     "serena@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
     "greptile@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true,
-    "circleback@claude-plugins-official": true
+    "claude-md-management@claude-plugins-official": true
   }
 }
