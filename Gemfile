@@ -54,7 +54,7 @@ gem "simple_inference"
 gem "httpx"
 
 gem "js_regex_to_ruby"
-gem "easy_talk"
+gem "easy_talk", path: "lib/easy_talk"
 gem "tavern_kit", path: "lib/tavern_kit"
 
 # ZIP processing for CharX format

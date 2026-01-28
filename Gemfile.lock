@@ -100,6 +100,15 @@ GIT
       zeitwerk (~> 2.6)
 
 PATH
+  remote: lib/easy_talk
+  specs:
+    easy_talk (3.3.0)
+      activemodel (>= 7.0, < 9.0)
+      activesupport (>= 7.0, < 9.0)
+      js_regex (~> 3.0)
+      sorbet-runtime (~> 0.5)
+
+PATH
   remote: lib/tavern_kit
   specs:
     tavern_kit (0.1.0)
@@ -150,11 +159,6 @@ GEM
     docile (1.4.1)
     dotenv (3.2.0)
     drb (2.2.3)
-    easy_talk (3.3.0)
-      activemodel (>= 7.0, < 9.0)
-      activesupport (>= 7.0, < 9.0)
-      js_regex (~> 3.0)
-      sorbet-runtime (~> 0.5)
     ed25519 (1.4.0)
     erb (6.0.1)
     erubi (1.13.1)
@@ -466,7 +470,7 @@ DEPENDENCIES
   cssbundling-rails
   debug
   dotenv
-  easy_talk
+  easy_talk!
   geared_pagination
   httpx
   image_processing (~> 1.2)
@@ -531,7 +535,7 @@ CHECKSUMS
   docile (1.4.1) sha256=96159be799bfa73cdb721b840e9802126e4e03dfc26863db73647204c727f21e
   dotenv (3.2.0) sha256=e375b83121ea7ca4ce20f214740076129ab8514cd81378161f11c03853fe619d
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
-  easy_talk (3.3.0) sha256=1db579c7d3db59a0aa3756393ee57b374a3d06aa080f492ea3ef56678611ccd8
+  easy_talk (3.3.0)
   ed25519 (1.4.0) sha256=16e97f5198689a154247169f3453ef4cfd3f7a47481fde0ae33206cdfdcac506
   erb (6.0.1) sha256=28ecdd99c5472aebd5674d6061e3c6b0a45c049578b071e5a52c2a7f13c197e5
   erubi (1.13.1) sha256=a082103b0885dbc5ecf1172fede897f9ebdb745a4b97a5e8dc63953db1ee4ad9

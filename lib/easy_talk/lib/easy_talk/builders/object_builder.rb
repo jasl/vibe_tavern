@@ -1,0 +1,348 @@
+# frozen_string_literal: true
+# typed: true
+
+require_relative 'base_builder'
+require_relative '../model_helper'
+
+module EasyTalk
+  module Builders
+    #
+    # ObjectBuilder is responsible for turning a SchemaDefinition of an "object" type
+    # into a validated JSON Schema hash. It:
+    #
+    # 1) Recursively processes the schema's :properties,
+    # 2) Determines which properties are required (unless optional),
+    # 3) Handles sub-schema composition (allOf, anyOf, oneOf, not),
+    # 4) Produces the final object-level schema hash.
+    #
+    class ObjectBuilder < BaseBuilder
+      extend T::Sig
+
+      # Required by BaseBuilder: recognized schema options for "object" types
+      VALID_OPTIONS = {
+        properties: { type: T::Hash[T.any(Symbol, String), T.untyped], key: :properties },
+        additional_properties: { type: T.any(T::Boolean, Class, T::Hash[Symbol, T.untyped]), key: :additionalProperties },
+        pattern_properties: { type: T::Hash[String, T.untyped], key: :patternProperties },
+        min_properties: { type: Integer, key: :minProperties },
+        max_properties: { type: Integer, key: :maxProperties },
+        dependencies: { type: T::Hash[String, T.any(T::Array[String], T::Hash[String, T.untyped])], key: :dependencies },
+        dependent_required: { type: T::Hash[String, T::Array[String]], key: :dependentRequired },
+        subschemas: { type: T::Array[T.untyped], key: :subschemas },
+        required: { type: T::Array[T.any(Symbol, String)], key: :required },
+        defs: { type: T.untyped, key: :$defs },
+        allOf: { type: T.untyped, key: :allOf },
+        anyOf: { type: T.untyped, key: :anyOf },
+        oneOf: { type: T.untyped, key: :oneOf },
+        not: { type: T.untyped, key: :not }
+      }.freeze
+
+      sig { params(schema_definition: EasyTalk::SchemaDefinition).void }
+      def initialize(schema_definition)
+        # Keep a reference to the original schema definition
+        @schema_definition = schema_definition
+        # Deep duplicate the raw schema hash so we can mutate it safely
+        @original_schema = deep_dup(schema_definition.schema)
+
+        # We'll collect required property names in this Set
+        @required_properties = Set.new
+
+        # Collect models that are referenced via $ref for $defs generation
+        @ref_models = Set.new
+
+        # Usually the name is a string (class name). Fallback to :klass if nil.
+        name_for_builder = schema_definition.name ? schema_definition.name.to_sym : :klass
+
+        # Build the base structure: { type: 'object' } plus any top-level options
+        super(
+          name_for_builder,
+          { type: 'object' },    # minimal "object" structure
+          build_options_hash,    # method below merges & cleans final top-level keys
+          VALID_OPTIONS
+        )
+      end
+
+      # Override build to add additionalProperties after BaseBuilder validation
+      sig { override.returns(T::Hash[Symbol, T.untyped]) }
+      def build
+        result = super
+        process_additional_properties(result)
+        result
+      end
+
+      private
+
+      ##
+      # Deep duplicates a hash, including nested hashes.
+      # This prevents mutations from leaking back to the original schema.
+      #
+      def deep_dup(obj)
+        case obj
+        when Hash
+          obj.transform_values { |v| deep_dup(v) }
+        when Array
+          obj.map { |v| deep_dup(v) }
+        when Class, Module
+          # Don't duplicate Class or Module objects - they represent types
+          obj
+        else
+          obj.duplicable? ? obj.dup : obj
+        end
+      end
+
+      ##
+      # Main aggregator: merges the top-level schema keys (like :properties, :subschemas)
+      # into a single hash that we'll feed to BaseBuilder.
+      def build_options_hash
+        # Start with a copy of the raw schema
+        merged = @original_schema.dup
+
+        # Remove schema_version and schema_id as they're handled separately in json_schema output
+        merged.delete(:schema_version)
+        merged.delete(:schema_id)
+
+        # Extract and build sub-schemas first (handles allOf/anyOf/oneOf references, etc.)
+        process_subschemas(merged)
+
+        # Build :properties into a final form (and find "required" props)
+        # This also collects models that use $ref into @ref_models
+        merged[:properties] = build_properties(merged.delete(:properties))
+
+        # Add $defs for any models that are referenced via $ref
+        add_ref_model_defs(merged) if @ref_models.any?
+
+        # Populate the final "required" array from @required_properties
+        merged[:required] = @required_properties.to_a if @required_properties.any?
+
+        # Process additionalProperties separately (don't let BaseBuilder validate it)
+        # Extract the value, process it, and we'll add it back after BaseBuilder runs
+        @additional_properties_value = merged.delete(:additional_properties)
+
+        # Prune empty or nil values so we don't produce stuff like "properties": {} unnecessarily
+        merged.reject! { |_k, v| v.nil? || v == {} || v == [] }
+
+        merged
+      end
+
+      ##
+      # Process additionalProperties to handle schema objects.
+      # Converts type classes or constraint hashes into proper JSON Schema.
+      # Called from build() method with the final schema hash.
+      #
+      def process_additional_properties(schema_hash)
+        value = @additional_properties_value
+
+        # If not set, use config default
+        if value.nil?
+          schema_hash[:additionalProperties] = EasyTalk.configuration.default_additional_properties
+          return
+        end
+
+        # Boolean: pass through as-is
+        if value.is_a?(TrueClass) || value.is_a?(FalseClass)
+          schema_hash[:additionalProperties] = value
+          return
+        end
+
+        # Class type: build schema
+        if value.is_a?(Class)
+          schema_hash[:additionalProperties] = build_additional_properties_schema(value, {})
+          return
+        end
+
+        # Hash with type + constraints: build schema with constraints
+        return unless value.is_a?(Hash)
+
+        type = value[:type] || value['type']
+        constraints = value.except(:type, 'type')
+        schema_hash[:additionalProperties] = build_additional_properties_schema(type, constraints)
+      end
+
+      ##
+      # Builds a JSON Schema for additionalProperties from a type and constraints.
+      # Uses the Property builder to generate the schema.
+      #
+      def build_additional_properties_schema(type, constraints)
+        return {} unless type
+
+        # Use Property builder to generate schema for the type
+        property = EasyTalk::Property.new(:_additional, type, constraints)
+        property.as_json
+      end
+
+      ##
+      # Given the property definitions hash, produce a new hash of
+      # { property_name => [Property or nested schema builder result] }.
+      #
+      def build_properties(properties_hash)
+        return {} unless properties_hash.is_a?(Hash)
+
+        # Cache with a key based on property name and its full configuration
+        @properties_cache ||= {}
+
+        properties_hash.each_with_object({}) do |(original_name, prop_options), result|
+          # Use :as constraint for property name without mutating original constraints
+          property_name = (prop_options[:constraints][:as] || original_name).to_sym
+          cache_key = [property_name, prop_options].hash
+
+          # Use cache if the exact property and configuration have been processed before
+          @properties_cache[cache_key] ||= begin
+            mark_required_unless_optional(property_name, prop_options)
+            build_property(property_name, prop_options)
+          end
+
+          result[property_name] = @properties_cache[cache_key]
+        end
+      end
+
+      ##
+      # Decide if a property should be required. If it's optional or nilable,
+      # we won't include it in the "required" array.
+      #
+      def mark_required_unless_optional(prop_name, prop_options)
+        return if property_optional?(prop_options)
+
+        @required_properties.add(prop_name)
+      end
+
+      ##
+      # Returns true if the property is declared optional.
+      #
+      def property_optional?(prop_options)
+        # Check constraints[:optional]
+        return true if prop_options.dig(:constraints, :optional)
+
+        # Check for nil_optional config to determine if nilable should also mean optional
+        return EasyTalk.configuration.nilable_is_optional if prop_options[:type].respond_to?(:nilable?) && prop_options[:type].nilable?
+
+        false
+      end
+
+      ##
+      # Builds a single property. Could be a nested schema if it has sub-properties,
+      # or a standard scalar property (String, Integer, etc.).
+      # Also tracks EasyTalk models that should be added to $defs when using $ref.
+      #
+      def build_property(prop_name, prop_options)
+        @property_cache ||= {}
+
+        # Memoize so we only build each property once
+        @property_cache[prop_name] ||= begin
+          # Remove internal constraints that shouldn't be passed to Property
+          constraints = prop_options[:constraints].except(:optional, :as)
+          prop_type = prop_options[:type]
+
+          # Track models that will use $ref for later $defs generation
+          collect_ref_models(prop_type, constraints)
+
+          # Normal property: e.g. { type: String, constraints: {...} }
+          Property.new(prop_name, prop_type, constraints)
+        end
+      end
+
+      ##
+      # Collects EasyTalk models that will be referenced via $ref.
+      # These models need to be added to $defs in the final schema.
+      #
+      def collect_ref_models(prop_type, constraints)
+        # Check if this type should use $ref
+        if should_collect_ref?(prop_type, constraints)
+          @ref_models.add(prop_type)
+        elsif prop_type.is_a?(EasyTalk::Types::Composer)
+          collect_ref_models(prop_type.items, constraints)
+        # Handle typed arrays with EasyTalk model items
+        elsif typed_array?(prop_type)
+          extract_inner_types(prop_type).each { |inner_type| collect_ref_models(inner_type, constraints) }
+        # Handle nilable types
+        elsif nilable_with_model?(prop_type)
+          actual_type = T::Utils::Nilable.get_underlying_type(prop_type)
+          @ref_models.add(actual_type) if should_collect_ref?(actual_type, constraints)
+        end
+      end
+
+      ##
+      # Determines if a type should be collected for $ref based on config and constraints.
+      #
+      def should_collect_ref?(check_type, constraints)
+        return false unless ModelHelper.easytalk_model?(check_type)
+
+        # Per-property constraint takes precedence
+        return constraints[:ref] if constraints.key?(:ref)
+
+        # Fall back to global configuration
+        EasyTalk.configuration.use_refs
+      end
+
+      def typed_array?(prop_type)
+        prop_type.is_a?(T::Types::TypedArray)
+      end
+
+      def extract_inner_types(prop_type)
+        return [] unless typed_array?(prop_type)
+
+        if prop_type.type.is_a?(EasyTalk::Types::Composer)
+          prop_type.type.items
+        else
+          [prop_type.type.raw_type]
+        end
+      end
+
+      ##
+      # Checks if type is nilable and contains an EasyTalk model.
+      #
+      def nilable_with_model?(prop_type)
+        return false unless prop_type.respond_to?(:types)
+        return false unless prop_type.types.all? { |t| t.respond_to?(:raw_type) }
+        return false unless prop_type.types.any? { |t| t.raw_type == NilClass }
+
+        actual_type = T::Utils::Nilable.get_underlying_type(prop_type)
+        ModelHelper.easytalk_model?(actual_type)
+      end
+
+      ##
+      # Adds $defs entries for all collected ref models.
+      #
+      def add_ref_model_defs(schema_hash)
+        definitions = @ref_models.each_with_object({}) do |model, acc|
+          acc[model.name] = model.schema
+        end
+
+        existing_defs = schema_hash[:defs] || {}
+        schema_hash[:defs] = existing_defs.merge(definitions)
+      end
+
+      ##
+      # Process top-level composition keywords (e.g. allOf, anyOf, oneOf),
+      # converting them to definitions + references if appropriate.
+      #
+      def process_subschemas(schema_hash)
+        subschemas = schema_hash.delete(:subschemas) || []
+        subschemas.each do |subschema|
+          add_defs_from_subschema(schema_hash, subschema)
+          add_refs_from_subschema(schema_hash, subschema)
+        end
+      end
+
+      ##
+      # For each item in the composer, add it to :defs so that we can reference it later.
+      #
+      def add_defs_from_subschema(schema_hash, subschema)
+        # Build up a hash of class_name => schema for each sub-item
+        definitions = subschema.items.each_with_object({}) do |item, acc|
+          acc[item.name] = item.schema
+        end
+        # Merge or create :defs
+        existing_defs = schema_hash[:defs] || {}
+        schema_hash[:defs] = existing_defs.merge(definitions)
+      end
+
+      ##
+      # Add references to the schema for each sub-item in the composer
+      # e.g. { "$ref": "#/$defs/SomeClass" }
+      #
+      def add_refs_from_subschema(schema_hash, subschema)
+        references = subschema.items.map { |item| { '$ref': item.ref_template } }
+        schema_hash[subschema.name] = references
+      end
+    end
+  end
+end

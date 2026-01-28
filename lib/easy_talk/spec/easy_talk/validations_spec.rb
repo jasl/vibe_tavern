@@ -1,0 +1,531 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
+RSpec.describe 'Auto Validations' do
+  let(:user_class) do
+    Class.new do
+      include EasyTalk::Model
+
+      def self.name
+        'User'
+      end
+
+      define_schema do
+        property :name, String, min_length: 2, max_length: 50
+        property :email, String, format: 'email'
+        property :age, Integer, minimum: 18, maximum: 120
+        property :gender, String, enum: %w[male female other]
+        property :tags, T::Array[String], min_items: 1, max_items: 5
+        property :active, T::Boolean
+      end
+    end
+  end
+
+  before do
+    # Enable auto-validations for testing
+    EasyTalk.configure { |config| config.auto_validations = true }
+  end
+
+  describe 'string validations' do
+    it 'validates string length' do
+      user = user_class.new(name: 'A')
+      expect(user.valid?).to be(false)
+      expect(user.errors[:name]).to include('is too short (minimum is 2 characters)')
+
+      user.name = 'A' * 51
+      expect(user.valid?).to be(false)
+      expect(user.errors[:name]).to include('is too long (maximum is 50 characters)')
+
+      user.name = 'Valid Name'
+      # Clear previous errors for this field
+      user.errors.delete(:name)
+      user.validate
+      expect(user.errors[:name]).to be_empty
+    end
+
+    it 'validates email format' do
+      user = user_class.new(email: 'not-an-email')
+      expect(user.valid?).to be(false)
+      expect(user.errors[:email]).to include('must be a valid email address')
+
+      user.email = 'valid@example.com'
+      # Clear previous errors for this field
+      user.errors.delete(:email)
+      user.validate
+      expect(user.errors[:email]).to be_empty
+    end
+
+    it 'validates enum inclusion' do
+      user = user_class.new(gender: 'invalid')
+      expect(user.valid?).to be(false)
+      expect(user.errors[:gender]).to include('must be one of: male, female, other')
+
+      user.gender = 'male'
+      # Clear previous errors for this field
+      user.errors.delete(:gender)
+      user.validate
+      expect(user.errors[:gender]).to be_empty
+    end
+  end
+
+  describe 'numeric validations' do
+    it 'validates numeric range' do
+      user = user_class.new(age: 17)
+      expect(user.valid?).to be(false)
+      expect(user.errors[:age]).to include('must be greater than or equal to 18')
+
+      user.age = 121
+      expect(user.valid?).to be(false)
+      expect(user.errors[:age]).to include('must be less than or equal to 120')
+
+      user.age = 25
+      # Clear previous errors for this field
+      user.errors.delete(:age)
+      user.validate
+      expect(user.errors[:age]).to be_empty
+    end
+  end
+
+  describe 'array validations' do
+    it 'validates array length' do
+      user = user_class.new(tags: [])
+      expect(user.valid?).to be(false)
+      expect(user.errors[:tags]).to include('is too short (minimum is 1 character)')
+
+      user.tags = %w[tag1 tag2 tag3 tag4 tag5 tag6]
+      expect(user.valid?).to be(false)
+      expect(user.errors[:tags]).to include('is too long (maximum is 5 characters)')
+
+      user.tags = %w[tag1 tag2]
+      # Clear previous errors for this field
+      user.errors.delete(:tags)
+      user.validate
+      expect(user.errors[:tags]).to be_empty
+    end
+  end
+
+  describe 'uniqueItems validation' do
+    let(:unique_items_class) do
+      Class.new do
+        include EasyTalk::Model
+
+        def self.name
+          'UniqueItemsTest'
+        end
+
+        define_schema do
+          # Use T.nilable to allow nil values (optional: true only affects JSON schema required array)
+          property :tags, T.nilable(T::Array[String]), unique_items: true, optional: true
+          property :numbers, T.nilable(T::Array[Integer]), unique_items: true, optional: true
+        end
+      end
+    end
+
+    describe 'basic duplicate detection' do
+      it 'rejects arrays with duplicate strings' do
+        instance = unique_items_class.new(tags: %w[foo bar foo], numbers: [1, 2, 3])
+        expect(instance.valid?).to be(false)
+        expect(instance.errors[:tags]).to include('must contain unique items')
+      end
+
+      it 'accepts arrays with unique strings' do
+        instance = unique_items_class.new(tags: %w[foo bar baz], numbers: [1, 2, 3])
+        expect(instance.valid?).to be(true)
+        expect(instance.errors[:tags]).to be_empty
+      end
+
+      it 'rejects arrays with duplicate integers' do
+        instance = unique_items_class.new(tags: %w[foo bar], numbers: [1, 2, 1])
+        expect(instance.valid?).to be(false)
+        expect(instance.errors[:numbers]).to include('must contain unique items')
+      end
+
+      it 'accepts arrays with unique integers' do
+        instance = unique_items_class.new(tags: %w[foo bar], numbers: [1, 2, 3])
+        expect(instance.valid?).to be(true)
+        expect(instance.errors[:numbers]).to be_empty
+      end
+
+      it 'accepts empty arrays' do
+        instance = unique_items_class.new(tags: [], numbers: [])
+        expect(instance.valid?).to be(true)
+        expect(instance.errors[:tags]).to be_empty
+      end
+
+      it 'accepts nil values for optional properties' do
+        instance = unique_items_class.new(tags: nil, numbers: nil)
+        expect(instance.valid?).to be(true)
+        expect(instance.errors[:tags]).to be_empty
+      end
+    end
+
+    describe 'JSON Schema equality semantics' do
+      let(:heterogeneous_class) do
+        Class.new do
+          include EasyTalk::Model
+
+          def self.name
+            'HeterogeneousArrayTest'
+          end
+
+          # Use a simple array property that accepts any values for testing
+          # JSON Schema equality semantics
+          attr_accessor :items
+
+          define_schema do
+            property :placeholder, String, optional: true
+          end
+
+          validate :validate_unique_items
+
+          def validate_unique_items
+            return if items.nil?
+
+            errors.add(:items, 'must contain unique items') if EasyTalk::JsonSchemaEquality.duplicates?(items)
+          end
+        end
+      end
+
+      it 'treats 1 and 1.0 as duplicates (mathematical equality)' do
+        instance = heterogeneous_class.new
+        instance.items = [1, 1.0]
+        expect(instance.valid?).to be(false)
+        expect(instance.errors[:items]).to include('must contain unique items')
+      end
+
+      it 'treats true and 1 as unique (type matters for non-numbers)' do
+        instance = heterogeneous_class.new
+        instance.items = [true, 1]
+        expect(instance.valid?).to be(true)
+      end
+
+      it 'treats false and 0 as unique (type matters for non-numbers)' do
+        instance = heterogeneous_class.new
+        instance.items = [false, 0]
+        expect(instance.valid?).to be(true)
+      end
+
+      it 'treats objects with same keys in different order as duplicates' do
+        instance = heterogeneous_class.new
+        instance.items = [{ 'a' => 1, 'b' => 2 }, { 'b' => 2, 'a' => 1 }]
+        expect(instance.valid?).to be(false)
+        expect(instance.errors[:items]).to include('must contain unique items')
+      end
+
+      it 'treats objects with different values as unique' do
+        instance = heterogeneous_class.new
+        instance.items = [{ 'a' => 1, 'b' => 2 }, { 'a' => 2, 'b' => 1 }]
+        expect(instance.valid?).to be(true)
+      end
+
+      it 'treats nested arrays with same content as duplicates' do
+        instance = heterogeneous_class.new
+        instance.items = [%w[foo bar], %w[foo bar]]
+        expect(instance.valid?).to be(false)
+        expect(instance.errors[:items]).to include('must contain unique items')
+      end
+
+      it 'treats nested objects with same content in different key order as duplicates' do
+        instance = heterogeneous_class.new
+        instance.items = [
+          { 'foo' => { 'a' => 1, 'b' => 2 } },
+          { 'foo' => { 'b' => 2, 'a' => 1 } }
+        ]
+        expect(instance.valid?).to be(false)
+        expect(instance.errors[:items]).to include('must contain unique items')
+      end
+    end
+  end
+
+  describe 'boolean validations' do
+    it 'validates boolean type' do
+      user = user_class.new(active: 'yes') # Not a boolean
+      expect(user.valid?).to be(false)
+      expect(user.errors[:active]).to include('is not included in the list')
+
+      user.active = true
+      # Clear previous errors for this field
+      user.errors.delete(:active)
+      user.validate
+      expect(user.errors[:active]).to be_empty
+    end
+  end
+
+  describe 'presence validations' do
+    it 'validates required fields' do
+      user = user_class.new
+      expect(user.valid?).to be(false)
+      expect(user.errors[:name]).to include("can't be blank")
+      expect(user.errors[:email]).to include("can't be blank")
+      expect(user.errors[:age]).to include("can't be blank")
+      expect(user.errors[:gender]).to include("can't be blank")
+      # Arrays skip presence validation (empty arrays are valid)
+      # Use min_items constraint to require non-empty arrays
+      expect(user.errors[:tags]).to include('is too short (minimum is 1 character)')
+      expect(user.errors[:active]).to include("can't be blank")
+    end
+  end
+
+  describe 'disabling auto-validations' do
+    before do
+      EasyTalk.configure { |config| config.auto_validations = false }
+    end
+
+    after do
+      EasyTalk.configure { |config| config.auto_validations = true }
+    end
+
+    it 'does not generate validations when disabled' do
+      # Create a fresh class with auto-validations disabled
+      test_class = Class.new do
+        include EasyTalk::Model
+
+        def self.name
+          'TestClass'
+        end
+
+        define_schema do
+          property :name, String, min_length: 2
+        end
+      end
+
+      instance = test_class.new(name: 'A')
+      # With validations disabled, this should pass even though name is too short
+      expect(instance.valid?).to be(true)
+    end
+  end
+
+  describe 'optional properties' do
+    let(:optional_class) do
+      Class.new do
+        include EasyTalk::Model
+
+        def self.name
+          'OptionalProps'
+        end
+
+        define_schema do
+          property :required_name, String, pattern: /\A\w+\z/
+          property :optional_name, String, pattern: /\A\w+\z/, optional: true
+          property :nilable_name, T.nilable(String)
+          property :required_enum, String, enum: %w[foo bar]
+          property :optional_enum, String, enum: %w[foo bar], optional: true
+        end
+      end
+    end
+
+    it 'does not require optional properties' do
+      EasyTalk.configure { |config| config.nilable_is_optional = false }
+      instance = optional_class.new(required_name: 'Present', required_enum: 'foo')
+
+      # When nilable_is_optional is false, we expect nilable_name to be required
+      # but optional_name should still be optional due to explicit optional: true flag
+      expect(instance.errors[:optional_name]).to be_empty
+
+      instance.nilable_name = nil
+      expect(instance.valid?).to be(true)
+    end
+
+    it 'treats nilable as optional when configured' do
+      EasyTalk.configure { |config| config.nilable_is_optional = true }
+      instance = optional_class.new(required_name: 'Present', required_enum: 'foo')
+
+      expect(instance.valid?).to be(true)
+      expect(instance.errors[:nilable_name]).to be_empty
+    end
+
+    it 'allows nil for optional enums' do
+      instance = optional_class.new(required_name: 'Present', required_enum: 'foo')
+
+      expect(instance.valid?).to be(true)
+      expect(instance.errors[:optional_enum]).to be_empty
+    end
+
+    it 'does not allow nil for non-optional enums' do
+      instance = optional_class.new(required_name: 'Present')
+
+      expect(instance.valid?).to be(false)
+      expect(instance.errors[:required_enum]).not_to be_empty
+    end
+  end
+
+  describe 'optional properties with format validation' do
+    let(:format_class) do
+      Class.new do
+        include EasyTalk::Model
+
+        def self.name
+          'FormatProps'
+        end
+
+        define_schema do
+          property :required_email, String, format: 'email'
+          property :optional_email, String, format: 'email', optional: true
+          property :nilable_email, T.nilable(String), format: 'email'
+        end
+      end
+    end
+
+    it 'does not allow nil for required email' do
+      instance = format_class.new(required_email: nil)
+
+      expect(instance.valid?).to be(false)
+      expect(instance.errors[:required_email]).to include("can't be blank")
+    end
+
+    it 'allows nil for optional email' do
+      instance = format_class.new(required_email: 'test@example.com', optional_email: nil)
+
+      expect(instance.valid?).to be(true)
+      expect(instance.errors[:optional_email]).to be_empty
+    end
+
+    it 'allows nil for nilable email' do
+      instance = format_class.new(required_email: 'test@example.com', nilable_email: nil)
+
+      expect(instance.valid?).to be(true)
+      expect(instance.errors[:nilable_email]).to be_empty
+    end
+
+    it 'validates format when optional email has a value' do
+      instance = format_class.new(required_email: 'test@example.com', optional_email: 'not-an-email')
+
+      expect(instance.valid?).to be(false)
+      expect(instance.errors[:optional_email]).to include('must be a valid email address')
+    end
+
+    it 'validates format when nilable email has a value' do
+      instance = format_class.new(required_email: 'test@example.com', nilable_email: 'not-an-email')
+
+      expect(instance.valid?).to be(false)
+      expect(instance.errors[:nilable_email]).to include('must be a valid email address')
+    end
+
+    # JSON Schema Compliance Gap: Format Validation Scope
+    # Per JSON Schema spec, format validations should only apply to strings and
+    # should be ignored for non-string types. Currently, EasyTalk validates format
+    # on any value that is present, which can cause issues when non-string values
+    # are assigned to a property with a format constraint.
+    describe 'format validation scope (JSON Schema compliance gap)' do
+      let(:format_scope_class) do
+        Class.new do
+          include EasyTalk::Model
+
+          def self.name
+            'FormatScopeTest'
+          end
+
+          define_schema do
+            property :email, String, format: 'email', optional: true
+          end
+        end
+      end
+
+      it 'validates format for string values' do
+        instance = format_scope_class.new(email: 'not-an-email')
+        expect(instance.valid?).to be(false)
+        expect(instance.errors[:email]).to include('must be a valid email address')
+      end
+
+      it 'passes format validation for valid email string' do
+        instance = format_scope_class.new(email: 'test@example.com')
+        expect(instance.valid?).to be(true)
+      end
+
+      # Per JSON Schema: format validations should be ignored for non-string types.
+      it 'ignores format validation for non-string types (JSON Schema compliant)' do
+        instance = format_scope_class.new(email: 12_345)
+        instance.valid?
+        # Per JSON Schema: format should be ignored for non-strings
+        expect(instance.errors[:email]).not_to include('must be a valid email address')
+      end
+    end
+
+    describe 'pattern validation scope (JSON Schema compliance)' do
+      let(:pattern_class) do
+        Class.new do
+          include EasyTalk::Model
+
+          def self.name
+            'PatternTest'
+          end
+
+          define_schema do
+            property :code, String, pattern: '\\A[A-Z]{3}\\z', optional: true
+          end
+        end
+      end
+
+      it 'validates pattern for string values' do
+        instance = pattern_class.new(code: 'abc')
+        expect(instance.valid?).to be(false)
+      end
+
+      it 'passes pattern validation for valid string' do
+        instance = pattern_class.new(code: 'ABC')
+        expect(instance.valid?).to be(true)
+      end
+
+      it 'ignores pattern validation for non-string types (JSON Schema compliant)' do
+        instance = pattern_class.new(code: 12_345)
+        instance.valid?
+        # Per JSON Schema: pattern should be ignored for non-strings
+        expect(instance.errors[:code]).to be_empty
+      end
+    end
+  end
+
+  describe 'optional properties with length validation' do
+    let(:length_class) do
+      Class.new do
+        include EasyTalk::Model
+
+        def self.name
+          'LengthProps'
+        end
+
+        define_schema do
+          property :required_bio, String, min_length: 10
+          property :optional_bio, String, min_length: 10, optional: true
+          property :nilable_bio, T.nilable(String), min_length: 10
+        end
+      end
+    end
+
+    it 'does not allow nil for required bio' do
+      instance = length_class.new(required_bio: nil)
+
+      expect(instance.valid?).to be(false)
+      expect(instance.errors[:required_bio]).to include("can't be blank")
+    end
+
+    it 'allows nil for optional bio' do
+      instance = length_class.new(required_bio: 'This is a valid bio', optional_bio: nil)
+
+      expect(instance.valid?).to be(true)
+      expect(instance.errors[:optional_bio]).to be_empty
+    end
+
+    it 'allows nil for nilable bio' do
+      instance = length_class.new(required_bio: 'This is a valid bio', nilable_bio: nil)
+
+      expect(instance.valid?).to be(true)
+      expect(instance.errors[:nilable_bio]).to be_empty
+    end
+
+    it 'validates length when optional bio has a value' do
+      instance = length_class.new(required_bio: 'This is a valid bio', optional_bio: 'short')
+
+      expect(instance.valid?).to be(false)
+      expect(instance.errors[:optional_bio]).to include('is too short (minimum is 10 characters)')
+    end
+
+    it 'validates length when nilable bio has a value' do
+      instance = length_class.new(required_bio: 'This is a valid bio', nilable_bio: 'short')
+
+      expect(instance.valid?).to be(false)
+      expect(instance.errors[:nilable_bio]).to include('is too short (minimum is 10 characters)')
+    end
+  end
+end

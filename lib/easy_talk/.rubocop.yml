@@ -1,0 +1,92 @@
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.2
+  SuggestExtensions: false
+  Exclude:
+    - 'db/**/*'
+    - 'config/**/*'
+    - 'script/**/*'
+    - 'bin/**/*'
+    - 'vendor/**/*'
+
+Style/Documentation:
+  Enabled: false
+
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+Layout/CaseIndentation:
+  Enabled: false
+
+Layout/LineLength:
+  Max: 180
+  Exclude:
+    - lib/easy_talk/configuration.rb
+    - spec/**/*
+
+Style/StringLiterals:
+  Enabled: false
+
+Metrics/ClassLength:
+  Max: 240
+  Exclude:
+    - lib/easy_talk/validation_adapters/active_model_adapter.rb
+
+Metrics/MethodLength:
+  Max: 60
+
+Metrics/AbcSize:
+  Max: 50
+
+Metrics/CyclomaticComplexity:
+  Max: 20
+
+Metrics/PerceivedComplexity:
+  Max: 20
+
+Metrics/ModuleLength:
+  Max: 150
+
+Metrics/BlockNesting:
+  Max: 10
+
+Metrics/BlockLength:
+  Exclude:
+    - spec/**/*
+    - easy_talk.gemspec
+
+Layout/EndAlignment:
+  Enabled: false
+
+Layout/ExtraSpacing:
+  Enabled: false
+
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - spec/**/*
+
+Lint/EmptyBlock:
+  Exclude:
+    - spec/**/*
+
+Lint/DuplicateBranch:
+  Enabled: false
+
+Gemspec/DevelopmentDependencies:
+  Enabled: false
+
+Naming/PredicateMethod:
+  Exclude:
+    - spec/support/schema_validation_matcher.rb
+
+Naming/BlockForwarding:
+  Enabled: false
+
+Lint/UnusedMethodArgument:
+  AllowUnusedKeywordArguments: true
+  Exclude:
+    - lib/easy_talk/configuration.rb
+    - lib/easy_talk/schema_definition.rb
+
+Style/DefWithParentheses:
+  Enabled: false
