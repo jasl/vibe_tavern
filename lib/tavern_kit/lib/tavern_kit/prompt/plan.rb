@@ -1,0 +1,142 @@
+# frozen_string_literal: true
+
+require_relative "block"
+
+module TavernKit
+  module Prompt
+    # A prompt plan is a sequence of Prompt::Block objects.
+    #
+    # Plans make it easier to:
+    # - inspect/debug the built prompt (all blocks including disabled)
+    # - filter to only enabled blocks for LLM consumption
+    # - insert custom content at specific points
+    class Plan
+      attr_reader :blocks, :outlets, :lore_result, :trim_report, :greeting, :greeting_index, :warnings
+
+      def initialize(blocks:, outlets: {}, lore_result: nil, trim_report: nil, greeting: nil, greeting_index: nil, warnings: nil)
+        @blocks = Array(blocks)
+        @outlets = outlets || {}
+        @lore_result = lore_result
+        @trim_report = trim_report
+        @greeting = greeting
+        @greeting_index = greeting_index
+        @warnings = Array(warnings).compact.map(&:to_s)
+      end
+
+      def greeting?
+        !@greeting.nil?
+      end
+
+      # Returns only enabled blocks.
+      # @return [Array<Block>]
+      def enabled_blocks
+        @blocks.select(&:enabled?)
+      end
+
+      # Convert enabled blocks to Message objects.
+      # @return [Array<Message>]
+      def messages
+        merge_in_chat_blocks_for_output(enabled_blocks).map(&:to_message)
+      end
+
+      # Convert enabled blocks to the specified dialect format.
+      # Dialects are loaded lazily to avoid circular dependencies.
+      def to_messages(dialect: :openai, squash_system_messages: false, **dialect_opts)
+        dialect_sym = dialect.to_sym
+
+        output_blocks = merge_in_chat_blocks_for_output(enabled_blocks)
+        if squash_system_messages && dialect_sym == :openai
+          output_blocks = squash_system_blocks(output_blocks)
+        end
+
+        msgs = output_blocks.map(&:to_message)
+
+        if defined?(Dialects)
+          Dialects.convert(msgs, dialect: dialect_sym, **dialect_opts)
+        else
+          # Fallback: simple message hash array
+          msgs.map(&:to_h)
+        end
+      end
+
+      def size = @blocks.size
+
+      def enabled_size
+        enabled_blocks.size
+      end
+
+      # Debug dump showing all blocks with their metadata.
+      def debug_dump
+        @blocks.map do |b|
+          status = b.enabled? ? "" : " [DISABLED]"
+          slot_info = b.slot ? " (#{b.slot})" : ""
+          header = "[#{b.role}]#{slot_info}#{status}"
+          meta_info = format_metadata(b)
+          "#{header}#{meta_info}\n#{b.content}\n"
+        end.join("\n")
+      end
+
+      private
+
+      SQUASH_SYSTEM_EXCLUDE_SLOTS = %i[new_chat_prompt new_example_chat].freeze
+
+      def squash_system_blocks(blocks)
+        blocks = Array(blocks)
+
+        squashed = []
+        blocks.each do |block|
+          next if block.role == :system && block.content.to_s.empty?
+
+          should_squash = block.role == :system &&
+            (block.name.nil? || block.name.to_s.empty?) &&
+            !SQUASH_SYSTEM_EXCLUDE_SLOTS.include?(block.slot)
+          last = squashed.last
+          last_should_squash = last &&
+            last.role == :system &&
+            (last.name.nil? || last.name.to_s.empty?) &&
+            !SQUASH_SYSTEM_EXCLUDE_SLOTS.include?(last.slot)
+
+          if should_squash && last_should_squash
+            merged_content = "#{last.content}\n#{block.content}"
+            squashed[-1] = last.with(content: merged_content)
+          else
+            squashed << block
+          end
+        end
+
+        squashed
+      end
+
+      def format_metadata(block)
+        parts = []
+        parts << "id=#{block.id[0, 8]}..." if block.id
+        parts << "depth=#{block.depth}" if block.in_chat?
+        parts << "order=#{block.order}" if block.order != 100
+        parts << "priority=#{block.priority}" if block.priority != 100
+        parts << "group=#{block.token_budget_group}" if block.token_budget_group != :default
+        parts << "tags=#{block.tags.join(",")}" if block.tags.any?
+
+        parts.empty? ? "" : " {#{parts.join(", ")}}"
+      end
+
+      def merge_in_chat_blocks_for_output(blocks)
+        merged = []
+
+        blocks.each do |block|
+          if block.in_chat? && (prev = merged.last) &&
+              prev.in_chat? &&
+              prev.role == block.role &&
+              prev.depth == block.depth &&
+              prev.order == block.order
+            merged_content = [prev.content.to_s.strip, block.content.to_s.strip].reject(&:empty?).join("\n")
+            merged[-1] = prev.with(content: merged_content)
+          else
+            merged << block
+          end
+        end
+
+        merged
+      end
+    end
+  end
+end

@@ -27,7 +27,7 @@ class StCharacterCardsTest < Minitest::Test
   end
 
   def test_byaf_macro_replacement
-    pending!("BYAF replaces {user}/{character} and #{user}: syntax")
+    pending!('BYAF replaces {user}/{character} and #{user}: syntax')
 
     byaf = TavernKit::SillyTavern::ByafParser.new(File.binread("test/fixtures/files/sample.byaf"))
     card = byaf.parse_character
