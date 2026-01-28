@@ -4,21 +4,21 @@ require "test_helper"
 
 class TavernKit::UtilsTest < Minitest::Test
   def test_deep_symbolize_keys
-    input = {"name" => "Test", "nested" => {"key" => "value"}}
+    input = { "name" => "Test", "nested" => { "key" => "value" } }
     result = TavernKit::Utils.deep_symbolize_keys(input)
-    assert_equal({name: "Test", nested: {key: "value"}}, result)
+    assert_equal({ name: "Test", nested: { key: "value" } }, result)
   end
 
   def test_deep_symbolize_keys_with_array
-    input = [{"a" => 1}, {"b" => 2}]
+    input = [{ "a" => 1 }, { "b" => 2 }]
     result = TavernKit::Utils.deep_symbolize_keys(input)
-    assert_equal([{a: 1}, {b: 2}], result)
+    assert_equal([{ a: 1 }, { b: 2 }], result)
   end
 
   def test_deep_stringify_keys
-    input = {name: "Test", nested: {key: "value"}}
+    input = { name: "Test", nested: { key: "value" } }
     result = TavernKit::Utils.deep_stringify_keys(input)
-    assert_equal({"name" => "Test", "nested" => {"key" => "value"}}, result)
+    assert_equal({ "name" => "Test", "nested" => { "key" => "value" } }, result)
   end
 
   def test_presence_with_value
@@ -41,7 +41,7 @@ class TavernKit::UtilsTest < Minitest::Test
   end
 
   def test_hash_accessor_basic
-    h = TavernKit::Utils::HashAccessor.wrap({"name" => "Test", key: "value"})
+    h = TavernKit::Utils::HashAccessor.wrap({ "name" => "Test", key: "value" })
     assert_equal "Test", h[:name]
     assert_equal "value", h[:key]
   end
@@ -53,19 +53,19 @@ class TavernKit::UtilsTest < Minitest::Test
   end
 
   def test_hash_accessor_dig
-    h = TavernKit::Utils::HashAccessor.wrap({"extensions" => {"world" => "Narnia"}})
+    h = TavernKit::Utils::HashAccessor.wrap({ "extensions" => { "world" => "Narnia" } })
     assert_equal "Narnia", h.dig(:extensions, :world)
   end
 
   def test_hash_accessor_bool
-    h = TavernKit::Utils::HashAccessor.wrap({"enabled" => true, "disabled" => false})
+    h = TavernKit::Utils::HashAccessor.wrap({ "enabled" => true, "disabled" => false })
     assert h.bool(:enabled)
     refute h.bool(:disabled)
     refute h.bool(:missing)
   end
 
   def test_hash_accessor_int
-    h = TavernKit::Utils::HashAccessor.wrap({"count" => 5})
+    h = TavernKit::Utils::HashAccessor.wrap({ "count" => 5 })
     assert_equal 5, h.int(:count)
     assert_equal 0, h.int(:missing)
     assert_equal 42, h.int(:missing, default: 42)

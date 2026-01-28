@@ -83,7 +83,7 @@ module TavernKit
       def validate_format!(format)
         return if VALID_FORMATS.include?(format)
 
-        raise ArgumentError, "Invalid format: #{format.inspect}. Must be one of: #{VALID_FORMATS.join(', ')}"
+        raise ArgumentError, "Invalid format: #{format.inspect}. Must be one of: #{VALID_FORMATS.join(", ")}"
       end
 
       # @api private

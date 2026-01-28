@@ -260,7 +260,7 @@ module TavernKit
         when :v1
           raise UnsupportedVersionError, "Character Card V1 is not supported. Please convert to V2 or V3."
         else
-          raise InvalidCardError, "Unknown character card format (spec=#{hash['spec'].inspect})"
+          raise InvalidCardError, "Unknown character card format (spec=#{hash["spec"].inspect})"
         end
       end
 

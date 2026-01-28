@@ -28,7 +28,7 @@ class StWorldInfoTest < Minitest::Test
       keys: ["dragon"],
       keysecondary: ["cave"],
       selective: true,
-      selective_logic: :and_all
+      selective_logic: :and_all,
     }
 
     scan = TavernKit::SillyTavern::WorldInfo.match_entry(entry, "dragon appears")

@@ -5,4 +5,3 @@
   integration without custom coders.
 - Add `to_type` to `EasyTalk::Model` and `EasyTalk::Schema`.
 - Document Rails integration in `lib/easy_talk/README.md`.
-
