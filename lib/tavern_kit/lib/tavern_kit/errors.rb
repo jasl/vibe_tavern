@@ -30,10 +30,12 @@ module TavernKit
         @macro_name = macro_name
         @position = position
 
-        parts = [message]
-        parts << "macro: #{macro_name}" if macro_name
-        parts << "at position: #{position}" if position
-        super(parts.join(" (") + (")" * [parts.size - 1, 0].max))
+        msg = message.to_s
+        meta = []
+        meta << "macro=#{macro_name}" if macro_name
+        meta << "position=#{position}" if position
+
+        super(meta.any? ? "#{msg} (#{meta.join(", ")})" : msg)
       end
     end
 
@@ -49,7 +51,7 @@ module TavernKit
       attr_reader :remaining_macros
 
       def initialize(message, remaining_macros: [], **kwargs)
-        @remaining_macros = remaining_macros
+        @remaining_macros = Array(remaining_macros).map(&:to_s).freeze
         super(message, **kwargs)
       end
     end

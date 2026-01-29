@@ -12,8 +12,8 @@ module TavernKit
         def self.wrap(entry) = new(entry)
 
         def initialize(entry)
-          @entry = entry
           @ext = TavernKit::Utils::HashAccessor.wrap(entry.respond_to?(:extensions) ? entry.extensions : {})
+          @memo = {}
         end
 
         # --- Match flags (non-chat scan sources) ---
@@ -37,11 +37,11 @@ module TavernKit
         # --- Character filtering ---
 
         def character_filter_names
-          Array(@ext[:character_filter_names]).map(&:to_s).freeze
+          @memo[:character_filter_names] ||= Array(@ext[:character_filter_names]).map(&:to_s).freeze
         end
 
         def character_filter_tags
-          Array(@ext[:character_filter_tags]).map(&:to_s).freeze
+          @memo[:character_filter_tags] ||= Array(@ext[:character_filter_tags]).map(&:to_s).freeze
         end
 
         def character_filter_exclude? = @ext.bool(:character_filter_exclude, default: false)
@@ -76,7 +76,7 @@ module TavernKit
         # --- Generation type triggers ---
 
         def triggers
-          TavernKit::Coerce.triggers(@ext[:triggers])
+          @memo[:triggers] ||= TavernKit::Coerce.triggers(@ext[:triggers])
         end
 
         def has_triggers? = triggers.any?
@@ -93,7 +93,7 @@ module TavernKit
         def use_probability? = @ext.bool(:use_probability, default: true)
 
         def outlet_name
-          TavernKit::Utils.presence(@ext[:outlet_name])
+          @memo[:outlet_name] ||= TavernKit::Utils.presence(@ext[:outlet_name])
         end
       end
     end
