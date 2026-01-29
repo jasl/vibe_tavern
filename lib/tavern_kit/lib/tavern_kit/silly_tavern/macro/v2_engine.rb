@@ -9,19 +9,19 @@ module TavernKit
     module Macro
       # Parser-based SillyTavern macro engine (Wave 3).
       #
-      # The full implementation targets ST's experimental macro engine:
-      # - scoped macros: {{if}}...{{/if}}
-      # - macro flags: {{#if ...}} preserve whitespace
-      # - typed args, list args, shorthand operators
+      # This is a Ruby re-implementation of ST's v2 macro pipeline:
+      # - priority-ordered pre/post processors (see Preprocessors)
+      # - nested macro evaluation in arguments and scoped content
+      # - scoped macro pairing: {{macro}}...{{/macro}}
+      # - variable shorthand expressions (e.g. {{.var+=1}})
       #
-      # The implementation grows with characterization tests to avoid drifting
-      # from real ST behavior.
+      # Design note: we intentionally implement "best-effort" parsing to remain
+      # tolerant of user-provided prompt strings.
       class V2Engine < TavernKit::Macro::Engine::Base
-        TextNode = Data.define(:text)
-        MacroNode = Data.define(:raw_inner, :offset)
-        IfNode = Data.define(:condition, :preserve_whitespace, :then_nodes, :else_nodes)
-
         UNKNOWN_POLICIES = %i[keep empty].freeze
+        VAR_NAME_PATTERN = /[a-zA-Z](?:[\w-]*[\w])?/.freeze
+        VAR_EXPR_PATTERN =
+          /\A(?<scope>[.$])(?<name>#{VAR_NAME_PATTERN})\s*(?<op>\+\+|--|\|\|=|\?\?=|\+=|-=|\|\||\?\?|==|!=|>=|<=|>|<|=)?(?<value>.*)\z/m.freeze
 
         def initialize(registry: Packs::SillyTavern.default_registry, unknown: :keep)
           unless UNKNOWN_POLICIES.include?(unknown)
@@ -42,8 +42,13 @@ module TavernKit
           raw_content_hash = Invocation.stable_hash(preprocessed)
           original_once = build_original_once(environment)
 
-          nodes = parse_template(preprocessed)
-          out = evaluate_nodes(nodes, environment, raw_content_hash: raw_content_hash, original_once: original_once)
+          out = evaluate_content(
+            preprocessed,
+            environment,
+            raw_content_hash: raw_content_hash,
+            original_once: original_once,
+            context_offset: 0,
+          )
 
           out = Preprocessors.postprocess(out, environment: environment)
           out = remove_unresolved_placeholders(out) if @unknown == :empty
@@ -52,172 +57,532 @@ module TavernKit
 
         private
 
-        def parse_template(str)
-          nodes, = parse_nodes(str, 0, terminators: nil)
-          nodes
-        end
+        ArgSpan = Data.define(:raw, :start_offset, :end_offset)
 
-        def parse_nodes(str, start_idx, terminators:)
-          nodes = []
-          i = start_idx
+        def evaluate_content(text, env, raw_content_hash:, original_once:, context_offset:)
+          out = +""
+          i = 0
+          str = text.to_s
 
           while i < str.length
             open = str.index("{{", i)
             if open.nil?
-              tail = str[i..]
-              nodes << TextNode.new(text: tail) if tail && !tail.empty?
-              return [nodes, str.length, nil]
+              out << str[i..].to_s
+              break
             end
 
-            nodes << TextNode.new(text: str[i...open]) if open > i
+            out << str[i...open] if open > i
 
             close = str.index("}}", open + 2)
             if close.nil?
-              nodes << TextNode.new(text: str[open..])
-              return [nodes, str.length, nil]
+              out << str[open..].to_s
+              break
             end
 
             raw_inner = str[(open + 2)...close].to_s
-            normalized = raw_inner.strip
-            key = normalized.downcase
+            raw_original = str[open...(close + 2)].to_s
 
-            if terminators && terminators.include?(key)
-              return [nodes, close + 2, key]
-            end
-
-            if_info = parse_if_open(normalized)
-            if if_info
-              then_nodes, next_idx, term = parse_nodes(str, close + 2, terminators: %w[else /if])
-              else_nodes = []
-              if term == "else"
-                else_nodes, next_idx, = parse_nodes(str, next_idx, terminators: %w[/if])
-              end
-
-              nodes << IfNode.new(
-                condition: if_info[:condition],
-                preserve_whitespace: if_info[:preserve_whitespace],
-                then_nodes: then_nodes,
-                else_nodes: else_nodes,
+            value =
+              evaluate_macro(
+                str,
+                open: open,
+                close: close,
+                raw_inner: raw_inner,
+                raw_original: raw_original,
+                env: env,
+                raw_content_hash: raw_content_hash,
+                original_once: original_once,
+                context_offset: context_offset,
               )
 
-              i = next_idx
-            else
-              nodes << MacroNode.new(raw_inner: raw_inner, offset: open)
-              i = close + 2
-            end
-          end
-
-          [nodes, i, nil]
-        end
-
-        def parse_if_open(normalized)
-          s = normalized.to_s
-          preserve = false
-          if s.start_with?("#")
-            preserve = true
-            s = s.delete_prefix("#").lstrip
-          end
-
-          return nil unless s.match?(/\Aif\b/i)
-
-          condition = s.sub(/\Aif\b/i, "").strip
-          { preserve_whitespace: preserve, condition: condition }
-        end
-
-        def evaluate_nodes(nodes, env, raw_content_hash:, original_once:)
-          out = +""
-
-          nodes.each do |node|
-            case node
-            when TextNode
-              out << node.text.to_s
-            when MacroNode
-              out << evaluate_macro_node(node, env, raw_content_hash: raw_content_hash, original_once: original_once)
-            when IfNode
-              out << evaluate_if_node(node, env, raw_content_hash: raw_content_hash, original_once: original_once)
-            else
-              out << node.to_s
-            end
+            out << value[:output]
+            i = value[:next_index]
           end
 
           out
         end
 
-        def evaluate_if_node(node, env, raw_content_hash:, original_once:)
-          truthy = evaluate_condition(node.condition, env)
-          chosen = truthy ? node.then_nodes : node.else_nodes
+        def evaluate_macro(str, open:, close:, raw_inner:, raw_original:, env:, raw_content_hash:, original_once:, context_offset:)
+          inner_start = open + 2
+          global_offset = context_offset + open
 
-          rendered = evaluate_nodes(chosen, env, raw_content_hash: raw_content_hash, original_once: original_once)
-          node.preserve_whitespace == true ? rendered : rendered.strip
-        end
+          variable = evaluate_variable_expr(
+            raw_inner,
+            env,
+            raw_content_hash: raw_content_hash,
+            original_once: original_once,
+            context_offset: context_offset,
+            open: open,
+          )
+          return { output: variable, next_index: close + 2 } if variable
 
-        def evaluate_condition(expr, env)
-          s = expr.to_s.strip
-          return false if s.empty?
+          info = parse_macro_inner(raw_inner)
+          return { output: raw_original, next_index: close + 2 } if info.nil?
 
-          if s.start_with?(".")
-            truthy_value(env.respond_to?(:get_var) ? env.get_var(s.delete_prefix("."), scope: :local) : nil)
-          elsif s.start_with?("$")
-            truthy_value(env.respond_to?(:get_var) ? env.get_var(s.delete_prefix("$"), scope: :global) : nil)
-          else
-            truthy_value(s)
+          key = info[:key]
+          name = info[:name]
+          flags = info[:flags]
+          arg_spans = info[:args]
+
+          if flags.closing_block?
+            return { output: raw_original, next_index: close + 2 }
           end
-        end
 
-        def truthy_value(value)
-          case value
-          when nil then false
-          when true then true
-          when false then false
-          else
-            s = value.to_s.strip
-            return false if s.empty?
-            return false if s.casecmp("false").zero?
-            return false if s == "0"
-
-            true
+          # Dynamic macros: only match argless, non-scoped `{{name}}`.
+          if arg_spans.empty? && env.respond_to?(:dynamic_macros)
+            dyn = env.dynamic_macros
+            if dyn.is_a?(Hash)
+              dyn_value = lookup_dynamic(dyn, key)
+              if dyn_value
+                value = dyn_value.respond_to?(:call) ? dyn_value.call : dyn_value
+                return { output: normalize_value(value), next_index: close + 2 }
+              end
+            end
           end
+
+          defn = @registry.respond_to?(:get) ? @registry.get(key) : nil
+          can_scope = defn.nil? ? true : defn.accepts_scoped_content?(arg_spans.length)
+
+          if can_scope
+            closing = find_matching_closing(str, close + 2, key)
+            if closing
+              if defn.nil?
+                raw = str[open...(closing[:close] + 2)].to_s
+                return { output: (@unknown == :empty ? "" : raw), next_index: closing[:close] + 2 }
+              end
+
+              scoped_start = close + 2
+              scoped_end = closing[:open] - 1
+              raw_scoped = scoped_start > scoped_end ? "" : str[scoped_start..scoped_end].to_s
+
+              output =
+                evaluate_invocation(
+                  defn,
+                  name,
+                  key,
+                  raw_inner,
+                  flags,
+                  arg_spans,
+                  raw_scoped,
+                  raw_original,
+                  env,
+                  raw_content_hash: raw_content_hash,
+                  original_once: original_once,
+                  context_offset: context_offset,
+                  inner_start: inner_start,
+                  global_offset: global_offset,
+                  open: open,
+                  close: close,
+                  scoped_start: scoped_start,
+                  scoped: true,
+                )
+
+              return { output: output, next_index: closing[:close] + 2 }
+            end
+          end
+
+          if defn.nil?
+            # Unknown macro: best-effort tolerance.
+            return { output: (@unknown == :empty ? "" : raw_original), next_index: close + 2 }
+          end
+
+          output =
+            evaluate_invocation(
+              defn,
+              name,
+              key,
+              raw_inner,
+              flags,
+              arg_spans,
+              nil,
+              raw_original,
+              env,
+              raw_content_hash: raw_content_hash,
+              original_once: original_once,
+              context_offset: context_offset,
+              inner_start: inner_start,
+              global_offset: global_offset,
+              open: open,
+              close: close,
+              scoped_start: nil,
+              scoped: false,
+            )
+
+          { output: output, next_index: close + 2 }
         end
 
-        def evaluate_macro_node(node, env, raw_content_hash:, original_once:)
-          fallback = "{{#{node.raw_inner}}}"
-          variable_out = evaluate_variable_shorthand(node.raw_inner, env)
-          return variable_out unless variable_out.nil?
+        def evaluate_invocation(
+          defn,
+          name,
+          key,
+          raw_inner,
+          flags,
+          arg_spans,
+          raw_scoped,
+          raw_original,
+          env,
+          raw_content_hash:,
+          original_once:,
+          context_offset:,
+          inner_start:,
+          global_offset:,
+          open:,
+          close:,
+          scoped_start:,
+          scoped:
+        )
+          delay = defn.respond_to?(:delay_arg_resolution?) && defn.delay_arg_resolution?
 
-          inv = parse_invocation(node.raw_inner, env, raw_content_hash, node.offset)
-          return fallback if inv.nil?
+          args = []
+          raw_args = []
 
-          replaced = evaluate_invocation(inv, fallback: fallback, original_once: original_once)
-          replaced.nil? ? fallback : replaced.to_s
+          arg_spans.each do |span|
+            raw = span.raw.to_s
+            raw_args << raw
+
+            if delay
+              args << raw.strip
+            else
+              arg_offset = context_offset + inner_start + span.start_offset.to_i
+              args << evaluate_content(raw, env, raw_content_hash: raw_content_hash, original_once: original_once, context_offset: arg_offset)
+            end
+          end
+
+          if scoped
+            raw_scoped_text = raw_scoped.to_s
+            raw_args << raw_scoped_text
+
+            if delay
+              args << raw_scoped_text
+            else
+              scoped_value =
+                evaluate_content(
+                  raw_scoped_text,
+                  env,
+                  raw_content_hash: raw_content_hash,
+                  original_once: original_once,
+                  context_offset: context_offset + scoped_start.to_i,
+                )
+
+              scoped_value = trim_scoped_content(scoped_value) unless flags.preserve_whitespace?
+              args << scoped_value
+            end
+          end
+
+          if key == "original"
+            return original_once ? original_once.call : ""
+          end
+
+          resolver = lambda do |text, offset_delta: 0|
+            evaluate_content(
+              text.to_s,
+              env,
+              raw_content_hash: raw_content_hash,
+              original_once: original_once,
+              context_offset: global_offset + offset_delta.to_i,
+            )
+          end
+
+          trimmer = lambda do |content, trim_indent: true|
+            trim_scoped_content(content, trim_indent: trim_indent == true)
+          end
+
+          warner = lambda do |message|
+            env.warn(message) if env.respond_to?(:warn)
+          end
+
+          inv = Invocation.new(
+            raw_inner: raw_inner.to_s.strip,
+            key: key,
+            name: key.to_sym,
+            args: args,
+            raw_args: raw_args,
+            flags: flags,
+            is_scoped: scoped == true,
+            range: { start_offset: open, end_offset: close + 1 },
+            offset: global_offset,
+            raw_content_hash: raw_content_hash,
+            environment: env,
+            resolver: resolver,
+            trimmer: trimmer,
+            warner: warner,
+          )
+
+          handler = defn.handler
+          value =
+            if handler.is_a?(Proc) && handler.arity == 0
+              handler.call
+            else
+              handler.call(inv)
+            end
+
+          post_process(env, value, fallback: raw_original)
+        rescue TavernKit::SillyTavern::MacroError => e
+          env.warn(e.message) if env.respond_to?(:warn)
+          raw_original.to_s
         end
 
-        def evaluate_variable_shorthand(raw_inner, env)
-          s = raw_inner.to_s.strip
-          return nil unless s.start_with?(".", "$")
+        def find_matching_closing(text, start_idx, target_key)
+          depth = 1
+          i = start_idx.to_i
+          str = text.to_s
 
-          m = s.match(/\A(?<scope>[.$])(?<name>[A-Za-z0-9_]+)\s*(?<op>\+\=|=|\+\+|--)?\s*(?<rest>.*)\z/)
+          while i < str.length
+            open = str.index("{{", i)
+            return nil if open.nil?
+
+            close = str.index("}}", open + 2)
+            return nil if close.nil?
+
+            inner = str[(open + 2)...close].to_s
+            info = parse_macro_inner(inner)
+            if info
+              key = info[:key]
+              if key == target_key
+                if info[:flags].closing_block?
+                  depth -= 1
+                  return { open: open, close: close } if depth.zero?
+                else
+                  defn = @registry.respond_to?(:get) ? @registry.get(key) : nil
+                  depth += 1 if defn.nil? || defn.accepts_scoped_content?(info[:args].length)
+                end
+              end
+            end
+
+            i = close + 2
+          end
+
+          nil
+        end
+
+        def parse_macro_inner(raw_inner)
+          s = raw_inner.to_s
+          len = s.length
+          i = 0
+
+          i += 1 while i < len && whitespace?(s.getbyte(i))
+          return nil if i >= len
+
+          # Special-case comment closing tag: {{///}}.
+          if s.getbyte(i) == "/".ord && s[i, 3] == "///"
+            rest = s[(i + 3)..].to_s
+            if rest.strip.empty?
+              return {
+                name: "//",
+                key: "//",
+                flags: Flags.parse(["/"]),
+                args: [],
+              }
+            end
+          end
+
+          # Special-case comment macro identifier: {{// ...}}.
+          if s[i, 2] == "//"
+            name = "//"
+            key = "//"
+            args, = parse_args(s, i + 2)
+            return { name: name, key: key, flags: Flags.empty, args: args }
+          end
+
+          flags_symbols = []
+          loop do
+            i += 1 while i < len && whitespace?(s.getbyte(i))
+            break if i >= len
+
+            ch = s.getbyte(i)
+            break unless flag_byte?(ch)
+
+            flags_symbols << ch.chr
+            i += 1
+          end
+
+          flags = Flags.parse(flags_symbols)
+
+          i += 1 while i < len && whitespace?(s.getbyte(i))
+          return nil if i >= len
+
+          name_start = i
+          while i < len
+            break if whitespace?(s.getbyte(i))
+            break if s.getbyte(i) == ":".ord && s.getbyte(i + 1) == ":".ord
+
+            i += 1
+          end
+
+          name = s[name_start...i].to_s.strip
+          return nil if name.empty?
+
+          args, = parse_args(s, i)
+          { name: name, key: name.downcase, flags: flags, args: args }
+        end
+
+        def parse_args(raw_inner, start_idx)
+          s = raw_inner.to_s
+          len = s.length
+          i = start_idx.to_i
+
+          i += 1 while i < len && whitespace?(s.getbyte(i))
+          if s.getbyte(i) == ":".ord && s.getbyte(i + 1) == ":".ord
+            i += 2
+          end
+
+          spans = []
+          i += 1 while i < len && whitespace?(s.getbyte(i))
+          return [spans, i] if i >= len
+
+          rest = s[i..].to_s
+          if rest.include?("::")
+            while i < len
+              delim = s.index("::", i)
+              seg_end = delim.nil? ? len : delim
+
+              left = i
+              left += 1 while left < seg_end && whitespace?(s.getbyte(left))
+              right = seg_end
+              right -= 1 while right > left && whitespace?(s.getbyte(right - 1))
+
+              spans << ArgSpan.new(raw: s[left...right], start_offset: left, end_offset: right - 1)
+
+              break if delim.nil?
+
+              i = delim + 2
+              i += 1 while i < len && whitespace?(s.getbyte(i))
+            end
+          else
+            left = i
+            right = len
+            left += 1 while left < right && whitespace?(s.getbyte(left))
+            right -= 1 while right > left && whitespace?(s.getbyte(right - 1))
+
+            spans << ArgSpan.new(raw: s[left...right], start_offset: left, end_offset: right - 1)
+          end
+
+          [spans, i]
+        end
+
+        def evaluate_variable_expr(raw_inner, env, raw_content_hash:, original_once:, context_offset:, open:)
+          s = raw_inner.to_s
+          first_non_ws = s.index(/\S/)
+          return nil unless first_non_ws
+
+          expr = s[first_non_ws..].to_s
+          return nil unless expr.start_with?(".", "$")
+
+          m = expr.match(VAR_EXPR_PATTERN)
           return nil unless m
 
           scope = m[:scope] == "$" ? :global : :local
           name = m[:name].to_s
           op = m[:op]
-          rest = m[:rest].to_s.strip
+          value_raw = m[:value].to_s
 
-          return nil unless env.respond_to?(:get_var) && env.respond_to?(:set_var)
+          return nil unless env.respond_to?(:get_var) && env.respond_to?(:set_var) && env.respond_to?(:has_var?)
+
+          value_start_in_inner = first_non_ws + (m.begin(:value) || 0)
+          value_context_offset = context_offset + open + 2 + value_start_in_inner
+
+          lazy_value = build_lazy_value(
+            env,
+            value_raw,
+            raw_content_hash: raw_content_hash,
+            original_once: original_once,
+            context_offset: value_context_offset,
+          )
+
+          vars_get = -> { env.get_var(name, scope: scope) }
+          vars_set = ->(v) { env.set_var(name, v, scope: scope) }
+          vars_has = -> { env.has_var?(name, scope: scope) }
 
           case op
           when nil
-            normalize_value(env.get_var(name, scope: scope))
-          when "+="
-            apply_var_add(env, name, scope: scope, value: rest)
+            normalize_value(vars_get.call)
           when "="
-            env.set_var(name, rest, scope: scope)
+            vars_set.call(lazy_value.call)
             ""
+          when "++"
+            current = coerce_number(vars_get.call) || 0
+            next_val = current + 1
+            vars_set.call(next_val)
+            normalize_value(next_val)
+          when "--"
+            current = coerce_number(vars_get.call) || 0
+            next_val = current - 1
+            vars_set.call(next_val)
+            normalize_value(next_val)
+          when "+="
+            apply_var_add(env, name, scope: scope, value: lazy_value.call)
+            ""
+          when "-="
+            apply_var_sub(env, name, scope: scope, value: lazy_value.call)
+            ""
+          when "||"
+            current = vars_get.call
+            falsy?(current) ? normalize_value(lazy_value.call) : normalize_value(current)
+          when "??"
+            vars_has.call ? normalize_value(vars_get.call) : normalize_value(lazy_value.call)
+          when "||="
+            current = vars_get.call
+            if falsy?(current)
+              vars_set.call(lazy_value.call)
+              normalize_value(lazy_value.call)
+            else
+              normalize_value(current)
+            end
+          when "??="
+            if !vars_has.call
+              vars_set.call(lazy_value.call)
+              normalize_value(lazy_value.call)
+            else
+              normalize_value(vars_get.call)
+            end
+          when "=="
+            normalize_value(vars_get.call) == normalize_value(lazy_value.call) ? "true" : "false"
+          when "!="
+            normalize_value(vars_get.call) != normalize_value(lazy_value.call) ? "true" : "false"
+          when ">", ">=", "<", "<="
+            left = coerce_number(vars_get.call)
+            right = coerce_number(lazy_value.call)
+            if left.nil? || right.nil?
+              env.warn(%(Variable shorthand "#{op}" operator requires numeric values.)) if env.respond_to?(:warn)
+              "false"
+            else
+              compare_numbers(op, left, right) ? "true" : "false"
+            end
           else
             nil
           end
         rescue StandardError
           nil
+        end
+
+        def build_lazy_value(env, raw, raw_content_hash:, original_once:, context_offset:)
+          resolved = false
+          cached = nil
+
+          lambda do
+            unless resolved
+              cached =
+                evaluate_content(
+                  raw.to_s.strip,
+                  env,
+                  raw_content_hash: raw_content_hash,
+                  original_once: original_once,
+                  context_offset: context_offset.to_i,
+                ).strip
+              resolved = true
+            end
+            cached
+          end
+        end
+
+        def compare_numbers(op, left, right)
+          case op
+          when ">" then left > right
+          when ">=" then left >= right
+          when "<" then left < right
+          when "<=" then left <= right
+          else false
+          end
         end
 
         def apply_var_add(env, name, scope:, value:)
@@ -227,11 +592,22 @@ module TavernKit
 
           if !rhs_num.nil? && (current.nil? || !cur_num.nil?)
             env.set_var(name, (cur_num || 0) + rhs_num, scope: scope)
-            return ""
+          else
+            env.set_var(name, "#{current}#{value}", scope: scope)
+          end
+        end
+
+        def apply_var_sub(env, name, scope:, value:)
+          current = env.get_var(name, scope: scope)
+          rhs_num = coerce_number(value)
+          cur_num = coerce_number(current)
+
+          if rhs_num.nil? || cur_num.nil?
+            env.warn(%(Variable shorthand "-=" operator requires a numeric value.)) if env.respond_to?(:warn)
+            return
           end
 
-          env.set_var(name, "#{current}#{value}", scope: scope)
-          ""
+          env.set_var(name, cur_num - rhs_num, scope: scope)
         end
 
         def coerce_number(value)
@@ -240,85 +616,92 @@ module TavernKit
           s = value.to_s.strip
           return nil if s.empty?
 
-          Integer(s)
-        rescue ArgumentError
-          Float(s)
-        rescue StandardError
+          if s.match?(/\A[-+]?\d+\z/)
+            Integer(s, 10)
+          else
+            Float(s)
+          end
+        rescue ArgumentError, TypeError
           nil
         end
 
-        def parse_invocation(inner, env, raw_content_hash, offset)
-          s = inner.to_s.strip
-          return nil if s.empty?
-
-          # Closing tags belong to scoped macros.
-          return nil if s.start_with?("/")
-
-          name, args = parse_name_and_args(s)
-          return nil if name.nil? || name.empty?
-
-          key = name.downcase
-          Invocation.new(
-            raw_inner: s,
-            key: key,
-            name: key.to_sym,
-            args: args,
-            raw_args: Array(args).dup,
-            flags: Flags.empty,
-            is_scoped: false,
-            range: nil,
-            offset: offset,
-            raw_content_hash: raw_content_hash,
-            environment: env,
-          )
+        def falsy?(value)
+          s = normalize_value(value).strip.downcase
+          s.empty? || %w[off false 0].include?(s)
         end
 
-        def parse_name_and_args(inner)
-          if inner.include?("::")
-            parts = inner.split("::", -1).map(&:to_s)
-            name = parts.shift.to_s.strip
-            args = parts.map { |p| p.to_s }
-            [name, args.empty? ? nil : args]
+        def post_process(env, value, fallback:)
+          if env.respond_to?(:post_process)
+            env.post_process.call(value)
           else
-            name, rest = inner.split(/\s+/, 2)
-            name = name.to_s.strip
-            args = rest.nil? ? nil : [rest.to_s]
-            [name, args]
-          end
-        end
-
-        def evaluate_invocation(inv, fallback:, original_once:)
-          if inv.key == "original"
-            return original_once ? original_once.call : ""
-          end
-
-          # Dynamic macros: only match argless `{{name}}`.
-          if (inv.args.nil? || inv.args == []) && inv.environment.respond_to?(:dynamic_macros)
-            dyn = inv.environment.dynamic_macros
-            if dyn.is_a?(Hash)
-              if dyn.key?(inv.key)
-                return normalize_value(dyn[inv.key])
-              end
-              if dyn.key?(inv.key.to_s)
-                return normalize_value(dyn[inv.key.to_s])
-              end
-              if dyn.key?(inv.key.to_sym)
-                return normalize_value(dyn[inv.key.to_sym])
-              end
-            end
-          end
-
-          defn = @registry.respond_to?(:get) ? @registry.get(inv.key) : nil
-          return nil unless defn
-
-          handler = defn.handler
-          if handler.is_a?(Proc) && handler.arity == 0
-            normalize_value(handler.call)
-          else
-            normalize_value(handler.call(inv))
+            value.to_s
           end
         rescue StandardError
           fallback.to_s
+        end
+
+        def trim_scoped_content(text, trim_indent: true)
+          s = text.to_s
+          return "" if s.empty?
+
+          normalized = s.gsub("\r\n", "\n")
+          stripped = normalized.strip
+          return "" if stripped.empty?
+
+          return stripped unless trim_indent == true
+
+          lines = stripped.split("\n", -1)
+          indents =
+            lines.filter_map do |line|
+              next nil if line.strip.empty?
+
+              line[/\A[ \t]*/].to_s.length
+            end
+
+          min_indent = indents.min || 0
+          return stripped if min_indent.zero?
+
+          lines.map { |line| line.start_with?(" " * min_indent) ? line[min_indent..] : line }.join("\n")
+        end
+
+        def lookup_dynamic(hash, key)
+          return hash[key] if hash.key?(key)
+          return hash[key.to_s] if hash.key?(key.to_s)
+          return hash[key.to_sym] if hash.key?(key.to_sym)
+
+          down = key.to_s.downcase
+          return hash[down] if hash.key?(down)
+
+          nil
+        end
+
+        def whitespace?(byte)
+          byte == 32 || byte == 9 || byte == 10 || byte == 13
+        end
+
+        def flag_byte?(byte)
+          case byte
+          when "!".ord, "?".ord, "~".ord, ">".ord, "/".ord, "#".ord then true
+          else false
+          end
+        end
+
+        def normalize_value(value)
+          case value
+          when Numeric
+            return value.to_s if value.is_a?(Integer)
+
+            f = value.to_f
+            return f.to_i.to_s if f.finite? && (f % 1).zero?
+
+            f.to_s
+          when nil then ""
+          when TrueClass then "true"
+          when FalseClass then "false"
+          else value.to_s
+          end
+        rescue StandardError
+          ""
         end
 
         def build_original_once(env)
@@ -334,17 +717,6 @@ module TavernKit
             used = true
             original.to_s
           end
-        end
-
-        def normalize_value(value)
-          case value
-          when nil then ""
-          when TrueClass then "true"
-          when FalseClass then "false"
-          else value.to_s
-          end
-        rescue StandardError
-          ""
         end
 
         def remove_unresolved_placeholders(str)

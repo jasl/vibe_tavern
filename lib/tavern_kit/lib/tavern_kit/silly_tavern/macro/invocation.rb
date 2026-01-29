@@ -25,6 +25,9 @@ module TavernKit
         :offset,
         :raw_content_hash,
         :environment,
+        :resolver,
+        :trimmer,
+        :warner,
       ) do
         def global_offset = offset
 
@@ -32,6 +35,30 @@ module TavernKit
           "{{#{raw_inner}}}"
         rescue StandardError
           ""
+        end
+
+        def resolve(text, offset_delta: 0)
+          return text.to_s unless resolver.respond_to?(:call)
+
+          resolver.call(text.to_s, offset_delta: offset_delta.to_i)
+        end
+
+        def trim_content(content, trim_indent: true)
+          return content.to_s unless trimmer.respond_to?(:call)
+
+          trimmer.call(content.to_s, trim_indent: trim_indent == true)
+        end
+
+        def warn(message)
+          msg = message.to_s
+
+          if warner.respond_to?(:call)
+            warner.call(msg)
+          elsif environment.respond_to?(:warn)
+            environment.warn(msg)
+          end
+
+          nil
         end
 
         def now

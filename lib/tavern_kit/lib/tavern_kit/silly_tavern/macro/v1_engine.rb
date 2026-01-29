@@ -90,6 +90,9 @@ module TavernKit
                 offset: offset,
                 raw_content_hash: raw_content_hash,
                 environment: env,
+                resolver: nil,
+                trimmer: nil,
+                warner: nil,
               )
 
               replaced = evaluate_value(value, inv)
@@ -127,6 +130,9 @@ module TavernKit
               offset: offset,
               raw_content_hash: raw_content_hash,
               environment: env,
+              resolver: nil,
+              trimmer: nil,
+              warner: nil,
             )
 
             value =
@@ -154,6 +160,9 @@ module TavernKit
               offset: offset,
               raw_content_hash: raw_content_hash,
               environment: env,
+              resolver: nil,
+              trimmer: nil,
+              warner: nil,
             )
 
             list = inv.split_list
@@ -177,6 +186,9 @@ module TavernKit
               offset: offset,
               raw_content_hash: raw_content_hash,
               environment: env,
+              resolver: nil,
+              trimmer: nil,
+              warner: nil,
             )
 
             list = inv.split_list
@@ -397,6 +409,9 @@ module TavernKit
               offset: offset,
               raw_content_hash: raw_content_hash,
               environment: env,
+              resolver: nil,
+              trimmer: nil,
+              warner: nil,
             )
 
             rolled = roll_dice(formula, rng: inv.rng_or_new)

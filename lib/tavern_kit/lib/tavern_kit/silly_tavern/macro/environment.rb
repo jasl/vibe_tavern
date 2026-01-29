@@ -11,7 +11,8 @@ module TavernKit
       # callers provide Character/User + variable storage, and optionally
       # additional dynamic macros via `extensions`.
       class Environment < TavernKit::Macro::Environment::Base
-        attr_reader :character, :user, :variables, :outlets, :original, :clock, :rng, :content_hash, :extensions, :post_process, :platform_attrs
+        attr_reader :character, :user, :variables, :outlets, :original, :clock, :rng, :content_hash, :extensions
+        attr_reader :post_process, :platform_attrs, :warning_handler, :warnings
 
         def initialize(
           character: nil,
@@ -29,6 +30,9 @@ module TavernKit
           group_name: nil,
           extensions: {},
           post_process: nil,
+          warning_handler: nil,
+          strict: false,
+          warnings: nil,
           **platform_attrs
         )
           @character = character
@@ -57,6 +61,10 @@ module TavernKit
           @extensions = extensions.is_a?(Hash) ? TavernKit::Utils.deep_stringify_keys(extensions) : {}
           @platform_attrs = TavernKit::Utils.deep_stringify_keys(platform_attrs.is_a?(Hash) ? platform_attrs : {})
 
+          @warning_handler = warning_handler
+          @strict = strict == true
+          @warnings = warnings.is_a?(Array) ? warnings : []
+
           @post_process =
             if post_process.respond_to?(:call)
               post_process
@@ -65,6 +73,19 @@ module TavernKit
             end
 
           seed_variables(locals: locals, globals: globals)
+        end
+
+        def strict? = @strict == true
+
+        def warn(message)
+          msg = message.to_s
+          warnings << msg
+
+          raise TavernKit::StrictModeError, msg if strict?
+
+          warning_handler.call(msg) if warning_handler.respond_to?(:call)
+
+          nil
         end
 
         def character_name
