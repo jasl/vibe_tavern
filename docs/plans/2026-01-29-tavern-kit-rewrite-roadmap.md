@@ -468,7 +468,7 @@ Stopping strings assembled from 4 sources (macro substitution via injected expan
 **SillyTavern engine implementations.**
 
 Scope updated after ST v1.15.0 source alignment
-(see `docs/rewrite/st-alignment-delta-v1.15.0.md`).
+(see `docs/rewrite/st-alignment-delta-v1.15.0.md` -- `resources/SillyTavern` on `staging` @ `bba43f33219e41de7331b61f6872f5c7227503a3`).
 
 #### 3a. Lore / World Info Engine
 

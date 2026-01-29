@@ -1,8 +1,8 @@
 # SillyTavern Alignment Delta -- v1.15.0
 
-Date: 2026-01-29
+Date: 2026-01-29 (updated after switching `resources/SillyTavern` to `staging`)
 
-Reference: `resources/SillyTavern/` (vendored, v1.15.0)
+Reference: `resources/SillyTavern/` (vendored, `staging` @ `bba43f33219e41de7331b61f6872f5c7227503a3`, version `1.15.0`)
 Compared against: `resources/tavern_kit/docs/` (old alignment docs, also referencing v1.15.0)
 
 ## Purpose
