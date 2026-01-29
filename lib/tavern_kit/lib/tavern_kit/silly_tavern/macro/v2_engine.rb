@@ -14,9 +14,13 @@ module TavernKit
       # - macro flags: {{#if ...}} preserve whitespace
       # - typed args, list args, shorthand operators
       #
-      # For now this is a small scaffold that runs preprocessors (legacy markers)
-      # so downstream systems can safely adopt the V2Engine entrypoint early.
+      # The implementation grows with characterization tests to avoid drifting
+      # from real ST behavior.
       class V2Engine < TavernKit::Macro::Engine::Base
+        TextNode = Data.define(:text)
+        MacroNode = Data.define(:raw_inner, :offset)
+        IfNode = Data.define(:condition, :preserve_whitespace, :then_nodes, :else_nodes)
+
         UNKNOWN_POLICIES = %i[keep empty].freeze
 
         def initialize(registry: Packs::SillyTavern.default_registry, unknown: :keep)
@@ -35,7 +39,10 @@ module TavernKit
           return str if str.empty?
 
           preprocessed = Preprocessors.preprocess(str, environment: environment)
-          out = expand_macros(preprocessed, environment)
+          raw_content_hash = Invocation.stable_hash(preprocessed)
+
+          nodes = parse_template(preprocessed)
+          out = evaluate_nodes(nodes, environment, raw_content_hash: raw_content_hash)
 
           out = remove_unresolved_placeholders(out) if @unknown == :empty
           out
@@ -43,28 +50,147 @@ module TavernKit
 
         private
 
-        def expand_macros(str, env)
-          return str if str.empty?
+        def parse_template(str)
+          nodes, = parse_nodes(str, 0, terminators: nil)
+          nodes
+        end
 
-          raw_content_hash = Invocation.stable_hash(str)
+        def parse_nodes(str, start_idx, terminators:)
+          nodes = []
+          i = start_idx
 
-          str.gsub(/\{\{([^{}]*?)\}\}/m) do |match|
-            offset = Regexp.last_match.begin(0) || 0
-            inner = Regexp.last_match(1).to_s
+          while i < str.length
+            open = str.index("{{", i)
+            if open.nil?
+              tail = str[i..]
+              nodes << TextNode.new(text: tail) if tail && !tail.empty?
+              return [nodes, str.length, nil]
+            end
 
-            inv = parse_invocation(inner, env, raw_content_hash, offset)
-            next match if inv.nil?
+            nodes << TextNode.new(text: str[i...open]) if open > i
 
-            replaced = evaluate_invocation(inv, fallback: match)
-            replaced.nil? ? match : replaced.to_s
+            close = str.index("}}", open + 2)
+            if close.nil?
+              nodes << TextNode.new(text: str[open..])
+              return [nodes, str.length, nil]
+            end
+
+            raw_inner = str[(open + 2)...close].to_s
+            normalized = raw_inner.strip
+            key = normalized.downcase
+
+            if terminators && terminators.include?(key)
+              return [nodes, close + 2, key]
+            end
+
+            if_info = parse_if_open(normalized)
+            if if_info
+              then_nodes, next_idx, term = parse_nodes(str, close + 2, terminators: %w[else /if])
+              else_nodes = []
+              if term == "else"
+                else_nodes, next_idx, = parse_nodes(str, next_idx, terminators: %w[/if])
+              end
+
+              nodes << IfNode.new(
+                condition: if_info[:condition],
+                preserve_whitespace: if_info[:preserve_whitespace],
+                then_nodes: then_nodes,
+                else_nodes: else_nodes,
+              )
+
+              i = next_idx
+            else
+              nodes << MacroNode.new(raw_inner: raw_inner, offset: open)
+              i = close + 2
+            end
           end
+
+          [nodes, i, nil]
+        end
+
+        def parse_if_open(normalized)
+          s = normalized.to_s
+          preserve = false
+          if s.start_with?("#")
+            preserve = true
+            s = s.delete_prefix("#").lstrip
+          end
+
+          return nil unless s.match?(/\Aif\b/i)
+
+          condition = s.sub(/\Aif\b/i, "").strip
+          { preserve_whitespace: preserve, condition: condition }
+        end
+
+        def evaluate_nodes(nodes, env, raw_content_hash:)
+          out = +""
+
+          nodes.each do |node|
+            case node
+            when TextNode
+              out << node.text.to_s
+            when MacroNode
+              out << evaluate_macro_node(node, env, raw_content_hash: raw_content_hash)
+            when IfNode
+              out << evaluate_if_node(node, env, raw_content_hash: raw_content_hash)
+            else
+              out << node.to_s
+            end
+          end
+
+          out
+        end
+
+        def evaluate_if_node(node, env, raw_content_hash:)
+          truthy = evaluate_condition(node.condition, env)
+          chosen = truthy ? node.then_nodes : node.else_nodes
+
+          rendered = evaluate_nodes(chosen, env, raw_content_hash: raw_content_hash)
+          node.preserve_whitespace == true ? rendered : rendered.strip
+        end
+
+        def evaluate_condition(expr, env)
+          s = expr.to_s.strip
+          return false if s.empty?
+
+          if s.start_with?(".")
+            truthy_value(env.respond_to?(:get_var) ? env.get_var(s.delete_prefix("."), scope: :local) : nil)
+          elsif s.start_with?("$")
+            truthy_value(env.respond_to?(:get_var) ? env.get_var(s.delete_prefix("$"), scope: :global) : nil)
+          else
+            truthy_value(s)
+          end
+        end
+
+        def truthy_value(value)
+          case value
+          when nil then false
+          when true then true
+          when false then false
+          else
+            s = value.to_s.strip
+            return false if s.empty?
+            return false if s.casecmp("false").zero?
+            return false if s == "0"
+
+            true
+          end
+        end
+
+        def evaluate_macro_node(node, env, raw_content_hash:)
+          fallback = "{{#{node.raw_inner}}}"
+          inv = parse_invocation(node.raw_inner, env, raw_content_hash, node.offset)
+          return fallback if inv.nil?
+
+          replaced = evaluate_invocation(inv, fallback: fallback)
+          replaced.nil? ? fallback : replaced.to_s
         end
 
         def parse_invocation(inner, env, raw_content_hash, offset)
           s = inner.to_s.strip
           return nil if s.empty?
 
-          # Closing tags belong to scoped macros (not implemented yet).
+          # Closing tags belong to scoped macros.
           return nil if s.start_with?("/")
 
           name, args = parse_name_and_args(s)

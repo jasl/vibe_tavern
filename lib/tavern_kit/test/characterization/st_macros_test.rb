@@ -25,8 +25,6 @@ class StMacrosTest < Minitest::Test
   end
 
   def test_if_else_scoped_macro
-    pending!("Scoped if/else with preserveWhitespace flag")
-
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
 
     template = "{{if .flag}}YES{{else}}NO{{/if}}"

@@ -17,6 +17,8 @@ module TavernKit
           character: nil,
           user: nil,
           variables: TavernKit::ChatVariables::InMemory.new,
+          locals: nil,
+          globals: nil,
           outlets: {},
           original: nil,
           clock: nil,
@@ -57,6 +59,8 @@ module TavernKit
             else
               ->(s) { s.to_s }
             end
+
+          seed_variables(locals: locals, globals: globals)
         end
 
         def character_name
@@ -116,6 +120,20 @@ module TavernKit
         end
 
         def dynamic_macros = extensions
+
+        private
+
+        def seed_variables(locals:, globals:)
+          return unless variables.respond_to?(:set)
+
+          if locals.is_a?(Hash)
+            locals.each { |k, v| variables.set(k.to_s, v, scope: :local) }
+          end
+
+          if globals.is_a?(Hash)
+            globals.each { |k, v| variables.set(k.to_s, v, scope: :global) }
+          end
+        end
       end
     end
   end
