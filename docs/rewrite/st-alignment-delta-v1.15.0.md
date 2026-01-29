@@ -681,6 +681,12 @@ Placeholders (all conditionally injected):
 - `{{wiBefore}}` / `{{wiAfter}}` -- World Info before/after positions
 - `{{anchorBefore}}` / `{{anchorAfter}}` -- Author's note anchors
 
+Implementation note:
+- Some context presets include **ST macro tokens** inside `story_string` (for
+  example `{{trim}}` in `default/content/presets/context/*.json`).
+  TavernKit Wave 2 should render Handlebars blocks + known placeholders only,
+  and leave unknown `{{...}}` macros intact for Wave 3 Macro expansion.
+
 ### 8.2 Context Template Fields
 
 | Field | Default | Description |
@@ -699,7 +705,8 @@ Placeholders (all conditionally injected):
 
 **Impact:** TavernKit's `SillyTavern::ContextTemplate` (Wave 2) must implement
 Handlebars-based story string compilation with all placeholders, plus
-chat_start/example_separator with stop-string integration.
+chat_start/example_separator with stop-string integration. Macro tokens inside
+the template (e.g. `{{trim}}`) are expanded later by the Macro engine (Wave 3).
 
 ---
 

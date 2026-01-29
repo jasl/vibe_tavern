@@ -216,32 +216,28 @@ plan = TavernKit::SillyTavern.build do
 end
 ```
 
-## Current State (Wave 1 -- Complete)
+## Current State (Wave 2 -- Complete)
 
-Delivered modules (all in Core):
-- Character / CharacterCard / Character schemas (V2 + V3)
-- PNG Parser + Writer
-- Participant / User
-- Prompt basics: Pipeline (skeleton), DSL, Plan, Context, Block, Message
-- Text::PatternMatcher (plain + whole-word + JS-style regex `/.../flags`)
-- PromptEntry (partial -- condition matching needs work)
-- Coerce / Utils / Constants / Errors
+Delivered modules:
+- **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (partial), Coerce/Utils/Constants/Errors
+- **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, CharacterImporter, TrimReport, Prompt::Trace/Instrumenter
+- **SillyTavern (Wave 2):** Preset + Instruct + ContextTemplate (config/data only; middleware chain lands in Wave 4)
 
-Test status: 206 tests, 176 passing, 30 skips (characterization scaffolding).
+Test status (gem): 233 runs, 0 failures, 30 skips (characterization scaffolding).
 
 ## Gap Summary
 
 | Area | Layer | Est. LOC | Status |
 |------|-------|----------|--------|
-| Preset (60+ fields) + Instruct (24 attrs) + ContextTemplate (Handlebars) | **ST** | ~1,250 | Missing |
-| ChatHistory + ChatVariables | **Core** | ~400 | Missing |
-| TokenEstimator | **Core** | ~150 | Missing |
+| Preset (60+ fields) + Instruct (24 attrs) + ContextTemplate (Handlebars) | **ST** | ~1,250 | ✅ (Wave 2) |
+| ChatHistory + ChatVariables | **Core** | ~400 | ✅ (Wave 2) |
+| TokenEstimator | **Core** | ~150 | ✅ (Wave 2) |
 | Trimmer | **Core** | ~197 | Missing |
 | Dialects (8 formats) | **Core** | ~970 | Missing |
 | Lore Engine + DecoratorParser + TimedEffects + KeyList | **ST** | ~1,750 | Missing |
-| Lore data (Book + Entry + Result + ScanInput) | **Core** | ~830 | Missing |
+| Lore data (Book + Entry + Result + ScanInput) | **Core** | ~830 | ✅ (Wave 2) |
 | Macro (V1+V2 Engine + Registry + Packs + Env + Invocation + Phase + Flags + Preprocessors) | **ST** | ~2,500 | Missing |
-| Macro::Engine::Base + Environment::Base + Registry::Base | **Core** | ~130 | Missing |
+| Macro::Engine::Base + Environment::Base + Registry::Base | **Core** | ~130 | ✅ (Wave 2) |
 | MacroContext | **ST** | ~50 | Missing |
 | ExamplesParser + ExpanderVars | **ST** | ~260 | Missing |
 | PromptEntry enhancements | **Core** | ~243 | Partial |
@@ -334,12 +330,16 @@ These must be preserved in the SillyTavern layer:
 
 **Context Template (SillyTavern::ContextTemplate):**
 - Handlebars-based `story_string` with conditional placeholders:
-  `system`, `description`, `personality`, `scenario`, `persona`,
-  `wiBefore`, `wiAfter`, `anchorBefore`, `anchorAfter`, `char`
+  `system`, `description`, `personality`, `scenario`, `persona`, `char`, `user`,
+  `wiBefore`, `wiAfter` (`loreBefore`/`loreAfter` aliases),
+  `anchorBefore`, `anchorAfter`, `mesExamples`, `mesExamplesRaw`
 - `chat_start` and `example_separator` markers (default: `"***"`)
 - Position config: `story_string_position` (IN_PROMPT or IN_CHAT),
   `story_string_depth`, `story_string_role`
 - `use_stop_strings` flag adds markers to stopping strings
+- **Important:** `story_string` commonly contains ST macros (e.g. `{{trim}}`).
+  Wave 2 ContextTemplate renders Handlebars blocks + known placeholders only;
+  unknown `{{...}}` tokens are preserved for Wave 3 Macro expansion.
 
 **Extension Prompt Injection (SillyTavern::Middleware::Injection):**
 - `extension_prompt_types`: NONE (-1), IN_PROMPT (0), IN_CHAT (1),
@@ -364,7 +364,7 @@ These must be preserved in the SillyTavern layer:
 - Names: `"\n{name}:"` for character, user, group members
 - Instruct: all sequences if `sequences_as_stop_strings` enabled
 - Context: `chat_start` and `example_separator` if `use_stop_strings`
-- Custom: JSON array + ephemeral runtime array, macro-substituted
+- Custom: JSON array + ephemeral runtime array, **macro-substituted** (requires a macro expander)
 - Single-line mode prepends `"\n"` to all stops
 
 **Group Chat (SillyTavern::GroupContext):**
@@ -441,8 +441,8 @@ These must be preserved in the SillyTavern layer:
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
 | `SillyTavern::Preset` | ST | 60+ ST config keys (sampling, budget, prompts, templates, nudges, prefill, postfix), ST preset JSON import, `with()`, `#stopping_strings(context)` assembling 4 sources | 400-500 |
-| `SillyTavern::Instruct` | ST | Text completion formatting, 24 attributes, stop sequence assembly, names behavior (NONE/FORCE/ALWAYS), system prompt separation (`sysprompt.content`) | 300-400 |
-| `SillyTavern::ContextTemplate` | ST | Handlebars-based story_string with all placeholders (system, description, personality, scenario, persona, wiBefore/wiAfter, anchorBefore/After), chat_start, example_separator, story_string_position/depth/role, use_stop_strings | 200-250 |
+| `SillyTavern::Instruct` | ST | Text completion formatting, 24+ attributes, stop sequence assembly, names behavior (NONE/FORCE/ALWAYS). Macro substitution is supported via an injected expander (Wave 3+) | 300-400 |
+| `SillyTavern::ContextTemplate` | ST | Handlebars-based story_string with placeholders. Does **not** evaluate ST macros (e.g. `{{trim}}`) in Wave 2; unknown `{{...}}` tokens are preserved for Wave 3 Macro expansion | 200-250 |
 **Tests:**
 - Core interface compliance tests
 - Lore data structure tests (Book, Entry, Result, ScanInput)
@@ -457,9 +457,9 @@ These must be preserved in the SillyTavern layer:
 
 **Deliverable:** Core interfaces defined. Lore data structures ready for engine
 implementations. ST Preset loadable from JSON with all prompt-affecting fields.
-ContextTemplate compiles story string from Handlebars. ChatHistory::Base
-subclassable by Rails. TokenEstimator callable standalone. Stopping strings
-assembled from 4 sources.
+ContextTemplate renders Handlebars blocks and preserves ST macros for Wave 3.
+ChatHistory::Base subclassable by Rails. TokenEstimator callable standalone.
+Stopping strings assembled from 4 sources (macro substitution via injected expander).
 
 ### Wave 3 -- Content Expansion Layer
 
