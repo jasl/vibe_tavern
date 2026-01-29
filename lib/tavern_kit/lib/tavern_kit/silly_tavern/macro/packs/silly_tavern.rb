@@ -26,8 +26,23 @@ module TavernKit
           end
 
           def self.register_core_macros(registry)
-            registry.register("newline") { "\n" }
+            registry.register("newline") do |inv|
+              count = Integer(Array(inv.args).first.to_s.strip)
+              count = 1 if count <= 0
+              "\n" * count
+            rescue StandardError
+              "\n"
+            end
             registry.register("noop") { "" }
+
+            registry.register("trim") do |inv|
+              content = Array(inv.args).first
+              # Scoped trim returns its content (the engine trims by default).
+              return content.to_s if content
+
+              # Non-scoped trim returns a marker, removed by post-processing.
+              "{{trim}}"
+            end
 
             registry.register("outlet") do |inv|
               key = Array(inv.args).first.to_s.strip
@@ -89,11 +104,16 @@ module TavernKit
           end
 
           def self.register_time_macros(registry)
-            # {{time_UTC::+3}} -> "HH:MM" (24h)
-            registry.register("time_UTC") do |inv|
-              offset = extract_hours_offset(inv)
-              now = inv.now.utc.getlocal(offset * 3600)
-              now.strftime("%H:%M")
+            # {{time}} or {{time::UTC+2}}
+            registry.register("time") do |inv|
+              raw = Array(inv.args).first
+              return inv.now.strftime("%-I:%M %p") if raw.nil? || raw.to_s.strip.empty?
+
+              match = raw.to_s.strip.match(/\AUTC(?<hours>[+-]\d+)\z/i)
+              return inv.now.strftime("%-I:%M %p") unless match
+
+              offset_hours = Integer(match[:hours])
+              inv.now.utc.getlocal(offset_hours * 3600).strftime("%-I:%M %p")
             rescue StandardError
               ""
             end

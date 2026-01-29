@@ -14,38 +14,57 @@ module TavernKit
           str = text.to_s
           return str if str.empty?
 
-          str = rewrite_legacy_markers(str, environment: environment)
           str = normalize_time_utc_legacy_syntax(str)
-          cleanup_trim(str)
+          rewrite_legacy_markers(str)
         end
 
-        # ST legacy "angle bracket" markers are commonly used in prompt strings.
-        # They must be normalized before `{{...}}` macro expansion.
-        def self.rewrite_legacy_markers(text, environment:)
-          user = environment.respond_to?(:user_name) ? environment.user_name.to_s : ""
-          char = environment.respond_to?(:character_name) ? environment.character_name.to_s : ""
-          group = environment.respond_to?(:group_name) ? environment.group_name.to_s : ""
+        def self.postprocess(text, environment:)
+          return "" if text.nil?
 
+          str = text.to_s
+          return str if str.empty?
+
+          str = unescape_braces(str)
+          str = cleanup_trim(str)
+          cleanup_else_marker(str)
+        end
+
+        # Legacy "angle bracket" markers are commonly used in prompt strings.
+        #
+        # They are rewritten into their equivalent macro forms so the normal
+        # engine pipeline resolves them (and custom handlers can intercept).
+        def self.rewrite_legacy_markers(text)
           text
-            .gsub(/<USER>/i, user)
-            .gsub(/<BOT>/i, char)
-            .gsub(/<CHAR>/i, char)
-            .gsub(/<CHARIFNOTGROUP>/i, group)
-            .gsub(/<GROUP>/i, group)
+            .gsub(/<USER>/i, "{{user}}")
+            .gsub(/<BOT>/i, "{{char}}")
+            .gsub(/<CHAR>/i, "{{char}}")
+            .gsub(/<GROUP>/i, "{{group}}")
+            .gsub(/<CHARIFNOTGROUP>/i, "{{charIfNotGroup}}")
         end
 
-        # Normalize `{{time_UTC-10}}` -> `{{time_UTC::-10}}` so parsers only have to
-        # support a single argument style.
+        # Normalize `{{time_UTC-10}}` -> `{{time::UTC-10}}` so parsers only have to
+        # support a single canonical form.
         def self.normalize_time_utc_legacy_syntax(text)
-          text.gsub(/\{\{time_UTC([+-]\d+)\}\}/i) do
-            "{{time_UTC::#{Regexp.last_match(1)}}}"
+          text.gsub(/\{\{time_(UTC[+-]\d+)\}\}/i) do
+            "{{time::#{Regexp.last_match(1)}}}"
           end
         end
 
-        # `{{trim}}` is a whitespace control marker. It removes surrounding
-        # newlines and itself.
+        ELSE_MARKER = "\u0000\u001FELSE\u001F\u0000"
+
+        # Unescape braces: `\{` → `{` and `\}` → `}`.
+        def self.unescape_braces(text)
+          text.gsub(/\\([{}])/, "\\1")
+        end
+
+        # Legacy `{{trim}}` behavior removes itself and surrounding newlines in
+        # post-processing.
         def self.cleanup_trim(text)
           text.gsub(/(?:\r?\n)*\{\{trim\}\}(?:\r?\n)*/i, "")
+        end
+
+        def self.cleanup_else_marker(text)
+          text.gsub(ELSE_MARKER, "")
         end
       end
     end

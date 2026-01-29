@@ -45,6 +45,7 @@ module TavernKit
           nodes = parse_template(preprocessed)
           out = evaluate_nodes(nodes, environment, raw_content_hash: raw_content_hash, original_once: original_once)
 
+          out = Preprocessors.postprocess(out, environment: environment)
           out = remove_unresolved_placeholders(out) if @unknown == :empty
           out
         end

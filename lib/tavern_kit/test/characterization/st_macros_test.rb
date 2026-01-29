@@ -20,8 +20,13 @@ class StMacrosTest < Minitest::Test
 
   def test_time_utc_legacy_syntax
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
-    result = engine.expand("{{time_UTC-10}}", environment: TavernKit::SillyTavern::Macro::Environment.new)
-    assert_match(/\A\d{2}:\d{2}\z/, result)
+    env =
+      TavernKit::SillyTavern::Macro::Environment.new(
+        clock: -> { Time.utc(2020, 1, 1, 12, 34, 0) },
+      )
+
+    result = engine.expand("{{time_UTC-10}}", environment: env)
+    assert_equal "2:34 AM", result
   end
 
   def test_if_else_scoped_macro
