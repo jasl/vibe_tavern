@@ -55,6 +55,8 @@ require_relative "tavern_kit/prompt/dsl"
 require_relative "tavern_kit/silly_tavern/context_template"
 require_relative "tavern_kit/silly_tavern/instruct"
 require_relative "tavern_kit/silly_tavern/preset"
+require_relative "tavern_kit/silly_tavern/lore/entry_extensions"
+require_relative "tavern_kit/silly_tavern/lore/scan_input"
 
 module TavernKit
   class << self

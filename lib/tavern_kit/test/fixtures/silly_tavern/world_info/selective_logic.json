@@ -1,0 +1,69 @@
+{
+  "_comment": "World Info entries demonstrating selective logic modes (AND/NOT variants)",
+  "entries": {
+    "0": {
+      "uid": 0,
+      "key": ["magic"],
+      "keysecondary": ["spell", "wizard"],
+      "comment": "AND_ANY: magic AND (spell OR wizard)",
+      "content": "Magic with any secondary key.",
+      "constant": false,
+      "selective": true,
+      "selectiveLogic": 0,
+      "order": 100,
+      "position": 0,
+      "disable": false,
+      "probability": 100,
+      "useProbability": true,
+      "depth": 4
+    },
+    "1": {
+      "uid": 1,
+      "key": ["magic"],
+      "keysecondary": ["spell", "wizard"],
+      "comment": "AND_ALL: magic AND spell AND wizard",
+      "content": "Magic with all secondary keys required.",
+      "constant": false,
+      "selective": true,
+      "selectiveLogic": 1,
+      "order": 100,
+      "position": 0,
+      "disable": false,
+      "probability": 100,
+      "useProbability": true,
+      "depth": 4
+    },
+    "2": {
+      "uid": 2,
+      "key": ["magic"],
+      "keysecondary": ["dark", "evil"],
+      "comment": "NOT_ANY: magic AND NOT (dark OR evil)",
+      "content": "Magic but not dark or evil.",
+      "constant": false,
+      "selective": true,
+      "selectiveLogic": 2,
+      "order": 100,
+      "position": 0,
+      "disable": false,
+      "probability": 100,
+      "useProbability": true,
+      "depth": 4
+    },
+    "3": {
+      "uid": 3,
+      "key": ["magic"],
+      "keysecondary": ["dark", "evil"],
+      "comment": "NOT_ALL: magic AND NOT (dark AND evil)",
+      "content": "Magic unless both dark and evil present.",
+      "constant": false,
+      "selective": true,
+      "selectiveLogic": 3,
+      "order": 100,
+      "position": 0,
+      "disable": false,
+      "probability": 100,
+      "useProbability": true,
+      "depth": 4
+    }
+  }
+}
