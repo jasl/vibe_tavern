@@ -25,6 +25,21 @@ require_relative "tavern_kit/chat_variables/in_memory"
 require_relative "tavern_kit/token_estimator"
 require_relative "tavern_kit/trim_report"
 
+require_relative "tavern_kit/preset/base"
+
+require_relative "tavern_kit/macro/engine/base"
+require_relative "tavern_kit/macro/environment/base"
+require_relative "tavern_kit/macro/registry/base"
+
+require_relative "tavern_kit/lore/scan_input"
+require_relative "tavern_kit/lore/entry"
+require_relative "tavern_kit/lore/book"
+require_relative "tavern_kit/lore/result"
+require_relative "tavern_kit/lore/engine/base"
+
+require_relative "tavern_kit/hook_registry/base"
+require_relative "tavern_kit/injection_registry/base"
+
 require_relative "tavern_kit/prompt/message"
 require_relative "tavern_kit/prompt/block"
 require_relative "tavern_kit/prompt/prompt_entry"
