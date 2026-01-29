@@ -27,7 +27,31 @@ class TavernKit::SillyTavern::Lore::EntryExtensionsTest < Minitest::Test
     assert ext.triggered_by?(:continue)
 
     assert ext.use_probability?
+    assert_equal 100, ext.probability
     assert_nil ext.outlet_name
+
+    assert_equal 4, ext.depth
+    assert_equal :system, ext.role
+
+    assert_equal :and_any, ext.selective_logic
+
+    refute ext.ignore_budget?
+    refute ext.exclude_recursion?
+    refute ext.prevent_recursion?
+    refute ext.delay_until_recursion?
+
+    assert_nil ext.scan_depth
+    assert_nil ext.match_whole_words
+
+    assert_nil ext.sticky
+    assert_nil ext.cooldown
+    assert_nil ext.delay
+
+    assert_nil ext.group
+    assert_equal [], ext.group_names
+    refute ext.group_override?
+    assert_equal 100, ext.group_weight
+    assert_nil ext.use_group_scoring
   end
 
   def test_reads_camel_case_and_snake_case_keys_from_extensions
@@ -41,17 +65,54 @@ class TavernKit::SillyTavern::Lore::EntryExtensionsTest < Minitest::Test
         "characterFilterExclude" => false,
         "triggers" => ["normal", "continue"],
         "useProbability" => false,
+        "probability" => 42,
         "outletName" => "outlet1",
+        "depth" => 2,
+        "role" => 2,
+        "selectiveLogic" => 3,
+        "ignoreBudget" => true,
+        "excludeRecursion" => true,
+        "preventRecursion" => true,
+        "delayUntilRecursion" => true,
+        "scanDepth" => 3,
+        "matchWholeWords" => true,
+        "sticky" => 2,
+        "cooldown" => 3,
+        "delay" => 4,
+        "group" => "a, b",
+        "groupOverride" => true,
+        "groupWeight" => 123,
+        "useGroupScoring" => true,
       },
     )
     ext = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry)
 
     assert ext.match_persona_description?
     refute ext.use_probability?
+    assert_equal 42, ext.probability
     assert_equal "outlet1", ext.outlet_name
     assert_equal ["Alice", "Bob"], ext.character_filter_names
     assert_equal ["fantasy"], ext.character_filter_tags
     assert_equal [:normal, :continue], ext.triggers
+
+    assert_equal 2, ext.depth
+    assert_equal :assistant, ext.role
+    assert_equal :and_all, ext.selective_logic
+    assert ext.ignore_budget?
+    assert ext.exclude_recursion?
+    assert ext.prevent_recursion?
+    assert ext.delay_until_recursion?
+    assert_equal 1, ext.delay_until_recursion_level
+    assert_equal 3, ext.scan_depth
+    assert_equal true, ext.match_whole_words
+    assert_equal 2, ext.sticky
+    assert_equal 3, ext.cooldown
+    assert_equal 4, ext.delay
+    assert_equal "a, b", ext.group
+    assert_equal ["a", "b"], ext.group_names
+    assert ext.group_override?
+    assert_equal 123, ext.group_weight
+    assert_equal true, ext.use_group_scoring
   end
 
   def test_snake_case_takes_precedence_over_camel_case
@@ -141,5 +202,54 @@ class TavernKit::SillyTavern::Lore::EntryExtensionsTest < Minitest::Test
     entry_false = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "useProbability" => false })
     ext_false = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry_false)
     refute ext_false.use_probability?
+  end
+
+  def test_selective_logic_defaults_and_coercions
+    entry_default = TavernKit::Lore::Entry.new(keys: ["k"], content: "c")
+    ext_default = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry_default)
+    assert_equal :and_any, ext_default.selective_logic
+
+    entry_int = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "selectiveLogic" => 1 })
+    ext_int = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry_int)
+    assert_equal :not_all, ext_int.selective_logic
+
+    entry_str = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "selective_logic" => "2" })
+    ext_str = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry_str)
+    assert_equal :not_any, ext_str.selective_logic
+
+    entry_sym = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "selective_logic" => "and_all" })
+    ext_sym = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry_sym)
+    assert_equal :and_all, ext_sym.selective_logic
+  end
+
+  def test_delay_until_recursion_level_coercion
+    entry_false = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "delayUntilRecursion" => false })
+    ext_false = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry_false)
+    assert_nil ext_false.delay_until_recursion_level
+    refute ext_false.delay_until_recursion?
+
+    entry_true = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "delayUntilRecursion" => true })
+    ext_true = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry_true)
+    assert_equal 1, ext_true.delay_until_recursion_level
+
+    entry_level = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "delay_until_recursion" => 3 })
+    ext_level = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry_level)
+    assert_equal 3, ext_level.delay_until_recursion_level
+  end
+
+  def test_probability_clamped
+    entry = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "probability" => 9001 })
+    ext = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry)
+    assert_equal 100, ext.probability
+
+    entry2 = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "probability" => -5 })
+    ext2 = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry2)
+    assert_equal 0, ext2.probability
+  end
+
+  def test_group_weight_minimum
+    entry = TavernKit::Lore::Entry.new(keys: ["k"], content: "c", extensions: { "groupWeight" => 0 })
+    ext = TavernKit::SillyTavern::Lore::EntryExtensions.wrap(entry)
+    assert_equal 1, ext.group_weight
   end
 end

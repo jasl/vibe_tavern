@@ -9,6 +9,13 @@ module TavernKit
       # store platform-only fields in `entry.extensions`, and expose them through
       # a platform wrapper like this one. RisuAI should follow the same pattern.
       class EntryExtensions
+        SELECTIVE_LOGIC = {
+          0 => :and_any,
+          1 => :not_all,
+          2 => :not_any,
+          3 => :and_all,
+        }.freeze
+
         def self.wrap(entry) = new(entry)
 
         def initialize(entry)
@@ -92,8 +99,135 @@ module TavernKit
 
         def use_probability? = @ext.bool(:use_probability, default: true)
 
+        def probability
+          raw = @ext[:probability]
+          p = raw.nil? ? 100 : raw.to_i
+          [[p, 0].max, 100].min
+        end
+
         def outlet_name
           @memo[:outlet_name] ||= TavernKit::Utils.presence(@ext[:outlet_name])
+        end
+
+        # --- In-chat insertion fields (at_depth / outlet) ---
+
+        def depth
+          # ST default depth is 4.
+          @ext.int(:depth, default: 4)
+        end
+
+        def role
+          TavernKit::Coerce.role(@ext[:role], default: :system)
+        end
+
+        # --- Selective logic ---
+
+        def selective_logic
+          raw = @ext[:selective_logic]
+          return :and_any if raw.nil?
+
+          if raw.is_a?(Integer)
+            SELECTIVE_LOGIC[raw] || :and_any
+          else
+            s = raw.to_s.strip
+            return :and_any if s.empty?
+
+            if s.match?(/\A\d+\z/)
+              SELECTIVE_LOGIC[s.to_i] || :and_any
+            else
+              sym = TavernKit::Utils.underscore(s).to_sym
+              SELECTIVE_LOGIC.value?(sym) ? sym : :and_any
+            end
+          end
+        end
+
+        # --- Budget + recursion flags ---
+
+        def ignore_budget? = @ext.bool(:ignore_budget, default: false)
+        def exclude_recursion? = @ext.bool(:exclude_recursion, default: false)
+        def prevent_recursion? = @ext.bool(:prevent_recursion, default: false)
+
+        def delay_until_recursion_level
+          raw = @ext[:delay_until_recursion]
+          return nil if raw.nil? || raw == false
+          return 1 if raw == true
+
+          s = raw.to_s.strip
+          return nil if s.empty?
+
+          i = s.to_i
+          i.positive? ? i : 1
+        end
+
+        def delay_until_recursion? = !delay_until_recursion_level.nil?
+
+        # --- Per-entry scan tuning ---
+
+        def scan_depth
+          raw = @ext[:scan_depth]
+          return nil if raw.nil?
+
+          s = raw.to_s.strip
+          return nil if s.empty?
+
+          s.to_i
+        end
+
+        def match_whole_words
+          raw = @ext[:match_whole_words]
+          return nil if raw.nil?
+
+          @ext.bool(:match_whole_words, default: false)
+        end
+
+        # --- Timed effects ---
+
+        def sticky
+          positive_int(:sticky)
+        end
+
+        def cooldown
+          positive_int(:cooldown)
+        end
+
+        def delay
+          positive_int(:delay)
+        end
+
+        # --- Inclusion groups ---
+
+        def group
+          @memo[:group] ||= TavernKit::Utils.presence(@ext[:group])
+        end
+
+        def group_names
+          @memo[:group_names] ||= Array(group&.split(/,\s*/)).map(&:to_s).map(&:strip).reject(&:empty?).uniq.freeze
+        end
+
+        def group_override? = @ext.bool(:group_override, default: false)
+
+        def group_weight
+          raw = @ext[:group_weight]
+          w = raw.nil? ? 100 : raw.to_i
+          [w, 1].max
+        end
+
+        # nil means "inherit global setting"
+        def use_group_scoring
+          raw = @ext[:use_group_scoring]
+          return nil if raw.nil?
+
+          @ext.bool(:use_group_scoring, default: false)
+        end
+
+        private
+
+        def positive_int(key)
+          raw = @ext[key]
+          return nil if raw.nil?
+
+          i = raw.to_i
+          i.positive? ? i : nil
         end
       end
     end

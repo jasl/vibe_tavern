@@ -1,5 +1,5 @@
 {
-  "_comment": "World Info entries demonstrating selective logic modes (AND/NOT variants)",
+  "_comment": "World Info entries demonstrating selective logic modes (SillyTavern world_info_logic: AND_ANY=0, NOT_ALL=1, NOT_ANY=2, AND_ALL=3)",
   "entries": {
     "0": {
       "uid": 0,
@@ -21,8 +21,8 @@
       "uid": 1,
       "key": ["magic"],
       "keysecondary": ["spell", "wizard"],
-      "comment": "AND_ALL: magic AND spell AND wizard",
-      "content": "Magic with all secondary keys required.",
+      "comment": "NOT_ALL: magic AND NOT (spell AND wizard)",
+      "content": "Magic unless all secondary keys are present.",
       "constant": false,
       "selective": true,
       "selectiveLogic": 1,
@@ -53,8 +53,8 @@
       "uid": 3,
       "key": ["magic"],
       "keysecondary": ["dark", "evil"],
-      "comment": "NOT_ALL: magic AND NOT (dark AND evil)",
-      "content": "Magic unless both dark and evil present.",
+      "comment": "AND_ALL: magic AND dark AND evil",
+      "content": "Magic only when all secondary keys are present.",
       "constant": false,
       "selective": true,
       "selectiveLogic": 3,
