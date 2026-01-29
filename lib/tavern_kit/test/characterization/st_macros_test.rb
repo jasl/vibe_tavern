@@ -36,8 +36,6 @@ class StMacrosTest < Minitest::Test
   end
 
   def test_variable_shorthand_operators
-    pending!("Variable shorthand (. / $) with +=, ??, || and comparisons")
-
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
     text = "{{.score+=1}}{{.score}}"
     assert_equal "1", engine.expand(text, environment: TavernKit::SillyTavern::Macro::Environment.new)

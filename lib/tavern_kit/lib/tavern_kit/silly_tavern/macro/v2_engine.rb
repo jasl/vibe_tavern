@@ -179,11 +179,70 @@ module TavernKit
 
         def evaluate_macro_node(node, env, raw_content_hash:)
           fallback = "{{#{node.raw_inner}}}"
+          variable_out = evaluate_variable_shorthand(node.raw_inner, env)
+          return variable_out unless variable_out.nil?
+
           inv = parse_invocation(node.raw_inner, env, raw_content_hash, node.offset)
           return fallback if inv.nil?
 
           replaced = evaluate_invocation(inv, fallback: fallback)
           replaced.nil? ? fallback : replaced.to_s
+        end
+
+        def evaluate_variable_shorthand(raw_inner, env)
+          s = raw_inner.to_s.strip
+          return nil unless s.start_with?(".", "$")
+
+          m = s.match(/\A(?<scope>[.$])(?<name>[A-Za-z0-9_]+)\s*(?<op>\+\=|=|\+\+|--)?\s*(?<rest>.*)\z/)
+          return nil unless m
+
+          scope = m[:scope] == "$" ? :global : :local
+          name = m[:name].to_s
+          op = m[:op]
+          rest = m[:rest].to_s.strip
+
+          return nil unless env.respond_to?(:get_var) && env.respond_to?(:set_var)
+
+          case op
+          when nil
+            normalize_value(env.get_var(name, scope: scope))
+          when "+="
+            apply_var_add(env, name, scope: scope, value: rest)
+          when "="
+            env.set_var(name, rest, scope: scope)
+            ""
+          else
+            nil
+          end
+        rescue StandardError
+          nil
+        end
+
+        def apply_var_add(env, name, scope:, value:)
+          current = env.get_var(name, scope: scope)
+          rhs_num = coerce_number(value)
+          cur_num = coerce_number(current)
+
+          if !rhs_num.nil? && (current.nil? || !cur_num.nil?)
+            env.set_var(name, (cur_num || 0) + rhs_num, scope: scope)
+            return ""
+          end
+
+          env.set_var(name, "#{current}#{value}", scope: scope)
+          ""
+        end
+
+        def coerce_number(value)
+          return value if value.is_a?(Numeric)
+
+          s = value.to_s.strip
+          return nil if s.empty?
+
+          Integer(s)
+        rescue ArgumentError
+          Float(s)
+        rescue StandardError
+          nil
         end
 
         def parse_invocation(inner, env, raw_content_hash, offset)
