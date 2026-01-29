@@ -1,0 +1,99 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
+  def test_expands_env_macros
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env
+
+    out = engine.expand("{{char}}/{{user}}/{{persona}}", environment: env)
+    assert_equal "Al/Bob/Persona text", out
+
+    out2 = engine.expand("{{description}}/{{personality}}/{{scenario}}", environment: env)
+    assert_equal "Desc/Pers/Scen", out2
+  end
+
+  def test_newline_and_noop
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env
+
+    assert_equal "a\nbc", engine.expand("a{{newline}}b{{noop}}c", environment: env)
+  end
+
+  def test_outlet_macro
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env(outlets: { "foo" => "BAR" })
+
+    out = engine.expand("x {{outlet::foo}} y", environment: env)
+    assert_equal "x BAR y", out
+  end
+
+  def test_random_macro_is_seeded_by_rng
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+
+    out1 = engine.expand("{{random::a,b,c}}", environment: build_env(rng: Random.new(1234)))
+    out2 = engine.expand("{{random::a,b,c}}", environment: build_env(rng: Random.new(1234)))
+    assert_equal out1, out2
+    assert_includes %w[a b c], out1
+  end
+
+  def test_pick_is_deterministic_for_same_input
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env(content_hash: "chat-1")
+
+    out1 = engine.expand("{{pick::a,b,c}}", environment: env)
+    out2 = engine.expand("{{pick::a,b,c}}", environment: env)
+    assert_equal out1, out2
+    assert_includes %w[a b c], out1
+  end
+
+  def test_variable_macros
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env
+
+    out = engine.expand("{{setvar::name::Bob}}{{getvar::name}}", environment: env)
+    assert_equal "Bob", out
+
+    assert_equal "true", engine.expand("{{hasvar::name}}", environment: env)
+    assert_equal "false", engine.expand("{{deletevar::name}}{{hasvar::name}}", environment: env)
+  end
+
+  def test_original_expands_only_once
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env(original: "ORIG")
+
+    out = engine.expand("a {{original}} b {{original}} c", environment: env)
+    assert_equal "a ORIG b  c", out
+  end
+
+  def test_unknown_macros_are_preserved_by_default
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env
+
+    out = engine.expand("hello {{unknown}}", environment: env)
+    assert_equal "hello {{unknown}}", out
+  end
+
+  private
+
+  def build_env(**overrides)
+    char = TavernKit::Character.create(name: "Alice", nickname: "Al", description: "Desc", personality: "Pers", scenario: "Scen")
+    user = TavernKit::User.new(name: "Bob", persona: "Persona text")
+
+    defaults = {
+      character: char,
+      user: user,
+      variables: TavernKit::ChatVariables::InMemory.new,
+      outlets: {},
+      original: nil,
+      clock: -> { Time.utc(2020, 1, 1, 0, 0, 0) },
+      rng: Random.new(1234),
+      content_hash: nil,
+      extensions: {},
+      post_process: ->(s) { s },
+    }
+
+    TavernKit::SillyTavern::Macro::Environment.new(**defaults.merge(overrides))
+  end
+end

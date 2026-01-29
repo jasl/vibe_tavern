@@ -40,9 +40,10 @@ module TavernKit
 
           preprocessed = Preprocessors.preprocess(str, environment: environment)
           raw_content_hash = Invocation.stable_hash(preprocessed)
+          original_once = build_original_once(environment)
 
           nodes = parse_template(preprocessed)
-          out = evaluate_nodes(nodes, environment, raw_content_hash: raw_content_hash)
+          out = evaluate_nodes(nodes, environment, raw_content_hash: raw_content_hash, original_once: original_once)
 
           out = remove_unresolved_placeholders(out) if @unknown == :empty
           out
@@ -122,7 +123,7 @@ module TavernKit
           { preserve_whitespace: preserve, condition: condition }
         end
 
-        def evaluate_nodes(nodes, env, raw_content_hash:)
+        def evaluate_nodes(nodes, env, raw_content_hash:, original_once:)
           out = +""
 
           nodes.each do |node|
@@ -130,9 +131,9 @@ module TavernKit
             when TextNode
               out << node.text.to_s
             when MacroNode
-              out << evaluate_macro_node(node, env, raw_content_hash: raw_content_hash)
+              out << evaluate_macro_node(node, env, raw_content_hash: raw_content_hash, original_once: original_once)
             when IfNode
-              out << evaluate_if_node(node, env, raw_content_hash: raw_content_hash)
+              out << evaluate_if_node(node, env, raw_content_hash: raw_content_hash, original_once: original_once)
             else
               out << node.to_s
             end
@@ -141,11 +142,11 @@ module TavernKit
           out
         end
 
-        def evaluate_if_node(node, env, raw_content_hash:)
+        def evaluate_if_node(node, env, raw_content_hash:, original_once:)
           truthy = evaluate_condition(node.condition, env)
           chosen = truthy ? node.then_nodes : node.else_nodes
 
-          rendered = evaluate_nodes(chosen, env, raw_content_hash: raw_content_hash)
+          rendered = evaluate_nodes(chosen, env, raw_content_hash: raw_content_hash, original_once: original_once)
           node.preserve_whitespace == true ? rendered : rendered.strip
         end
 
@@ -177,7 +178,7 @@ module TavernKit
           end
         end
 
-        def evaluate_macro_node(node, env, raw_content_hash:)
+        def evaluate_macro_node(node, env, raw_content_hash:, original_once:)
           fallback = "{{#{node.raw_inner}}}"
           variable_out = evaluate_variable_shorthand(node.raw_inner, env)
           return variable_out unless variable_out.nil?
@@ -185,7 +186,7 @@ module TavernKit
           inv = parse_invocation(node.raw_inner, env, raw_content_hash, node.offset)
           return fallback if inv.nil?
 
-          replaced = evaluate_invocation(inv, fallback: fallback)
+          replaced = evaluate_invocation(inv, fallback: fallback, original_once: original_once)
           replaced.nil? ? fallback : replaced.to_s
         end
 
@@ -281,13 +282,24 @@ module TavernKit
           end
         end
 
-        def evaluate_invocation(inv, fallback:)
+        def evaluate_invocation(inv, fallback:, original_once:)
+          if inv.key == "original"
+            return original_once ? original_once.call : ""
+          end
+
           # Dynamic macros: only match argless `{{name}}`.
           if (inv.args.nil? || inv.args == []) && inv.environment.respond_to?(:dynamic_macros)
             dyn = inv.environment.dynamic_macros
             if dyn.is_a?(Hash)
-              v = dyn[inv.key] || dyn[inv.key.to_s] || dyn[inv.key.to_sym]
-              return normalize_value(v)
+              if dyn.key?(inv.key)
+                return normalize_value(dyn[inv.key])
+              end
+              if dyn.key?(inv.key.to_s)
+                return normalize_value(dyn[inv.key.to_s])
+              end
+              if dyn.key?(inv.key.to_sym)
+                return normalize_value(dyn[inv.key.to_sym])
+              end
             end
           end
 
@@ -302,6 +314,21 @@ module TavernKit
           end
         rescue StandardError
           fallback.to_s
+        end
+
+        def build_original_once(env)
+          return nil unless env.respond_to?(:original)
+
+          original = env.original
+          return nil if original.nil? || original.to_s.empty?
+
+          used = false
+          lambda do
+            return "" if used
+
+            used = true
+            original.to_s
+          end
         end
 
         def normalize_value(value)
