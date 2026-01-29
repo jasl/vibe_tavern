@@ -4,6 +4,8 @@ require "test_helper"
 
 class TavernKit::SillyTavern::Preset::StImporterTest < Minitest::Test
   def test_imports_all_prompt_affecting_fields
+    resolver = ->(id) { id }
+
     preset = TavernKit::SillyTavern::Preset.from_st_preset_json(
       {
         # Budgets
@@ -30,6 +32,7 @@ class TavernKit::SillyTavern::Preset::StImporterTest < Minitest::Test
         "names_behavior" => 2,
         "custom_prompt_post_processing" => "",
         "bias_preset_selected" => "Default (none)",
+        "pinned_group_resolver" => resolver,
 
         # Templates
         "send_if_empty" => "SEND",
@@ -152,6 +155,7 @@ class TavernKit::SillyTavern::Preset::StImporterTest < Minitest::Test
     assert_equal :content, preset.names_behavior
     assert_nil preset.custom_prompt_post_processing
     assert_equal "Default (none)", preset.bias_preset_selected
+    assert_same resolver, preset.pinned_group_resolver
 
     assert_equal "SEND", preset.send_if_empty
     assert_equal "NEW_CHAT", preset.new_chat_prompt
