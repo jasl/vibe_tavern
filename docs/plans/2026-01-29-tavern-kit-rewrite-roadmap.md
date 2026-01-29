@@ -53,8 +53,9 @@ and SillyTavern/RisuAI spec support.
   payloads into CCv2/CCv3 hashes and then calls Core parsing APIs.
 - **Platform-specific fields:** ST/RisuAI-only fields should live in
   `extensions` (Core) and be interpreted by the platform layer.
-- **Multimodal forward-compat:** Core `Prompt::Message` should reserve optional
-  multimodal/metadata fields to avoid future breaking changes.
+- **Multimodal / tool-calling forward-compat:** Core `Prompt::Message` should
+  reserve optional `attachments` and `metadata` fields to avoid future breaking
+  changes (images/audio + tool calls/tool results).
   Note: until Dialects are implemented, `Plan#to_messages` fallback returns
   minimal message hashes (role/content/name) and may drop passthrough fields.
 
@@ -219,11 +220,11 @@ end
 ## Current State (Wave 2 -- Complete)
 
 Delivered modules:
-- **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (partial), Coerce/Utils/Constants/Errors
-- **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, CharacterImporter, TrimReport, Prompt::Trace/Instrumenter
+- **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (basic), Coerce/Utils/Constants/Errors
+- **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, CharacterImporter, TrimReport, Prompt::Trace/Instrumenter, PromptEntry enhancements (conditions + pattern matching)
 - **SillyTavern (Wave 2):** Preset + Instruct + ContextTemplate (config/data only; middleware chain lands in Wave 4)
 
-Test status (gem): 239 runs, 0 failures, 30 skips (characterization scaffolding).
+Test status (gem): 295 runs, 0 failures, 30 skips (characterization scaffolding).
 
 ## Gap Summary
 
@@ -240,7 +241,7 @@ Test status (gem): 239 runs, 0 failures, 30 skips (characterization scaffolding)
 | Macro::Engine::Base + Environment::Base + Registry::Base | **Core** | ~130 | ✅ (Wave 2) |
 | MacroContext | **ST** | ~50 | Missing |
 | ExamplesParser + ExpanderVars | **ST** | ~260 | Missing |
-| PromptEntry enhancements | **Core** | ~243 | Partial |
+| PromptEntry enhancements | **Core** | ~243 | ✅ (Wave 2 supplement) |
 | Middleware (9 stages, incl. extension prompts, author's note, persona positions) | **ST** | ~2,700 | Missing |
 | HookRegistry + HookContext + InjectionRegistry (ephemeral, filters) | **ST** | ~300 | Missing |
 | GroupContext (4 strategies, 3 modes, card merging) | **ST** | ~300 | Missing |
@@ -386,11 +387,12 @@ These must be preserved in the SillyTavern layer:
 - `insertion_point`, `depth`, `order`, `priority`, `token_budget_group`
 - `tags`, `metadata`
 - Implemented in Core (Wave 1): `role`/`insertion_point`/`token_budget_group`
-  are type-checked as `Symbol` (no fixed whitelist); `removable:` is supported.
+  are type-checked as `Symbol` (no fixed whitelist; supports `:tool`/`:function`); `removable:` is supported.
 
 **Message attributes (Core -- Prompt::Message):**
-- `role`, `content`, `name` plus optional `multimodals`/`attachments` and
-  `metadata` passthrough for future provider/tooling needs.
+- `role`, `content`, `name` plus optional `attachments` and `metadata`
+  passthrough for future provider/tooling needs (tool calls / tool results).
+  Core allows `:tool` / `:function` roles (ST ignores; Dialects handle conversion).
 
 **Plan (Core -- Prompt::Plan):**
 - `blocks` (all, including disabled) / `enabled_blocks` (active only)
@@ -499,7 +501,8 @@ Scope updated after ST v1.15.0 source alignment
 |--------|-------|-------------|----------|
 | `SillyTavern::ExamplesParser` | ST | `<START>` marker parsing | 150-200 |
 | `SillyTavern::ExpanderVars` | ST | Context -> macro vars mapping | 60-80 |
-| PromptEntry enhancements | Core | Regex recognition, conditions (chat/turns/character) | 100-150 |
+
+Note: PromptEntry conditions + pattern matching moved to Wave 2 supplement.
 
 **Tests:**
 - Lore: keyword matching, recursive scanning, budget, timed effects, decorators,
@@ -522,9 +525,9 @@ Both usable standalone by Rails and as middleware dependencies.
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
 | `Trimmer` | Core | Pluggable eviction strategy: `:group_order` (ST: examples -> lore -> history) or `:priority` (RisuAI: sort by priority, evict lowest first) | 180-230 |
-| `Dialects::Base` | Core | Dialect interface | 40-60 |
-| `Dialects::OpenAI` | Core | `[{role, content, name?}]`, squash_system option | 80-100 |
-| `Dialects::Anthropic` | Core | `{messages, system}`, content blocks | 120-150 |
+| `Dialects::Base` | Core | Dialect interface + passthrough contract for tool calls/results (via Message metadata) | 40-60 |
+| `Dialects::OpenAI` | Core | ChatCompletions `[{role, content, name?}]` + tool calls/tool results passthrough; squash_system option | 80-100 |
+| `Dialects::Anthropic` | Core | `{messages, system}`, content blocks (incl. tool use / tool result) | 120-150 |
 | `Dialects::Google` | Core | `{contents, system_instruction}` | 80-100 |
 | `Dialects::Cohere` | Core | `{chat_history}` | 60-80 |
 | `Dialects::AI21` | Core | `[{role, content}]` | 60-80 |
@@ -550,6 +553,7 @@ Both usable standalone by Rails and as middleware dependencies.
 **Tests:**
 - End-to-end: character + preset + lore + history -> plan -> messages
 - All 8 dialect output format tests
+- Dialects: tool calls/tool results passthrough + conversion tests (OpenAI/Anthropic)
 - Middleware ordering and insertion tests
 - Trimmer eviction strategy tests
 - Injection tests: extension prompt types, persona positions, author's note interval
