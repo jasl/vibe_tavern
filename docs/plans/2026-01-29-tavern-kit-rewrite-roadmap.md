@@ -83,7 +83,7 @@ TavernKit (Core)
 
 TavernKit::SillyTavern
 ├── Config: Preset (40+ ST keys, JSON import), Instruct, ContextTemplate
-├── Lore: Engine, DecoratorParser, TimedEffects, KeyList, ScanInput
+├── Lore: Engine, DecoratorParser, TimedEffects, KeyList, ScanInput, WorldInfoImporter, EntryExtensions
 ├── Macro: V1Engine, V2Engine, Registry, Packs, Environment, Invocation, Phase
 ├── Middleware (9 stages): Hooks, Lore, Entries, PinnedGroups, Injection,
 │   Compilation, MacroExpansion, PlanAssembly, Trimming
@@ -223,8 +223,9 @@ Delivered modules:
 - **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (basic), Coerce/Utils/Constants/Errors
 - **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, CharacterImporter, TrimReport, Prompt::Trace/Instrumenter, PromptEntry enhancements (conditions + pattern matching)
 - **SillyTavern (Wave 2):** Preset + Instruct + ContextTemplate (config/data only; middleware chain lands in Wave 4)
+- **SillyTavern (Wave 2 supplement / Wave 3 prep):** Lore::EntryExtensions, Lore::WorldInfoImporter, macro error classes
 
-Test status (gem): 295 runs, 0 failures, 30 skips (characterization scaffolding).
+Test status (gem): 349 runs, 0 failures, 30 skips (characterization scaffolding).
 
 ## Gap Summary
 
@@ -474,6 +475,7 @@ Scope updated after ST v1.15.0 source alignment
 
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
+| `SillyTavern::Lore::WorldInfoImporter` | ST | Import/normalize ST native World Info JSON -> Core `Lore::Book`/`Lore::Entry`; canonicalize extension keys to snake_case for internal consistency. | 120-200 |
 | `SillyTavern::Lore::Engine` | ST | Implements `Lore::Engine::Base`: keyword matching, recursive scanning, timed effects, min activations, group scoring, JS regex, non-chat scan data opt-in, generation trigger filtering, character filtering. **Callback interfaces:** `force_activate` (external forced activation, maps to `WORLDINFO_FORCE_ACTIVATE` event), `on_scan_done` (per-loop-iteration hook, maps to `WORLDINFO_SCAN_DONE` event). | 500-700 |
 | `SillyTavern::Lore::ScanInput` | ST | Extends Core `Lore::ScanInput` with ST-specific fields: `scan_context`, `scan_injects`, `trigger`, `timed_state`, `character_filter`, `forced_activations`, `min_activations`, `min_activations_depth_max` | 80-120 |
 | `SillyTavern::Lore::DecoratorParser` | ST | ST decorator syntax (`@@activate`, `@@dont_activate`) | 200-250 |
@@ -485,7 +487,7 @@ Scope updated after ST v1.15.0 source alignment
   - `extensions.selectiveLogic` (Character Book export) vs `selectiveLogic` (ST native World Info)
   - `extensions.useProbability` vs `useProbability`
   - `extensions.match_persona_description` (Character Book export) vs `matchPersonaDescription` (ST native World Info)
-- Importers normalize these into a canonical internal representation; the engine still treats unknown/missing fields as defaults (tolerant external input).
+- `SillyTavern::Lore::WorldInfoImporter` normalizes these into a canonical snake_case representation; the engine still treats unknown/missing fields as defaults (tolerant external input).
 
 #### 3b. Macro System
 

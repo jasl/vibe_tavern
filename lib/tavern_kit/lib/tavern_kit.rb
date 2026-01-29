@@ -57,6 +57,7 @@ require_relative "tavern_kit/silly_tavern/instruct"
 require_relative "tavern_kit/silly_tavern/preset"
 require_relative "tavern_kit/silly_tavern/lore/entry_extensions"
 require_relative "tavern_kit/silly_tavern/lore/scan_input"
+require_relative "tavern_kit/silly_tavern/lore/world_info_importer"
 
 module TavernKit
   class << self
