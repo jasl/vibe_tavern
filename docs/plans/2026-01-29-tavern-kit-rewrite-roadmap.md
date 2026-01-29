@@ -477,7 +477,7 @@ Scope updated after ST v1.15.0 source alignment
 |--------|-------|-------------|----------|
 | `SillyTavern::Lore::WorldInfoImporter` | ST | Import/normalize ST native World Info JSON -> Core `Lore::Book`/`Lore::Entry`; canonicalize extension keys to snake_case for internal consistency. | 120-200 |
 | `SillyTavern::Lore::Engine` | ST | Implements `Lore::Engine::Base`: keyword matching, recursive scanning, timed effects, min activations, group scoring, JS regex, non-chat scan data opt-in, generation trigger filtering, character filtering. **Callback interfaces:** `force_activate` (external forced activation, maps to `WORLDINFO_FORCE_ACTIVATE` event), `on_scan_done` (per-loop-iteration hook, maps to `WORLDINFO_SCAN_DONE` event). | 500-700 |
-| `SillyTavern::Lore::ScanInput` | ST | Extends Core `Lore::ScanInput` with ST-specific fields: `scan_context`, `scan_injects`, `trigger`, `timed_state`, `character_filter`, `forced_activations`, `min_activations`, `min_activations_depth_max` | 80-120 |
+| `SillyTavern::Lore::ScanInput` | ST | Extends Core `Lore::ScanInput` with ST-specific fields for non-chat scan context/injects, generation trigger, timed state, character identity (name/tags), forced/min activations, and turn count. | 80-120 |
 | `SillyTavern::Lore::DecoratorParser` | ST | ST decorator syntax (`@@activate`, `@@dont_activate`) | 200-250 |
 | `SillyTavern::Lore::TimedEffects` | ST | sticky/cooldown/delay state tracking | 200-250 |
 | `SillyTavern::Lore::KeyList` | ST | Comma-separated keyword parsing | 80-100 |
@@ -488,6 +488,7 @@ Scope updated after ST v1.15.0 source alignment
   - `extensions.useProbability` vs `useProbability`
   - `extensions.match_persona_description` (Character Book export) vs `matchPersonaDescription` (ST native World Info)
 - `SillyTavern::Lore::WorldInfoImporter` normalizes these into a canonical snake_case representation; the engine still treats unknown/missing fields as defaults (tolerant external input).
+- `SillyTavern::Lore::WorldInfoImporter` also normalizes numeric entry `position` codes into canonical strings: `before_char_defs`, `after_char_defs`, `top_of_an`, `bottom_of_an`, `at_depth`, `before_example_messages`, `after_example_messages`, `outlet`.
 
 #### 3b. Macro System
 
