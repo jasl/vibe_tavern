@@ -480,6 +480,13 @@ Scope updated after ST v1.15.0 source alignment
 | `SillyTavern::Lore::TimedEffects` | ST | sticky/cooldown/delay state tracking | 200-250 |
 | `SillyTavern::Lore::KeyList` | ST | Comma-separated keyword parsing | 80-100 |
 
+**Compatibility notes (ST staging reality):**
+- `Lore::Entry#extensions` key shapes are inconsistent across ST formats. The engine must accept both snake_case and camelCase for the same semantics. Examples:
+  - `extensions.selectiveLogic` (Character Book export) vs `selectiveLogic` (ST native World Info)
+  - `extensions.useProbability` vs `useProbability`
+  - `extensions.match_persona_description` (Character Book export) vs `matchPersonaDescription` (ST native World Info)
+- Importers normalize these into a canonical internal representation; the engine still treats unknown/missing fields as defaults (tolerant external input).
+
 #### 3b. Macro System
 
 | Module | Layer | Description | Est. LOC |
@@ -495,6 +502,11 @@ Scope updated after ST v1.15.0 source alignment
 | `SillyTavern::Macro::Preprocessors` | ST | Priority-ordered pre/post-processors: legacy angle-bracket normalization, `{{time_UTC+N}}` normalization, brace unescaping, `{{trim}}` cleanup, `ELSE_MARKER` cleanup | 80-100 |
 | `SillyTavern::MacroContext` | ST | Context for custom macro handlers | 40-60 |
 
+**Error handling policy (Wave 3):**
+- **Tolerant for external/user input by default:** malformed macros, unknown macros, and invalid args should not hard-fail prompt building. Prefer: preserve raw `{{...}}` tokens, return best-effort output, and record diagnostics (warnings) when possible.
+- **Fail-fast for programmer errors:** unexpected exceptions (bugs in TavernKit or custom handlers) must bubble up (do not swallow).
+- Add a **strict mode** (opt-in) to turn diagnostics into exceptions (e.g. `StrictModeError`/`MacroError`) for tests and debugging.
+
 #### 3c. Other
 
 | Module | Layer | Description | Est. LOC |
@@ -505,6 +517,7 @@ Scope updated after ST v1.15.0 source alignment
 Note: PromptEntry conditions + pattern matching moved to Wave 2 supplement.
 
 **Tests:**
+- Tests are derived from ST/RisuAI behavior, but **must be re-authored** (no direct copying of upstream fixtures/tests due to license incompatibility).
 - Lore: keyword matching, recursive scanning, budget, timed effects, decorators,
   non-chat scan data, generation triggers, character filtering
 - Macro: all ~81 ST macros, scoped blocks (`{{if}}...{{else}}...{{/if}}`),
