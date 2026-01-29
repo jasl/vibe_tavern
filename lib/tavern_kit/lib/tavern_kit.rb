@@ -53,6 +53,8 @@ require_relative "tavern_kit/prompt/pipeline"
 require_relative "tavern_kit/prompt/dsl"
 
 require_relative "tavern_kit/silly_tavern/context_template"
+require_relative "tavern_kit/silly_tavern/examples_parser"
+require_relative "tavern_kit/silly_tavern/expander_vars"
 require_relative "tavern_kit/silly_tavern/instruct"
 require_relative "tavern_kit/silly_tavern/preset"
 require_relative "tavern_kit/silly_tavern/macro/environment"
