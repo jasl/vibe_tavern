@@ -103,6 +103,22 @@ class TavernKit::Prompt::PlanTest < Minitest::Test
     assert_equal trace, plan.trace
   end
 
+  def test_fingerprint_is_stable_and_sensitive_to_output_shape
+    blocks = [
+      TavernKit::Prompt::Block.new(role: :system, content: "First"),
+      TavernKit::Prompt::Block.new(role: :system, content: "Second"),
+      TavernKit::Prompt::Block.new(role: :user, content: "Hello!"),
+    ]
+    plan = TavernKit::Prompt::Plan.new(blocks: blocks)
+
+    fp = plan.fingerprint(dialect: :openai, squash_system_messages: false)
+    assert_match(/\A[0-9a-f]{64}\z/, fp)
+    assert_equal fp, plan.fingerprint(dialect: :openai, squash_system_messages: false)
+
+    squashed = plan.fingerprint(dialect: :openai, squash_system_messages: true)
+    refute_equal fp, squashed
+  end
+
   def test_debug_dump
     blocks = [
       TavernKit::Prompt::Block.new(role: :system, content: "System prompt", slot: :main_prompt),

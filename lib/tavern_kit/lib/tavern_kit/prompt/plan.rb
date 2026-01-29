@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "digest"
+require "json"
+
 require_relative "block"
 
 module TavernKit
@@ -60,6 +63,17 @@ module TavernKit
           # Fallback: simple message hash array
           msgs.map(&:to_h)
         end
+      end
+
+      # Stable SHA256 fingerprint derived from final output messages.
+      #
+      # Intended for caching/debugging. Excludes random block ids by design.
+      def fingerprint(dialect: :openai, squash_system_messages: false, **dialect_opts)
+        Digest::SHA256.hexdigest(
+          JSON.generate(
+            to_messages(dialect: dialect, squash_system_messages: squash_system_messages, **dialect_opts),
+          ),
+        )
       end
 
       def size = @blocks.size
