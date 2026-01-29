@@ -94,7 +94,8 @@ module TavernKit
           @scan_context = normalize_scan_context(scan_context)
           @scan_injects = Array(scan_injects).map(&:to_s).freeze
           @trigger = trigger.is_a?(Symbol) ? trigger : trigger.to_s.to_sym
-          @timed_state = timed_state.dup.freeze
+          # Application-owned mutable state. TimedEffects updates this in-place.
+          @timed_state = timed_state.is_a?(Hash) ? timed_state : {}
           @character_name = character_name&.to_s
           @character_tags = Array(character_tags).map(&:to_s).freeze
           @forced_activations = Array(forced_activations).map(&:to_s).freeze
@@ -145,30 +146,32 @@ module TavernKit
         # @param entry_uid [String]
         # @return [Boolean]
         def sticky_active?(entry_uid)
-          state = timed_state[entry_uid.to_s]
-          return false unless state&.dig(:sticky, :end_turn)
+          effect = timed_effect(entry_uid, :sticky)
+          return false unless effect
 
-          turn_count <= state[:sticky][:end_turn]
+          turn_count < effect_end_turn(effect)
         end
 
         # Checks if an entry is currently in cooldown.
         # @param entry_uid [String]
         # @return [Boolean]
         def cooldown_active?(entry_uid)
-          state = timed_state[entry_uid.to_s]
-          return false unless state&.dig(:cooldown, :end_turn)
+          effect = timed_effect(entry_uid, :cooldown)
+          return false unless effect
 
-          turn_count < state[:cooldown][:end_turn]
+          turn_count < effect_end_turn(effect)
         end
 
         # Checks if an entry has a delay that hasn't elapsed.
         # @param entry_uid [String]
         # @return [Boolean]
         def delay_active?(entry_uid)
-          state = timed_state[entry_uid.to_s]
-          return false unless state&.dig(:delay, :start_turn)
+          effect = timed_effect(entry_uid, :delay)
+          return false unless effect
 
-          turn_count < state[:delay][:start_turn] + (state[:delay][:duration] || 0)
+          start_turn = (effect[:start_turn] || effect["start_turn"] || 0).to_i
+          duration = (effect[:duration] || effect["duration"] || 0).to_i
+          turn_count < start_turn + duration
         end
 
         private
@@ -193,6 +196,18 @@ module TavernKit
             normalized[sym_key] = value&.to_s
           end
           normalized.freeze
+        end
+
+        def timed_effect(entry_uid, type)
+          state = timed_state[entry_uid.to_s]
+          return nil unless state.is_a?(Hash)
+
+          effect = state[type] || state[type.to_s]
+          effect.is_a?(Hash) ? effect : nil
+        end
+
+        def effect_end_turn(effect)
+          (effect[:end_turn] || effect["end_turn"] || effect[:end] || effect["end"] || 0).to_i
         end
       end
     end

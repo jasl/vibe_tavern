@@ -56,7 +56,10 @@ require_relative "tavern_kit/silly_tavern/context_template"
 require_relative "tavern_kit/silly_tavern/instruct"
 require_relative "tavern_kit/silly_tavern/preset"
 require_relative "tavern_kit/silly_tavern/lore/entry_extensions"
+require_relative "tavern_kit/silly_tavern/lore/key_list"
+require_relative "tavern_kit/silly_tavern/lore/decorator_parser"
 require_relative "tavern_kit/silly_tavern/lore/scan_input"
+require_relative "tavern_kit/silly_tavern/lore/timed_effects"
 require_relative "tavern_kit/silly_tavern/lore/world_info_importer"
 
 module TavernKit

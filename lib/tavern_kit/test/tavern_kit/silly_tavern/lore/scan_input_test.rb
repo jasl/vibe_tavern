@@ -201,8 +201,10 @@ class TavernKit::SillyTavern::Lore::ScanInputTest < Minitest::Test
   end
 
   def test_timed_state_frozen
-    input = build_input(timed_state: { "entry_1" => { sticky: true } })
-    assert input.timed_state.frozen?
+    state = { "entry_1" => { sticky: { end_turn: 10 } } }
+    input = build_input(timed_state: state)
+    refute input.timed_state.frozen?
+    assert_same state, input.timed_state
   end
 
   private
