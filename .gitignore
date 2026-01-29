@@ -16,6 +16,7 @@
 /.cursor
 /.ruby-lsp
 /.vscode
+/.claude/settings.local.json
 
 # Ignore bundler config.
 /.bundle

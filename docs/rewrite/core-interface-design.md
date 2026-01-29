@@ -37,10 +37,11 @@ its own configuration parsing.
 | Macro/CBS Engine | **High** | `#expand(text, vars)` too narrow; needs `environment:` parameter object |
 | Lore Engine | **Medium-High** | `#scan(text, books:, budget:)` too narrow; needs `ScanInput` parameter object |
 | ChatVariables | **Medium** | Missing `temp`/`function_arg` scopes for RisuAI |
-| Prompt::Block | **Low** | Missing `:function` role; `INSERTION_POINTS`/`BUDGET_GROUPS` too restrictive |
+| Prompt::Block | **Medium** | Missing `:function` role + `removable` flag; `INSERTION_POINTS`/`BUDGET_GROUPS` too restrictive |
+| Prompt::Message | **Medium** | Reserve optional multimodal/metadata fields; allow dialect passthrough |
 | Trimmer | **Low** | Needs pluggable strategy (`:group_order` vs `:priority`) |
 | Pipeline/Middleware | **None** | Fully platform-agnostic; no changes needed |
-| TokenEstimator | **None** | One interface sufficient; add optional `model_hint:` |
+| TokenEstimator | **Low** | Pluggable adapter interface; optional `model_hint:` |
 | Character/Card | **None** | `extensions` hash handles platform-specific fields |
 
 ---
@@ -133,7 +134,7 @@ end
 
 | Platform | ScanInput Extensions |
 |----------|---------------------|
-| ST | `scan_context` (persona/desc/personality/depth_prompt/scenario/creator_notes), `trigger` (generation type), `timed_state`, `character_filter`, `forced_activations`, `min_activations`, `min_activations_depth_max` |
+| ST | `scan_context` (persona/desc/personality/depth_prompt/scenario/creator_notes), `scan_injects` (Author's Note + extension prompts), `trigger` (generation type), `timed_state`, `character_filter`, `forced_activations`, `min_activations`, `min_activations_depth_max` |
 | RisuAI | `chat_variables`, `message_index`, `recursive_scanning`, `greeting_index` |
 
 ---
@@ -196,6 +197,10 @@ Relax validation for cross-platform support:
 - Current: `%i[system user assistant]`
 - Add: `:function` (RisuAI `OpenAIChat` uses `role: 'function'`)
 
+**REMOVABLE:**
+- Add `removable: true/false` flag (default `true`)
+- Rationale: both ST and RisuAI need hard protections (system prompt/PHI/latest user msg) even when trimming
+
 **INSERTION_POINTS:**
 - Current: whitelist of 8 ST-specific points
 - Change: type-check only (`Symbol` required, no fixed set)
@@ -209,7 +214,17 @@ Relax validation for cross-platform support:
 
 ---
 
-### 6. Trimmer
+### 6. Prompt::Message Forward Compatibility
+
+Reserve optional fields for multimodal and metadata passthrough:
+- `multimodals` / `attachments` (images/audio/video payloads)
+- `metadata` (tool calls, cache hints, provider-specific fields)
+
+Dialect converters should **preserve passthrough fields** whenever possible.
+
+---
+
+### 7. Trimmer
 
 Add pluggable eviction strategy:
 
@@ -232,9 +247,9 @@ end
 
 ---
 
-### 7. TokenEstimator
+### 8. TokenEstimator
 
-Add optional model hint:
+Pluggable adapter interface with optional model hint:
 
 ```ruby
 class TokenEstimator
@@ -244,7 +259,7 @@ end
 
 ---
 
-### 8. Prompt::Context
+### 9. Prompt::Context
 
 Current ST-flavored accessors should migrate to `metadata` hash access in
 Wave 4 refactor:
@@ -269,6 +284,7 @@ supports platform-specific storage.
 | P0 | `Lore::Engine::Base` + `ScanInput` | Wave 2 |
 | P1 | `ChatVariables::Base` scope parameter | Wave 2 |
 | P1 | `Block` validation relaxation | Wave 2 |
+| P1 | `Prompt::Message` multimodal/metadata scaffolding | Wave 2 |
 | P2 | `Trimmer` strategy parameter | Wave 4 |
 | P2 | `Registry::Base` metadata parameter | Wave 2 |
 | P3 | `Context` ST accessor migration | Wave 4 |

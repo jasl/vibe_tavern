@@ -47,6 +47,16 @@
 7. Frontend scope: **Confirmed** — UI can be significantly reshaped, but must be tested for correct rendering/interaction.
 8. Pipeline modularization: **Confirmed** — SillyTavern pipeline/macros should live under `TavernKit::SillyTavern`.
 
+## Scope Updates (2026-01-29)
+- RisuAI parity includes **memory system integration**; tokenizer parity is
+  interface-first, full tokenizer suite deferred.
+- Plugins/Lua hooks are **lowest priority**; `.risum` modules are **deferred**
+  (not part of this batch).
+- Data Bank / vector matching are **interfaces only** in TavernKit; I/O stays
+  in the application layer.
+- ST/RisuAI-specific fields live in `extensions`; platform layers interpret them.
+- Core `Prompt::Message` should reserve optional multimodal/metadata fields.
+
 ## Next Steps (proposed)
 - Deep-dive `resources/tavern_kit/ARCHITECTURE.md` and Playground models/services.
 - Extract a parity checklist against SillyTavern/RisuAI for critical behaviors.

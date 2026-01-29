@@ -24,6 +24,22 @@ and SillyTavern/RisuAI spec support.
    See "Architecture" section.
 7. **CI gate per Wave** -- all tests green + rubocop clean + >= 80% coverage.
 
+## Scope Clarifications (2026-01-29 Update)
+
+- **RisuAI parity scope (this batch):** include **memory system integration**
+  (HypaMemory/SupaMemory stage) as part of the RisuAI pipeline. Tokenizer parity
+  is acknowledged but will be **interface-first** and can be completed later.
+- **Deferred/low priority:** RisuAI **plugins**, **Lua hooks**, and **.risum
+  modules** are **explicitly out of scope for this batch**. Track as Wave 6+
+  backlog items.
+- **Data Bank / vector matching:** TavernKit stays **prompt-building focused**.
+  Provide **interfaces/hooks** for vector results; **I/O + retrieval lives in
+  the application layer**.
+- **Platform-specific fields:** ST/RisuAI-only fields should live in
+  `extensions` (Core) and be interpreted by the platform layer.
+- **Multimodal forward-compat:** Core `Prompt::Message` should reserve optional
+  multimodal/metadata fields to avoid future breaking changes.
+
 ## Architecture: Three Layers
 
 ```
@@ -40,7 +56,7 @@ TavernKit (Core)
 │   └── ChatVariables::Base (scope: :local/:global; extensible by platforms)
 ├── Platform-agnostic implementations:
 │   ├── Dialects (OpenAI, Anthropic, Google, Cohere, AI21, Mistral, XAI, Text)
-│   ├── TokenEstimator (tiktoken_ruby, model_hint:)
+│   ├── TokenEstimator (pluggable adapters; tiktoken_ruby default, model_hint:)
 │   ├── Trimmer (pluggable strategy: :group_order or :priority)
 │   ├── ChatHistory::Base + ChatHistory::InMemory
 │   └── ChatVariables::InMemory
@@ -59,7 +75,7 @@ TavernKit::SillyTavern
 TavernKit::RisuAI (Wave 5)
 ├── CBS: Engine, Macros (130+), Environment
 ├── Lore: Engine, DecoratorParser (30+), ScanInput
-├── RegexScripts, Triggers (v1+v2), TemplateCards
+├── Memory (Hypa/Supa), RegexScripts, Triggers (v1+v2), TemplateCards
 └── Pipeline, RisuAI.build() convenience entry
 ```
 
@@ -85,7 +101,7 @@ TavernKit::RisuAI (Wave 5)
 **RisuAI** provides:
 - CBS macro system (`#if`/`#when`/`#each`/`#func`/`#escape`/`#pure`)
 - RisuAI decorator syntax (40+ decorators, `@inject_lore`/`@inject_at`)
-- Regex scripts, triggers, template cards
+- Memory system (Hypa/Supa), regex scripts, triggers, template cards
 - RisuAI-specific middleware chain
 
 ### Key Design Rule
@@ -115,7 +131,8 @@ Core interfaces must define **behavioral contracts**, not unified configuration.
 | `Macro::Engine::Base` | `#expand(text, environment:)` with Environment protocol | P0 (Wave 2) |
 | `Lore::Engine::Base` | `#scan(input)` with ScanInput parameter object | P0 (Wave 2) |
 | `ChatVariables::Base` | Add `scope:` parameter (Core: local/global; RisuAI: +temp/function_arg) | P1 (Wave 2) |
-| `Prompt::Block` | Relax ROLES/INSERTION_POINTS/BUDGET_GROUPS to type-check only | P1 (Wave 2) |
+| `Prompt::Block` | Relax ROLES/INSERTION_POINTS/BUDGET_GROUPS; add `removable:` flag | P1 (Wave 2) |
+| `Prompt::Message` | Reserve optional multimodal/metadata fields; allow passthrough in dialects | P1 (Wave 2) |
 | `Trimmer` | Add `strategy:` parameter (:group_order vs :priority) | P2 (Wave 4) |
 | `Macro::Registry::Base` | `#register(name, handler, **metadata)` with opaque metadata | P2 (Wave 2) |
 
@@ -309,6 +326,8 @@ These must be preserved in the SillyTavern layer:
   `4_vectors_data_bank`, `PERSONA_DESCRIPTION`, `DEPTH_PROMPT`
 - Author's Note: interval-based insertion (`note_interval`), character-specific
   overrides (replace/before/after)
+- Vector/Data Bank content is provided externally (hooks/injections), not fetched
+  by TavernKit.
 
 **Persona Description (SillyTavern::Middleware::Injection):**
 - 5 positions: IN_PROMPT (0), AFTER_CHAR (1, deprecated), TOP_AN (2),
@@ -348,6 +367,10 @@ These must be preserved in the SillyTavern layer:
   only (`Symbol` required, no fixed set) so platform layers can define their
   own insertion points and budget groups without Core changes.
 
+**Message attributes (Core -- Prompt::Message):**
+- `role`, `content`, `name` plus optional `multimodals`/`attachments` and
+  `metadata` passthrough for future provider/tooling needs.
+
 **Plan (Core -- Prompt::Plan):**
 - `blocks` (all, including disabled) / `enabled_blocks` (active only)
 - `greeting` / `greeting_index`, `warnings`, `trim_report`, `outlets`
@@ -368,7 +391,7 @@ These must be preserved in the SillyTavern layer:
 | `InjectionRegistry::Base` | Core | Interface: `#register`, `#remove`, `#entries` | 20-30 |
 | `ChatHistory::Base` + `InMemory` | Core | Abstract protocol + default impl | 150-200 |
 | `ChatVariables::Base` + `InMemory` | Core | Type-safe variable storage + default impl; `scope:` parameter (Core: `:local`/`:global`; RisuAI extends with `:temp`/`:function_arg`) | 150-200 |
-| `TokenEstimator` | Core | Token counting (tiktoken_ruby), optional `model_hint:`, usable standalone | 100-150 |
+| `TokenEstimator` | Core | Token counting (tiktoken_ruby), optional `model_hint:`, **pluggable adapter interface** | 100-150 |
 | `SillyTavern::Preset` | ST | 60+ ST config keys (sampling, budget, prompts, templates, nudges, prefill, postfix), ST preset JSON import, `with()`, `#stopping_strings(context)` assembling 4 sources | 400-500 |
 | `SillyTavern::Instruct` | ST | Text completion formatting, 24 attributes, stop sequence assembly, names behavior (NONE/FORCE/ALWAYS), system prompt separation (`sysprompt.content`) | 300-400 |
 | `SillyTavern::ContextTemplate` | ST | Handlebars-based story_string with all placeholders (system, description, personality, scenario, persona, wiBefore/wiAfter, anchorBefore/After), chat_start, example_separator, story_string_position/depth/role, use_stop_strings | 200-250 |
@@ -399,9 +422,9 @@ Scope updated after ST v1.15.0 source alignment
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
 | `Lore::Book` | Core | Book data structure (character_book or standalone) | 150-200 |
-| `Lore::Entry` | Core | Entry with keywords, content, insertion config, 6 `match*` flags, `characterFilter*`, `triggers`, `useProbability` | 250-350 |
+| `Lore::Entry` | Core | Entry with minimal shared schema + `extensions` (ST/RisuAI-specific fields live in extensions) | 250-350 |
 | `Lore::Result` | Core | Activation results with token costs | 150-200 |
-| `SillyTavern::Lore::Engine` | ST | Implements `Lore::Engine::Base`: keyword matching, recursive scanning, timed effects, min activations, group scoring, JS regex, non-chat scan data opt-in, generation trigger filtering, character filtering | 500-700 |
+| `SillyTavern::Lore::Engine` | ST | Implements `Lore::Engine::Base`: keyword matching, recursive scanning, timed effects, min activations, group scoring, JS regex, non-chat scan data opt-in, generation trigger filtering, character filtering. **Callback interfaces:** `force_activate` (external forced activation, maps to `WORLDINFO_FORCE_ACTIVATE` event), `on_scan_done` (per-loop-iteration hook, maps to `WORLDINFO_SCAN_DONE` event). | 500-700 |
 | `SillyTavern::Lore::DecoratorParser` | ST | ST decorator syntax (`@@activate`, `@@dont_activate`) | 200-250 |
 | `SillyTavern::Lore::TimedEffects` | ST | sticky/cooldown/delay state tracking | 200-250 |
 | `SillyTavern::Lore::KeyList` | ST | Comma-separated keyword parsing | 80-100 |
@@ -541,6 +564,12 @@ Scope updated after RisuAI source scan
 | `RisuAI::Pipeline` | RisuAI | 4-stage processing (Prompt Preparation → Memory Integration → Final Formatting → API Request), message processing flow (input → CBS → regex → triggers → display) | 150-200 |
 | `RisuAI::RisuAI.build()` | RisuAI | Convenience entry with RisuAI defaults | 40-60 |
 
+#### 5g. RisuAI Memory (Required)
+
+| Module | Layer | Description | Est. LOC |
+|--------|-------|-------------|----------|
+| `RisuAI::Memory` | RisuAI | HypaMemory V1/V2/V3 + SupaMemory integration point; Stage 2 pipeline hook | 250-400 |
+
 **Tests:**
 - CBS: all 10 block types, 13+ #when operators, 130+ macros, variable scopes,
   math expressions, deterministic RNG, function definitions, processing modes
@@ -550,12 +579,24 @@ Scope updated after RisuAI source scan
 - Regex scripts: 6 execution types, flag parsing, @@ directives, ordering
 - Triggers: v1 effects, v2 control flow, v2 lorebook CRUD, condition types,
   lowLevelAccess gating, recursion limits
+- Memory: Hypa/Supa integration tests (compression selection + token budget)
 - End-to-end: character + RisuAI template + lore + CBS macros -> plan -> messages
 
 **Deliverable:** All characterization tests passing. Full ST + RisuAI spec
 parity verified. Rails integration documented. `TavernKit::RisuAI.build()`
 runs end-to-end with CBS macros, decorator-driven lorebook, regex scripts,
 and triggers all operational.
+
+#### Deferred / Out of Scope (This Batch)
+
+- RisuAI tokenizer suite (10+ tokenizers) beyond the Core pluggable interface.
+- RisuAI plugin system and Lua hooks.
+- .risum module import/export.
+- **Lorebook import formats:** ST supports importing from Novel AI (detected by
+  `lorebookVersion`), Agnai (detected by `kind === 'memory'`), and RisuAI
+  (detected by `type === 'risu'`). TavernKit will focus on ST native +
+  Character Book (CCv2/CCv3 embedded) formats; external format importers are
+  low priority and can be added via pluggable importer interface if needed.
 
 ## API Design Direction
 
@@ -780,6 +821,8 @@ lib/tavern_kit/
         engine.rb                    # RisuAI lore (decorator-driven, iterative loop)
         decorator_parser.rb          # 30+ RisuAI decorators
         scan_input.rb                # RisuAI::Lore::ScanInput (extends Core; adds chat_variables, message_index, recursive_scanning)
+      memory/
+        engine.rb                    # HypaMemory/SupaMemory integration
       regex_scripts.rb               # customscript processing
       triggers.rb                    # v1+v2 triggers
       template_cards.rb              # Template card system
@@ -813,6 +856,7 @@ lib/tavern_kit/
 | RisuAI lorebook decorators | 0 | 30+ (position, activation, keys, recursion, injection) |
 | RisuAI trigger v2 effects | 0 | 60+ (control flow, vars, strings, arrays, dicts, chat, lorebook CRUD, UI) |
 | RisuAI prompt item types | 0 | 6 (Plain, Typed, Chat, AuthorNote, ChatML, Cache) |
+| RisuAI memory system | 0 | HypaMemory V1/V2/V3 + SupaMemory |
 | Dialect formats | 0 | 8 |
 | Middleware stages (ST) | 1 (base) | 9 + base |
 | Platform layers | 1 (Core) | 3 (Core + ST + RisuAI) |
