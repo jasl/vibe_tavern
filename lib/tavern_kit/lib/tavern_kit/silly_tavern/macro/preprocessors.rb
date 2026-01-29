@@ -14,7 +14,9 @@ module TavernKit
           str = text.to_s
           return str if str.empty?
 
-          rewrite_legacy_markers(str, environment: environment)
+          str = rewrite_legacy_markers(str, environment: environment)
+          str = normalize_time_utc_legacy_syntax(str)
+          cleanup_trim(str)
         end
 
         # ST legacy "angle bracket" markers are commonly used in prompt strings.
@@ -30,6 +32,20 @@ module TavernKit
             .gsub(/<CHAR>/i, char)
             .gsub(/<CHARIFNOTGROUP>/i, group)
             .gsub(/<GROUP>/i, group)
+        end
+
+        # Normalize `{{time_UTC-10}}` -> `{{time_UTC::-10}}` so parsers only have to
+        # support a single argument style.
+        def self.normalize_time_utc_legacy_syntax(text)
+          text.gsub(/\{\{time_UTC([+-]\d+)\}\}/i) do
+            "{{time_UTC::#{Regexp.last_match(1)}}}"
+          end
+        end
+
+        # `{{trim}}` is a whitespace control marker. It removes surrounding
+        # newlines and itself.
+        def self.cleanup_trim(text)
+          text.gsub(/(?:\r?\n)*\{\{trim\}\}(?:\r?\n)*/i, "")
         end
       end
     end

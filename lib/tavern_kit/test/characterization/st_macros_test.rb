@@ -19,8 +19,6 @@ class StMacrosTest < Minitest::Test
   end
 
   def test_time_utc_legacy_syntax
-    pending!("Legacy time_UTC offset syntax")
-
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
     result = engine.expand("{{time_UTC-10}}", environment: TavernKit::SillyTavern::Macro::Environment.new)
     assert_match(/\A\d{2}:\d{2}\z/, result)
@@ -48,8 +46,6 @@ class StMacrosTest < Minitest::Test
   end
 
   def test_trim_macro_postprocessing
-    pending!("{{trim}} removes surrounding newlines after evaluation")
-
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
     template = "A\n{{trim}}\nB"
     assert_equal "AB", engine.expand(template, environment: TavernKit::SillyTavern::Macro::Environment.new)
