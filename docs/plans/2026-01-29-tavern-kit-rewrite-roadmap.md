@@ -799,6 +799,13 @@ TavernKit::SillyTavern::MacroError
 TavernKit::SillyTavern::LoreParseError
 ```
 
+**Strict mode (standardized):**
+- Purpose: **tests + debugging** (not production). Catch "quality" issues early.
+- Definition: `Prompt::Context#warn` becomes fatal. Any `ctx.warn(...)` raises `TavernKit::StrictModeError`.
+- Enable:
+  - Pipeline DSL: `strict(true)` inside `TavernKit.build { ... }`
+  - Or direct: `TavernKit::Prompt::Context.new(strict: true)`
+
 ## File Organization Target
 
 ```
