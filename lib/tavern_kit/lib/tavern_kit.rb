@@ -48,6 +48,7 @@ require_relative "tavern_kit/prompt/context"
 require_relative "tavern_kit/prompt/trace"
 require_relative "tavern_kit/prompt/instrumenter"
 require_relative "tavern_kit/prompt/middleware/base"
+require_relative "tavern_kit/prompt/middleware/max_tokens"
 require_relative "tavern_kit/prompt/pipeline"
 require_relative "tavern_kit/prompt/dsl"
 

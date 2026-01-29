@@ -33,4 +33,26 @@ module TavernKit
       super("#{message} (stage: #{stage})")
     end
   end
+
+  class MaxTokensExceededError < PipelineError
+    attr_reader :estimated_tokens, :max_tokens, :reserve_tokens, :limit_tokens
+
+    def initialize(estimated_tokens:, max_tokens:, reserve_tokens: 0, stage:)
+      @estimated_tokens = Integer(estimated_tokens)
+      @max_tokens = Integer(max_tokens)
+      @reserve_tokens = Integer(reserve_tokens)
+      @limit_tokens = [@max_tokens - @reserve_tokens, 0].max
+
+      super(
+        format(
+          "Prompt estimated tokens %d exceeded limit %d (max_tokens: %d, reserve_tokens: %d)",
+          @estimated_tokens,
+          @limit_tokens,
+          @max_tokens,
+          @reserve_tokens,
+        ),
+        stage: stage,
+      )
+    end
+  end
 end
