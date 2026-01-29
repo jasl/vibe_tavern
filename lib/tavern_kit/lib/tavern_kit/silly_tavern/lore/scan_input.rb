@@ -51,7 +51,8 @@ module TavernKit
         # @return [Symbol] Current generation type (:normal, :continue, :impersonate, :swipe, :quiet).
         attr_reader :trigger
 
-        # @return [Hash] Timed effect state keyed by entry UID.
+        # @return [Hash] Timed effect state keyed by entry id.
+        #   ST key form is typically "world.uid" (see SillyTavern::Lore::Engine id namespacing).
         #   Values are hashes with :sticky, :cooldown, :delay tracking.
         attr_reader :timed_state
 
@@ -61,7 +62,8 @@ module TavernKit
         # @return [Array<String>] Current character tags for filtering.
         attr_reader :character_tags
 
-        # @return [Array<String>] Entry UIDs to force activate regardless of keyword matching.
+        # @return [Array<String>] Entry ids to force activate regardless of keyword matching.
+        #   ST key form is typically "world.uid" (see SillyTavern::Lore::Engine id namespacing).
         attr_reader :forced_activations
 
         # @return [Integer] Minimum number of entries to activate.
@@ -105,7 +107,7 @@ module TavernKit
         end
 
         # Returns true if entry should be force-activated.
-        # @param entry_uid [String] Entry unique identifier
+        # @param entry_uid [String] Entry id (typically "world.uid")
         # @return [Boolean]
         def force_activate?(entry_uid)
           forced_activations.include?(entry_uid.to_s)

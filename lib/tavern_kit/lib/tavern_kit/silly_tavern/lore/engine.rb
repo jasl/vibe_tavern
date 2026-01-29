@@ -9,6 +9,11 @@ module TavernKit
       #
       # Implements the core scanning loop: keyword matching, recursion, delayed recursion,
       # timed effects, min activations, inclusion groups, and token budgeting.
+      #
+      # Entry identity: ST treats world info entries as (world, uid) pairs. To avoid id collisions
+      # across multiple books, this engine namespaces entry ids as "world.uid", using:
+      # - book.extensions["world"] (preferred) or book.name
+      # - fallback: "book#{index}"
       class Engine < TavernKit::Lore::Engine::Base
         DEFAULT_MAX_RECURSION_STEPS = 3
         HARD_MAX_RECURSION_STEPS = 10
