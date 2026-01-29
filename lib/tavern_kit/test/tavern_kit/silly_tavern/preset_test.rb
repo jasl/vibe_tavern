@@ -3,6 +3,15 @@
 require "test_helper"
 
 class TavernKit::SillyTavern::PresetTest < Minitest::Test
+  def test_with_returns_new_instance
+    preset = TavernKit::SillyTavern::Preset.new(main_prompt: "A")
+    other = preset.with(main_prompt: "B")
+
+    refute_same preset, other
+    assert_equal "A", preset.main_prompt
+    assert_equal "B", other.main_prompt
+  end
+
   def test_from_st_preset_json_builds_prompt_entries_and_coerces_continue_postfix
     preset = TavernKit::SillyTavern::Preset.from_st_preset_json(
       {
@@ -47,6 +56,24 @@ class TavernKit::SillyTavern::PresetTest < Minitest::Test
     custom = entries.find { |e| e.id == "customThing" }
     assert custom
     refute custom.pinned?
+  end
+
+  def test_stopping_strings_ignores_invalid_custom_stopping_strings_json
+    preset = TavernKit::SillyTavern::Preset.new(
+      custom_stopping_strings: "not json",
+      context_template: TavernKit::SillyTavern::ContextTemplate.new(
+        names_as_stop_strings: false,
+        use_stop_strings: false,
+      ),
+      instruct: TavernKit::SillyTavern::Instruct.new(enabled: false),
+    )
+
+    ctx = TavernKit::Prompt::Context.new(
+      character: TavernKit::Character.create(name: "Alice"),
+      user: TavernKit::User.new(name: "Bob"),
+    )
+
+    assert_equal [], preset.stopping_strings(ctx)
   end
 
   def test_stopping_strings_assembles_all_sources

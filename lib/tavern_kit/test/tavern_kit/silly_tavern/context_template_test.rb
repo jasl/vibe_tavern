@@ -3,6 +3,15 @@
 require "test_helper"
 
 class TavernKit::SillyTavern::ContextTemplateTest < Minitest::Test
+  def test_with_returns_new_instance
+    template = TavernKit::SillyTavern::ContextTemplate.new(preset: "A")
+    other = template.with(preset: "B")
+
+    refute_same template, other
+    assert_equal "A", template.preset
+    assert_equal "B", other.preset
+  end
+
   def test_render_renders_only_known_fields_and_preserves_unknown_macros
     template = TavernKit::SillyTavern::ContextTemplate.new(
       story_string: "{{#if system}}{{system}}\n{{/if}}{{trim}}",

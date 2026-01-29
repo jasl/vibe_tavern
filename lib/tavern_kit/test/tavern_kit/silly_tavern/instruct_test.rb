@@ -3,6 +3,15 @@
 require "test_helper"
 
 class TavernKit::SillyTavern::InstructTest < Minitest::Test
+  def test_with_returns_new_instance
+    instruct = TavernKit::SillyTavern::Instruct.new(enabled: true, preset: "A")
+    other = instruct.with(preset: "B")
+
+    refute_same instruct, other
+    assert_equal "A", instruct.preset
+    assert_equal "B", other.preset
+  end
+
   def test_names_behavior_coerce
     nb = TavernKit::SillyTavern::Instruct::NamesBehavior
 

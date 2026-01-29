@@ -256,6 +256,10 @@ module TavernKit
         prompt_entries || self.class.default_prompt_entries
       end
 
+      def with(**overrides)
+        self.class.new(**deconstruct_keys(nil).merge(overrides))
+      end
+
       # Assemble stopping strings following SillyTavern's 4-source merge:
       # 1) names-based stops (if context.names_as_stop_strings)
       # 2) instruct stop sequences

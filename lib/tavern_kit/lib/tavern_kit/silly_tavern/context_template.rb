@@ -51,6 +51,10 @@ module TavernKit
       def use_stop_strings? = use_stop_strings == true
       def names_as_stop_strings? = names_as_stop_strings == true
 
+      def with(**overrides)
+        self.class.new(**deconstruct_keys(nil).merge(overrides))
+      end
+
       # Render the story string template with the provided params.
       #
       # - `{{field}}` → value or kept as-is if field is unknown

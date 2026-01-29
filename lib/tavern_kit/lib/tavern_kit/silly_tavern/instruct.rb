@@ -96,6 +96,10 @@ module TavernKit
       def sequences_as_stop_strings? = sequences_as_stop_strings == true
       def skip_examples? = skip_examples == true
 
+      def with(**overrides)
+        self.class.new(**deconstruct_keys(nil).merge(overrides))
+      end
+
       # Converts instruct mode sequences to an array of stopping strings.
       #
       # Follows ST's `getInstructStoppingSequences` behavior:
