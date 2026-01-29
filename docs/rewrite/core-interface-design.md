@@ -418,7 +418,7 @@ Relax validation for cross-platform support:
 
 **ROLES:**
 - Current: `%i[system user assistant]`
-- Add: `:function` (RisuAI `OpenAIChat` uses `role: 'function'`)
+- Add: `:tool` / `:function` (Core can represent tool calls/results; dialect converters handle provider-specific mapping)
 
 **REMOVABLE:**
 - Add `removable: true/false` flag (default `true`)
@@ -441,7 +441,7 @@ Relax validation for cross-platform support:
 
 Reserve optional fields for multimodal and metadata passthrough:
 - `multimodals` / `attachments` (images/audio/video payloads)
-- `metadata` (tool calls, cache hints, provider-specific fields)
+- `metadata` (tool calls/tool results, cache hints, provider-specific fields)
 
 Dialect converters should **preserve passthrough fields** whenever possible.
 In the Core-only phase (before Dialects exist), `Plan#to_messages` may return
