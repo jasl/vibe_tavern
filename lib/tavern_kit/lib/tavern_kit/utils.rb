@@ -4,6 +4,36 @@ module TavernKit
   module Utils
     module_function
 
+    # Convert a string to snake_case (best-effort, ActiveSupport-free).
+    #
+    # Examples:
+    # - "matchPersonaDescription" -> "match_persona_description"
+    # - "use_probability" -> "use_probability"
+    # - "My::ModuleName" -> "my/module_name"
+    def underscore(value)
+      word = value.to_s.dup
+      return "" if word.empty?
+
+      word.gsub!("::", "/")
+      word.gsub!(/([A-Z\d]+)([A-Z][a-z])/, "\\1_\\2")
+      word.gsub!(/([a-z\d])([A-Z])/, "\\1_\\2")
+      word.tr!("-", "_")
+      word.downcase!
+      word
+    end
+
+    # Convert snake_case (or similar) to lowerCamelCase (best-effort).
+    #
+    # Examples:
+    # - "use_probability" -> "useProbability"
+    def camelize_lower(value)
+      parts = underscore(value).split("_")
+      return "" if parts.empty?
+
+      head = parts.shift.to_s
+      head + parts.map { |p| p.capitalize }.join
+    end
+
     # Deep-convert keys to symbols.
     def deep_symbolize_keys(value)
       case value
@@ -58,7 +88,7 @@ module TavernKit
       # Fetch value by trying multiple keys (string and symbol variants).
       def [](*keys)
         keys.each do |key|
-          [key.to_s, key.to_sym].each do |k|
+          candidate_keys(key).each do |k|
             return @hash[k] if @hash.key?(k)
           end
         end
@@ -73,7 +103,16 @@ module TavernKit
         current = @hash
         path.each do |key|
           return nil unless current.is_a?(Hash)
-          current = current[key.to_s] || current[key.to_sym]
+
+          found = nil
+          candidate_keys(key).each do |k|
+            if current.key?(k)
+              found = current[k]
+              break
+            end
+          end
+
+          current = found
         end
         current
       end
@@ -111,6 +150,18 @@ module TavernKit
       end
 
       private
+
+      def candidate_keys(key)
+        base = key.to_s
+        underscore = Utils.underscore(base)
+        camel = Utils.camelize_lower(base)
+
+        variants = [base, underscore, camel].uniq
+
+        # Hashes coming from JSON parsing are typically string-keyed, but we also
+        # accept symbol keys for ergonomics.
+        variants.flat_map { |v| [v, v.to_sym] }
+      end
 
       def to_bool(val, default)
         return default if val.nil?
