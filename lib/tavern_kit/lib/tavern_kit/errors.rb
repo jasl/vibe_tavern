@@ -20,4 +20,17 @@ module TavernKit
   module Lore
     class ParseError < TavernKit::Error; end
   end
+
+  # Raised when a middleware stage fails during pipeline execution.
+  #
+  # Use the built-in exception cause chain (raise ..., cause: e) to retain the
+  # original error for debugging.
+  class PipelineError < Error
+    attr_reader :stage
+
+    def initialize(message, stage:)
+      @stage = stage
+      super("#{message} (stage: #{stage})")
+    end
+  end
 end

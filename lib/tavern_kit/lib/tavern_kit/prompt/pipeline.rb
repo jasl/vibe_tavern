@@ -183,7 +183,8 @@ module TavernKit
         app = Terminal.new
 
         @entries.reverse_each do |entry|
-          app = entry.middleware.new(app, **entry.options)
+          # Pass the registered name for observability/debug tracing.
+          app = entry.middleware.new(app, **entry.options, __stage: entry.name)
         end
 
         app

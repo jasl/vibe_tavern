@@ -44,10 +44,24 @@ module TavernKit
         # @param ctx [Context] the prompt context
         # @return [Context] the processed context
         def call(ctx)
+          stage = option(:__stage, self.class.middleware_name)
+          prev_stage = ctx.current_stage
+          ctx.current_stage = stage
+
+          ctx.instrument(:middleware_start, name: stage)
           before(ctx)
           @app.call(ctx)
           after(ctx)
+          ctx.instrument(:middleware_finish, name: stage)
           ctx
+        rescue => e
+          ctx.instrument(:middleware_error, name: stage, error: e)
+
+          raise e if e.is_a?(TavernKit::PipelineError)
+
+          raise TavernKit::PipelineError.new("#{e.class}: #{e.message}", stage: stage), cause: e
+        ensure
+          ctx.current_stage = prev_stage if ctx
         end
 
         # Class method to get the middleware name for registration.

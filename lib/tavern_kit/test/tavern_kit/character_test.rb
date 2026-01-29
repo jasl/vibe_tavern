@@ -60,8 +60,8 @@ class TavernKit::CharacterTest < Minitest::Test
       nickname: "Sera",
       group_only_greetings: ["Hello, group!"],
       source: ["https://example.com"],
-      creation_date: 1700000000,
-      modification_date: 1700100000,
+      creation_date: "1700000000",
+      modification_date: "1700100000",
     )
 
     assert_equal "Sera", char.data.nickname

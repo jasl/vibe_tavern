@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../text/pattern_matcher"
+
 module TavernKit
   module Prompt
     # Models a single Prompt Manager "Prompt Entry".
@@ -223,20 +225,12 @@ module TavernKit
       end
 
       def pattern_matches?(pattern, text, case_sensitive:, match_whole_words:)
-        k = pattern.to_s.strip
-        return false if k.empty?
-
-        haystack = case_sensitive ? text.to_s : text.to_s.downcase
-        needle = case_sensitive ? k : k.downcase
-
-        return haystack.include?(needle) unless match_whole_words
-
-        words = needle.split(/\s+/)
-        return haystack.include?(needle) if words.length > 1
-
-        boundary = "[^A-Za-z0-9_]"
-        re = Regexp.new("(?:^|#{boundary})#{Regexp.escape(needle)}(?:$|#{boundary})")
-        re.match?(haystack)
+        Text::PatternMatcher.match?(
+          pattern,
+          text,
+          case_sensitive: case_sensitive,
+          match_whole_words: match_whole_words,
+        )
       end
     end
   end

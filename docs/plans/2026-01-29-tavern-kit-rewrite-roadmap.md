@@ -15,6 +15,9 @@ and SillyTavern/RisuAI spec support.
 2. **Test first** -- extract/write characterization tests before implementation.
    Unlock pending tests as modules land.
 3. **Immutable by default** -- value objects use Ruby `Data` or frozen Struct.
+   Note: immutability is currently **shallow** (object frozen; nested values may
+   still be mutable). We treat all nested values as read-only by convention and
+   will tighten this at module boundaries as needed.
 4. **Small files** -- 200-400 lines typical, 800 max. Split original large files.
 5. **API redesign** -- no backward compatibility constraint. Design for the
    downstream Rails app: clear interfaces, explicit semantics, fail-fast with
@@ -22,23 +25,38 @@ and SillyTavern/RisuAI spec support.
 6. **Three-layer architecture** -- Core (interfaces + platform-agnostic infra) +
    SillyTavern (ST-specific implementation) + RisuAI (RisuAI-specific).
    See "Architecture" section.
-7. **CI gate per Wave** -- all tests green + rubocop clean + >= 80% coverage.
+7. **CI gate per Wave** -- all tests green + rubocop clean. Coverage target
+   ramps over time (>= 80% by Wave 5).
 
 ## Scope Clarifications (2026-01-29 Update)
 
 - **RisuAI parity scope (this batch):** include **memory system integration**
   (HypaMemory/SupaMemory stage) as part of the RisuAI pipeline. Tokenizer parity
   is acknowledged but will be **interface-first** and can be completed later.
+  Acceptance criteria (integration, not I/O):
+  - Pipeline can accept memory artifacts (summaries, pinned memories, metadata)
+    via Context/hooks and place them into prompt output deterministically.
+  - Memory stage participates in budgeting/trimming decisions (via block tags /
+    `removable` / priority), without performing retrieval or vector matching.
 - **Deferred/low priority:** RisuAI **plugins**, **Lua hooks**, and **.risum
   modules** are **explicitly out of scope for this batch**. Track as Wave 6+
   backlog items.
 - **Data Bank / vector matching:** TavernKit stays **prompt-building focused**.
   Provide **interfaces/hooks** for vector results; **I/O + retrieval lives in
   the application layer**.
+- **CharX (.charx) import/export:** defer to **Wave 6+** as a **RisuAI
+  extension**. Core stays focused on CCv2/CCv3 JSON + PNG wrappers; RisuAI can
+  provide a CharX loader that extracts `card.json` + assets and then calls Core
+  parsing APIs.
+- **RisuAI off-spec card import (OldTavernChar):** defer to **Wave 6+** as a
+  **RisuAI extension**. RisuAI can provide a converter that normalizes off-spec
+  payloads into CCv2/CCv3 hashes and then calls Core parsing APIs.
 - **Platform-specific fields:** ST/RisuAI-only fields should live in
   `extensions` (Core) and be interpreted by the platform layer.
 - **Multimodal forward-compat:** Core `Prompt::Message` should reserve optional
   multimodal/metadata fields to avoid future breaking changes.
+  Note: until Dialects are implemented, `Plan#to_messages` fallback returns
+  minimal message hashes (role/content/name) and may drop passthrough fields.
 
 ## Architecture: Three Layers
 
@@ -48,7 +66,7 @@ TavernKit (Core)
 │   Lore::Book, Lore::Entry, Lore::Result, Lore::ScanInput, Prompt::*)
 ├── Pipeline framework (Pipeline, Middleware::Base, Context, DSL)
 ├── Interface protocols:
-│   ├── Lore::Engine::Base (#scan(input) -> Result)
+│   ├── Lore::Engine::Base (#scan(input) -> Lore::Result)
 │   ├── Macro::Engine::Base (#expand(text, environment:) -> String)
 │   ├── Macro::Environment::Base (character_name, user_name, get_var/set_var)
 │   ├── Macro::Registry::Base (#register(name, handler, **metadata))
@@ -96,7 +114,7 @@ TavernKit::RisuAI (Wave 5)
   Macro::Engine with `{{macro}}` syntax and 50+ built-in ST macros)
 - ST-specific middleware chain (14 pinned group slots, FORCE_RELATIVE_IDS,
   FORCE_LAST_IDS, in-chat depth/order/role rules)
-- ST-specific tools (ExamplesParser with `<START>` markers, BYAF import)
+- ST-specific tools (ExamplesParser with `<START>` markers)
 
 **RisuAI** provides:
 - CBS macro system (`#if`/`#when`/`#each`/`#func`/`#escape`/`#pure`)
@@ -107,6 +125,10 @@ TavernKit::RisuAI (Wave 5)
 ### Key Design Rule
 
 **No ST or RisuAI specifics leak into Core.**
+
+- Exception: `Prompt::Context` is a mutable build workspace and may temporarily
+  carry ST-flavored accessors for ergonomics; those should migrate into
+  `ctx.metadata` as the ST/RisuAI layers land (see `docs/rewrite/core-interface-design.md`).
 
 - String constants like `"main_prompt"`, `"nsfw"`, `{{char}}` belong in
   `TavernKit::SillyTavern`, never in `TavernKit` root.
@@ -131,15 +153,15 @@ Core interfaces must define **behavioral contracts**, not unified configuration.
 | `Macro::Engine::Base` | `#expand(text, environment:)` with Environment protocol | P0 (Wave 2) |
 | `Lore::Engine::Base` | `#scan(input)` with ScanInput parameter object | P0 (Wave 2) |
 | `ChatVariables::Base` | Add `scope:` parameter (Core: local/global; RisuAI: +temp/function_arg) | P1 (Wave 2) |
-| `Prompt::Block` | Relax ROLES/INSERTION_POINTS/BUDGET_GROUPS; add `removable:` flag | P1 (Wave 2) |
-| `Prompt::Message` | Reserve optional multimodal/metadata fields; allow passthrough in dialects | P1 (Wave 2) |
+| `Prompt::Block` | Relax ROLES/INSERTION_POINTS/BUDGET_GROUPS; add `removable:` flag | P1 (Wave 1) |
+| `Prompt::Message` | Reserve optional multimodal/metadata fields; allow passthrough in dialects | P1 (Wave 1) |
 | `Trimmer` | Add `strategy:` parameter (:group_order vs :priority) | P2 (Wave 4) |
 | `Macro::Registry::Base` | `#register(name, handler, **metadata)` with opaque metadata | P2 (Wave 2) |
 
 ### Pipeline Stage Order (SillyTavern Default)
 
 ```
-SillyTavern.build()  -->  Prompt::Context (immutable)
+SillyTavern.build()  -->  Prompt::Context (mutable build workspace)
                                  |
   1. Hooks (before)     Execute before_build hooks, validate inputs
   2. Lore               Evaluate World Info via SillyTavern::Lore::Engine
@@ -162,7 +184,8 @@ Each middleware implements `before(context)` and/or `after(context)`:
 
 - `before` -- pre-processing, runs top-down (Hooks first, Trimming last)
 - `after` -- post-processing, runs bottom-up (Trimming first, Hooks last)
-- Context is immutable; middleware returns `context.with(...)` for modifications
+- Context is mutable; middleware mutates `ctx` directly
+- For branching/what-if pipelines, use `ctx.dup` (shallow copy; duplicates key arrays/hashes used by the pipeline)
 
 ### Pipeline Customization
 
@@ -200,11 +223,11 @@ Delivered modules (all in Core):
 - PNG Parser + Writer
 - Participant / User
 - Prompt basics: Pipeline (skeleton), DSL, Plan, Context, Block, Message
+- Text::PatternMatcher (plain + whole-word + JS-style regex `/.../flags`)
 - PromptEntry (partial -- condition matching needs work)
 - Coerce / Utils / Constants / Errors
-- Result service object (app/services/)
 
-Test status: 202 tests, 172 passing, 30 pending (characterization scaffolding).
+Test status: 206 tests, 176 passing, 30 skips (characterization scaffolding).
 
 ## Gap Summary
 
@@ -362,10 +385,8 @@ These must be preserved in the SillyTavern layer:
 - `id`, `role`, `content`, `name`, `slot`, `enabled`
 - `insertion_point`, `depth`, `order`, `priority`, `token_budget_group`
 - `tags`, `metadata`
-- **Validation relaxation (Wave 2):** `ROLES` adds `:function` (RisuAI).
-  `INSERTION_POINTS` and `BUDGET_GROUPS` change from whitelist to type-check
-  only (`Symbol` required, no fixed set) so platform layers can define their
-  own insertion points and budget groups without Core changes.
+- Implemented in Core (Wave 1): `role`/`insertion_point`/`token_budget_group`
+  are type-checked as `Symbol` (no fixed whitelist); `removable:` is supported.
 
 **Message attributes (Core -- Prompt::Message):**
 - `role`, `content`, `name` plus optional `multimodals`/`attachments` and
@@ -374,57 +395,85 @@ These must be preserved in the SillyTavern layer:
 **Plan (Core -- Prompt::Plan):**
 - `blocks` (all, including disabled) / `enabled_blocks` (active only)
 - `greeting` / `greeting_index`, `warnings`, `trim_report`, `outlets`
+- Optional observability payload: `trace` (`Prompt::Trace`) (stage timings,
+  token counts, eviction reasons, and a stable prompt fingerprint for caching)
+  populated only when debug instrumentation is enabled (production default: off).
 
 ## Wave Plan
 
 ### Wave 2 -- Configuration & Data Layer
 
-**Core interfaces + Core implementations + SillyTavern config.**
+**Core interfaces + Core data structures + SillyTavern config.**
+
+#### 2a. Core Interfaces
 
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
 | `Preset::Base` | Core | Minimal preset interface (context_window_tokens, reserved_response_tokens) | 40-60 |
-| `Lore::Engine::Base` + `Lore::ScanInput` | Core | Interface: `#scan(input)` -> Result; ScanInput holds messages/books/budget, subclassed by ST/RisuAI for platform-specific fields | 50-70 |
+| `Lore::Engine::Base` | Core | Interface: `#scan(input)` -> Lore::Result | 30-40 |
 | `Macro::Engine::Base` + `Macro::Environment::Base` | Core | Interface: `#expand(text, environment:)` -> String; Environment protocol provides character_name, user_name, get_var/set_var(scope:); subclassed by ST/RisuAI | 60-80 |
 | `Macro::Registry::Base` | Core | Interface: `#register(name, handler, **metadata)`, `#get`, `#has?`; metadata opaque to Core | 30-40 |
-| `HookRegistry::Base` | Core | Interface: `#before_build`, `#after_build` | 20-30 |
-| `InjectionRegistry::Base` | Core | Interface: `#register`, `#remove`, `#entries` | 20-30 |
+| `HookRegistry::Base` | Core | Interface: `#before_build(&block)`, `#after_build(&block)`, `#run_before_build(ctx)`, `#run_after_build(ctx)` | 40-60 |
+| `InjectionRegistry::Base` | Core | Interface: `#register(id:, content:, position:, **opts)`, `#remove(id:)`, `#each`, `#ephemeral_ids` | 40-60 |
+
+#### 2b. Core Data Structures (Lore)
+
+| Module | Layer | Description | Est. LOC |
+|--------|-------|-------------|----------|
+| `Lore::ScanInput` | Core | Parameter object: messages, books, budget; subclassed by ST/RisuAI for platform-specific fields | 80-100 |
+| `Lore::Book` | Core | Book data structure (character_book or standalone) | 150-200 |
+| `Lore::Entry` | Core | Entry with minimal shared schema + `extensions` Hash (ST/RisuAI-specific fields live in extensions; treat keys as string-keyed at serialization boundaries; Core may accept string/symbol keys) | 250-350 |
+| `Lore::Result` | Core | Activation results with token costs and TrimReport | 150-200 |
+
+#### 2c. Core Implementations
+
+| Module | Layer | Description | Est. LOC |
+|--------|-------|-------------|----------|
 | `ChatHistory::Base` + `InMemory` | Core | Abstract protocol + default impl | 150-200 |
 | `ChatVariables::Base` + `InMemory` | Core | Type-safe variable storage + default impl; `scope:` parameter (Core: `:local`/`:global`; RisuAI extends with `:temp`/`:function_arg`) | 150-200 |
 | `TokenEstimator` | Core | Token counting (tiktoken_ruby), optional `model_hint:`, **pluggable adapter interface** | 100-150 |
+| `CharacterImporter` | Core | Unified character import helper for CCv2/CCv3 sources (JSON/PNG/Hash) with **pluggable importers** for extra formats (e.g., CharX via RisuAI extension) | 80-120 |
+| `TrimReport` + `TrimResult` | Core | Shared budgeting result value objects (Lore budget trimming + Trimmer); include eviction reasons + provenance for debugging | 60-100 |
+| `Prompt::Trace` + `Prompt::Instrumenter` | Core | Optional pipeline instrumentation (stage timings + key counters + fingerprint); opt-in via `context.instrumenter` (nil by default); integrates with `Context#warnings`; no ActiveSupport dependency | 100-150 |
+
+#### 2d. SillyTavern Config
+
+| Module | Layer | Description | Est. LOC |
+|--------|-------|-------------|----------|
 | `SillyTavern::Preset` | ST | 60+ ST config keys (sampling, budget, prompts, templates, nudges, prefill, postfix), ST preset JSON import, `with()`, `#stopping_strings(context)` assembling 4 sources | 400-500 |
 | `SillyTavern::Instruct` | ST | Text completion formatting, 24 attributes, stop sequence assembly, names behavior (NONE/FORCE/ALWAYS), system prompt separation (`sysprompt.content`) | 300-400 |
 | `SillyTavern::ContextTemplate` | ST | Handlebars-based story_string with all placeholders (system, description, personality, scenario, persona, wiBefore/wiAfter, anchorBefore/After), chat_start, example_separator, story_string_position/depth/role, use_stop_strings | 200-250 |
-
 **Tests:**
 - Core interface compliance tests
+- Lore data structure tests (Book, Entry, Result, ScanInput)
 - ST preset import round-trip tests (all 60+ fields)
-- ChatHistory protocol + InMemory tests
+- ChatHistory protocol + message contract + InMemory tests
 - TokenEstimator accuracy tests
+- Pipeline tracing/instrumentation tests (Trace collector + stage timing + warnings integration)
 - ContextTemplate story_string Handlebars compilation tests
 - Instruct stop sequence assembly tests
 - Preset stopping strings integration tests
+- CharacterImporter behavior tests (JSON/PNG/Hash), plus extension registration tests
 
-**Deliverable:** Core interfaces defined. ST Preset loadable from JSON with all
-prompt-affecting fields. ContextTemplate compiles story string from Handlebars.
-ChatHistory::Base subclassable by Rails. TokenEstimator callable standalone.
-Stopping strings assembled from 4 sources.
+**Deliverable:** Core interfaces defined. Lore data structures ready for engine
+implementations. ST Preset loadable from JSON with all prompt-affecting fields.
+ContextTemplate compiles story string from Handlebars. ChatHistory::Base
+subclassable by Rails. TokenEstimator callable standalone. Stopping strings
+assembled from 4 sources.
 
 ### Wave 3 -- Content Expansion Layer
 
-**Core data structures + SillyTavern engine implementations.**
+**SillyTavern engine implementations.**
 
 Scope updated after ST v1.15.0 source alignment
 (see `docs/rewrite/st-alignment-delta-v1.15.0.md`).
 
-#### 3a. Lore / World Info
+#### 3a. Lore / World Info Engine
 
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
-| `Lore::Book` | Core | Book data structure (character_book or standalone) | 150-200 |
-| `Lore::Entry` | Core | Entry with minimal shared schema + `extensions` (ST/RisuAI-specific fields live in extensions) | 250-350 |
-| `Lore::Result` | Core | Activation results with token costs | 150-200 |
 | `SillyTavern::Lore::Engine` | ST | Implements `Lore::Engine::Base`: keyword matching, recursive scanning, timed effects, min activations, group scoring, JS regex, non-chat scan data opt-in, generation trigger filtering, character filtering. **Callback interfaces:** `force_activate` (external forced activation, maps to `WORLDINFO_FORCE_ACTIVATE` event), `on_scan_done` (per-loop-iteration hook, maps to `WORLDINFO_SCAN_DONE` event). | 500-700 |
+| `SillyTavern::Lore::ScanInput` | ST | Extends Core `Lore::ScanInput` with ST-specific fields: `scan_context`, `scan_injects`, `trigger`, `timed_state`, `character_filter`, `forced_activations`, `min_activations`, `min_activations_depth_max` | 80-120 |
 | `SillyTavern::Lore::DecoratorParser` | ST | ST decorator syntax (`@@activate`, `@@dont_activate`) | 200-250 |
 | `SillyTavern::Lore::TimedEffects` | ST | sticky/cooldown/delay state tracking | 200-250 |
 | `SillyTavern::Lore::KeyList` | ST | Comma-separated keyword parsing | 80-100 |
@@ -436,7 +485,7 @@ Scope updated after ST v1.15.0 source alignment
 | `SillyTavern::Macro::V1Engine` | ST | Multi-pass regex expansion (legacy) | 200-250 |
 | `SillyTavern::Macro::V2Engine` | ST | Chevrotain-equivalent pipeline: lexer (multi-mode) + parser (CST) + walker. Scoped block macros (`{{macro}}...{{/macro}}`), variable shorthand (16 operators), macro flags (6 types, 2 implemented), lazy branch resolution, auto-trim/dedent, error recovery | 500-700 |
 | `SillyTavern::Macro::Registry` | ST | Implements `Macro::Registry::Base`, typed args (`MacroValueType`), arg validation, `strictArgs`, `delayArgResolution`, `list` support | 200-250 |
-| `SillyTavern::Macro::Packs` | ST | ~81 built-in ST macros (utility, random, names, character, chat, time, variable, prompts, state), including `{{if}}`/`{{else}}`, `{{space}}`, `{{hasvar}}`/`{{deletevar}}`, `{{hasglobalvar}}`/`{{deleteglobalvar}}`, `{{groupNotMuted}}` | 400-500 |
+| `SillyTavern::Macro::Packs` | ST | ~81 built-in ST macros (utility, random, names, character, chat, time, variable, prompts, state), including `{{if}}`/`{{else}}`, `{{space}}`, `{{hasvar}}`/`{{deletevar}}`, `{{hasglobalvar}}`/`{{deleteglobalvar}}`, `{{groupNotMuted}}`, `{{hasExtension}}` | 400-500 |
 | `SillyTavern::Macro::Environment` | ST | Extensible macro execution context, lazy providers | 100-150 |
 | `SillyTavern::Macro::Invocation` | ST | Call-site object (`MacroCall`): name, args, flags, isScoped, rawInner, rawArgs, range, globalOffset | 80-100 |
 | `SillyTavern::Macro::Phase` | ST | Multi-pass phase control | 40-60 |
@@ -564,11 +613,44 @@ Scope updated after RisuAI source scan
 | `RisuAI::Pipeline` | RisuAI | 4-stage processing (Prompt Preparation → Memory Integration → Final Formatting → API Request), message processing flow (input → CBS → regex → triggers → display) | 150-200 |
 | `RisuAI::RisuAI.build()` | RisuAI | Convenience entry with RisuAI defaults | 40-60 |
 
-#### 5g. RisuAI Memory (Required)
+#### 5g. RisuAI Memory (Interface Only)
 
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
-| `RisuAI::Memory` | RisuAI | HypaMemory V1/V2/V3 + SupaMemory integration point; Stage 2 pipeline hook | 250-400 |
+| `RisuAI::Memory::Base` | RisuAI | **Interface-only** for HypaMemory/SupaMemory integration. Defines hooks for pipeline Stage 2 (Memory Integration) without implementing actual retrieval/compression. Application layer provides concrete adapter. | 80-120 |
+| `RisuAI::Memory::MemoryInput` | RisuAI | Parameter object for memory stage: `summaries`, `pinned_memories`, `metadata`, `budget_tokens` | 60-80 |
+| `RisuAI::Memory::MemoryResult` | RisuAI | Result object: `blocks` (memory-derived Blocks), `tokens_used`, `compression_type` | 60-80 |
+
+**Memory Interface Contract:**
+
+```ruby
+module TavernKit::RisuAI::Memory
+  class Base
+    # @param input [MemoryInput] memory artifacts from application layer
+    # @param context [Prompt::Context] pipeline context
+    # @return [MemoryResult] blocks to inject + metadata
+    def integrate(input, context:) = raise NotImplementedError
+  end
+
+  # Application layer implements actual retrieval:
+  # class MyMemoryAdapter < TavernKit::RisuAI::Memory::Base
+  #   def integrate(input, context:)
+  #     # Fetch from vector DB, apply compression, etc.
+  #     MemoryResult.new(blocks: [...], tokens_used: 500, compression_type: :hypa_v3)
+  #   end
+  # end
+end
+```
+
+**Rationale:** Memory retrieval involves vector matching, external DB calls, and
+compression algorithms that belong in the application layer. TavernKit provides:
+- Interface contract for pipeline integration
+- Block injection hooks at Stage 2
+- Budget participation (memory blocks have `token_budget_group: :memory`)
+- `removable:` and `priority:` support for trimming decisions
+
+Actual HypaMemory/SupaMemory implementation is deferred until test samples are
+available.
 
 **Tests:**
 - CBS: all 10 block types, 13+ #when operators, 130+ macros, variable scopes,
@@ -579,7 +661,7 @@ Scope updated after RisuAI source scan
 - Regex scripts: 6 execution types, flag parsing, @@ directives, ordering
 - Triggers: v1 effects, v2 control flow, v2 lorebook CRUD, condition types,
   lowLevelAccess gating, recursion limits
-- Memory: Hypa/Supa integration tests (compression selection + token budget)
+- Memory: interface compliance tests (mock adapter), block injection, budget participation
 - End-to-end: character + RisuAI template + lore + CBS macros -> plan -> messages
 
 **Deliverable:** All characterization tests passing. Full ST + RisuAI spec
@@ -632,9 +714,9 @@ end
 ### Output conversion (Core -- platform-agnostic)
 
 ```ruby
-# Dialects as first-class objects
-messages = plan.to_messages(TavernKit::Dialects::Anthropic.new)
-messages = plan.to_messages(TavernKit::Dialects::OpenAI.new(squash_system: true))
+# Dialects by symbol (default: :openai)
+messages = plan.to_messages(dialect: :anthropic)
+messages = plan.to_messages(dialect: :openai, squash_system_messages: true)
 ```
 
 ### Standalone tool usage (by Rails app)
@@ -682,11 +764,17 @@ end
 ### Error handling
 
 ```ruby
-# Core errors
+# Core errors (current / planned)
 TavernKit::Error                     # Base
-TavernKit::CharacterLoadError        # Card parsing failure
-TavernKit::PipelineError             # Middleware chain failure
-TavernKit::TokenBudgetExceeded       # Context overflow (strict mode)
+TavernKit::InvalidCardError          # Card parsing failure
+TavernKit::UnsupportedVersionError   # Unsupported card format/version
+TavernKit::Png::ParseError
+TavernKit::Png::WriteError
+TavernKit::Lore::ParseError
+TavernKit::StrictModeError           # Warnings are errors
+
+TavernKit::PipelineError             # (planned) middleware chain failure w/ stage name
+TavernKit::TokenBudgetExceeded       # (planned) context overflow / trimming failures
 
 # ST-specific errors
 TavernKit::SillyTavern::InvalidPresetError
@@ -704,6 +792,7 @@ lib/tavern_kit/
     # === CORE: Value Objects & Data Models ===
     character.rb                     # (exists)
     character_card.rb                # (exists)
+    character_importer.rb            # CharacterImporter            [Wave 2]
     character/                       # (exists) Character schemas
     user.rb                          # (exists)
     participant.rb                   # (exists)
@@ -715,9 +804,9 @@ lib/tavern_kit/
       engine/
         base.rb                      # Lore::Engine::Base interface
       scan_input.rb                  # Lore::ScanInput (messages, books, budget; subclassed by ST/RisuAI)
-      book.rb                        # Lore::Book data            [Wave 3]
-      entry.rb                       # Lore::Entry data (minimal shared + extensions Hash) [Wave 3]
-      result.rb                      # Lore::Result data          [Wave 3]
+      book.rb                        # Lore::Book data            [Wave 2]
+      entry.rb                       # Lore::Entry data (minimal shared + extensions Hash) [Wave 2]
+      result.rb                      # Lore::Result data          [Wave 2]
     macro/
       engine/
         base.rb                      # Macro::Engine::Base (#expand with environment:)
@@ -738,12 +827,15 @@ lib/tavern_kit/
     chat_variables/
       in_memory.rb                   # ChatVariables::InMemory     [Wave 2]
     token_estimator.rb               # TokenEstimator              [Wave 2]
+    trim_report.rb                   # TrimReport + TrimResult     [Wave 2]
     trimmer.rb                       # Trimmer                     [Wave 4]
     prompt/
       pipeline.rb                    # Pipeline (exists)
       dsl.rb                         # DSL (exists)
       plan.rb                        # Plan (exists)
       context.rb                     # Context (exists)
+      trace.rb                       # Trace/build report          [Wave 2]
+      instrumenter.rb                # Instrumenter interface      [Wave 2]
       block.rb                       # Block (exists)
       message.rb                     # Message (exists)
       prompt_entry.rb                # PromptEntry (enhance)       [Wave 3]
@@ -835,8 +927,8 @@ lib/tavern_kit/
 |--------|-------------------|------------------|
 | Gem LOC | ~2,000 | ~13,000-15,000 |
 | Test files | 25 | 90+ |
-| Test cases | 202 (30 pending) | 1,000+ (0 pending) |
-| Code coverage | ~36% | >= 80% |
+| Test cases | 206 (30 pending) | 1,000+ (0 pending) |
+| Code coverage | ~35% | >= 80% |
 | Pending characterization tests | 30 | 0 |
 | ST parity | Partial (cards only) | Full (aligned to v1.15.0) |
 | ST preset fields | 0 | 60+ (sampling, budget, prompts, templates, nudges) |

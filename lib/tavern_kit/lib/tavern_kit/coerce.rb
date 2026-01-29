@@ -109,5 +109,27 @@ module TavernKit
       else default
       end
     end
+
+    # Coerce a loose timestamp input (string/float/etc) into an Integer unix timestamp.
+    #
+    # Returns nil for blank/invalid inputs.
+    def unix_timestamp(value)
+      case value
+      when nil
+        nil
+      when Integer
+        value
+      when Numeric
+        value.to_i
+      else
+        s = value.to_s.strip
+        return nil if s.empty?
+        return Integer(s) if s.match?(/\A-?\d+\z/)
+
+        nil
+      end
+    rescue ArgumentError, TypeError
+      nil
+    end
   end
 end

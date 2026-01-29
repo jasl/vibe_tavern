@@ -15,6 +15,8 @@ class TavernKit::Prompt::ContextTest < Minitest::Test
     assert_equal({}, ctx.pinned_groups)
     assert_equal [], ctx.blocks
     assert_equal false, ctx.strict
+    assert_nil ctx.instrumenter
+    assert_nil ctx.current_stage
     assert_equal [], ctx.warnings
     assert_equal({}, ctx.metadata)
   end
@@ -72,12 +74,20 @@ class TavernKit::Prompt::ContextTest < Minitest::Test
   end
 
   def test_dup_creates_independent_copy
-    ctx = TavernKit::Prompt::Context.new
+    ctx = TavernKit::Prompt::Context.new(warning_handler: nil)
     ctx.warn("original")
+    ctx.macro_vars = { foo: "bar" }
+    ctx.pinned_groups["chat_history"] = [TavernKit::Prompt::Block.new(role: :user, content: "hi")]
     copy = ctx.dup
     copy.warn("copy")
+    copy.macro_vars[:foo] = "changed"
+    copy.pinned_groups["chat_history"] << TavernKit::Prompt::Block.new(role: :assistant, content: "yo")
 
     assert_equal ["original"], ctx.warnings
     assert_equal ["original", "copy"], copy.warnings
+    assert_equal "bar", ctx.macro_vars[:foo]
+    assert_equal "changed", copy.macro_vars[:foo]
+    assert_equal 1, ctx.pinned_groups["chat_history"].length
+    assert_equal 2, copy.pinned_groups["chat_history"].length
   end
 end

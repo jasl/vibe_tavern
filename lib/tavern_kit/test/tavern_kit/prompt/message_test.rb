@@ -36,7 +36,7 @@ class TavernKit::Prompt::MessageTest < Minitest::Test
 
   def test_message_invalid_role
     assert_raises(ArgumentError) do
-      TavernKit::Prompt::Message.new(role: :invalid, content: "test")
+      TavernKit::Prompt::Message.new(role: "user", content: "test")
     end
   end
 
@@ -58,5 +58,18 @@ class TavernKit::Prompt::MessageTest < Minitest::Test
     assert_equal "user", h[:role]
     assert_equal "Hello!", h[:content]
     assert_equal "Alice", h[:name]
+  end
+
+  def test_message_serializable_hash_includes_attachments_and_metadata
+    msg = TavernKit::Prompt::Message.new(
+      role: :user,
+      content: "Hello!",
+      attachments: [{ type: "image", url: "https://example.test/a.png" }],
+      metadata: { provider: "test" },
+    )
+
+    h = msg.to_serializable_hash
+    assert_equal [{ type: "image", url: "https://example.test/a.png" }], h[:attachments]
+    assert_equal({ provider: "test" }, h[:metadata])
   end
 end

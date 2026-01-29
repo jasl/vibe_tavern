@@ -14,14 +14,23 @@ require_relative "tavern_kit/user"
 
 require_relative "tavern_kit/character"
 require_relative "tavern_kit/character_card"
+require_relative "tavern_kit/character_importer"
 require_relative "tavern_kit/png/parser"
 require_relative "tavern_kit/png/writer"
+
+require_relative "tavern_kit/chat_history"
+require_relative "tavern_kit/chat_history/in_memory"
+require_relative "tavern_kit/chat_variables"
+require_relative "tavern_kit/chat_variables/in_memory"
+require_relative "tavern_kit/token_estimator"
+require_relative "tavern_kit/trim_report"
 
 require_relative "tavern_kit/prompt/message"
 require_relative "tavern_kit/prompt/block"
 require_relative "tavern_kit/prompt/prompt_entry"
 require_relative "tavern_kit/prompt/plan"
 require_relative "tavern_kit/prompt/context"
+require_relative "tavern_kit/prompt/trace"
 require_relative "tavern_kit/prompt/middleware/base"
 require_relative "tavern_kit/prompt/pipeline"
 require_relative "tavern_kit/prompt/dsl"
@@ -32,7 +41,7 @@ module TavernKit
     # @param input [String, Hash] file path, JSON string, or Hash
     # @return [Character]
     def load_character(input)
-      CharacterCard.load(input)
+      CharacterImporter.load(input)
     end
 
     # Build a prompt using the DSL-based pipeline.

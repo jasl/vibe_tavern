@@ -10,6 +10,7 @@ class TavernKit::Prompt::PlanTest < Minitest::Test
     assert_equal [], plan.messages
     assert_equal [], plan.warnings
     refute plan.greeting?
+    assert plan.frozen?
   end
 
   def test_plan_with_blocks

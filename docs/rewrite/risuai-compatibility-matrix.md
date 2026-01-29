@@ -785,9 +785,9 @@ Status legend:
 |--------|--------|-----------|-------|
 | CharacterCardV3 (CCv3) | ✅ | ✅ | Via Core |
 | CharacterCardV2Risu | ✅ | ✅ | Via Core |
-| OldTavernChar | ✅ | ✅ | Via Core |
-| CharX (.charx) | ✅ | ⏸️ | Deferred |
-| JPEG-wrapped CharX | ✅ | ⏸️ | Deferred |
+| OldTavernChar | ✅ | ⏸️ | Wave 6+ (RisuAI extension; convert to CCv2/CCv3) |
+| CharX (.charx) | ✅ | ⏸️ | Wave 6+ |
+| JPEG-wrapped CharX | ✅ | ⏸️ | Wave 6+ |
 
 ### 8.2 RisuAI-Specific Fields
 
@@ -809,7 +809,7 @@ Status legend:
 
 | Type | RisuAI | TavernKit | Backend |
 |------|--------|-----------|---------|
-| `tik` | ✅ | ✅* | Tiktoken (via Core) |
+| `tik` | ✅ | ❌ | Tiktoken (Core TokenEstimator, Wave 2) |
 | `mistral` | ✅ | ⏸️ | Custom |
 | `novelai` | ✅ | ⏸️ | SentencePiece |
 | `claude` | ✅ | ⏸️ | Claude tokenizer |
@@ -820,7 +820,7 @@ Status legend:
 | `cohere` | ✅ | ⏸️ | JSON tokenizer |
 | `deepseek` | ✅ | ⏸️ | JSON tokenizer |
 
-\* Core provides tiktoken_ruby; other tokenizers via pluggable interface.
+\* Core will provide tiktoken_ruby in Wave 2; other tokenizers via pluggable interface.
 
 ---
 
@@ -848,8 +848,8 @@ Status legend:
 | Triggers | ~90 | 0 | ~90 |
 | Pipeline | ~15 | 0 | ~15 |
 | Memory | ~5 | 0 | ~5 |
-| Character Cards | ~10 | ~5 | ~5 |
-| **Total** | **~390** | **~5** | **~385** |
+| Character Cards | ~10 | ~2 | ~8 |
+| **Total** | **~390** | **~2** | **~388** |
 
 ---
 

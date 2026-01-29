@@ -37,12 +37,138 @@ its own configuration parsing.
 | Macro/CBS Engine | **High** | `#expand(text, vars)` too narrow; needs `environment:` parameter object |
 | Lore Engine | **Medium-High** | `#scan(text, books:, budget:)` too narrow; needs `ScanInput` parameter object |
 | ChatVariables | **Medium** | Missing `temp`/`function_arg` scopes for RisuAI |
-| Prompt::Block | **Medium** | Missing `:function` role + `removable` flag; `INSERTION_POINTS`/`BUDGET_GROUPS` too restrictive |
-| Prompt::Message | **Medium** | Reserve optional multimodal/metadata fields; allow dialect passthrough |
+| Prompt::Block | **Low** | Implemented in Core: flexible role/points/groups + `removable` flag |
+| Prompt::Message | **Low** | Implemented in Core: `attachments`/`metadata` passthrough fields |
 | Trimmer | **Low** | Needs pluggable strategy (`:group_order` vs `:priority`) |
 | Pipeline/Middleware | **None** | Fully platform-agnostic; no changes needed |
 | TokenEstimator | **Low** | Pluggable adapter interface; optional `model_hint:` |
-| Character/Card | **None** | `extensions` hash handles platform-specific fields |
+| Character/Card | **None** | `extensions` hash is the forward-compat surface; unknown keys outside extensions may be dropped |
+
+---
+
+## Hash Key Type Convention
+
+TavernKit uses a consistent Hash key type policy to avoid `hash["a"] || hash[:a]`
+patterns and unnecessary conversions.
+
+### The Rule
+
+| Context | Key Type | Rationale |
+|---------|----------|-----------|
+| **Internal domain objects** | **Symbol** | Ruby idiomatic, fast hash lookup |
+| **JSON I/O boundary** | **String** (via JSON library) | JSON.parse returns strings; JSON.generate handles symbols |
+| **`extensions` Hash** | **String** | Passthrough for external/unknown data |
+
+### Detailed Guidelines
+
+#### Internal Objects (Symbol Keys)
+
+All internal value objects use Symbol keys:
+
+```ruby
+# Block#to_h, Message#to_h, Entry#to_h, etc.
+{ role: :system, content: "Hello", name: nil }
+
+# Context#metadata
+ctx[:my_key] = value
+ctx.fetch(:my_key, default)
+
+# Lore::ScanInput options
+ScanInput.new(messages: msgs, books: books, budget: 2000)
+
+# TrimReport, Trace, etc.
+{ strategy: :group_order, budget_tokens: 4000 }
+```
+
+#### JSON Import Boundary (Parse Owned Fields; Keep `extensions` Raw)
+
+When parsing external JSON (presets, cards, etc.), keep the raw payload
+**String-keyed** and map owned fields into internal value objects.
+
+Do **not** blanket-symbolize the entire payload, because it would also convert
+`extensions` keys to Symbols (breaking the passthrough contract).
+
+```ruby
+# In CharacterCard.load, Preset.load, etc.
+def self.load(input)
+  raw = JSON.parse(input)         # String keys from JSON
+  parse_internal(raw)             # Parse owned fields explicitly
+end
+
+def self.parse_internal(raw)
+  data = raw.fetch("data")        # still String keys
+  extensions = data["extensions"]
+  extensions = {} unless extensions.is_a?(Hash)
+
+  Character::Data.new(
+    name: data.fetch("name").to_s,
+    # ...
+    extensions: extensions,       # Keep String keys
+  )
+end
+```
+
+#### JSON Export (Let JSON Library Handle It)
+
+When exporting to JSON, **do not manually stringify keys**. Ruby's JSON library
+handles Symbol -> String conversion automatically:
+
+```ruby
+# Internal hash with symbol keys
+data = { role: :system, content: "Hello" }
+
+# JSON.generate handles the conversion
+JSON.generate(data)  # => '{"role":"system","content":"Hello"}'
+```
+
+#### The `extensions` Exception
+
+The `extensions` Hash (in Character, Lore::Entry, etc.) uses **String keys**
+because:
+
+1. It stores arbitrary third-party data that TavernKit doesn't interpret
+2. Preserves exact key names from external sources
+3. Round-trips correctly without normalization
+
+```ruby
+# Character extensions (String keys)
+character.data.extensions["chub/alt_expressions"]  # ✓ correct
+character.data.extensions[:chub_alt_expressions]   # ✗ wrong
+
+# Lore::Entry extensions (String keys)
+entry.extensions["sillyTavern/sticky"]             # ✓ correct
+```
+
+### What to Avoid
+
+```ruby
+# ✗ WRONG: Defensive dual-key access
+value = hash["key"] || hash[:key]
+
+# ✗ WRONG: Blanket symbolization of external payloads
+# (also converts `extensions` keys, breaking passthrough)
+raw = JSON.parse(input)
+symbolized = Utils.deep_symbolize_keys(raw)
+
+# ✗ WRONG: Manual stringify before JSON
+def to_json
+  JSON.generate(Utils.deep_stringify_keys(to_h))  # Unnecessary
+end
+```
+
+### HashAccessor Deprecation Plan
+
+The current `Utils::HashAccessor` tries both String and Symbol keys. This will
+be deprecated in favor of:
+
+1. Normalize external payloads to **String keys** at import boundaries (JSON shape)
+2. Parse into value objects (no internal code should depend on raw hash key types)
+3. Remove dual-key fallback behavior
+
+Migration path:
+- Wave 2: Add `normalize_keys: true` option to parsers (deep-stringify Hash inputs)
+- Wave 3: Default to normalized String keys; deprecate HashAccessor dual-key usage
+- Wave 4: Remove HashAccessor dual-key; keep explicit accessors/value objects only
 
 ---
 
@@ -189,6 +315,103 @@ end
 
 ---
 
+### 4b. ChatHistory::Base
+
+Chat history is a **prompt-building data source**, not a chat UI model. Core
+needs a minimal, predictable contract that works for both in-memory arrays and
+ActiveRecord-backed iterators.
+
+**Contract (Core):**
+- `ChatHistory::Base` includes `Enumerable`.
+- `#each` yields messages in **chronological order** (oldest -> newest).
+- Yielded messages should be `Prompt::Message` (recommended) or at least duck-
+  type as `{ role:, content: }`.
+
+```ruby
+module TavernKit
+  module ChatHistory
+    class Base
+      include Enumerable
+
+      def append(message) = raise NotImplementedError
+      def each(&block) = raise NotImplementedError
+      def size = raise NotImplementedError
+      def clear = raise NotImplementedError
+
+      # Optional performance overrides: #last(n), *_message_count
+    end
+  end
+end
+```
+
+**Message model contract (Core):**
+- Required: `role: Symbol`, `content: String`
+- Optional: `name: String`, `send_date: Time/Date/DateTime/Numeric/String`
+- Optional ST/RisuAI state lives in `Prompt::Message#metadata` (e.g., swipe
+  info, provider/tool-call passthrough, app-specific IDs).
+
+Core and platform layers may derive "message id" semantics from the **index in
+the yielded sequence** (0-based) unless a platform chooses to expose a stable
+identifier via `message.metadata[:id]`.
+
+**Performance note:** adapters may override `#last(n)`/`#size`/`*_message_count`
+to avoid materializing the full history (ActiveRecord windowing).
+
+**Ergonomics:** Core should provide `ChatHistory.wrap(input)` to accept nil,
+arrays, or enumerable-like inputs and coerce hashes into `Prompt::Message`.
+
+---
+
+### 4c. Preset::Base (Token Budget Contract)
+
+Core needs a minimal, provider-agnostic budget contract. Platform layers add
+their own configuration surfaces, but Core only requires the numbers needed for
+token budgeting.
+
+```ruby
+module TavernKit
+  module Preset
+    class Base
+      def context_window_tokens = raise NotImplementedError
+      def reserved_response_tokens = raise NotImplementedError
+
+      def max_prompt_tokens
+        context_window_tokens.to_i - reserved_response_tokens.to_i
+      end
+    end
+  end
+end
+```
+
+---
+
+### 4d. HookRegistry::Base (Build-time Hooks)
+
+Hooks are optional build-time interception points used by the application layer
+and/or platform layers (mirrors ST extension interception).
+
+Core contract should support:
+- register hooks (`#before_build`, `#after_build`)
+- run hooks (`#run_before_build`, `#run_after_build`)
+
+Hook contexts are platform-defined (Core treats them as opaque objects with
+known accessors).
+
+---
+
+### 4e. InjectionRegistry::Base (Programmatic Injections)
+
+Programmatic injections are a data-model for features like STscript `/inject`:
+register by id, position mapping, optional scan/ephemeral flags.
+
+Core contract should support:
+- `#register(id:, content:, position:, **opts)` (idempotent replace by id)
+- `#remove(id:)`
+- `#each` yields injection entries
+- `#ephemeral_ids` for one-shot pruning after a build
+
+---
+
 ### 5. Prompt::Block Validation Relaxation
 
 Relax validation for cross-platform support:
@@ -221,6 +444,9 @@ Reserve optional fields for multimodal and metadata passthrough:
 - `metadata` (tool calls, cache hints, provider-specific fields)
 
 Dialect converters should **preserve passthrough fields** whenever possible.
+In the Core-only phase (before Dialects exist), `Plan#to_messages` may return
+minimal OpenAI-like hashes (role/content/name) and therefore drop passthrough
+fields; use explicit serialization helpers for persistence.
 
 ---
 
@@ -233,7 +459,7 @@ class Trimmer
   # :group_order (ST default) -- examples > lore > history
   # :priority (RisuAI) -- sort by block.priority, evict lowest first
   def initialize(strategy: :group_order)
-  def trim(blocks, budget:, estimator:) -> { kept:, evicted:, report: }
+  def trim(blocks, budget:, estimator:) -> TrimResult
 end
 ```
 
@@ -244,6 +470,60 @@ end
 | Order | `:system` > `:examples` > `:lore` > `:history` | Sort by `block.priority` descending |
 | Eviction unit | Examples as whole dialogues; history oldest-first | Individual blocks |
 | Protection | `:system` never evicted; preserve latest user message | `removable: false` flag; `@ignore_on_max_context` sets priority -1000 |
+
+#### 7a. TrimResult and TrimReport
+
+**TrimResult** is the return value of `Trimmer#trim`:
+
+```ruby
+module TavernKit
+  # Immutable result of a trim operation.
+  TrimResult = Data.define(:kept, :evicted, :report) do
+    # @return [Array<Block>] blocks retained in the prompt
+    # @return [Array<Block>] blocks evicted due to budget
+    # @return [TrimReport] detailed report for debugging/observability
+  end
+
+  # Detailed trim report for debugging and observability.
+  TrimReport = Data.define(
+    :strategy,           # Symbol - :group_order or :priority
+    :budget_tokens,      # Integer - max tokens allowed
+    :initial_tokens,     # Integer - tokens before trimming
+    :final_tokens,       # Integer - tokens after trimming
+    :eviction_count,     # Integer - number of blocks evicted
+    :evictions           # Array<EvictionRecord> - per-block eviction details
+  ) do
+    def tokens_saved = initial_tokens - final_tokens
+    def over_budget? = initial_tokens > budget_tokens
+  end
+
+  # Per-block eviction record.
+  EvictionRecord = Data.define(
+    :block_id,           # String - block.id
+    :slot,               # Symbol, nil - block.slot
+    :token_count,        # Integer - tokens in this block
+    :reason,             # Symbol - :budget_exceeded, :group_overflow, :priority_cutoff
+    :budget_group,       # Symbol - block.token_budget_group
+    :priority,           # Integer - block.priority (for :priority strategy)
+    :source              # Hash, nil - block.metadata[:source] for provenance
+  )
+end
+```
+
+**Usage in Lore::Result:**
+
+`Lore::Result` should also include a `TrimReport` when budget enforcement
+applies during lore activation:
+
+```ruby
+module TavernKit::Lore
+  Result = Data.define(
+    :activated_entries,  # Array<Entry> - entries that matched and fit budget
+    :total_tokens,       # Integer - total tokens of activated entries
+    :trim_report         # TrimReport, nil - if budget trimming occurred
+  )
+end
+```
 
 ---
 
@@ -259,7 +539,34 @@ end
 
 ---
 
+### 8b. Dialects (Output Conversion)
+
+Core API uses a **symbol dialect selector**:
+
+- `Plan#to_messages(dialect: :openai, **opts)` (default: `:openai`)
+- Dialect conversion should be implemented as `TavernKit::Dialects.convert(messages, dialect:, **opts)`
+
+This keeps the public surface small and matches how Rails app callers typically
+switch providers.
+
+**Extensibility (low ceremony):**
+- Downstream apps can add a custom dialect by extending the `TavernKit::Dialects`
+  registry/case statement once it lands (no need to thread a dialect object
+  through the entire build).
+
+---
+
 ### 9. Prompt::Context
+
+`Prompt::Context` is a **mutable build workspace** that flows through the
+middleware pipeline. Middlewares mutate `ctx` directly; branching/what-if is
+done via `ctx.dup` (shallow copy). Output value objects (`Prompt::Block`,
+`Prompt::Message`, `Prompt::Plan`) should remain immutable.
+
+Note: output immutability is currently **shallow**. Objects are frozen, but
+nested values may still be mutable depending on construction. Treat nested
+values as read-only by convention, and tighten boundaries as Dialects and
+platform layers land.
 
 Current ST-flavored accessors should migrate to `metadata` hash access in
 Wave 4 refactor:
@@ -276,18 +583,525 @@ supports platform-specific storage.
 
 ---
 
+### 10. Pipeline Observability & Debuggability
+
+TavernKit is used to build prompts for roleplay/writing/agent workflows where
+it is critical to understand:
+- how the final prompt is composed (provenance)
+- why content was trimmed/evicted (budget compliance)
+- whether output is stable enough to cache (fingerprinting)
+
+Core should provide optional instrumentation with **no ActiveSupport
+dependency**:
+
+- `Prompt::Instrumenter` interface (callable) receives events:
+  `:middleware_start`, `:middleware_finish`, `:middleware_error`, `:warning`,
+  `:stat`, plus budget/trim events.
+- `Prompt::Trace` value object collects stage timings and key counters
+  (block counts, token estimates, warnings, evictions) and a stable prompt
+  fingerprint derived from final output messages (excluding random block ids).
+- Blocks should carry provenance in `block.metadata[:source]` (e.g.,
+  `{ stage: :lore, id: "wi:entry_123" }`) so traces and trim reports can explain
+  *why* content exists in the final prompt.
+- Middleware exceptions should be wrapped as a `PipelineError` that includes
+  the failing stage name and original error to make production debugging
+  actionable.
+
+This should be opt-in (off by default) so production overhead is controllable.
+
+#### 10a. Trace and Instrumenter Design
+
+```ruby
+module TavernKit
+  module Prompt
+    # Per-stage trace record.
+    TraceStage = Data.define(
+      :name,             # Symbol - middleware/stage name
+      :duration_ms,      # Float - execution time
+      :stats,            # Hash - stage-specific counters (symbol keys)
+      :warnings          # Array<String> - warnings emitted during this stage
+    )
+
+    # Complete pipeline trace.
+    Trace = Data.define(
+      :stages,           # Array<TraceStage>
+      :fingerprint,      # String - SHA256 of final prompt content (for caching)
+      :started_at,       # Time
+      :finished_at,      # Time
+      :total_warnings    # Array<String> - all warnings (aggregated from stages + context)
+    ) do
+      def duration_ms = (finished_at - started_at) * 1000
+      def success? = stages.none? { |s| s.stats[:error] }
+    end
+
+    # Simple callable interface (Proc-compatible).
+    module Instrumenter
+      class Base
+        # @param event [Symbol] event type
+        # @param payload [Hash] event-specific data (symbol keys)
+        def call(event, **payload) = raise NotImplementedError
+      end
+
+      # Default no-op instrumenter (optional).
+      # Production default should be `nil` to avoid instrumentation overhead.
+      class Null < Base
+        def call(event, **payload) = nil
+      end
+
+      # Trace-collecting instrumenter for debugging.
+      class TraceCollector < Base
+        attr_reader :stages, :warnings
+
+        def initialize
+          @started_at = Time.now
+          @stages = []
+          @warnings = []
+          @stage_warnings = Hash.new { |h, k| h[k] = [] }
+          @stage_stats = Hash.new { |h, k| h[k] = {} }
+          @current_stage = nil
+          @stage_start = nil
+        end
+
+        def call(event, **payload)
+          case event
+          when :middleware_start
+            @current_stage = payload[:name]
+            @stage_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            @stage_warnings[@current_stage] = []
+            @stage_stats[@current_stage] = {}
+          when :middleware_finish
+            duration = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - @stage_start) * 1000
+            @stages << TraceStage.new(
+              name: @current_stage,
+              duration_ms: duration,
+              stats: @stage_stats[@current_stage].merge(payload[:stats] || {}),
+              warnings: @stage_warnings[@current_stage].dup
+            )
+          when :warning
+            @warnings << payload[:message]
+            stage = payload[:stage] || @current_stage
+            @stage_warnings[stage] << payload[:message] if stage
+          when :stat
+            stage = payload[:stage] || @current_stage
+            key = payload[:key]
+            @stage_stats[stage][key.to_sym] = payload[:value] if stage && key
+          when :middleware_error
+            @stages << TraceStage.new(
+              name: @current_stage,
+              duration_ms: 0,
+              stats: @stage_stats[@current_stage].merge(error: payload[:error].class.name),
+              warnings: @stage_warnings[@current_stage].dup
+            )
+          end
+        end
+
+        def to_trace(fingerprint:)
+          finished_at = Time.now
+          Trace.new(
+            stages: @stages.freeze,
+            fingerprint: fingerprint,
+            started_at: @started_at,
+            finished_at: finished_at,
+            total_warnings: @warnings.freeze
+          )
+        end
+      end
+    end
+  end
+end
+```
+
+**Debug switch (Core):**
+- `context.instrumenter` is `nil` by default (production).
+- Debug builds set `context.instrumenter = Instrumenter::TraceCollector.new`.
+- Middleware authors can emit stage-local stats via `ctx.instrument(:stat, key: ..., value: ...)`
+  (and optionally `stage:` when emitting from nested helpers).
+- Provide a helper that supports lazy payload evaluation so middleware authors
+  can attach expensive debug data without impacting production:
+
+```ruby
+class TavernKit::Prompt::Context
+  attr_accessor :instrumenter
+
+  def instrument(event, **payload)
+    return nil unless @instrumenter
+
+    if block_given?
+      @instrumenter.call(event, **payload.merge(yield))
+    else
+      @instrumenter.call(event, **payload)
+    end
+  end
+end
+```
+
+#### 10b. Integration with Context#warnings
+
+`Prompt::Context#warn` should emit to both the warnings array AND the
+instrumenter (if present):
+
+```ruby
+class TavernKit::Prompt::Context
+  def warn(message)
+    msg = message.to_s
+    @warnings << msg
+
+    instrument(:warning, message: msg, stage: @current_stage)
+
+    if @strict
+      raise TavernKit::StrictModeError, msg
+    end
+
+    effective_warning_handler&.call(msg)
+    nil
+  end
+end
+```
+
+This ensures warnings appear in both:
+- `context.warnings` (for programmatic access)
+- `trace.stages[n].warnings` (for per-stage debugging)
+- `trace.total_warnings` (for summary)
+
+---
+
+### 11. Error Handling Strategy
+
+TavernKit uses a layered error handling approach: warnings for recoverable
+issues, exceptions for unrecoverable failures.
+
+#### 11a. Error Hierarchy
+
+```ruby
+module TavernKit
+  # Base error class for all TavernKit errors.
+  class Error < StandardError; end
+
+  # === Core Errors ===
+
+  # Card parsing/validation failures.
+  class InvalidCardError < Error; end
+
+  # Unsupported card format/version.
+  class UnsupportedVersionError < Error; end
+
+  # PNG parsing failures.
+  module Png
+    class ParseError < Error; end
+    class WriteError < Error; end
+  end
+
+  # Lore parsing failures.
+  module Lore
+    class ParseError < Error; end
+  end
+
+  # Strict mode: warnings become errors.
+  class StrictModeError < Error; end
+
+  # Pipeline execution failures (wraps stage errors).
+  class PipelineError < Error
+    attr_reader :stage
+
+    def initialize(message, stage:)
+      @stage = stage
+      super("#{message} (stage: #{stage})")
+    end
+  end
+
+  # Token budget exceeded and cannot recover.
+  class TokenBudgetExceeded < Error
+    attr_reader :budget, :actual
+
+    def initialize(budget:, actual:)
+      @budget = budget
+      @actual = actual
+      super("Token budget exceeded: #{actual} > #{budget}")
+    end
+  end
+
+  # === SillyTavern Errors ===
+  module SillyTavern
+    # Invalid ST preset format/fields.
+    class InvalidPresetError < Error; end
+
+    # Macro expansion failures.
+    class MacroError < Error
+      attr_reader :macro_name, :position
+
+      def initialize(message, macro_name: nil, position: nil)
+        @macro_name = macro_name
+        @position = position
+        super(message)
+      end
+    end
+
+    # Macro syntax errors (malformed `{{...}}`).
+    class MacroSyntaxError < MacroError; end
+
+    # Unknown macro name.
+    class UnknownMacroError < MacroError; end
+
+    # Unmatched macro placeholders after expansion.
+    class UnconsumedMacroError < MacroError; end
+
+    # Lore/World Info parsing failures (ST-specific).
+    class LoreParseError < Error; end
+
+    # Invalid instruct format.
+    class InvalidInstructError < Error; end
+
+    # Invalid context template.
+    class InvalidContextTemplateError < Error; end
+  end
+
+  # === RisuAI Errors ===
+  module RisuAI
+    # CBS macro failures.
+    class CBSError < Error
+      attr_reader :position, :block_type
+
+      def initialize(message, position: nil, block_type: nil)
+        @position = position
+        @block_type = block_type
+        super(message)
+      end
+    end
+
+    # CBS syntax errors.
+    class CBSSyntaxError < CBSError; end
+
+    # CBS function call depth exceeded (20 limit).
+    class CBSStackOverflowError < CBSError; end
+
+    # Decorator parsing failures.
+    class DecoratorParseError < Error; end
+
+    # Trigger execution failures.
+    class TriggerError < Error
+      attr_reader :trigger_type, :effect_type
+
+      def initialize(message, trigger_type: nil, effect_type: nil)
+        @trigger_type = trigger_type
+        @effect_type = effect_type
+        super(message)
+      end
+    end
+
+    # Trigger recursion limit exceeded (10 limit).
+    class TriggerRecursionError < TriggerError; end
+  end
+end
+```
+
+#### 11b. Warning vs Exception Decision Rules
+
+| Situation | Strict Mode | Normal Mode | Rationale |
+|-----------|-------------|-------------|-----------|
+| **Unknown macro** (`{{unknown}}`) | `raise UnknownMacroError` | `warn` + preserve literal | User may have intentional placeholder |
+| **Malformed macro syntax** (`{{broken`) | `raise MacroSyntaxError` | `warn` + preserve literal | Likely typo, preserve for debugging |
+| **Unmatched placeholders after expansion** | `raise UnconsumedMacroError` | `warn` | Quality issue but recoverable |
+| **Missing required context** (no character) | `raise ArgumentError` | `raise ArgumentError` | Cannot proceed without data |
+| **Invalid card format** | `raise InvalidCardError` | `raise InvalidCardError` | Cannot parse, unrecoverable |
+| **Middleware exception** | `raise PipelineError` | `raise PipelineError` | Always fatal, wrap with stage info |
+| **Token budget exceeded** | `raise TokenBudgetExceeded` | Trim + `warn` | Recoverable via trimming |
+| **Invalid preset field value** | `raise InvalidPresetError` | `warn` + use default | Config error, but can continue |
+| **Lore entry parse error** | `raise LoreParseError` | `warn` + skip entry | One bad entry shouldn't kill build |
+| **CBS block unclosed** | `raise CBSSyntaxError` | `warn` + preserve | RisuAI: syntax error |
+| **CBS stack overflow** | `raise CBSStackOverflowError` | `raise CBSStackOverflowError` | Always fatal (infinite recursion) |
+| **Trigger recursion limit** | `raise TriggerRecursionError` | `raise TriggerRecursionError` | Always fatal (infinite loop) |
+
+#### 11c. Strict Mode
+
+Strict mode (`context.strict = true`) converts **quality-affecting warnings**
+into exceptions:
+
+```ruby
+# In Context#warn
+def warn(message)
+  msg = message.to_s
+  @warnings << msg
+
+  instrument(:warning, message: msg, stage: @current_stage)
+  raise TavernKit::StrictModeError, msg if @strict
+  effective_warning_handler&.call(msg)
+  nil
+end
+```
+
+**Use strict mode for:**
+- Tests (catch all quality issues)
+- Card validation tools
+- Debug builds
+
+**Use normal mode for:**
+- Production runtime (graceful degradation)
+- User-facing applications
+
+#### 11d. Pipeline Error Wrapping
+
+Middleware exceptions should always be wrapped to include stage context:
+
+```ruby
+# Rack-style middleware chain: wrap errors at the stage boundary.
+class TavernKit::Prompt::Middleware::Base
+  def call(ctx)
+    stage = self.class.middleware_name
+    ctx.instance_variable_set(:@current_stage, stage)
+
+    ctx.instrument(:middleware_start, name: stage)
+
+    before(ctx)
+    @app.call(ctx)
+    after(ctx)
+
+    ctx.instrument(:middleware_finish, name: stage, stats: {})
+    ctx
+  rescue StandardError => e
+    ctx.instrument(:middleware_error, name: stage, error: e)
+    raise TavernKit::PipelineError.new(e.message, stage: stage), cause: e
+  ensure
+    ctx.instance_variable_set(:@current_stage, nil)
+  end
+end
+```
+
+---
+
 ## Implementation Priority
 
 | Priority | Change | When |
 |----------|--------|------|
 | P0 | `Macro::Engine::Base` + `Environment::Base` | Wave 2 |
 | P0 | `Lore::Engine::Base` + `ScanInput` | Wave 2 |
+| P1 | `ChatHistory::Base` + message contract | Wave 2 |
 | P1 | `ChatVariables::Base` scope parameter | Wave 2 |
-| P1 | `Block` validation relaxation | Wave 2 |
-| P1 | `Prompt::Message` multimodal/metadata scaffolding | Wave 2 |
+| P1 | `Block` validation relaxation | Done (2026-01-29) |
+| P1 | `Prompt::Message` multimodal/metadata scaffolding | Done (2026-01-29) |
+| P1 | `Prompt::Trace` + instrumentation hooks | Wave 2 |
 | P2 | `Trimmer` strategy parameter | Wave 4 |
 | P2 | `Registry::Base` metadata parameter | Wave 2 |
+| P2 | `Dialects` conversion (`dialect: :openai` etc) | Wave 4 |
 | P3 | `Context` ST accessor migration | Wave 4 |
+
+---
+
+## API Style Guidelines
+
+### Ruby Idiomatic Patterns
+
+#### 1. Normalize Inputs, Fail-fast at Boundaries
+
+Prefer small normalization (`to_sym`/`to_s`) and raise descriptive errors at
+boundaries. Use duck typing internally, but avoid leaking `NoMethodError` to
+callers.
+
+```ruby
+# ✓ Normalize, raise helpful errors at boundaries
+def initialize(role:)
+  @role = role.to_sym
+rescue NoMethodError
+  raise ArgumentError, "role must be symbol-like (responds to #to_sym)"
+end
+```
+
+#### 2. Fluent Immutable Updates
+
+Value objects should support `#with(**attrs)` for immutable updates:
+
+```ruby
+# Supported pattern
+new_block = block.with(enabled: false, priority: 50)
+
+# Also support convenience methods
+disabled_block = block.disable
+high_priority = block.with_priority(200)
+```
+
+#### 3. Named Parameters for Complex Constructors
+
+Use keyword arguments for constructors with 3+ parameters:
+
+```ruby
+# ✓ Clear intent
+Block.new(
+  role: :system,
+  content: "Hello",
+  insertion_point: :relative,
+  priority: 100
+)
+
+# ✗ Positional confusion
+Block.new(:system, "Hello", :relative, 100)
+```
+
+#### 4. Builder Pattern for Complex Configuration
+
+Consider Builder for objects with many optional parameters:
+
+```ruby
+# For Pipeline/Context configuration
+ctx = Context.build do |b|
+  b.character my_char
+  b.user my_user
+  b.preset my_preset
+  b.strict true
+end
+
+# Alternative: DSL block (already used in TavernKit.build)
+plan = TavernKit::SillyTavern.build do
+  character my_char
+  user my_user
+  message "Hello!"
+end
+```
+
+#### 5. Module Aliasing for Deep Namespaces
+
+Provide shortcuts sparingly for very deep namespaces (usually engines/parsers),
+to keep call sites readable.
+
+```ruby
+# In lib/tavern_kit/silly_tavern/silly_tavern.rb
+module TavernKit
+  module SillyTavern
+    MacroV2 = Macro::V2Engine
+  end
+end
+
+# Usage:
+engine = TavernKit::SillyTavern::MacroV2.new
+```
+
+#### 6. Predicate Methods
+
+Use `?` suffix for boolean queries:
+
+```ruby
+block.enabled?      # not block.is_enabled
+block.removable?    # not block.can_remove
+context.strict?     # not context.strict_mode
+plan.greeting?      # not plan.has_greeting
+```
+
+#### 7. Bang Methods for Mutation/Danger
+
+Use `!` suffix for in-place mutation or operations that raise:
+
+```ruby
+context.validate!   # raises if invalid
+entry.activate!     # mutates state (if mutable)
+```
+
+### Naming Conventions
+
+| Pattern | Example | Usage |
+|---------|---------|-------|
+| `to_*` | `to_h`, `to_message`, `to_json` | Conversion methods |
+| `*?` | `enabled?`, `valid?` | Boolean predicates |
+| `*!` | `validate!`, `save!` | Dangerous/mutating operations |
+| `with_*` | `with(attrs)`, `with_priority(n)` | Immutable update |
+| `from_*` | `from_hash`, `from_json` | Factory methods |
 
 ---
 

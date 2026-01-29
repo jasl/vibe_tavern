@@ -112,8 +112,8 @@ class TavernKit::CharacterCardTest < Minitest::Test
     )
     character = TavernKit::CharacterCard.load(hash)
 
-    assert_equal "1706745600", character.data.creation_date
-    assert_equal "1706832000", character.data.modification_date
+    assert_equal 1_706_745_600, character.data.creation_date
+    assert_equal 1_706_832_000, character.data.modification_date
   end
 
   # --- Loading V1 ---
@@ -188,7 +188,7 @@ class TavernKit::CharacterCardTest < Minitest::Test
       name: "V3Char",
       nickname: "V3Nick",
       group_only_greetings: ["Hi group!"],
-      creation_date: "12345",
+      creation_date: 12_345,
     )
 
     v2 = TavernKit::CharacterCard.export_v2(character, preserve_v3_fields: true)
@@ -197,7 +197,7 @@ class TavernKit::CharacterCardTest < Minitest::Test
     refute_nil extras
     assert_equal "V3Nick", extras["nickname"]
     assert_equal ["Hi group!"], extras["group_only_greetings"]
-    assert_equal "12345", extras["creation_date"]
+    assert_equal 12_345, extras["creation_date"]
   end
 
   def test_export_v2_without_preserving_v3_fields
@@ -235,8 +235,8 @@ class TavernKit::CharacterCardTest < Minitest::Test
       nickname: "V3Nick",
       group_only_greetings: ["Hi!"],
       assets: [{ "type" => "icon", "uri" => "data:image/png;base64,abc" }],
-      creation_date: "12345",
-      modification_date: "67890",
+      creation_date: 12_345,
+      modification_date: 67_890,
       source: ["https://example.com"],
     )
 
@@ -247,8 +247,8 @@ class TavernKit::CharacterCardTest < Minitest::Test
     assert_equal "V3Export", v3["data"]["name"]
     assert_equal "V3Nick", v3["data"]["nickname"]
     assert_equal ["Hi!"], v3["data"]["group_only_greetings"]
-    assert_equal "12345", v3["data"]["creation_date"]
-    assert_equal "67890", v3["data"]["modification_date"]
+    assert_equal 12_345, v3["data"]["creation_date"]
+    assert_equal 67_890, v3["data"]["modification_date"]
     assert_equal ["https://example.com"], v3["data"]["source"]
   end
 
@@ -329,8 +329,8 @@ class TavernKit::CharacterCardTest < Minitest::Test
       description: "A V3 character",
       nickname: "V3Nick",
       group_only_greetings: ["Group hello!"],
-      creation_date: "1706745600",
-      modification_date: "1706832000",
+      creation_date: 1_706_745_600,
+      modification_date: 1_706_832_000,
       source: ["https://example.com"],
     )
 

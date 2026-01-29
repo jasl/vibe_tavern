@@ -145,6 +145,12 @@ module TavernKit
       # Warnings and metadata
       # ============================================
 
+      # @return [Prompt::Instrumenter::Base, nil] optional debug instrumenter
+      attr_accessor :instrumenter
+
+      # @return [Symbol, nil] current middleware stage name (internal)
+      attr_accessor :current_stage
+
       # @return [Array<String>] collected warnings
       attr_reader :warnings
 
@@ -154,6 +160,8 @@ module TavernKit
       def initialize(**attrs)
         @warnings = []
         @metadata = {}
+        @instrumenter = nil
+        @current_stage = nil
         @lore_books = []
         @forced_world_info_activations = []
         @outlets = {}
@@ -178,11 +186,28 @@ module TavernKit
         copy = super
         copy.instance_variable_set(:@warnings, @warnings.dup)
         copy.instance_variable_set(:@metadata, @metadata.dup)
+
         copy.instance_variable_set(:@lore_books, @lore_books.dup)
         copy.instance_variable_set(:@forced_world_info_activations, @forced_world_info_activations.dup)
+
         copy.instance_variable_set(:@outlets, @outlets.dup)
-        copy.instance_variable_set(:@pinned_groups, @pinned_groups.dup)
+
+        pinned_groups_copy = @pinned_groups.transform_values do |value|
+          value.is_a?(Array) ? value.dup : value
+        end
+        copy.instance_variable_set(:@pinned_groups, pinned_groups_copy)
+
         copy.instance_variable_set(:@blocks, @blocks.dup)
+        copy.instance_variable_set(:@continue_blocks, @continue_blocks&.dup)
+        copy.instance_variable_set(:@prompt_entries, @prompt_entries&.dup)
+
+        copy.instance_variable_set(:@macro_vars, @macro_vars&.dup)
+        copy.instance_variable_set(:@authors_note_overrides, @authors_note_overrides&.dup)
+
+        copy.instance_variable_set(:@scan_messages, @scan_messages&.dup)
+        copy.instance_variable_set(:@scan_context, @scan_context&.dup)
+        copy.instance_variable_set(:@scan_injects, @scan_injects&.dup)
+        copy.instance_variable_set(:@chat_scan_messages, @chat_scan_messages&.dup)
         copy
       end
 
@@ -191,15 +216,30 @@ module TavernKit
       def warn(message)
         msg = message.to_s
 
+        @warnings << msg
+        instrument(:warning, message: msg, stage: @current_stage)
+
         if @strict
-          @warnings << msg
           raise TavernKit::StrictModeError, msg
         end
 
-        @warnings << msg
         effective_warning_handler&.call(msg)
 
         nil
+      end
+
+      # Emit an instrumentation event. No-op when instrumenter is nil.
+      #
+      # Supports lazy payload evaluation to avoid expensive debug work in
+      # production (where instrumenter is typically nil).
+      def instrument(event, **payload)
+        return nil unless @instrumenter
+
+        if block_given?
+          @instrumenter.call(event, **payload.merge(yield))
+        else
+          @instrumenter.call(event, **payload)
+        end
       end
 
       # Access arbitrary metadata.

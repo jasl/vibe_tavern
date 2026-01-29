@@ -7,7 +7,7 @@ module TavernKit
     # Immutable message value object (Ruby 3.2+ Data class).
     #
     # @!attribute [r] role
-    #   @return [Symbol] message role (:user, :assistant, :system)
+    #   @return [Symbol] message role (:user, :assistant, :system, :function, ...)
     # @!attribute [r] content
     #   @return [String] message content
     # @!attribute [r] name
@@ -17,13 +17,18 @@ module TavernKit
     # - swipes: Array of alternative assistant message variants
     # - swipe_id: 0-based index of the currently selected swipe
     # - send_date: message timestamp
-    Message = Data.define(:role, :content, :name, :swipes, :swipe_id, :send_date) do
-      # Valid roles for messages (aligned with chat completion APIs)
-      ROLES = %i[system user assistant].freeze
+    #
+    # Forward-compat fields:
+    # - attachments: multimodal payloads (images/audio/video), provider-agnostic
+    # - metadata: passthrough fields for dialect/tooling (tool calls, cache hints, etc.)
+    Message = Data.define(:role, :content, :name, :swipes, :swipe_id, :send_date, :attachments, :metadata) do
+      # Keep validation minimal: platform layers and dialect converters may
+      # introduce additional roles (e.g., :function for OpenAI/RisuAI).
+      ROLES = %i[system user assistant function].freeze
 
-      def initialize(role:, content:, name: nil, swipes: nil, swipe_id: nil, send_date: nil)
-        unless role.is_a?(Symbol) && ROLES.include?(role)
-          raise ArgumentError, "role must be one of #{ROLES.inspect}, got: #{role.inspect}"
+      def initialize(role:, content:, name: nil, swipes: nil, swipe_id: nil, send_date: nil, attachments: nil, metadata: nil)
+        unless role.is_a?(Symbol)
+          raise ArgumentError, "role must be a Symbol, got: #{role.inspect}"
         end
 
         unless content.is_a?(String)
@@ -50,7 +55,26 @@ module TavernKit
                 "send_date must be a Time/DateTime/Date/Integer/Float/String (or nil), got: #{send_date.class}"
         end
 
-        super(role: role, content: content, name: name, swipes: swipes, swipe_id: swipe_id, send_date: send_date)
+        if !attachments.nil? && !attachments.is_a?(Array)
+          raise ArgumentError, "attachments must be an Array (or nil), got: #{attachments.class}"
+        end
+        attachments = attachments&.dup&.freeze
+
+        if !metadata.nil? && !metadata.is_a?(Hash)
+          raise ArgumentError, "metadata must be a Hash (or nil), got: #{metadata.class}"
+        end
+        metadata = metadata&.dup&.freeze
+
+        super(
+          role: role,
+          content: content,
+          name: name,
+          swipes: swipes,
+          swipe_id: swipe_id,
+          send_date: send_date,
+          attachments: attachments,
+          metadata: metadata,
+        )
       end
 
       # Convert to hash for API requests (minimal, only role/content/name).
@@ -71,6 +95,8 @@ module TavernKit
         h[:swipes] = swipes if swipes
         h[:swipe_id] = swipe_id if swipe_id
         h[:send_date] = serialize_send_date(send_date) if send_date
+        h[:attachments] = attachments if attachments
+        h[:metadata] = metadata if metadata
         h
       end
 

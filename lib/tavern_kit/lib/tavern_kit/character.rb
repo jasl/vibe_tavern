@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "participant"
+require_relative "coerce"
 require_relative "character/schema"
 
 module TavernKit
@@ -130,8 +131,8 @@ module TavernKit
         nickname: kwargs[:nickname],
         creator_notes_multilingual: kwargs[:creator_notes_multilingual],
         source: kwargs[:source],
-        creation_date: kwargs[:creation_date],
-        modification_date: kwargs[:modification_date],
+        creation_date: Coerce.unix_timestamp(kwargs[:creation_date]),
+        modification_date: Coerce.unix_timestamp(kwargs[:modification_date]),
       )
 
       new(data: data, source_version: nil, raw: nil)

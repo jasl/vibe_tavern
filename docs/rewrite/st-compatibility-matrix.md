@@ -98,7 +98,7 @@ Status legend:
 | CHAT | 8 | ✅ | ❌ | 3 |
 | TIME | 8 | ✅ | ❌ | 3 |
 | VARIABLE | 14 | ✅ | ❌ | 3 |
-| PROMPTS (instruct) | 19 | ✅ | ❌ | 4 |
+| PROMPTS (instruct) | 19 | ✅ | ❌ | 3 |
 | STATE | 3 | ✅ | ❌ | 3 |
 
 #### Key Macros Detail
@@ -124,8 +124,8 @@ Status legend:
 | `{{noop}}` | ✅ | ❌ | No operation |
 | `{{banned "..."}}` | ✅ | ❌ | Stopping strings |
 | `{{group}}` / `{{groupNotMuted}}` / `{{notChar}}` | ✅ | ❌ | Group macros |
-| `{{hasExtension}}` | ✅ | 🚫 | ST extension check; returns `"false"` |
-| `<USER>` / `<BOT>` / `<CHAR>` | ✅ | 🚫 | Legacy angle-bracket; not implemented |
+| `{{hasExtension}}` | ✅ | ❌ | Extension check via Macro::Environment `extensions` surface |
+| `<USER>` / `<BOT>` / `<CHAR>` | ✅ | ❌ | Legacy angle-bracket aliases (pre-processor normalization) |
 
 ---
 
@@ -514,8 +514,8 @@ Status legend:
 | Read `chara` chunk (CCv2) | ✅ | ✅ | 1 |
 | Read `ccv3` chunk (CCv3) | ✅ | ✅ | 1 |
 | Write PNG metadata | ✅ | ✅ | 1 |
-| CharX (`.charx`) import | ✅ | ⏸️ | Wave 5+ |
-| JPEG-wrapped CharX | ✅ | ⏸️ | Wave 5+ |
+| CharX (`.charx`) import | ✅ | ⏸️ | Wave 6+ |
+| JPEG-wrapped CharX | ✅ | ⏸️ | Wave 6+ |
 
 ---
 

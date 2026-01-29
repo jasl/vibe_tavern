@@ -185,8 +185,12 @@ module TavernKit
         data_hash["nickname"] = data.nickname if data.nickname
         data_hash["creator_notes_multilingual"] = data.creator_notes_multilingual if data.creator_notes_multilingual
         data_hash["source"] = data.source if data.source
-        data_hash["creation_date"] = data.creation_date if data.creation_date
-        data_hash["modification_date"] = data.modification_date if data.modification_date
+        if (ts = Coerce.unix_timestamp(data.creation_date))
+          data_hash["creation_date"] = ts
+        end
+        if (ts = Coerce.unix_timestamp(data.modification_date))
+          data_hash["modification_date"] = ts
+        end
 
         {
           "spec" => "chara_card_v3",
@@ -363,8 +367,8 @@ module TavernKit
           nickname: data_hash["nickname"],
           creator_notes_multilingual: data_hash["creator_notes_multilingual"],
           source: data_hash["source"],
-          creation_date: data_hash["creation_date"],
-          modification_date: data_hash["modification_date"],
+          creation_date: Coerce.unix_timestamp(data_hash["creation_date"]),
+          modification_date: Coerce.unix_timestamp(data_hash["modification_date"]),
         )
 
         Character.new(data: data, source_version: :v3, raw: hash)
@@ -391,8 +395,12 @@ module TavernKit
         extras["nickname"] = data.nickname if data.nickname
         extras["creator_notes_multilingual"] = data.creator_notes_multilingual if data.creator_notes_multilingual
         extras["source"] = data.source if data.source
-        extras["creation_date"] = data.creation_date if data.creation_date
-        extras["modification_date"] = data.modification_date if data.modification_date
+        if (ts = Coerce.unix_timestamp(data.creation_date))
+          extras["creation_date"] = ts
+        end
+        if (ts = Coerce.unix_timestamp(data.modification_date))
+          extras["modification_date"] = ts
+        end
         extras
       end
 

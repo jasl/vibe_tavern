@@ -34,6 +34,7 @@ module TavernKit
                   :name,
                   :slot,
                   :enabled,
+                  :removable,
                   :insertion_point,
                   :depth,
                   :order,
@@ -49,6 +50,7 @@ module TavernKit
         name: nil,
         slot: nil,
         enabled: true,
+        removable: true,
         insertion_point: :relative,
         depth: 0,
         order: 100,
@@ -63,8 +65,8 @@ module TavernKit
         end
         @id = resolved_id
 
-        unless role.is_a?(Symbol) && ROLES.include?(role)
-          raise ArgumentError, "role must be one of #{ROLES.inspect}, got: #{role.inspect}"
+        unless role.is_a?(Symbol)
+          raise ArgumentError, "role must be a Symbol, got: #{role.inspect}"
         end
         @role = role
 
@@ -88,9 +90,13 @@ module TavernKit
         end
         @enabled = enabled
 
-        unless insertion_point.is_a?(Symbol) && INSERTION_POINTS.include?(insertion_point)
-          raise ArgumentError,
-                "insertion_point must be one of #{INSERTION_POINTS.inspect}, got: #{insertion_point.inspect}"
+        unless removable == true || removable == false
+          raise ArgumentError, "removable must be a Boolean, got: #{removable.class}"
+        end
+        @removable = removable
+
+        unless insertion_point.is_a?(Symbol)
+          raise ArgumentError, "insertion_point must be a Symbol, got: #{insertion_point.inspect}"
         end
         @insertion_point = insertion_point
 
@@ -109,9 +115,8 @@ module TavernKit
         end
         @priority = priority
 
-        unless token_budget_group.is_a?(Symbol) && BUDGET_GROUPS.include?(token_budget_group)
-          raise ArgumentError,
-                "token_budget_group must be one of #{BUDGET_GROUPS.inspect}, got: #{token_budget_group.inspect}"
+        unless token_budget_group.is_a?(Symbol)
+          raise ArgumentError, "token_budget_group must be a Symbol, got: #{token_budget_group.inspect}"
         end
         @token_budget_group = token_budget_group
 
@@ -123,11 +128,14 @@ module TavernKit
         unless metadata.is_a?(Hash)
           raise ArgumentError, "metadata must be a Hash, got: #{metadata.class}"
         end
-        @metadata = metadata.dup
+        @metadata = metadata.dup.freeze
+
+        freeze
       end
 
       def enabled? = @enabled
       def disabled? = !@enabled
+      def removable? = @removable
       def in_chat? = @insertion_point == :in_chat
       def relative? = @insertion_point == :relative
 
@@ -147,6 +155,7 @@ module TavernKit
           name: name,
           slot: slot,
           enabled: enabled,
+          removable: removable,
           insertion_point: insertion_point,
           depth: depth,
           order: order,
