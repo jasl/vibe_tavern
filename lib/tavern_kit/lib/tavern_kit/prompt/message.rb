@@ -7,7 +7,7 @@ module TavernKit
     # Immutable message value object (Ruby 3.2+ Data class).
     #
     # @!attribute [r] role
-    #   @return [Symbol] message role (:user, :assistant, :system, :function, ...)
+    #   @return [Symbol] message role (:user, :assistant, :system, :tool, :function, ...)
     # @!attribute [r] content
     #   @return [String] message content
     # @!attribute [r] name
@@ -24,7 +24,7 @@ module TavernKit
     Message = Data.define(:role, :content, :name, :swipes, :swipe_id, :send_date, :attachments, :metadata) do
       # Keep validation minimal: platform layers and dialect converters may
       # introduce additional roles (e.g., :function for OpenAI/RisuAI).
-      ROLES = %i[system user assistant function].freeze
+      ROLES = %i[system user assistant tool function].freeze
 
       def initialize(role:, content:, name: nil, swipes: nil, swipe_id: nil, send_date: nil, attachments: nil, metadata: nil)
         unless role.is_a?(Symbol)

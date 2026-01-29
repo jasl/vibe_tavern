@@ -58,6 +58,8 @@ class TavernKit::CoerceTest < Minitest::Test
     assert_equal :system, TavernKit::Coerce.role("system")
     assert_equal :user, TavernKit::Coerce.role("user")
     assert_equal :assistant, TavernKit::Coerce.role("assistant")
+    assert_equal :tool, TavernKit::Coerce.role("tool")
+    assert_equal :function, TavernKit::Coerce.role("function")
   end
 
   def test_role_from_integer

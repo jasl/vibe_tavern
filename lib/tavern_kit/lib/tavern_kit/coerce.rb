@@ -59,6 +59,8 @@ module TavernKit
       when "system", "0" then :system
       when "user", "1" then :user
       when "assistant", "2" then :assistant
+      when "tool" then :tool
+      when "function" then :function
       else default
       end
     end

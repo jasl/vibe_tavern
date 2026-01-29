@@ -12,7 +12,7 @@ module TavernKit
     # - Metadata for debugging, filtering, and budget management
     # - Positioning information for insertion logic
     class Block
-      ROLES = %i[system user assistant].freeze
+      ROLES = %i[system user assistant tool function].freeze
 
       INSERTION_POINTS = %i[
         relative

@@ -188,7 +188,8 @@ module TavernKit
         end
 
         def build_prompt_entries_from_st(hash)
-          prompts = hash["prompts"] || []
+          prompts = hash["prompts"]
+          prompts = [] unless prompts.is_a?(Array)
           prompt_order = extract_prompt_order_entries(hash["prompt_order"])
 
           prompts_by_id = prompts.each_with_object({}) do |p, result|
