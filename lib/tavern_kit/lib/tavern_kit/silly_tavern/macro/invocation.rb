@@ -2,6 +2,8 @@
 
 require "zlib"
 
+require_relative "flags"
+
 module TavernKit
   module SillyTavern
     module Macro
@@ -16,10 +18,22 @@ module TavernKit
         :key,
         :name,
         :args,
+        :raw_args,
+        :flags,
+        :is_scoped,
+        :range,
         :offset,
         :raw_content_hash,
         :environment,
       ) do
+        def global_offset = offset
+
+        def raw
+          "{{#{raw_inner}}}"
+        rescue StandardError
+          ""
+        end
+
         def now
           environment.respond_to?(:now) ? environment.now : Time.now
         end
