@@ -223,7 +223,7 @@ Delivered modules:
 - **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, CharacterImporter, TrimReport, Prompt::Trace/Instrumenter
 - **SillyTavern (Wave 2):** Preset + Instruct + ContextTemplate (config/data only; middleware chain lands in Wave 4)
 
-Test status (gem): 233 runs, 0 failures, 30 skips (characterization scaffolding).
+Test status (gem): 239 runs, 0 failures, 30 skips (characterization scaffolding).
 
 ## Gap Summary
 
