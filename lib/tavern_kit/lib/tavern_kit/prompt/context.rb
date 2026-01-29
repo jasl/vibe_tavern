@@ -181,6 +181,8 @@ module TavernKit
         end
       end
 
+      def strict? = @strict == true
+
       # Create a shallow copy suitable for pipeline branching.
       def dup
         copy = super

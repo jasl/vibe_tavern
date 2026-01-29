@@ -94,6 +94,20 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     assert_equal true, ctx.strict
   end
 
+  def test_dsl_sets_instrumenter
+    collector = TavernKit::Prompt::Instrumenter::TraceCollector.new
+
+    pipeline = simple_pipeline
+    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl.instrumenter(collector)
+    dsl.warning_handler(nil)
+    dsl.message("Hello!")
+    dsl.build
+
+    trace = collector.to_trace(fingerprint: "fp")
+    assert_equal [:simple], trace.stages.map(&:name)
+  end
+
   def test_dsl_macro_vars
     pipeline = simple_pipeline
     dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)

@@ -90,6 +90,19 @@ class TavernKit::Prompt::PlanTest < Minitest::Test
     assert_equal ["warn1", "warn2"], plan.warnings
   end
 
+  def test_trace
+    trace = TavernKit::Prompt::Trace.new(
+      stages: [],
+      fingerprint: "fp",
+      started_at: Time.now,
+      finished_at: Time.now,
+      total_warnings: [],
+    )
+
+    plan = TavernKit::Prompt::Plan.new(blocks: [], trace: trace)
+    assert_equal trace, plan.trace
+  end
+
   def test_debug_dump
     blocks = [
       TavernKit::Prompt::Block.new(role: :system, content: "System prompt", slot: :main_prompt),

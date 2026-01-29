@@ -170,6 +170,12 @@ module TavernKit
         self
       end
 
+      # Set the debug instrumenter (typically nil in production).
+      def instrumenter(instrumenter)
+        @context.instrumenter = instrumenter
+        self
+      end
+
       # Enable or disable strict mode.
       def strict(enabled = true)
         @context.strict = enabled

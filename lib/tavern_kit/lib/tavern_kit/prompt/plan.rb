@@ -11,9 +11,9 @@ module TavernKit
     # - filter to only enabled blocks for LLM consumption
     # - insert custom content at specific points
     class Plan
-      attr_reader :blocks, :outlets, :lore_result, :trim_report, :greeting, :greeting_index, :warnings
+      attr_reader :blocks, :outlets, :lore_result, :trim_report, :greeting, :greeting_index, :warnings, :trace
 
-      def initialize(blocks:, outlets: {}, lore_result: nil, trim_report: nil, greeting: nil, greeting_index: nil, warnings: nil)
+      def initialize(blocks:, outlets: {}, lore_result: nil, trim_report: nil, greeting: nil, greeting_index: nil, warnings: nil, trace: nil)
         @blocks = Array(blocks).dup.freeze
         @outlets = (outlets || {}).dup.freeze
         @lore_result = lore_result
@@ -21,6 +21,7 @@ module TavernKit
         @greeting = greeting
         @greeting_index = greeting_index
         @warnings = Array(warnings).compact.map(&:to_s).freeze
+        @trace = trace
 
         freeze
       end

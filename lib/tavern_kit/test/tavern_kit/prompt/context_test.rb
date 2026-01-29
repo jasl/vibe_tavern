@@ -15,6 +15,7 @@ class TavernKit::Prompt::ContextTest < Minitest::Test
     assert_equal({}, ctx.pinned_groups)
     assert_equal [], ctx.blocks
     assert_equal false, ctx.strict
+    assert_equal false, ctx.strict?
     assert_nil ctx.instrumenter
     assert_nil ctx.current_stage
     assert_equal [], ctx.warnings
@@ -49,6 +50,7 @@ class TavernKit::Prompt::ContextTest < Minitest::Test
 
   def test_warn_in_strict_mode
     ctx = TavernKit::Prompt::Context.new(strict: true, warning_handler: nil)
+    assert_equal true, ctx.strict?
     assert_raises(TavernKit::StrictModeError) do
       ctx.warn("strict error")
     end
