@@ -8,8 +8,6 @@ class StMacrosTest < Minitest::Test
   end
 
   def test_legacy_marker_rewrites
-    pending!("Macro pre-processor rewrites legacy <USER>/<BOT>/<GROUP> markers")
-
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
     env = TavernKit::SillyTavern::Macro::Environment.new(
       user_name: "Alice",

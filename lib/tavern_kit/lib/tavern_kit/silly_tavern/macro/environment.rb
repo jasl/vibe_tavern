@@ -22,6 +22,9 @@ module TavernKit
           clock: nil,
           rng: nil,
           content_hash: nil,
+          character_name: nil,
+          user_name: nil,
+          group_name: nil,
           extensions: {},
           post_process: nil,
           **_platform_attrs
@@ -31,6 +34,9 @@ module TavernKit
           @variables = variables || TavernKit::ChatVariables::InMemory.new
           @outlets = outlets.is_a?(Hash) ? outlets : {}
           @original = original.nil? ? nil : original.to_s
+          @character_name = character_name.nil? ? nil : character_name.to_s
+          @user_name = user_name.nil? ? nil : user_name.to_s
+          @group_name = group_name.nil? ? nil : group_name.to_s
 
           @clock =
             if clock.nil?
@@ -54,6 +60,8 @@ module TavernKit
         end
 
         def character_name
+          return @character_name if @character_name && !@character_name.empty?
+
           if character.respond_to?(:display_name)
             character.display_name.to_s
           elsif character.respond_to?(:name)
@@ -64,7 +72,16 @@ module TavernKit
         end
 
         def user_name
+          return @user_name if @user_name && !@user_name.empty?
+
           user.respond_to?(:name) ? user.name.to_s : ""
+        end
+
+        def group_name
+          return @group_name if @group_name && !@group_name.empty?
+
+          # In ST, `group` often falls back to the bot name for non-group chats.
+          character_name
         end
 
         def now
