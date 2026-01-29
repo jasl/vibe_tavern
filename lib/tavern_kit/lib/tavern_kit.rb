@@ -46,9 +46,14 @@ require_relative "tavern_kit/prompt/prompt_entry"
 require_relative "tavern_kit/prompt/plan"
 require_relative "tavern_kit/prompt/context"
 require_relative "tavern_kit/prompt/trace"
+require_relative "tavern_kit/prompt/instrumenter"
 require_relative "tavern_kit/prompt/middleware/base"
 require_relative "tavern_kit/prompt/pipeline"
 require_relative "tavern_kit/prompt/dsl"
+
+require_relative "tavern_kit/silly_tavern/context_template"
+require_relative "tavern_kit/silly_tavern/instruct"
+require_relative "tavern_kit/silly_tavern/preset"
 
 module TavernKit
   class << self
