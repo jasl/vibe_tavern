@@ -267,12 +267,19 @@
 - Module bundle includes lorebook, regex scripts, triggers, assets, and toggles.
 - Import/export uses rpack + asset payloads; modules can inject toggle definitions.
 
-## Next Actions (proposed)
-- Add characterization tests for:
-  - PNG read/write precedence (`ccv3` > `chara`).
-  - BYAF import macro replacements and example formatting.
-  - Macro engine: core macros + variable shorthand behavior.
-  - World Info: key matching, budgets, insertion strategies, timed effects.
-- Prompt Manager: injection positions, ordering, group nudge, continue nudge.
-- RisuAI CBS: `#when` operators, `#each`, `#func`/`call`, `#escape`/`#pure` parsing behavior.
-- RisuAI lorebook: decorators, recursive scanning, regex vs full-word matching, `inject_*` behaviors.
+## Next Actions
+
+Detailed implementation plans have been refined into the following documents:
+
+- **Roadmap (wave plan + Core interface design):**
+  `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
+- **ST alignment delta (30 action items):**
+  `docs/rewrite/st-alignment-delta-v1.15.0.md`
+- **RisuAI alignment delta (39 action items):**
+  `docs/rewrite/risuai-alignment-delta.md`
+
+High-level summary of remaining work:
+- Wave 2: Core interfaces (revised for dual-platform support) + ST config
+- Wave 3: Lore engine + Macro engine (ST implementations)
+- Wave 4: Middleware chain + Dialects + full `SillyTavern.build()` end-to-end
+- Wave 5: RisuAI layer + parity verification
