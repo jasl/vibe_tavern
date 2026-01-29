@@ -11,7 +11,7 @@ module TavernKit
       # callers provide Character/User + variable storage, and optionally
       # additional dynamic macros via `extensions`.
       class Environment < TavernKit::Macro::Environment::Base
-        attr_reader :character, :user, :variables, :outlets, :original, :clock, :rng, :content_hash, :extensions, :post_process
+        attr_reader :character, :user, :variables, :outlets, :original, :clock, :rng, :content_hash, :extensions, :post_process, :platform_attrs
 
         def initialize(
           character: nil,
@@ -29,7 +29,7 @@ module TavernKit
           group_name: nil,
           extensions: {},
           post_process: nil,
-          **_platform_attrs
+          **platform_attrs
         )
           @character = character
           @user = user
@@ -49,9 +49,13 @@ module TavernKit
               -> { clock }
             end
 
-          @rng = rng || Random.new
+          # If callers want deterministic behavior (tests/debugging), pass a
+          # seeded Random. Otherwise leave it nil to match ST's typical "fresh
+          # entropy" behavior for random-like macros.
+          @rng = rng
           @content_hash = content_hash
           @extensions = extensions.is_a?(Hash) ? TavernKit::Utils.deep_stringify_keys(extensions) : {}
+          @platform_attrs = TavernKit::Utils.deep_stringify_keys(platform_attrs.is_a?(Hash) ? platform_attrs : {})
 
           @post_process =
             if post_process.respond_to?(:call)
