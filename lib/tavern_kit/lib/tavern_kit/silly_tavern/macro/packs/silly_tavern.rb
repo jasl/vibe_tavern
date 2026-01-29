@@ -26,7 +26,12 @@ module TavernKit
           end
 
           def self.register_core_macros(registry)
-            registry.register("newline") do |inv|
+            registry.register(
+              "newline",
+              unnamed_args: [
+                { name: "count", optional: true, type: :integer },
+              ],
+            ) do |inv|
               count = Integer(Array(inv.args).first.to_s.strip)
               count = 1 if count <= 0
               "\n" * count
@@ -35,7 +40,12 @@ module TavernKit
             end
             registry.register("noop") { "" }
 
-            registry.register("trim") do |inv|
+            registry.register(
+              "trim",
+              unnamed_args: [
+                { name: "content", optional: true, type: :string },
+              ],
+            ) do |inv|
               content = Array(inv.args).first
               # Scoped trim returns its content (the engine trims by default).
               return content.to_s if content
@@ -44,7 +54,12 @@ module TavernKit
               "{{trim}}"
             end
 
-            registry.register("outlet") do |inv|
+            registry.register(
+              "outlet",
+              unnamed_args: [
+                { name: "key", type: :string },
+              ],
+            ) do |inv|
               key = Array(inv.args).first.to_s.strip
               next "" if key.empty?
 
@@ -52,14 +67,14 @@ module TavernKit
               outlets.is_a?(Hash) ? (outlets[key] || outlets[key.to_s] || "") : ""
             end
 
-            registry.register("random") do |inv|
+            registry.register("random", list: true) do |inv|
               list = extract_list(inv)
               next "" if list.empty?
 
               list[inv.rng_or_new.rand(list.length)].to_s
             end
 
-            registry.register("pick") do |inv|
+            registry.register("pick", list: true) do |inv|
               list = extract_list(inv)
               next "" if list.empty?
 
@@ -105,7 +120,12 @@ module TavernKit
 
           def self.register_time_macros(registry)
             # {{time}} or {{time::UTC+2}}
-            registry.register("time") do |inv|
+            registry.register(
+              "time",
+              unnamed_args: [
+                { name: "offset", optional: true, type: :string },
+              ],
+            ) do |inv|
               raw = Array(inv.args).first
               return inv.now.strftime("%-I:%M %p") if raw.nil? || raw.to_s.strip.empty?
 
@@ -120,54 +140,96 @@ module TavernKit
           end
 
           def self.register_variable_macros(registry)
-            registry.register("setvar") do |inv|
+            registry.register(
+              "setvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+                { name: "value", type: %i[string number] },
+              ],
+            ) do |inv|
               name, value = Array(inv.args)
               key = name.to_s.strip
               inv.environment.set_var(key, value.to_s, scope: :local) if !key.empty? && inv.environment.respond_to?(:set_var)
               ""
             end
 
-            registry.register("getvar") do |inv|
+            registry.register(
+              "getvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
               name = Array(inv.args).first.to_s.strip
               v = inv.environment.respond_to?(:get_var) ? inv.environment.get_var(name, scope: :local) : nil
               normalize(v)
             end
 
-            registry.register("hasvar") do |inv|
+            registry.register(
+              "hasvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
               name = Array(inv.args).first.to_s.strip
               has = inv.environment.respond_to?(:has_var?) ? inv.environment.has_var?(name, scope: :local) : false
               has ? "true" : "false"
             end
             registry.register_alias("hasvar", "varexists")
 
-            registry.register("deletevar") do |inv|
+            registry.register(
+              "deletevar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
               name = Array(inv.args).first.to_s.strip
               inv.environment.delete_var(name, scope: :local) if inv.environment.respond_to?(:delete_var)
               ""
             end
             registry.register_alias("deletevar", "flushvar")
 
-            registry.register("setglobalvar") do |inv|
+            registry.register(
+              "setglobalvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+                { name: "value", type: %i[string number] },
+              ],
+            ) do |inv|
               name, value = Array(inv.args)
               key = name.to_s.strip
               inv.environment.set_var(key, value.to_s, scope: :global) if !key.empty? && inv.environment.respond_to?(:set_var)
               ""
             end
 
-            registry.register("getglobalvar") do |inv|
+            registry.register(
+              "getglobalvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
               name = Array(inv.args).first.to_s.strip
               v = inv.environment.respond_to?(:get_var) ? inv.environment.get_var(name, scope: :global) : nil
               normalize(v)
             end
 
-            registry.register("hasglobalvar") do |inv|
+            registry.register(
+              "hasglobalvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
               name = Array(inv.args).first.to_s.strip
               has = inv.environment.respond_to?(:has_var?) ? inv.environment.has_var?(name, scope: :global) : false
               has ? "true" : "false"
             end
             registry.register_alias("hasglobalvar", "globalvarexists")
 
-            registry.register("deleteglobalvar") do |inv|
+            registry.register(
+              "deleteglobalvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
               name = Array(inv.args).first.to_s.strip
               inv.environment.delete_var(name, scope: :global) if inv.environment.respond_to?(:delete_var)
               ""
