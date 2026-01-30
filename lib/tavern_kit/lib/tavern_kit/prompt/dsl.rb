@@ -57,6 +57,14 @@ module TavernKit
         self
       end
 
+      # Set the target dialect hint (:openai, :anthropic, :text, ...).
+      #
+      # Dialect-aware pipelines may branch behavior based on this value.
+      def dialect(value)
+        @context.dialect = value&.to_sym
+        self
+      end
+
       # Set the chat history.
       def history(value)
         @context.history = value

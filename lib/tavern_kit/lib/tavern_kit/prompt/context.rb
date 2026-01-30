@@ -27,6 +27,12 @@ module TavernKit
       # @return [Object, nil] preset configuration
       attr_accessor :preset
 
+      # @return [Symbol, nil] output dialect hint (:openai, :anthropic, :text, ...)
+      #
+      # Used by dialect-aware pipelines (e.g. SillyTavern) to branch between
+      # chat-style assembly vs text-completion style assembly.
+      attr_accessor :dialect
+
       # @return [Symbol] generation type (:normal, :continue, :impersonate, etc.)
       attr_accessor :generation_type
 

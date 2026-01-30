@@ -82,6 +82,7 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
     dsl.character(char)
     dsl.user(user)
+    dsl.dialect(:text)
     dsl.message("Hello!")
     dsl.generation_type(:continue)
     dsl.strict(true)
@@ -89,6 +90,7 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     ctx = dsl.context
     assert_equal char, ctx.character
     assert_equal user, ctx.user
+    assert_equal :text, ctx.dialect
     assert_equal "Hello!", ctx.user_message
     assert_equal :continue, ctx.generation_type
     assert_equal true, ctx.strict

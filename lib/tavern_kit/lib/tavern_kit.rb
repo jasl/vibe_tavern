@@ -39,6 +39,7 @@ require_relative "tavern_kit/lore/engine/base"
 
 require_relative "tavern_kit/hook_registry/base"
 require_relative "tavern_kit/injection_registry/base"
+require_relative "tavern_kit/injection_registry/entry"
 
 require_relative "tavern_kit/prompt/message"
 require_relative "tavern_kit/prompt/block"

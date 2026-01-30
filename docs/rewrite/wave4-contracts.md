@@ -168,6 +168,20 @@ text from multiple fields.
 
 Core object: `TavernKit::SillyTavern::ContextTemplate`.
 
+### Dialect-aware behavior (:text vs chat)
+
+SillyTavern uses two different prompt assembly modes:
+
+- **Chat dialects** (e.g. `:openai`, `:anthropic`): prompt is assembled as an
+  ordered collection of prompts/messages; **story string is not used**.
+- **Text dialect** (`:text`): prompt is assembled as a single string; story
+  string IS used as the primary "context template".
+
+In Wave 4, the ST pipeline must branch based on `ctx.dialect`:
+
+- `ctx.dialect == :text` => apply ContextTemplate story string rules
+- otherwise => chat-style assembly (PromptManager-style)
+
 ### Template syntax
 
 Wave 4 only relies on a restricted Handlebars-like subset:
@@ -191,13 +205,22 @@ ST behavior (and our renderer) normalizes the rendered output:
 ContextTemplate includes `story_string_position`, `story_string_depth`, and
 `story_string_role` (mirrors ST `extension_prompt_types` / `extension_prompt_roles`).
 
-- If `story_string_position == :in_chat`, emit an in-chat message at
-  `story_string_depth` with role `story_string_role`.
+In **text dialect mode** (`ctx.dialect == :text`):
+
+- `anchorBefore` and `anchorAfter` MUST be derived from extension prompts:
+  - `anchorBefore` := concatenation of `position: :before` injection content
+  - `anchorAfter`  := concatenation of `position: :after` injection content
+  - These are passed into `ContextTemplate#render` params as
+    `anchorBefore` / `anchorAfter`.
+  - Note: they are NOT emitted as standalone blocks unless the template
+    includes `{{anchorBefore}}` / `{{anchorAfter}}`.
+- If `story_string_position == :in_chat`, emit the rendered story string as an
+  in-chat message at `story_string_depth` with role `story_string_role`.
   - In instruct mode, do NOT apply `instruct.story_string_prefix/suffix`
     (chat message sequences already wrap the injected message).
-- Otherwise (`:in_prompt` / `:before_prompt`), treat the story string as
-  system-level prompt content at the corresponding position, and instruct
-  may wrap it via `instruct.story_string_prefix/suffix`.
+- Otherwise (`:in_prompt` / `:before_prompt`), the rendered story string is
+  used as system-level prompt prefix (and instruct may wrap it via
+  `instruct.story_string_prefix/suffix`).
 
 ## InjectionRegistry Contract
 
@@ -214,6 +237,14 @@ class TavernKit::InjectionRegistry::Base
   def ephemeral_ids = raise NotImplementedError
 end
 ```
+
+### Yield contract
+
+`each` must yield `TavernKit::InjectionRegistry::Entry` objects (not raw tuples).
+
+- When called without a block, it should return an Enumerator.
+- Entry ids are strings (`entry.id`), so callers can do stable ordering,
+  de-duplication, and tracing.
 
 ### Standard opts keys
 
@@ -368,6 +399,9 @@ Behavior:
   - Apply extension_prompt_types mapping
   - Handle author's note interval logic (note_interval)
   - Handle persona description positions (IN_PROMPT/TOP_AN/BOTTOM_AN/AT_DEPTH/NONE)
+  - Dialect-aware:
+    - `ctx.dialect == :text`: `:before/:after` injections feed `anchorBefore/anchorAfter` only (template decides inclusion)
+    - otherwise: `:before/:after` injections are emitted as relative blocks at start/end (chat-style)
   - Merge `position: :chat` entries by `(depth, role)` (stable order within group)
   - Final in-chat ordering for the same depth is role-descending: Assistant > User > System (ST parity via reverse-depth insertion)
   - If a merged group is empty after trimming/normalization, do not emit a message for it

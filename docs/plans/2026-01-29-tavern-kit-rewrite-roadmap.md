@@ -543,6 +543,10 @@ Both usable standalone by Rails and as middleware dependencies.
 Contracts pinned for implementation alignment:
 - `docs/rewrite/wave4-contracts.md` (Dialects tool/function passthrough, Trimmer bundled eviction, strict/debug conventions)
 
+Dialect-aware ST behavior:
+- `ctx.dialect == :text` uses ContextTemplate (story string) + anchors for text-completion style prompts
+- otherwise uses chat-style prompt assembly (PromptManager-like)
+
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
 | `Trimmer` | Core | Pluggable eviction strategy: `:group_order` (ST: examples -> lore -> history) or `:priority` (RisuAI: sort by priority, evict lowest first) | 180-230 |
