@@ -16,9 +16,27 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     end
   end
 
+  class DialectPlanMiddleware < TavernKit::Prompt::Middleware::Base
+    private
+
+    def before(ctx)
+      ctx.plan = TavernKit::Prompt::Plan.new(
+        blocks: [
+          TavernKit::Prompt::Block.new(role: :user, content: ctx.dialect.to_s),
+        ],
+      )
+    end
+  end
+
   def simple_pipeline
     TavernKit::Prompt::Pipeline.new do
       use SimplePlanMiddleware, name: :simple
+    end
+  end
+
+  def dialect_pipeline
+    TavernKit::Prompt::Pipeline.new do
+      use DialectPlanMiddleware, name: :dialect
     end
   end
 
@@ -140,5 +158,22 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
 
     assert_kind_of TavernKit::Prompt::Plan, plan
     assert_equal 1, plan.size
+  end
+
+  def test_dsl_to_messages_sets_ctx_dialect_before_build
+    pipeline = dialect_pipeline
+    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+
+    output = dsl.to_messages(dialect: :text)
+
+    assert_equal :text, dsl.context.dialect
+    assert_equal "text", output.first.fetch(:content)
+  end
+
+  def test_tavern_kit_to_messages_sets_ctx_dialect_before_build
+    pipeline = dialect_pipeline
+    output = TavernKit.to_messages(dialect: :text, pipeline: pipeline) { }
+
+    assert_equal "text", output.first.fetch(:content)
   end
 end

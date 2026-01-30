@@ -115,8 +115,18 @@ module TavernKit
     # @param pipeline [Prompt::Pipeline] the pipeline to use (required)
     # @return [Array<Hash>]
     def to_messages(dialect: :openai, pipeline:, **kwargs, &block)
-      plan = build(pipeline: pipeline, **kwargs, &block)
-      plan.to_messages(dialect: dialect)
+      dsl = Prompt::DSL.new(pipeline: pipeline)
+      dsl.dialect(dialect)
+
+      if block
+        dsl.instance_eval(&block)
+      else
+        kwargs.each do |key, value|
+          dsl.public_send(key, value) if dsl.respond_to?(key)
+        end
+      end
+
+      dsl.to_messages(dialect: dialect)
     end
   end
 end

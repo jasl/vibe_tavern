@@ -239,6 +239,7 @@ module TavernKit
 
       # Build and convert to messages.
       def to_messages(dialect: :openai)
+        self.dialect(dialect) if @context.dialect.nil?
         plan = build
         plan.to_messages(dialect: dialect)
       end
