@@ -40,6 +40,7 @@ module TavernKit
 
       def scan? = scan == true
       def ephemeral? = ephemeral == true
+      def in_chat? = position == :chat
 
       def active_for?(ctx)
         return true unless filter.respond_to?(:call)

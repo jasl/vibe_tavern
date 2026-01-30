@@ -17,6 +17,7 @@ class TavernKit::InjectionRegistry::EntryTest < Minitest::Test
     assert_equal 4, entry.depth
     assert_equal false, entry.scan?
     assert_equal false, entry.ephemeral?
+    assert_equal false, entry.in_chat?
     assert_nil entry.filter
   end
 

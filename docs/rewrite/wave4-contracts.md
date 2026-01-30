@@ -250,6 +250,37 @@ end
 - Entry ids are strings (`entry.id`), so callers can do stable ordering,
   de-duplication, and tracing.
 
+### Entry data structure
+
+```ruby
+TavernKit::InjectionRegistry::Entry = Data.define(
+  :id,        # String - unique identifier for idempotent replacement
+  :content,   # String - the text content to inject
+  :position,  # Symbol - canonical position (:before, :after, :chat, :none)
+  :role,      # Symbol - message role (:system, :user, :assistant)
+  :depth,     # Integer - insertion depth for :chat position (0 = after last)
+  :scan,      # Boolean - include in World Info scanning
+  :ephemeral, # Boolean - one-shot, removed after generation
+  :filter     # Proc or nil - optional (ctx) -> Boolean for conditional activation
+)
+
+# Convenience helpers:
+entry.in_chat?      # position == :chat
+entry.scan?         # include in World Info scanning
+entry.ephemeral?    # one-shot
+entry.active_for?(ctx)  # evaluates filter (if callable), else true
+```
+
+Notes:
+
+- `position` is always stored as the canonical symbol (`:before`, `:after`, `:chat`,
+  `:none`), even if an alias was used during registration.
+- `filter` is called lazily during injection middleware; if it returns `false`, the
+  entry is skipped for that build cycle (but remains registered).
+  - Parity + safety: filter errors are treated as external input issues; injection
+    middleware should `ctx.warn(...)` and treat the entry as active (unfiltered).
+- `depth` is only meaningful when `position == :chat`; ignored otherwise.
+
 ### Standard opts keys
 
 When calling `register(id:, content:, position:, **opts)`, the following opts are

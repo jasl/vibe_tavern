@@ -594,6 +594,33 @@ Dialect-aware ST behavior:
 chain operational. Extension prompt injection, author's note, persona description,
 continue/impersonate modes, and group chat behaviors all functional.
 
+#### Implementation Notes / Risk Control (Wave 4)
+
+Stage 5 (`SillyTavern::Middleware::Injection`) is intentionally the most complex.
+To keep the implementation readable and testable, split it into internal helpers
+(or sub-objects) with narrow responsibilities:
+
+- `Injection::RegistryNormalizer` (coercion + aliasing + stable ordering + filter evaluation)
+- `Injection::PersonaDescription` (5 persona positions)
+- `Injection::AuthorsNote` (interval logic + positions)
+- `Injection::StoryString` (text-dialect-only assembly + in-chat injection)
+- `Injection::ChatInserter` (depth/role ordering + merge rules)
+
+`SillyTavern::GroupContext` behaviors (pulled from ST staging `group-chats.js`):
+
+- Activation strategy NATURAL:
+  - If user typed input, parse mentions and activate mentioned members (excluding last speaker unless allow_self_responses).
+  - Then roll talkativeness for each member (shuffled), may activate multiple members.
+  - If none activated, pick one random member (prefer talkativeness > 0 members).
+- LIST: activate all enabled members in list order.
+- POOLED: pick exactly one member who has not spoken since the last user message; otherwise pick random excluding the last speaker when possible.
+- MANUAL: if NOT user-triggered input, pick one random enabled member; user-triggered input yields no activation (user message just sends).
+
+Special generation types override activation strategy:
+- `quiet`: 1 member chosen from swipe logic (allowSystem), fallback to first member.
+- `swipe` / `continue`: members chosen from swipe logic (last speaker), error if deleted.
+- `impersonate`: pick 1 random member.
+
 ### Wave 5 -- Parity Verification & RisuAI
 
 Scope updated after RisuAI source scan
