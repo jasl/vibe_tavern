@@ -1,0 +1,85 @@
+{
+  "cases": [
+    {
+      "name": "persona TOP_AN only applies when Author's Note is scheduled",
+      "turn_count": 2,
+      "authors_note": {
+        "text": "NOTE",
+        "frequency": 2,
+        "position": "in_chat",
+        "depth": 4,
+        "role": "system"
+      },
+      "persona": {
+        "text": "PERSONA",
+        "position": "top_an"
+      },
+      "expected": {
+        "authors_note_injected": true,
+        "authors_note_text": "PERSONA\nNOTE",
+        "persona_in_chat": false
+      }
+    },
+    {
+      "name": "persona TOP_AN is NOT injected when Author's Note is not scheduled",
+      "turn_count": 3,
+      "authors_note": {
+        "text": "NOTE",
+        "frequency": 2,
+        "position": "in_chat",
+        "depth": 4,
+        "role": "system"
+      },
+      "persona": {
+        "text": "PERSONA",
+        "position": "top_an"
+      },
+      "expected": {
+        "authors_note_injected": false,
+        "persona_in_chat": false
+      }
+    },
+    {
+      "name": "persona AT_DEPTH injects as in-chat message regardless of Author's Note cadence",
+      "turn_count": 3,
+      "authors_note": {
+        "text": "NOTE",
+        "frequency": 2,
+        "position": "in_chat",
+        "depth": 4,
+        "role": "system"
+      },
+      "persona": {
+        "text": "PERSONA",
+        "position": "at_depth",
+        "depth": 2,
+        "role": "assistant"
+      },
+      "expected": {
+        "persona_in_chat": true,
+        "persona_depth": 2,
+        "persona_role": "assistant"
+      }
+    },
+    {
+      "name": "persona BOTTOM_AN appends to Author's Note when scheduled",
+      "turn_count": 2,
+      "authors_note": {
+        "text": "NOTE",
+        "frequency": 2,
+        "position": "in_chat",
+        "depth": 4,
+        "role": "system"
+      },
+      "persona": {
+        "text": "PERSONA",
+        "position": "bottom_an"
+      },
+      "expected": {
+        "authors_note_injected": true,
+        "authors_note_text": "NOTE\nPERSONA"
+      }
+    }
+  ]
+}
+

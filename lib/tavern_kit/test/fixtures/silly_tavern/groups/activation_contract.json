@@ -1,0 +1,76 @@
+{
+  "cases": [
+    {
+      "name": "LIST activates enabled members in order",
+      "config": {
+        "activation_strategy": "list",
+        "allow_self_responses": false,
+        "members": [
+          { "id": "alice", "name": "Alice", "talkativeness": 0.0 },
+          { "id": "bob", "name": "Bob", "talkativeness": 0.0 }
+        ],
+        "disabled_members": ["bob"]
+      },
+      "input": {
+        "generation_type": "normal",
+        "is_user_input": true,
+        "activation_text": "hi",
+        "last_speaker_id": "alice",
+        "seed": 123
+      },
+      "expected": {
+        "activated_member_ids": ["alice"]
+      }
+    },
+    {
+      "name": "NATURAL mention activates the mentioned member (talkativeness=0)",
+      "config": {
+        "activation_strategy": "natural",
+        "allow_self_responses": false,
+        "members": [
+          { "id": "alice", "name": "Alice", "talkativeness": 0.0 },
+          { "id": "bob", "name": "Bob", "talkativeness": 0.0 }
+        ],
+        "disabled_members": []
+      },
+      "input": {
+        "generation_type": "normal",
+        "is_user_input": true,
+        "activation_text": "hello, Alice!",
+        "last_speaker_id": "bob",
+        "seed": 123
+      },
+      "expected": {
+        "activated_member_ids": ["alice"]
+      }
+    },
+    {
+      "name": "POOLED picks the member who has not spoken since the last user message",
+      "config": {
+        "activation_strategy": "pooled",
+        "allow_self_responses": false,
+        "members": [
+          { "id": "alice", "name": "Alice", "talkativeness": 0.0 },
+          { "id": "bob", "name": "Bob", "talkativeness": 0.0 }
+        ],
+        "disabled_members": []
+      },
+      "input": {
+        "generation_type": "normal",
+        "is_user_input": false,
+        "activation_text": "last assistant message",
+        "last_speaker_id": "alice",
+        "seed": 42,
+        "chat": [
+          { "role": "user", "member_id": "user" },
+          { "role": "assistant", "member_id": "alice" },
+          { "role": "assistant", "member_id": "alice" }
+        ]
+      },
+      "expected": {
+        "activated_member_ids": ["bob"]
+      }
+    }
+  ]
+}
+

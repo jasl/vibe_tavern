@@ -431,6 +431,99 @@ Determinism requirements:
 - Both `config` and `decision` should have stable fingerprints recorded via
   `ctx.instrument(:stat, ...)` and/or `plan.trace`.
 
+### Activation strategy contract (ST `group-chats.js`)
+
+This section makes the 4 activation strategies implementable without
+guesswork, based on ST staging `public/scripts/group-chats.js`.
+
+Definitions:
+
+- **enabled members** = `config.members` excluding `config.disabled_members`
+- **banned member** = "last speaker" (prevents the same character speaking twice)
+  - only applies when `allow_self_responses == false`
+- **mention parsing** uses ST `extractAllWords()` semantics:
+  - words = `/\b\w+\b/i` matches, lowercased
+  - match if any word in `member.name` is present in the input words
+
+Inputs required to compute a decision:
+
+- `members`: ordered list of group member identifiers + display names + talkativeness
+- `disabled_members`: list of identifiers
+- `allow_self_responses`: boolean
+- `generation_type`: `:normal`, `:continue`, `:swipe`, `:quiet`, `:impersonate`
+- `activation_strategy`: `:natural`, `:list`, `:manual`, `:pooled`
+- `is_user_input`: boolean (user typed text this turn)
+- `activation_text`: String (user input if present; else last assistant message text)
+- `last_speaker_id`: identifier (if known)
+- `chat`: optional chat messages (needed for POOLED and swipe/continue parity)
+- `seed`: integer (for RNG)
+
+Pinned behavior:
+
+- `:list`: activate all **enabled** members in list order.
+- `:manual`:
+  - if `is_user_input == true` => activate none (user message just sends)
+  - else => pick 1 random enabled member
+- `:pooled`:
+  - Build `spoken_since_user` by walking chat backwards until the latest user
+    message (or stop immediately if `is_user_input == true`), skipping system/narrator.
+  - `have_not_spoken = enabled_members - spoken_since_user`
+  - if `have_not_spoken.any?` => pick 1 random from it
+  - else pick 1 random from enabled members, excluding `last_speaker_id` when possible
+- `:natural`:
+  1) mention activation: activate any mentioned enabled members (excluding banned member)
+  2) talkativeness activation: iterate enabled members in a **shuffled order**
+     (excluding banned member); activate if `talkativeness >= rng.rand`
+  3) if still none, pick 1 random from `chatty_members` (talkativeness > 0) if any,
+     else from all enabled members (excluding banned member)
+  4) de-duplicate while preserving first-seen order
+
+Generation-type overrides (applied before strategy):
+
+- `:quiet`: pick 1 member using swipe-like logic that may allow system messages;
+  if none can be determined, fall back to the first member.
+- `:swipe` / `:continue`: pick member(s) using swipe-like logic that chooses the
+  last speaking character; if that character is missing, this is an error.
+- `:impersonate`: pick 1 random member.
+
+Determinism:
+
+- All randomness (shuffle + random selection) MUST go through the injected RNG
+  seeded by `decision[:seed]`.
+- This is required so Mode A can be replayed and Mode B can be validated.
+
+### Card merging contract (ST `generation_mode_join_prefix/suffix`)
+
+When `generation_mode` is `:append` or `:append_disabled`, SillyTavern merges
+multiple character cards into one "group card" used for prompt construction.
+
+Wave 4 pins the ST join behavior from `getGroupCharacterCardsLazy()`:
+
+- Only applies for `generation_mode` in `[:append, :append_disabled]`.
+- Member selection:
+  - Iterate members in `config.members` order.
+  - Skip missing members.
+  - If a member is disabled AND is not the current speaker AND mode is NOT
+    `:append_disabled`, skip it.
+  - Otherwise include it (including a disabled current speaker).
+- Join templates:
+  - `join_prefix` and `join_suffix` are applied **per member field value**.
+  - Both support `<FIELDNAME>` placeholder (case-insensitive) replaced with the
+    display name of the field (e.g. `"Description"`, `"Scenario"`).
+- Normalization:
+  - Each field value is `strip`ped; empty values are ignored.
+  - The final output joins member chunks with `"\n"`.
+- Field-specific rules:
+  - `scenario`: if an app-provided override exists (ST `chat_metadata.scenario`),
+    use it (after trim) instead of collecting from members.
+  - `example messages`:
+    - if an override exists (ST `chat_metadata.mes_example`), use it
+    - else collect member `mes_examples`, and ensure each non-empty value starts
+      with `"<START>\n"` (prepend if missing) before applying join templates.
+
+`baseChatReplace()` substitutions exist in ST, but Wave 4 only requires the
+structural join behavior above; macro expansion still happens later in Stage 7.
+
 ## Middleware Data Flow Contract
 
 Each middleware stage has defined inputs and outputs. Stages run in order 1→9.
@@ -506,6 +599,67 @@ Behavior:
   - Final in-chat ordering for the same depth is role-descending: Assistant > User > System (ST parity via reverse-depth insertion)
   - If a merged group is empty after trimming/normalization, do not emit a message for it
 ```
+
+#### Author's Note insertion (ST `2_floating_prompt`) parity
+
+SillyTavern's Author's Note extension (`public/scripts/authors-note.js`)
+computes a per-turn "should inject" boolean based on the number of **user**
+messages and the configured `note_interval`.
+
+Wave 4 contract:
+
+- Inputs:
+  - `preset.authors_note` (String)
+  - `preset.authors_note_frequency` (Integer, ST `note_interval`)
+  - `ctx.turn_count` (Integer) — **number of user messages** in the chat **including**
+    the current user input (application is responsible for setting it correctly)
+- Scheduling:
+  - if `authors_note_frequency <= 0` => disabled (no injection)
+  - else inject when `ctx.turn_count > 0` AND `ctx.turn_count % authors_note_frequency == 0`
+    - parity note: ST computes a countdown UI, but the "inject now" condition is
+      equivalent to "turn count is a multiple of interval" (for `turn_count > 0`)
+- Content:
+  - When injected, note content is `preset.authors_note.to_s` (may be empty).
+  - If the note content is empty/whitespace after normalization, do not emit a message.
+- Placement:
+  - Uses `preset.authors_note_position` (`:in_chat`, `:in_prompt`, `:before_prompt`, `:none`)
+  - Uses `preset.authors_note_depth` / `preset.authors_note_role`
+  - `ctx.authors_note_overrides` (if present) may override **position/depth/role**
+    for this build cycle (but not text/frequency).
+
+Rationale: this makes Author's Note deterministic and testable while matching
+the ST insertion cadence.
+
+#### Persona description positions parity (ST `persona_description_positions`)
+
+SillyTavern supports 5 persona description positions. Wave 4 pins the exact
+interaction with Author's Note to avoid "almost correct" implementations.
+
+Inputs (conceptual; app supplies them in some form):
+- `persona_text` (String)
+- `persona_position` (Symbol): `:in_prompt`, `:top_an`, `:bottom_an`, `:at_depth`, `:none`
+- `persona_depth` (Integer, only for `:at_depth`)
+- `persona_role` (Symbol, only for `:at_depth`)
+
+Behavior:
+
+- `:none` => do nothing.
+- `:in_prompt` => persona text is emitted as part of the system prompt
+  (implementation detail: typically the `persona_description` pinned slot).
+- `:at_depth` => persona text becomes an in-chat injection at `persona_depth`
+  with role `persona_role`, and MUST have WI scanning enabled (ST passes
+  `allowWIScan=true` when creating the depth injection).
+- `:top_an` / `:bottom_an` => **only** applies on turns where Author's Note is
+  scheduled to inject (see Author's Note scheduling contract above).
+  - When Author's Note is injected, its content is rewritten to include persona:
+    - `:top_an`    => `"#{persona_text}\n#{authors_note_text}"`
+    - `:bottom_an` => `"#{authors_note_text}\n#{persona_text}"`
+  - When Author's Note is NOT injected this turn, persona MUST NOT be injected
+    at all (no separate message).
+
+This mirrors ST's implementation (`addPersonaDescriptionExtensionPrompt()`),
+where persona TOP/BOTTOM is applied by rewriting the Author's Note extension
+prompt only when `shouldWIAddPrompt` is true.
 
 #### In-chat insertion (ST `doChatInject()` parity)
 

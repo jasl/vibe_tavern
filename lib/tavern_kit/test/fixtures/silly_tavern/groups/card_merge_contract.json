@@ -1,0 +1,79 @@
+{
+  "cases": [
+    {
+      "name": "APPEND skips disabled members (unless current speaker), applies join templates per member",
+      "config": {
+        "generation_mode": "append",
+        "members": ["alice", "bob"],
+        "disabled_members": ["bob"],
+        "join_prefix": "[<FIELDNAME>] ",
+        "join_suffix": ""
+      },
+      "current_speaker_id": "alice",
+      "overrides": {
+        "scenario": "",
+        "mes_examples": ""
+      },
+      "characters": {
+        "alice": {
+          "name": "Alice",
+          "description": "A",
+          "personality": "PA",
+          "scenario": "SA",
+          "mes_examples": "E1"
+        },
+        "bob": {
+          "name": "Bob",
+          "description": "B",
+          "personality": "PB",
+          "scenario": "SB",
+          "mes_examples": "E2"
+        }
+      },
+      "expected": {
+        "description": "[Description] A",
+        "personality": "[Personality] PA",
+        "scenario": "[Scenario] SA",
+        "mesExamples": "[Example Messages] <START>\nE1"
+      }
+    },
+    {
+      "name": "APPEND_DISABLED includes disabled members, joins with newlines",
+      "config": {
+        "generation_mode": "append_disabled",
+        "members": ["alice", "bob"],
+        "disabled_members": ["bob"],
+        "join_prefix": "",
+        "join_suffix": ""
+      },
+      "current_speaker_id": "alice",
+      "overrides": {
+        "scenario": "",
+        "mes_examples": ""
+      },
+      "characters": {
+        "alice": {
+          "name": "Alice",
+          "description": "A",
+          "personality": "PA",
+          "scenario": "SA",
+          "mes_examples": "<START>\nE1"
+        },
+        "bob": {
+          "name": "Bob",
+          "description": "B",
+          "personality": "PB",
+          "scenario": "SB",
+          "mes_examples": "E2"
+        }
+      },
+      "expected": {
+        "description": "A\nB",
+        "personality": "PA\nPB",
+        "scenario": "SA\nSB",
+        "mesExamples": "<START>\nE1\n<START>\nE2"
+      }
+    }
+  ]
+}
+
