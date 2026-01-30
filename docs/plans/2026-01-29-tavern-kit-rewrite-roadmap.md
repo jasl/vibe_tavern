@@ -44,13 +44,16 @@ and SillyTavern/RisuAI spec support.
 - **Data Bank / vector matching:** TavernKit stays **prompt-building focused**.
   Provide **interfaces/hooks** for vector results; **I/O + retrieval lives in
   the application layer**.
-- **BYAF (.byaf) import:** Core supports BYAF (Backyard Archive Format) as a
-  ZIP container that maps into a CCv2-compatible payload. Import is **JSON
-  only** (no asset extraction to disk). Downstream apps can handle assets by
-  consuming ZIP entries via Core archive APIs.
-- **CHARX (.charx) import:** Core supports CHARX as a CCv3 ZIP container with
-  `card.json` at the root. Import extracts and validates `card.json` (CCv3)
-  and exposes embedded asset paths for downstream apps to persist if needed.
+- **File ingestion:** Core `CharacterCard` parses from a Ruby `Hash` only.
+  All on-disk formats are handled by `TavernKit::Ingest`, which returns an
+  `Ingest::Bundle` (character + optional extracted files + warnings). Use
+  `TavernKit::Ingest.open(path) { |bundle| ... }` to ensure tmp cleanup.
+- **BYAF (.byaf) ingest:** `TavernKit::Ingest` maps BYAF (Backyard Archive
+  Format) into a CCv2-compatible payload and returns normalized `scenarios`
+  hashes. It may extract referenced character images and scenario background
+  images into a temp directory for downstream apps to import.
+- **CHARX (.charx) ingest:** `TavernKit::Ingest` parses and validates
+  `card.json` (CCv3) and extracts `embeded://...` assets into a temp directory.
   Export of CHARX containers is deferred to Wave 6+.
 - **RisuAI off-spec card import (OldTavernChar):** defer to **Wave 6+** as a
   **RisuAI extension**. RisuAI can provide a converter that normalizes off-spec
@@ -83,7 +86,8 @@ TavernKit (Core)
 │   ├── Trimmer (pluggable strategy: :group_order or :priority)
 │   ├── ChatHistory::Base + ChatHistory::InMemory
 │   └── ChatVariables::InMemory
-└── Utilities (Coerce, Utils, Constants, Errors, Png::Parser/Writer)
+├── Utilities (Coerce, Utils, Constants, Errors, Png::Parser/Writer)
+└── Ingest (file adapters: JSON/PNG/APNG/BYAF/CHARX; tmp extraction bundle)
 
 TavernKit::SillyTavern
 ├── Config: Preset (40+ ST keys, JSON import), Instruct, ContextTemplate
