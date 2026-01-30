@@ -4,7 +4,7 @@ module TavernKit
   # Unified character import helper.
   #
   # Core handles CCv2/CCv3 sources (JSON/PNG wrappers). Platform layers may
-  # register additional importers (e.g., CharX via TavernKit::RisuAI).
+  # register additional importers (e.g., platform-specific container formats).
   module CharacterImporter
     @importers_by_ext = {}
 
@@ -46,3 +46,11 @@ end
 TavernKit::CharacterImporter.register(".json") { |path| TavernKit::CharacterCard.load_file(path) }
 TavernKit::CharacterImporter.register(".png") { |path| TavernKit::CharacterCard.load_file(path) }
 TavernKit::CharacterImporter.register(".apng") { |path| TavernKit::CharacterCard.load_file(path) }
+
+# ZIP-based containers (Core).
+TavernKit::CharacterImporter.register(".byaf") do |path|
+  hash = TavernKit::Archive::ByafParser.new(File.binread(path)).parse_character
+  TavernKit::CharacterCard.load(hash)
+end
+
+TavernKit::CharacterImporter.register(".charx") { |path| TavernKit::Archive::CharX.load_character(path) }
