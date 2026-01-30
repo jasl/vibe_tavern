@@ -55,29 +55,6 @@ class TavernKit::SillyTavern::Middleware::MacroExpansionTest < Minitest::Test
     assert_equal "Hello Zed and Alice.", ctx.blocks.first.content
   end
 
-  def test_global_macros_can_override_builtins
-    TavernKit.macros.clear
-    TavernKit.macros.register("user") { |_inv| "GlobalUser" }
-
-    ctx = TavernKit::Prompt::Context.new(
-      character: TavernKit::Character.create(name: "Alice"),
-      user: TavernKit::User.new(name: "Bob"),
-      preset: TavernKit::SillyTavern::Preset.new,
-      history: [],
-      user_message: "",
-    )
-
-    ctx.blocks = [
-      TavernKit::Prompt::Block.new(role: :system, content: "Hello {{user}} and {{char}}."),
-    ]
-
-    run_macro_expansion(ctx)
-
-    assert_equal "Hello GlobalUser and Alice.", ctx.blocks.first.content
-  ensure
-    TavernKit.macros.clear
-  end
-
   def test_macro_errors_warn_and_preserve_original_content
     ctx = TavernKit::Prompt::Context.new(
       character: TavernKit::Character.create(name: "Alice"),
