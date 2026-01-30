@@ -62,7 +62,10 @@ module TavernKit
       end
 
       def entries
-        @zip.entries.map(&:name)
+        @zip.entries.map do |entry|
+          validate_entry_name!(entry.name.to_s)
+          entry.name
+        end
       end
 
       def read(path, max_bytes: @max_entry_bytes)
@@ -125,22 +128,7 @@ module TavernKit
       def validate_entry!(entry)
         name = entry.name.to_s
 
-        if name.bytesize > 1024
-          raise TavernKit::Archive::ZipError, "ZIP entry name too long: #{name.bytesize} bytes"
-        end
-
-        if name.start_with?("/") || name.match?(%r{\A[A-Za-z]:[/\\]})
-          raise TavernKit::Archive::ZipError, "ZIP entry path must be relative: #{name.inspect}"
-        end
-
-        if name.include?("\\") || name.include?("\0")
-          raise TavernKit::Archive::ZipError, "ZIP entry path is invalid: #{name.inspect}"
-        end
-
-        parts = name.split("/")
-        if parts.any? { |p| p == ".." }
-          raise TavernKit::Archive::ZipError, "ZIP entry path traversal is not allowed: #{name.inspect}"
-        end
+        validate_entry_name!(name)
 
         if entry.encrypted? && !@allow_encrypted
           raise TavernKit::Archive::ZipError, "Encrypted ZIP entries are not supported: #{name.inspect}"
@@ -156,6 +144,27 @@ module TavernKit
             raise TavernKit::Archive::ZipError,
               format("ZIP entry compression ratio too high: %<name>s (%<ratio>.1f)", name: name.inspect, ratio: ratio)
           end
+        end
+
+        nil
+      end
+
+      def validate_entry_name!(name)
+        if name.bytesize > 1024
+          raise TavernKit::Archive::ZipError, "ZIP entry name too long: #{name.bytesize} bytes"
+        end
+
+        if name.start_with?("/") || name.match?(%r{\A[A-Za-z]:[/\\]})
+          raise TavernKit::Archive::ZipError, "ZIP entry path must be relative: #{name.inspect}"
+        end
+
+        if name.include?("\\") || name.include?("\0")
+          raise TavernKit::Archive::ZipError, "ZIP entry path is invalid: #{name.inspect}"
+        end
+
+        parts = name.split("/")
+        if parts.any? { |p| p == ".." }
+          raise TavernKit::Archive::ZipError, "ZIP entry path traversal is not allowed: #{name.inspect}"
         end
 
         nil
