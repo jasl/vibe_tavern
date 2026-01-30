@@ -14,6 +14,47 @@ class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
     assert_equal "Desc/Pers/Scen", out2
   end
 
+  def test_additional_env_macros
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+
+    char =
+      TavernKit::Character.create(
+        name: "Alice",
+        system_prompt: "SYS",
+        post_history_instructions: "PHI",
+        creator_notes: "NOTES",
+        character_version: "1.2.3",
+        mes_example: "Example",
+        extensions: { "depth_prompt" => { "prompt" => "DEPTH" } },
+      )
+
+    env =
+      build_env(
+        character: char,
+        group_not_muted: "Alice, Bob",
+        not_char: "Bob",
+        model: "gpt-test",
+        is_mobile: true,
+        main_api: "openai",
+      )
+
+    assert_equal "Alice, Bob", engine.expand("{{groupNotMuted}}", environment: env)
+    assert_equal "Bob", engine.expand("{{notChar}}", environment: env)
+    assert_equal "SYS", engine.expand("{{charPrompt}}", environment: env)
+    assert_equal "PHI", engine.expand("{{charInstruction}}", environment: env)
+    assert_equal "DEPTH", engine.expand("{{charDepthPrompt}}", environment: env)
+    assert_equal "NOTES", engine.expand("{{charCreatorNotes}}", environment: env)
+    assert_equal "NOTES", engine.expand("{{creatorNotes}}", environment: env)
+    assert_equal "1.2.3", engine.expand("{{charVersion}}", environment: env)
+    assert_equal "1.2.3", engine.expand("{{version}}", environment: env)
+    assert_equal "gpt-test", engine.expand("{{model}}", environment: env)
+    assert_equal "true", engine.expand("{{isMobile}}", environment: env)
+
+    examples = engine.expand("{{mesExamples}}", environment: env)
+    assert_includes examples, "<START>"
+    assert_includes examples, "Example"
+  end
+
   def test_newline_and_noop
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
     env = build_env
