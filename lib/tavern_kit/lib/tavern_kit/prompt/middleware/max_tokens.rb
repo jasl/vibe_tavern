@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 require_relative "base"
 
 module TavernKit
@@ -20,7 +22,9 @@ module TavernKit
 
           ctx.instrument(:stat, key: :estimated_prompt_tokens, value: prompt_tokens, stage: ctx.current_stage)
           ctx.instrument(:stat, key: :estimated_content_tokens, value: estimation.fetch(:content), stage: ctx.current_stage)
-          ctx.instrument(:stat, key: :message_overhead_tokens, value: estimation.fetch(:overhead_per_message), stage: ctx.current_stage)
+          ctx.instrument(:stat, key: :estimated_metadata_tokens, value: estimation.fetch(:metadata), stage: ctx.current_stage)
+          ctx.instrument(:stat, key: :message_overhead_per_message_tokens, value: estimation.fetch(:overhead_per_message), stage: ctx.current_stage)
+          ctx.instrument(:stat, key: :message_overhead_tokens, value: estimation.fetch(:overhead_total), stage: ctx.current_stage)
           ctx.instrument(:stat, key: :message_count, value: estimation.fetch(:message_count), stage: ctx.current_stage)
           ctx.instrument(:stat, key: :max_prompt_tokens, value: limit_tokens, stage: ctx.current_stage)
 
@@ -56,6 +60,7 @@ module TavernKit
           estimator = option(:token_estimator) || ctx.token_estimator || TavernKit::TokenEstimator.default
           model_hint = resolve_value(option(:model_hint, ctx[:model_hint]), ctx)
           overhead_per_message = resolve_non_negative_int(option(:message_overhead_tokens, 0), ctx, allow_nil: true) || 0
+          include_metadata_tokens = resolve_value(option(:include_message_metadata_tokens, false), ctx) == true
 
           messages = if ctx.plan
             ctx.plan.messages
@@ -69,14 +74,38 @@ module TavernKit
             estimator.estimate(msg.content.to_s, model_hint: model_hint)
           end
 
+          metadata_tokens = if include_metadata_tokens
+            messages.sum do |msg|
+              estimate_message_metadata_tokens(msg, estimator: estimator, model_hint: model_hint)
+            end
+          else
+            0
+          end
+
           overhead_tokens = overhead_per_message * messages.size
 
           {
             content: content_tokens,
+            metadata: metadata_tokens,
             overhead_per_message: overhead_per_message,
+            overhead_total: overhead_tokens,
             message_count: messages.size,
-            total: content_tokens + overhead_tokens,
+            total: content_tokens + metadata_tokens + overhead_tokens,
           }
+        end
+
+        def estimate_message_metadata_tokens(message, estimator:, model_hint:)
+          meta = message.metadata
+          return 0 unless meta.is_a?(Hash) && meta.any?
+
+          serialized =
+            begin
+              JSON.generate(meta)
+            rescue JSON::GeneratorError, TypeError
+              meta.to_s
+            end
+
+          estimator.estimate(serialized, model_hint: model_hint)
         end
 
         def resolve_value(value, ctx)

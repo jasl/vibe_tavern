@@ -25,17 +25,48 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
     end
   end
 
+  class BuildOneMessageWithMetadataPlanMiddleware < TavernKit::Prompt::Middleware::Base
+    private
+
+    def before(ctx)
+      blocks = [
+        TavernKit::Prompt::Block.new(
+          role: :assistant,
+          content: "ok",
+          message_metadata: {
+            tool_calls: [
+              {
+                id: "call_123",
+                type: "function",
+                function: { name: "get_weather", arguments: "{\"location\":\"Boston, MA\"}" },
+              },
+            ],
+          },
+        ),
+      ]
+      ctx.plan = TavernKit::Prompt::Plan.new(blocks: blocks)
+    end
+  end
+
   class CharCountEstimator
     def estimate(text, model_hint: nil)
       text.to_s.length
     end
   end
 
-  def build_pipeline(max_tokens:, reserve_tokens: 0, mode: :warn, message_overhead_tokens: 0, build: :one_message)
+  def build_pipeline(
+    max_tokens:,
+    reserve_tokens: 0,
+    mode: :warn,
+    message_overhead_tokens: 0,
+    include_message_metadata_tokens: false,
+    build: :one_message
+  )
     build_middleware =
       case build
       when :one_message then BuildPlanMiddleware
       when :two_messages then BuildTwoMessagesPlanMiddleware
+      when :one_message_with_metadata then BuildOneMessageWithMetadataPlanMiddleware
       else
         raise ArgumentError, "Unknown build: #{build.inspect}"
       end
@@ -46,6 +77,7 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
           max_tokens: max_tokens,
           reserve_tokens: reserve_tokens,
           message_overhead_tokens: message_overhead_tokens,
+          include_message_metadata_tokens: include_message_metadata_tokens,
           mode: mode
       use build_middleware, name: :build_plan
     end
@@ -90,6 +122,25 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
     # Messages are "hi" and "ok" => 4 content tokens + 2 * 3 overhead = 10.
     assert_equal 1, ctx.warnings.size
     assert_match(/exceeded limit 4/, ctx.warnings.first)
+  end
+
+  def test_include_message_metadata_tokens_counts_tool_calls_payload
+    pipeline = build_pipeline(
+      max_tokens: 10,
+      mode: :warn,
+      include_message_metadata_tokens: true,
+      build: :one_message_with_metadata,
+    )
+    ctx = TavernKit::Prompt::Context.new(
+      token_estimator: CharCountEstimator.new,
+      warning_handler: nil,
+    )
+
+    pipeline.call(ctx)
+
+    # The metadata JSON is longer than the content, so it should exceed the soft cap.
+    assert_equal 1, ctx.warnings.size
+    assert_match(/exceeded limit 10/, ctx.warnings.first)
   end
 
   def test_error_mode_raises_max_tokens_exceeded_error
@@ -143,6 +194,7 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
       max_tokens: ->(ctx) { ctx[:max_tokens] },
       reserve_tokens: ->(ctx) { ctx[:reserve_tokens] },
       message_overhead_tokens: ->(ctx) { ctx[:message_overhead_tokens] },
+      include_message_metadata_tokens: ->(ctx) { ctx[:include_message_metadata_tokens] },
       mode: ->(ctx) { ctx[:mode] },
     )
 
@@ -153,6 +205,7 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
       max_tokens: 10,
       reserve_tokens: 3,
       message_overhead_tokens: 4,
+      include_message_metadata_tokens: false,
       mode: :warn,
     )
 
