@@ -155,6 +155,229 @@ Trimmer must produce:
 SillyTavern trimming middleware should attach `trim_report` to `ctx.trim_report`
 and instrument summary stats (initial/final/budget, eviction_count).
 
+## InjectionRegistry Contract
+
+`InjectionRegistry::Base` defines the interface for runtime content injection (mirrors
+STscript `/inject` feature).
+
+### Interface
+
+```ruby
+class TavernKit::InjectionRegistry::Base
+  def register(id:, content:, position:, **opts) = raise NotImplementedError
+  def remove(id:) = raise NotImplementedError
+  def each(&block) = raise NotImplementedError
+  def ephemeral_ids = raise NotImplementedError
+end
+```
+
+### Standard opts keys
+
+When calling `register(id:, content:, position:, **opts)`, the following opts are
+recognized:
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `role` | Symbol | `:system` | Message role (`:system`, `:user`, `:assistant`) |
+| `depth` | Integer | `4` | Insertion depth (0 = after last message, N = before Nth-to-last). ST default is 4. |
+| `scan` | Boolean | `false` | Include in World Info scanning |
+| `ephemeral` | Boolean | `false` | One-shot: removed after generation |
+| `filter` | Proc/nil | `nil` | Optional closure `(ctx) -> Boolean` for conditional activation |
+
+### Position mapping
+
+`position:` parameter maps to ST `extension_prompt_types`. For ST parity, the
+canonical positions are:
+
+- `:before` (ST `/inject position=before`)
+- `:after` (ST `/inject position=after`, default)
+- `:chat` (ST `/inject position=chat`)
+- `:none` (ST `/inject position=none`)
+
+Aliases are allowed for convenience:
+
+- `:before_prompt` => `:before`
+- `:in_prompt` => `:after`
+- `:in_chat` => `:chat`
+
+| TavernKit position | ST `/inject` arg | ST constant | Behavior |
+|--------------------|------------------|-------------|----------|
+| `:none` | `none` | `NONE (-1)` | WI scanning only, not in prompt |
+| `:after` | `after` | `IN_PROMPT (0)` | In prompt, after main prompt (still before chat history) |
+| `:chat` | `chat` | `IN_CHAT (1)` | In chat, at specified depth |
+| `:before` | `before` | `BEFORE_PROMPT (2)` | Before main prompt (system-level) |
+
+### Idempotency
+
+Registering with an existing `id:` replaces the previous entry (no duplicates).
+
+### Ephemeral lifecycle
+
+Entries with `ephemeral: true`:
+- Are returned by `ephemeral_ids` after each generation
+- Should be removed by the application layer post-generation
+- TavernKit does NOT auto-remove (Rails controls lifecycle)
+
+## HookRegistry Contract
+
+`HookRegistry::Base` defines the interface for before/after build hooks.
+
+### Interface
+
+```ruby
+class TavernKit::HookRegistry::Base
+  def before_build(&block) = raise NotImplementedError
+  def after_build(&block) = raise NotImplementedError
+  def run_before_build(ctx) = raise NotImplementedError
+  def run_after_build(ctx) = raise NotImplementedError
+end
+```
+
+### Hook context
+
+Hooks receive `ctx` (Prompt::Context) directly:
+
+- `before_build` hooks: may mutate `ctx.character`, `ctx.user`, `ctx.preset`,
+  `ctx.history`, `ctx.user_message`, `ctx.macro_vars`
+- `after_build` hooks: may mutate `ctx.plan` (add/remove/modify blocks)
+
+Hooks should NOT:
+- Mutate `ctx.blocks` directly in `before_build` (use middleware instead)
+- Raise exceptions for recoverable issues (use `ctx.warn`)
+
+### Execution order
+
+Hooks run in registration order (FIFO).
+
+## Middleware Data Flow Contract
+
+Each middleware stage has defined inputs and outputs. Stages run in order 1→9.
+The `:hooks` middleware wraps the pipeline and runs `before_build` hooks in its
+`before(ctx)` phase and `after_build` hooks in its `after(ctx)` phase.
+
+### Stage 1: Hooks
+
+```
+Name: :hooks
+Input (before):  ctx.hook_registry, ctx.character, ctx.user, ctx.preset, ctx.history
+Output (before): (hooks may mutate ctx inputs)
+Side effects (before): Runs all registered before_build hooks
+Invariant (before): Must NOT modify ctx.blocks
+
+Input (after):  ctx.hook_registry, ctx.plan
+Output (after): (hooks may mutate ctx.plan)
+Side effects (after): Runs all registered after_build hooks
+```
+
+### Stage 2: Lore
+
+```
+Name: :lore
+Input:  ctx.lore_books, ctx.lore_engine, ctx.scan_messages, ctx.scan_context,
+        ctx.scan_injects, ctx.forced_world_info_activations, ctx.generation_type
+Output: ctx.lore_result (Lore::Result), ctx.outlets (Hash{String => content})
+Side effects: Evaluates World Info via ST Lore::Engine
+Invariant: Does NOT modify ctx.blocks
+```
+
+### Stage 3: Entries
+
+```
+Name: :entries
+Input:  ctx.preset.effective_prompt_entries, ctx.lore_result, ctx.generation_type,
+        ctx.chat_scan_messages, ctx.turn_count
+Output: ctx.prompt_entries (Array<PromptEntry> - filtered and normalized)
+Side effects: Applies FORCE_RELATIVE_IDS, FORCE_LAST_IDS normalization
+Behavior:
+  - Filter entries by conditions (active_for?(ctx))
+  - Apply ST entry ID normalization rules
+```
+
+### Stage 4: PinnedGroups
+
+```
+Name: :pinned_groups
+Input:  ctx.prompt_entries, ctx.character, ctx.user, ctx.preset, ctx.lore_result
+Output: ctx.pinned_groups (Hash{String => Array<Block>})
+Side effects: Resolves 14 ST pinned group slots
+Slots: main_prompt, persona_description, character_description, character_personality,
+       scenario, chat_examples, chat_history, authors_note, world_info_before,
+       world_info_after, system_prompt, jailbreak, post_history_instructions, etc.
+```
+
+### Stage 5: Injection
+
+```
+Name: :injection
+Input:  ctx.injection_registry, ctx.pinned_groups, ctx.preset, ctx.authors_note_overrides
+Output: ctx.blocks (Array<Block> - with injections applied)
+Side effects: Applies injection registry entries, author's note, persona description
+Behavior:
+  - Map injection positions to insertion points
+  - Apply extension_prompt_types mapping
+  - Handle author's note interval logic (note_interval)
+  - Handle persona description positions (IN_PROMPT/TOP_AN/BOTTOM_AN/AT_DEPTH/NONE)
+  - Merge same-depth entries by order, then role (Assistant > User > System)
+```
+
+### Stage 6: Compilation
+
+```
+Name: :compilation
+Input:  ctx.pinned_groups, ctx.prompt_entries, ctx.outlets, ctx.blocks
+Output: ctx.blocks (Array<Block> - fully compiled)
+Side effects: Compiles all entries into blocks, resolves outlet insertions
+Behavior:
+  - Expand pinned groups into block array
+  - Resolve outlet `{{slot::name}}` insertions from ctx.outlets
+  - Set token_budget_group on each block
+  - Set removable flag based on entry/slot requirements
+```
+
+### Stage 7: MacroExpansion
+
+```
+Name: :macro_expansion
+Input:  ctx.blocks, ctx.expander, ctx.macro_vars, ctx.macro_registry
+Output: ctx.blocks (Array<Block> - content expanded)
+Side effects: Expands {{macro}} syntax in all block content
+Behavior:
+  - Use ST Macro::V2Engine (or V1 fallback)
+  - Build environment from ctx (character, user, preset, history, etc.)
+  - Preserve unknown macros (tolerant mode)
+  - Record macro errors as warnings (strict mode: raise)
+```
+
+### Stage 8: PlanAssembly
+
+```
+Name: :plan_assembly
+Input:  ctx.blocks, ctx.outlets, ctx.greeting_index, ctx.generation_type,
+        ctx.resolved_greeting, ctx.preset
+Output: ctx.plan (Prompt::Plan)
+Side effects: Creates final Plan with blocks, greeting, outlets, warnings
+Behavior:
+  - Handle continue mode: nudge prompt, prefill, postfix (NONE/SPACE/NEWLINE/DOUBLE_NEWLINE)
+  - Handle impersonate mode: impersonation_prompt, assistant_impersonation (Claude)
+  - Set assistant prefill for Claude sources
+  - Populate plan.warnings from ctx.warnings
+```
+
+### Stage 9: Trimming
+
+```
+Name: :trimming
+Input:  ctx.plan, ctx.token_estimator, ctx.preset (budget fields)
+Output: ctx.plan (trimmed), ctx.trim_report (TrimReport)
+Side effects: Enforces token budget, populates trim_report
+Behavior:
+  - Delegate to Core Trimmer with strategy selected by the pipeline
+  - Default strategy is fixed by pipeline: :group_order (ST), :priority (RisuAI)
+  - Respect eviction_bundle for grouped eviction
+  - Raise error if budget cannot be met (mandatory prompts exceed limit)
+  - Instrument: initial_tokens, final_tokens, budget_tokens, eviction_count
+```
+
 ## Middleware Output Expectations (Wave 4)
 
 Wave 4 middleware must output blocks that are ready for trimming and dialect conversion:
