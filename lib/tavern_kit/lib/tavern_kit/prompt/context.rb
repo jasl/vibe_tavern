@@ -79,9 +79,6 @@ module TavernKit
       # @return [Array<Block>] compiled blocks
       attr_accessor :blocks
 
-      # @return [Array<Block>, nil] continue blocks for :continue generation
-      attr_accessor :continue_blocks
-
       # @return [Object, nil] variables store
       attr_accessor :variables_store
 
@@ -140,9 +137,6 @@ module TavernKit
 
       # @return [Object, nil] custom macro registry
       attr_accessor :macro_registry
-
-      # @return [Object, nil] builtins macro registry
-      attr_accessor :macro_builtins_registry
 
       # @return [Object, nil] pinned group resolver
       attr_accessor :pinned_group_resolver
@@ -212,7 +206,6 @@ module TavernKit
         copy.instance_variable_set(:@pinned_groups, pinned_groups_copy)
 
         copy.instance_variable_set(:@blocks, @blocks.dup)
-        copy.instance_variable_set(:@continue_blocks, @continue_blocks&.dup)
         copy.instance_variable_set(:@prompt_entries, @prompt_entries&.dup)
         copy.instance_variable_set(:@llm_options, @llm_options&.dup)
 

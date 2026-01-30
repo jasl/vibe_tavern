@@ -13,7 +13,7 @@ module TavernKit
 
           # These "control prompts" are inserted late (after macro expansion),
           # so we expand them explicitly to keep behavior consistent.
-          ctx.expander ||= TavernKit::SillyTavern::Macro::V2Engine.new
+          ctx.expander ||= build_default_expander(ctx)
           env = TavernKit::SillyTavern::ExpanderVars.build(ctx)
 
           generation_type = ctx.generation_type.to_sym
@@ -156,6 +156,24 @@ module TavernKit
         rescue TavernKit::SillyTavern::MacroError => e
           ctx.warn("Macro expansion error in #{source}: #{e.class}: #{e.message}")
           text
+        end
+
+        def build_default_expander(ctx)
+          builtins = TavernKit::SillyTavern::Macro::Packs::SillyTavern.default_registry
+
+          custom = ctx.macro_registry
+          if custom && !custom.respond_to?(:get)
+            raise ArgumentError, "macro_registry must respond to #get"
+          end
+
+          registry =
+            if custom
+              TavernKit::SillyTavern::Macro::RegistryChain.new(custom, builtins)
+            else
+              builtins
+            end
+
+          TavernKit::SillyTavern::Macro::V2Engine.new(registry: registry)
         end
       end
     end

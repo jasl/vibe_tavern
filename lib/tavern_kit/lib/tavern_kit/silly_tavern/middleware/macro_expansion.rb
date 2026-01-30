@@ -8,7 +8,7 @@ module TavernKit
         private
 
         def before(ctx)
-          ctx.expander ||= TavernKit::SillyTavern::Macro::V2Engine.new
+          ctx.expander ||= build_default_expander(ctx)
 
           env = TavernKit::SillyTavern::ExpanderVars.build(ctx)
 
@@ -26,6 +26,24 @@ module TavernKit
 
           ctx.blocks = expanded
           ctx.instrument(:stat, stage: :macro_expansion, key: :expanded_blocks, value: expanded.size) if ctx.instrumenter
+        end
+
+        def build_default_expander(ctx)
+          builtins = TavernKit::SillyTavern::Macro::Packs::SillyTavern.default_registry
+
+          custom = ctx.macro_registry
+          if custom && !custom.respond_to?(:get)
+            raise ArgumentError, "macro_registry must respond to #get"
+          end
+
+          registry =
+            if custom
+              TavernKit::SillyTavern::Macro::RegistryChain.new(custom, builtins)
+            else
+              builtins
+            end
+
+          TavernKit::SillyTavern::Macro::V2Engine.new(registry: registry)
         end
       end
     end

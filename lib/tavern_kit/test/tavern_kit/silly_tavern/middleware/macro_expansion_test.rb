@@ -33,6 +33,28 @@ class TavernKit::SillyTavern::Middleware::MacroExpansionTest < Minitest::Test
     assert_equal "Hello Bob and Alice.", ctx.blocks.first.content
   end
 
+  def test_macro_registry_can_override_builtins
+    registry = TavernKit::SillyTavern::Macro::Registry.new
+    registry.register("user") { |_inv| "Zed" }
+
+    ctx = TavernKit::Prompt::Context.new(
+      character: TavernKit::Character.create(name: "Alice"),
+      user: TavernKit::User.new(name: "Bob"),
+      preset: TavernKit::SillyTavern::Preset.new,
+      history: [],
+      user_message: "",
+      macro_registry: registry,
+    )
+
+    ctx.blocks = [
+      TavernKit::Prompt::Block.new(role: :system, content: "Hello {{user}} and {{char}}."),
+    ]
+
+    run_macro_expansion(ctx)
+
+    assert_equal "Hello Zed and Alice.", ctx.blocks.first.content
+  end
+
   def test_macro_errors_warn_and_preserve_original_content
     ctx = TavernKit::Prompt::Context.new(
       character: TavernKit::Character.create(name: "Alice"),

@@ -153,6 +153,43 @@ module TavernKit
           s.downcase
         end
       end
+
+      # Read-through registry wrapper for layering user-defined macros on top of built-ins.
+      #
+      # This keeps the macro engine simple (it only needs `#get`/`#has?`) while
+      # allowing downstream apps to provide a registry via `ctx.macro_registry`.
+      class RegistryChain < TavernKit::Macro::Registry::Base
+        def initialize(*registries)
+          @registries = registries.compact
+        end
+
+        def register(...) = primary.register(...)
+
+        def get(name)
+          @registries.each do |reg|
+            next unless reg.respond_to?(:get)
+
+            defn = reg.get(name)
+            return defn if defn
+          end
+
+          nil
+        end
+
+        def has?(name)
+          !get(name).nil?
+        end
+
+        private
+
+        def primary
+          reg = @registries.first
+          raise ArgumentError, "No primary registry configured" unless reg
+          raise ArgumentError, "Primary registry must respond to #register" unless reg.respond_to?(:register)
+
+          reg
+        end
+      end
     end
   end
 end
