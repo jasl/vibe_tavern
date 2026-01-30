@@ -166,12 +166,15 @@ module TavernKit
             raise ArgumentError, "macro_registry must respond to #get"
           end
 
-          registry =
-            if custom
-              TavernKit::SillyTavern::Macro::RegistryChain.new(custom, builtins)
-            else
-              builtins
-            end
+          registries = []
+          registries << custom if custom
+
+          global = TavernKit.macros
+          registries << global unless global.empty?
+
+          registries << builtins
+
+          registry = registries.one? ? registries.first : TavernKit::SillyTavern::Macro::RegistryChain.new(*registries)
 
           TavernKit::SillyTavern::Macro::V2Engine.new(registry: registry)
         end

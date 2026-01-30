@@ -147,6 +147,17 @@ module TavernKit
       TavernKit::SillyTavern::Preset.new(**kwargs)
     end
 
+    # Global custom macro registry (legacy gem compatibility).
+    #
+    # Downstream apps can register additional macros here and they will be
+    # consulted before built-in ST macros during expansion.
+    #
+    # Note: this is intentionally process-global state; prefer per-request
+    # `ctx.macro_registry` when you need isolation.
+    def macros
+      @macros ||= TavernKit::SillyTavern::Macro::Registry.new
+    end
+
     # Returns the default pipeline for this gem (SillyTavern).
     #
     # Kept as a convenience for downstream apps; Wave 4 docs still recommend

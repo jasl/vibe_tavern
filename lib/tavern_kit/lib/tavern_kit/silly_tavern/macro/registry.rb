@@ -86,6 +86,14 @@ module TavernKit
           @entries = {}
         end
 
+        def size = @entries.size
+        def empty? = @entries.empty?
+
+        def clear
+          @entries.clear
+          self
+        end
+
         def register(
           name,
           handler = nil,
