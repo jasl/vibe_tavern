@@ -217,15 +217,15 @@ plan = TavernKit::SillyTavern.build do
 end
 ```
 
-## Current State (Wave 2 -- Complete)
+## Current State (Wave 3 -- Complete)
 
 Delivered modules:
 - **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (basic), Coerce/Utils/Constants/Errors
 - **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, CharacterImporter, TrimReport, Prompt::Trace/Instrumenter, PromptEntry enhancements (conditions + pattern matching)
 - **SillyTavern (Wave 2):** Preset + Instruct + ContextTemplate (config/data only; middleware chain lands in Wave 4)
-- **SillyTavern (Wave 2 supplement / Wave 3 prep):** Lore::EntryExtensions, Lore::WorldInfoImporter, macro error classes
+- **SillyTavern (Wave 3):** Lore engine (World Info) + Macro engines (V1+V2) + ExamplesParser + ExpanderVars
 
-Test status (gem): 349 runs, 0 failures, 30 skips (characterization scaffolding).
+Test status (gem): 414 runs, 0 failures, 21 skips (Wave 4/5 characterization scaffolding).
 
 ## Gap Summary
 
@@ -236,12 +236,12 @@ Test status (gem): 349 runs, 0 failures, 30 skips (characterization scaffolding)
 | TokenEstimator | **Core** | ~150 | ✅ (Wave 2) |
 | Trimmer | **Core** | ~197 | Missing |
 | Dialects (8 formats) | **Core** | ~970 | Missing |
-| Lore Engine + DecoratorParser + TimedEffects + KeyList | **ST** | ~1,750 | Missing |
+| Lore Engine + DecoratorParser + TimedEffects + KeyList | **ST** | ~1,750 | ✅ (Wave 3) |
 | Lore data (Book + Entry + Result + ScanInput) | **Core** | ~830 | ✅ (Wave 2) |
-| Macro (V1+V2 Engine + Registry + Packs + Env + Invocation + Phase + Flags + Preprocessors) | **ST** | ~2,500 | Missing |
+| Macro (V1+V2 Engine + Registry + Packs + Env + Invocation + Flags + Preprocessors) | **ST** | ~2,500 | ✅ (Wave 3) |
 | Macro::Engine::Base + Environment::Base + Registry::Base | **Core** | ~130 | ✅ (Wave 2) |
-| MacroContext | **ST** | ~50 | Missing |
-| ExamplesParser + ExpanderVars | **ST** | ~260 | Missing |
+| Macro handler context (Invocation) | **ST** | ~50 | ✅ (Wave 3) |
+| ExamplesParser + ExpanderVars | **ST** | ~260 | ✅ (Wave 3) |
 | PromptEntry enhancements | **Core** | ~243 | ✅ (Wave 2 supplement) |
 | Middleware (9 stages, incl. extension prompts, author's note, persona positions) | **ST** | ~2,700 | Missing |
 | HookRegistry + HookContext + InjectionRegistry (ephemeral, filters) | **ST** | ~300 | Missing |
