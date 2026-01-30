@@ -344,10 +344,6 @@ module TavernKit
         Preset::StImporter.new(hash).to_preset
       end
 
-      def self.load_st_preset_file(path)
-        Preset::StImporter.load_file(path)
-      end
-
       def self.default_prompt_entries
         @default_prompt_entries ||= [
           Prompt::PromptEntry.new(id: "main_prompt", pinned: true, role: :system),

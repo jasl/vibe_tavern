@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "json"
-
 module TavernKit
   module SillyTavern
     class Preset
@@ -57,11 +55,9 @@ module TavernKit
           "authors_note" => "authors_note",
         }.freeze
 
-        def self.load_file(path)
-          new(JSON.parse(File.read(path))).to_preset
-        end
-
         def initialize(hash)
+          raise ArgumentError, "ST preset must be a Hash" unless hash.is_a?(Hash)
+
           @hash = Utils.deep_stringify_keys(hash)
         end
 

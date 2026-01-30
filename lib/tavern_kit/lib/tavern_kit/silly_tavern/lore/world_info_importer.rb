@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "json"
-
 module TavernKit
   module SillyTavern
     module Lore
@@ -15,28 +13,6 @@ module TavernKit
       #
       # All ST-only fields are placed under `extensions` in snake_case form.
       class WorldInfoImporter
-        def self.load(input, strict: false)
-          if input.is_a?(String) && File.file?(input)
-            load_file(input, strict: strict)
-          elsif input.is_a?(String)
-            load_json(input, strict: strict)
-          else
-            load_hash(input, strict: strict)
-          end
-        end
-
-        def self.load_file(path, strict: false)
-          load_hash(JSON.parse(File.read(path)), strict: strict)
-        rescue JSON::ParserError => e
-          raise TavernKit::SillyTavern::LoreParseError, e.message
-        end
-
-        def self.load_json(json, strict: false)
-          load_hash(JSON.parse(json.to_s), strict: strict)
-        rescue JSON::ParserError => e
-          raise TavernKit::SillyTavern::LoreParseError, e.message
-        end
-
         def self.load_hash(hash, strict: false)
           raise ArgumentError, "World Info must be a Hash" unless hash.is_a?(Hash)
 
