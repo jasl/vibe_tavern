@@ -100,6 +100,61 @@ module TavernKit
       CharacterImporter.load(input)
     end
 
+    # Load a SillyTavern preset from a file path or Hash.
+    #
+    # This is a convenience API for downstream apps migrating from the legacy
+    # gem where presets were loaded via `TavernKit.load_preset(...)`.
+    #
+    # @param input [String, Hash, nil] file path, JSON string, or Hash
+    # @return [SillyTavern::Preset]
+    def load_preset(input)
+      return TavernKit::SillyTavern::Preset.new if input.nil?
+
+      if input.is_a?(String)
+        str = input.to_s
+
+        if File.exist?(str)
+          return TavernKit::SillyTavern::Preset.load_st_preset_file(str)
+        end
+
+        trimmed = str.strip
+        if trimmed.start_with?("{")
+          return load_preset(JSON.parse(trimmed))
+        end
+
+        raise ArgumentError, "Preset path does not exist: #{input.inspect}"
+      end
+
+      unless input.is_a?(Hash)
+        raise ArgumentError, "Preset input must be a Hash or file path, got: #{input.class}"
+      end
+
+      h = Utils.deep_stringify_keys(input)
+
+      # Auto-detect ST preset JSON shape (Prompt Manager).
+      if h.key?("prompts") || h.key?("prompt_order") || h.key?("promptOrder")
+        return TavernKit::SillyTavern::Preset.from_st_preset_json(h)
+      end
+
+      allowed = TavernKit::SillyTavern::Preset.members.map(&:to_s)
+      kwargs = h.each_with_object({}) do |(k, v), out|
+        key = k.to_s
+        next unless allowed.include?(key)
+
+        out[key.to_sym] = v
+      end
+
+      TavernKit::SillyTavern::Preset.new(**kwargs)
+    end
+
+    # Returns the default pipeline for this gem (SillyTavern).
+    #
+    # Kept as a convenience for downstream apps; Wave 4 docs still recommend
+    # using `TavernKit::SillyTavern.build` for ST-style prompt building.
+    def pipeline
+      TavernKit::SillyTavern::Pipeline
+    end
+
     # Build a prompt using the DSL-based pipeline.
     #
     # Requires explicit pipeline selection — there is no default.
