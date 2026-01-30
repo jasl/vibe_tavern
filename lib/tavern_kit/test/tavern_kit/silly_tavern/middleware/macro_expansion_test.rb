@@ -42,6 +42,7 @@ class TavernKit::SillyTavern::Middleware::MacroExpansionTest < Minitest::Test
       user_message: "",
       expander: BoomExpander.new,
     )
+    ctx.warning_handler = nil
 
     ctx.blocks = [
       TavernKit::Prompt::Block.new(role: :system, content: "Hi {{x}}"),
