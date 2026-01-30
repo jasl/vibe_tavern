@@ -257,6 +257,8 @@ These must be preserved in the SillyTavern layer:
 - V2 Engine: Chevrotain-equivalent pipeline (lexer -> parser -> CST walker).
   True nesting (`{{outer::{{inner}}}}`), depth-first evaluation, preserves
   unknown macros. Error recovery for malformed macros.
+  - Arg splitting must be depth-aware: only top-level `::` separators split
+    arguments; nested macros may contain their own `::` (e.g. `{{reverse::{{getvar::x}}}}`).
 - **Scoped block macros**: `{{macro}}...{{/macro}}` pairing with auto-trim/dedent.
   Content between tags becomes the last unnamed argument.
 - **`{{if}}`/`{{else}}` conditional**: lazy branch resolution, `!` negation,

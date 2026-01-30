@@ -225,7 +225,7 @@ module TavernKit
               open = str.index("{{", i)
               break if open.nil?
 
-              close = str.index("}}", open + 2)
+              close = find_macro_close(str, open)
               break if close.nil?
 
               inner = str[(open + 2)...close].to_s
@@ -253,38 +253,79 @@ module TavernKit
 
           def self.extract_macro_info(raw_inner)
             s = raw_inner.to_s
-            idx = s.index(/\S/)
-            return nil unless idx
+            len = s.length
+            i = 0
 
-            rest = s[idx..].to_s
-            return nil if rest.start_with?(".", "$")
+            i += 1 while i < len && whitespace?(s.getbyte(i))
+            return nil if i >= len
+
+            # Ignore variable shorthand (.var / $var).
+            return nil if s[i] == "." || s[i] == "$"
 
             closing = false
             loop do
-              rest = rest.lstrip
-              break if rest.empty?
+              i += 1 while i < len && whitespace?(s.getbyte(i))
+              break if i >= len
 
-              ch = rest[0]
-              break unless %w[! ? ~ > # /].include?(ch)
+              ch = s.getbyte(i)
+              break unless flag_byte?(ch)
 
-              closing = true if ch == "/"
-              rest = rest[1..].to_s
+              closing = true if ch == "/".ord
+              i += 1
             end
 
-            rest = rest.lstrip
-            name, tail = rest.split(/\s+/, 2)
-            name = name.to_s
+            i += 1 while i < len && whitespace?(s.getbyte(i))
+            return nil if i >= len
+
+            name_start = i
+            while i < len
+              break if whitespace?(s.getbyte(i))
+              break if s.getbyte(i) == ":".ord
+
+              i += 1
+            end
+
+            name = s[name_start...i].to_s.strip
             return nil if name.empty?
 
-            args_part = tail.to_s
-            args_part = args_part.delete_prefix("::") if args_part.lstrip.start_with?("::")
+            j = i
+            j += 1 while j < len && whitespace?(s.getbyte(j))
+            if j < len && s.getbyte(j) == ":".ord
+              j += s.getbyte(j + 1) == ":".ord ? 2 : 1
+            end
+            j += 1 while j < len && whitespace?(s.getbyte(j))
+
             arg_count =
-              if args_part.include?("::")
-                args_part.split("::", -1).length
-              elsif args_part.strip.empty?
+              if j >= len
                 0
               else
-                1
+                count = 1
+                depth = 0
+                cursor = j
+
+                while cursor < len
+                  if s[cursor, 2] == "{{"
+                    depth += 1
+                    cursor += 2
+                    next
+                  end
+
+                  if s[cursor, 2] == "}}"
+                    depth -= 1 if depth.positive?
+                    cursor += 2
+                    next
+                  end
+
+                  if depth.zero? && s[cursor, 2] == "::"
+                    count += 1
+                    cursor += 2
+                    next
+                  end
+
+                  cursor += 1
+                end
+
+                count
               end
 
             { key: name.downcase, closing: closing, arg_count: arg_count }
@@ -292,7 +333,43 @@ module TavernKit
             nil
           end
 
-          private_class_method :register_core_macros, :extract_list, :split_on_top_level_else, :extract_macro_info
+          def self.find_macro_close(text, open)
+            str = text.to_s
+            depth = 1
+            i = open.to_i + 2
+
+            while i < str.length
+              next_open = str.index("{{", i)
+              next_close = str.index("}}", i)
+              return nil if next_open.nil? && next_close.nil?
+
+              if next_close.nil? || (!next_open.nil? && next_open < next_close)
+                depth += 1
+                i = next_open + 2
+              else
+                depth -= 1
+                return next_close if depth.zero?
+
+                i = next_close + 2
+              end
+            end
+
+            nil
+          end
+
+          def self.whitespace?(byte)
+            byte == 32 || byte == 9 || byte == 10 || byte == 13
+          end
+
+          def self.flag_byte?(byte)
+            case byte
+            when "!".ord, "?".ord, "~".ord, ">".ord, "/".ord, "#".ord then true
+            else false
+            end
+          end
+
+          private_class_method :register_core_macros, :extract_list, :split_on_top_level_else, :extract_macro_info,
+            :find_macro_close, :whitespace?, :flag_byte?
         end
       end
     end

@@ -73,7 +73,7 @@ module TavernKit
 
             out << str[i...open] if open > i
 
-            close = str.index("}}", open + 2)
+            close = find_macro_close(str, open)
             if close.nil?
               out << str[open..].to_s
               break
@@ -338,7 +338,7 @@ module TavernKit
             open = str.index("{{", i)
             return nil if open.nil?
 
-            close = str.index("}}", open + 2)
+            close = find_macro_close(str, open)
             return nil if close.nil?
 
             inner = str[(open + 2)...close].to_s
@@ -357,6 +357,32 @@ module TavernKit
             end
 
             i = close + 2
+          end
+
+          nil
+        end
+
+        # Find the closing "}}" for a macro starting at `open` (the index of "{{"),
+        # supporting nested macros like `{{outer::{{inner}}}}`.
+        def find_macro_close(text, open)
+          str = text.to_s
+          depth = 1
+          i = open.to_i + 2
+
+          while i < str.length
+            next_open = str.index("{{", i)
+            next_close = str.index("}}", i)
+            return nil if next_open.nil? && next_close.nil?
+
+            if next_close.nil? || (!next_open.nil? && next_open < next_close)
+              depth += 1
+              i = next_open + 2
+            else
+              depth -= 1
+              return next_close if depth.zero?
+
+              i = next_close + 2
+            end
           end
 
           nil
@@ -437,34 +463,47 @@ module TavernKit
           i += 1 while i < len && whitespace?(s.getbyte(i))
           return [spans, i] if i >= len
 
-          rest = s[i..].to_s
-          if rest.include?("::")
-            while i < len
-              delim = s.index("::", i)
-              seg_end = delim.nil? ? len : delim
+          depth = 0
+          seg_start = i
+          cursor = i
 
-              left = i
-              left += 1 while left < seg_end && whitespace?(s.getbyte(left))
-              right = seg_end
-              right -= 1 while right > left && whitespace?(s.getbyte(right - 1))
-
-              spans << ArgSpan.new(raw: s[left...right], start_offset: left, end_offset: right - 1)
-
-              break if delim.nil?
-
-              i = delim + 2
-              i += 1 while i < len && whitespace?(s.getbyte(i))
+          while cursor < len
+            if s[cursor, 2] == "{{"
+              depth += 1
+              cursor += 2
+              next
             end
-          else
-            left = i
-            right = len
-            left += 1 while left < right && whitespace?(s.getbyte(left))
-            right -= 1 while right > left && whitespace?(s.getbyte(right - 1))
 
-            spans << ArgSpan.new(raw: s[left...right], start_offset: left, end_offset: right - 1)
+            if s[cursor, 2] == "}}"
+              depth -= 1 if depth.positive?
+              cursor += 2
+              next
+            end
+
+            if depth.zero? && s[cursor, 2] == "::"
+              spans << build_arg_span(s, seg_start, cursor)
+              cursor += 2
+              seg_start = cursor
+              seg_start += 1 while seg_start < len && whitespace?(s.getbyte(seg_start))
+              cursor = seg_start
+              next
+            end
+
+            cursor += 1
           end
 
-          [spans, i]
+          spans << build_arg_span(s, seg_start, len)
+          [spans, len]
+        end
+
+        def build_arg_span(str, left, right)
+          l = left.to_i
+          r = right.to_i
+
+          l += 1 while l < r && whitespace?(str.getbyte(l))
+          r -= 1 while r > l && whitespace?(str.getbyte(r - 1))
+
+          ArgSpan.new(raw: str[l...r], start_offset: l, end_offset: r - 1)
         end
 
         def evaluate_variable_expr(raw_inner, env, raw_content_hash:, original_once:, context_offset:, open:)

@@ -40,6 +40,25 @@ class StMacrosTest < Minitest::Test
     assert_equal "  YES  ", engine.expand(preserved, environment: TavernKit::SillyTavern::Macro::Environment.new(locals: { "flag" => "true" }))
   end
 
+  def test_nested_macros_in_args
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = TavernKit::SillyTavern::Macro::Environment.new(user_name: "Bob")
+    assert_equal "boB", engine.expand("{{reverse::{{user}}}}", environment: env)
+
+    # Nested macro includes `::` in its own args; outer arg splitting must not
+    # treat that as top-level separators.
+    template = "{{setvar::x::Bob}}{{reverse::{{getvar::x}}}}"
+    assert_equal "boB", engine.expand(template, environment: TavernKit::SillyTavern::Macro::Environment.new)
+  end
+
+  def test_nested_macros_in_if_condition
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+
+    template = "{{if {{getvar::flag}}}}YES{{else}}NO{{/if}}"
+    assert_equal "YES", engine.expand(template, environment: TavernKit::SillyTavern::Macro::Environment.new(locals: { "flag" => "true" }))
+    assert_equal "NO", engine.expand(template, environment: TavernKit::SillyTavern::Macro::Environment.new(locals: { "flag" => "false" }))
+  end
+
   def test_variable_shorthand_operators
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
     text = "{{.score+=1}}{{.score}}"
