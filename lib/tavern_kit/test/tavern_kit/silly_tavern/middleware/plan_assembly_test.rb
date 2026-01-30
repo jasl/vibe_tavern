@@ -35,21 +35,28 @@ class TavernKit::SillyTavern::Middleware::PlanAssemblyTest < Minitest::Test
     assert_equal :continue_nudge, ctx.blocks.last.metadata[:source]
   end
 
-  def test_continue_prefill_appends_postfix_to_last_assistant_message
+  def test_continue_prefill_appends_displaced_message_for_chat_dialects
     preset = TavernKit::SillyTavern::Preset.new(
       continue_prefill: true,
       continue_postfix: " ",
     )
 
-    blocks = [
-      TavernKit::Prompt::Block.new(role: :assistant, content: "A", token_budget_group: :history, removable: true),
-    ]
-
-    ctx = base_ctx(preset: preset, blocks: blocks, generation_type: :continue)
+    ctx = base_ctx(preset: preset, blocks: [], generation_type: :continue)
+    ctx[:st_continue_prefill_block] = TavernKit::Prompt::Block.new(
+      role: :assistant,
+      content: "A",
+      slot: :chat_history,
+      token_budget_group: :history,
+      removable: true,
+    )
     run_plan_assembly(ctx)
 
-    assert_equal "A ", ctx.blocks.first.content
+    assert_equal 1, ctx.blocks.size
+    assert_equal "A", ctx.blocks.first.content
     assert_equal :continue_prefill, ctx.blocks.first.metadata[:source]
+    assert_equal :continue_prefill, ctx.blocks.first.slot
+    assert_equal :system, ctx.blocks.first.token_budget_group
+    assert_equal false, ctx.blocks.first.removable?
   end
 
   def test_claude_source_sets_assistant_prefill_request_option
@@ -71,16 +78,48 @@ class TavernKit::SillyTavern::Middleware::PlanAssemblyTest < Minitest::Test
       assistant_prefill: "P",
     )
 
-    blocks = [
-      TavernKit::Prompt::Block.new(role: :assistant, content: "A", token_budget_group: :history, removable: true),
-    ]
-
-    ctx = base_ctx(preset: preset, blocks: blocks, generation_type: :continue)
+    ctx = base_ctx(preset: preset, blocks: [], generation_type: :continue)
+    ctx[:st_continue_prefill_block] = TavernKit::Prompt::Block.new(
+      role: :assistant,
+      content: "A",
+      slot: :chat_history,
+      token_budget_group: :history,
+      removable: true,
+    )
     ctx[:chat_completion_source] = "claude"
     run_plan_assembly(ctx)
 
-    assert_equal "P\n\nA ", ctx.blocks.first.content
+    assert_equal "P\n\nA", ctx.blocks.first.content
     assert_equal({}, ctx.plan.llm_options)
+  end
+
+  def test_continue_nudge_moves_last_chat_message_after_group_nudge_for_chat_dialects
+    preset = TavernKit::SillyTavern::Preset.new(
+      continue_prefill: false,
+      continue_nudge_prompt: "NUDGE {{char}}",
+      group_nudge_prompt: "GROUP {{char}}",
+    )
+
+    blocks = [
+      TavernKit::Prompt::Block.new(role: :user, content: "U", slot: :chat_history, token_budget_group: :history, removable: true),
+      TavernKit::Prompt::Block.new(role: :assistant, content: "A", slot: :chat_history, token_budget_group: :history, removable: true),
+      TavernKit::Prompt::Block.new(
+        role: :system,
+        content: "INJ",
+        slot: :chat_history,
+        token_budget_group: :system,
+        removable: false,
+        metadata: { source: :injection, injected: true },
+      ),
+    ]
+
+    ctx = base_ctx(preset: preset, blocks: blocks, generation_type: :continue, group: { members: [] })
+    run_plan_assembly(ctx)
+
+    assert_equal ["U", "INJ", "GROUP Alice", "A", "NUDGE Alice"], ctx.blocks.map(&:content)
+    assert_equal :group_nudge, ctx.blocks[-3].metadata[:source]
+    assert_equal :continue_message, ctx.blocks[-2].metadata[:source]
+    assert_equal :continue_nudge, ctx.blocks[-1].metadata[:source]
   end
 
   def test_impersonate_for_claude_sets_assistant_impersonation_prefill_request_option

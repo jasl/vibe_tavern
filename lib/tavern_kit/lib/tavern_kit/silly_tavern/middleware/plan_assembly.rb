@@ -31,18 +31,12 @@ module TavernKit
           end
 
           if generation_type == :continue
-            if preset.continue_prefill == true
-              blocks = apply_continue_prefill(blocks, ctx, preset, env: env)
-            else
-              blocks = append_control_prompt(
-                blocks,
-                ctx,
-                content: preset.continue_nudge_prompt,
-                env: env,
-                source: :continue_nudge,
-                slot: :continue_nudge_prompt,
-              )
-            end
+            blocks =
+              if text_dialect?(ctx)
+                apply_continue_text(blocks, ctx, preset, env: env)
+              else
+                apply_continue_chat(blocks, ctx, preset, env: env)
+              end
           end
 
           if generation_type == :impersonate
@@ -121,6 +115,84 @@ module TavernKit
           ]
         end
 
+        def apply_continue_chat(blocks, ctx, preset, env:)
+          if preset.continue_prefill == true
+            append_continue_prefill_message(blocks, ctx, preset, env: env)
+          else
+            append_continue_nudge_message(blocks, ctx, preset, env: env)
+          end
+        end
+
+        def apply_continue_text(blocks, ctx, preset, env:)
+          if preset.continue_prefill == true
+            apply_continue_prefill(blocks, ctx, preset, env: env)
+          else
+            append_control_prompt(
+              blocks,
+              ctx,
+              content: preset.continue_nudge_prompt,
+              env: env,
+              source: :continue_nudge,
+              slot: :continue_nudge_prompt,
+            )
+          end
+        end
+
+        def append_continue_prefill_message(blocks, ctx, preset, env:)
+          displaced = ctx[:st_continue_prefill_block]
+          return blocks unless displaced.is_a?(TavernKit::Prompt::Block)
+
+          content = displaced.content.to_s
+
+          # Claude source parity: when using continue prefill, assistant_prefill is applied
+          # by prepending it to the message to be continued, not via request options.
+          if claude_source?(ctx) && displaced.role == :assistant
+            expanded = expand_control_text(ctx, env: env, content: preset.assistant_prefill.to_s, source: :assistant_prefill)
+            expanded = expanded.to_s.strip
+            content = [expanded, content].reject(&:empty?).join("\n\n") unless expanded.empty?
+          end
+
+          blocks + [
+            displaced.with(
+              content: content,
+              slot: :continue_prefill,
+              token_budget_group: :system,
+              removable: false,
+              metadata: displaced.metadata.merge(source: :continue_prefill),
+            ),
+          ]
+        end
+
+        def append_continue_nudge_message(blocks, ctx, preset, env:)
+          idx = blocks.rindex { |b| b.enabled? && b.slot == :chat_history && b.token_budget_group == :history }
+
+          next_blocks =
+            if idx.nil?
+              blocks
+            else
+              target = blocks[idx]
+
+              copy = blocks.dup
+              copy.delete_at(idx)
+              copy << target.with(
+                slot: :continue_message,
+                token_budget_group: :system,
+                removable: false,
+                metadata: target.metadata.merge(source: :continue_message),
+              )
+              copy
+            end
+
+          append_control_prompt(
+            next_blocks,
+            ctx,
+            content: preset.continue_nudge_prompt,
+            env: env,
+            source: :continue_nudge,
+            slot: :continue_nudge_prompt,
+          )
+        end
+
         def apply_continue_prefill(blocks, ctx, preset, env:)
           suffix = preset.continue_postfix.to_s
           assistant_prefill = preset.assistant_prefill.to_s
@@ -174,6 +246,10 @@ module TavernKit
             end
 
           TavernKit::SillyTavern::Macro::V2Engine.new(registry: registry)
+        end
+
+        def text_dialect?(ctx)
+          ctx.dialect.to_s.strip.downcase.to_sym == :text
         end
       end
     end

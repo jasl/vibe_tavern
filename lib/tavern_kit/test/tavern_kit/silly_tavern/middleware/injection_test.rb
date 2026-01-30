@@ -80,6 +80,43 @@ class TavernKit::SillyTavern::Middleware::InjectionTest < Minitest::Test
     assert_equal :user_message, blocks[-2].metadata[:source]
   end
 
+  def test_continue_prefill_displaces_last_message_before_in_chat_injection_for_chat_dialects
+    character = TavernKit::Character.create(name: "Alice")
+    preset = TavernKit::SillyTavern::Preset.new(
+      new_chat_prompt: "HEADER",
+      continue_prefill: true,
+      prefer_char_prompt: false,
+    )
+    prompt_entries = [
+      TavernKit::Prompt::PromptEntry.new(id: "chat_history", pinned: true, role: :system),
+    ]
+
+    registry = TavernKit::SillyTavern::InjectionRegistry.new
+    registry.register(id: "sys_d0", content: "INJ", position: :chat, depth: 0, role: :system)
+
+    ctx = base_ctx(
+      character: character,
+      preset: preset,
+      prompt_entries: prompt_entries,
+      injection_registry: registry,
+      history: [{ role: :user, content: "m1" }, { role: :assistant, content: "m2" }],
+      user_message: "",
+      dialect: :openai,
+      generation_type: :continue,
+    )
+
+    run_pipeline(ctx)
+
+    displaced = ctx[:st_continue_prefill_block]
+    assert_instance_of TavernKit::Prompt::Block, displaced
+    assert_equal "m2", displaced.content
+    assert_equal :assistant, displaced.role
+    assert_equal :chat_history, displaced.slot
+
+    blocks = ctx.pinned_groups.fetch("chat_history")
+    assert_equal ["HEADER", "m1", "INJ"], blocks.map(&:content)
+  end
+
   def test_in_chat_prompt_entries_are_injected
     character = TavernKit::Character.create(name: "Alice")
     preset = TavernKit::SillyTavern::Preset.new(new_chat_prompt: "", prefer_char_prompt: false)

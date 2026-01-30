@@ -10,6 +10,11 @@ module TavernKit
         def before(ctx)
           injections = collect_injections(ctx)
 
+          # ST chat-completions parity (openai.js): for continue+continue_prefill,
+          # displace the message to be continued *before* in-chat injections so
+          # depth=0 injections land before the continued message.
+          displace_continue_prefill_message(ctx)
+
           # Apply story string (text dialect only). This may:
           # - consume before/after injections into anchorBefore/anchorAfter
           # - clear groups that would otherwise duplicate story-string content
@@ -303,6 +308,18 @@ module TavernKit
           end
 
           ctx.pinned_groups["chat_history"] = header + merged_blocks
+        end
+
+        def displace_continue_prefill_message(ctx)
+          return if text_dialect?(ctx)
+          return unless ctx.generation_type.to_sym == :continue
+          return unless ctx.preset&.continue_prefill == true
+
+          header, base_blocks = split_chat_history_header(ctx.pinned_groups.fetch("chat_history", []))
+          return if base_blocks.empty?
+
+          ctx[:st_continue_prefill_block] = base_blocks.pop
+          ctx.pinned_groups["chat_history"] = header + base_blocks
         end
 
         def split_chat_history_header(blocks)
