@@ -84,11 +84,11 @@ TavernKit (Core)
 TavernKit::SillyTavern
 ├── Config: Preset (40+ ST keys, JSON import), Instruct, ContextTemplate
 ├── Lore: Engine, DecoratorParser, TimedEffects, KeyList, ScanInput, WorldInfoImporter, EntryExtensions
-├── Macro: V1Engine, V2Engine, Registry, Packs, Environment, Invocation, Phase
+├── Macro: V1Engine, V2Engine, Registry, Packs, Environment, Invocation
 ├── Middleware (9 stages): Hooks, Lore, Entries, PinnedGroups, Injection,
 │   Compilation, MacroExpansion, PlanAssembly, Trimming
-├── Tools: ExamplesParser, ExpanderVars, HookRegistry, HookContext,
-│   InjectionRegistry, GroupContext, MacroContext
+├── Tools: ExamplesParser, ExpanderVars, HookRegistry,
+│   InjectionRegistry, GroupContext
 └── Pipeline (default 9-stage chain), SillyTavern.build() convenience entry
 
 TavernKit::RisuAI (Wave 5)
@@ -217,15 +217,17 @@ plan = TavernKit::SillyTavern.build do
 end
 ```
 
-## Current State (Wave 3 -- Complete)
+## Current State (Wave 4 -- Complete)
 
 Delivered modules:
 - **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (basic), Coerce/Utils/Constants/Errors
 - **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, CharacterImporter, TrimReport, Prompt::Trace/Instrumenter, PromptEntry enhancements (conditions + pattern matching)
 - **SillyTavern (Wave 2):** Preset + Instruct + ContextTemplate (config/data only; middleware chain lands in Wave 4)
 - **SillyTavern (Wave 3):** Lore engine (World Info) + Macro engines (V1+V2) + ExamplesParser + ExpanderVars
+- **Core (Wave 4):** Trimmer + Dialects (8 formats) + MaxTokensMiddleware guardrails
+- **SillyTavern (Wave 4):** 9-stage middleware chain + HookRegistry + InjectionRegistry + GroupContext + ST build()/to_messages convenience
 
-Test status (gem): 414 runs, 0 failures, 21 skips (Wave 4/5 characterization scaffolding).
+Test status (gem): 484 runs, 0 failures, 15 skips (all remaining skips are RisuAI parity).
 
 ## Gap Summary
 
@@ -234,8 +236,8 @@ Test status (gem): 414 runs, 0 failures, 21 skips (Wave 4/5 characterization sca
 | Preset (60+ fields) + Instruct (24 attrs) + ContextTemplate (Handlebars) | **ST** | ~1,250 | ✅ (Wave 2) |
 | ChatHistory + ChatVariables | **Core** | ~400 | ✅ (Wave 2) |
 | TokenEstimator | **Core** | ~150 | ✅ (Wave 2) |
-| Trimmer | **Core** | ~197 | Missing |
-| Dialects (8 formats) | **Core** | ~970 | Missing |
+| Trimmer | **Core** | ~197 | ✅ (Wave 4) |
+| Dialects (8 formats) | **Core** | ~970 | ✅ (Wave 4) |
 | Lore Engine + DecoratorParser + TimedEffects + KeyList | **ST** | ~1,750 | ✅ (Wave 3) |
 | Lore data (Book + Entry + Result + ScanInput) | **Core** | ~830 | ✅ (Wave 2) |
 | Macro (V1+V2 Engine + Registry + Packs + Env + Invocation + Flags + Preprocessors) | **ST** | ~2,500 | ✅ (Wave 3) |
@@ -243,9 +245,9 @@ Test status (gem): 414 runs, 0 failures, 21 skips (Wave 4/5 characterization sca
 | Macro handler context (Invocation) | **ST** | ~50 | ✅ (Wave 3) |
 | ExamplesParser + ExpanderVars | **ST** | ~260 | ✅ (Wave 3) |
 | PromptEntry enhancements | **Core** | ~243 | ✅ (Wave 2 supplement) |
-| Middleware (9 stages, incl. extension prompts, author's note, persona positions) | **ST** | ~2,700 | Missing |
-| HookRegistry + HookContext + InjectionRegistry (ephemeral, filters) | **ST** | ~300 | Missing |
-| GroupContext (4 strategies, 3 modes, card merging) | **ST** | ~300 | Missing |
+| Middleware (9 stages, incl. extension prompts, author's note, persona positions) | **ST** | ~2,700 | ✅ (Wave 4) |
+| HookRegistry + InjectionRegistry (ephemeral, filters) | **ST** | ~300 | ✅ (Wave 4) |
+| GroupContext (4 strategies, 3 modes, card merging) | **ST** | ~300 | ✅ (Wave 4) |
 | RisuAI (CBS Engine 800-1K + CBS Macros 600-800 + Lore 400-500 + Decorators 250-300 + Templates 200-250 + Regex 250-300 + Triggers 500-700 + Pipeline 190-260) | **RisuAI** | ~3,190-4,110 | Wave 5 |
 
 ### Key Behavioral Requirements (from ARCHITECTURE.md)
@@ -322,7 +324,7 @@ These must be preserved in the SillyTavern layer:
 **HookRegistry (SillyTavern::HookRegistry):**
 - `before_build`: mutable = character, user, history, user_message
 - `after_build`: mutable = plan (blocks manipulation)
-- `HookContext`: typed context object with phase-specific mutability
+- Hooks receive `Prompt::Context` directly (no separate HookContext type)
 
 **InjectionRegistry (SillyTavern::InjectionRegistry):**
 - Mirrors STscript `/inject` feature
@@ -502,10 +504,8 @@ Scope updated after ST v1.15.0 source alignment
 | `SillyTavern::Macro::Packs` | ST | ~81 built-in ST macros (utility, random, names, character, chat, time, variable, prompts, state), including `{{if}}`/`{{else}}`, `{{space}}`, `{{hasvar}}`/`{{deletevar}}`, `{{hasglobalvar}}`/`{{deleteglobalvar}}`, `{{groupNotMuted}}`, `{{hasExtension}}` | 400-500 |
 | `SillyTavern::Macro::Environment` | ST | Extensible macro execution context, lazy providers | 100-150 |
 | `SillyTavern::Macro::Invocation` | ST | Call-site object (`MacroCall`): name, args, flags, isScoped, rawInner, rawArgs, range, globalOffset | 80-100 |
-| `SillyTavern::Macro::Phase` | ST | Multi-pass phase control | 40-60 |
 | `SillyTavern::Macro::Flags` | ST | 6 flag types: `!` (immediate), `?` (delayed), `~` (re-evaluate), `>` (filter), `/` (closing block), `#` (preserve whitespace). Implement `/` and `#`; parse and ignore others | 60-80 |
 | `SillyTavern::Macro::Preprocessors` | ST | Priority-ordered pre/post-processors: legacy angle-bracket normalization, `{{time_UTC+N}}` normalization, brace unescaping, `{{trim}}` cleanup, `ELSE_MARKER` cleanup | 80-100 |
-| `SillyTavern::MacroContext` | ST | Context for custom macro handlers | 40-60 |
 
 **Error handling policy (Wave 3):**
 - **Tolerant for external/user input by default:** malformed macros, unknown macros, and invalid args should not hard-fail prompt building. Prefer: preserve raw `{{...}}` tokens, return best-effort output, and record diagnostics (warnings) when possible.
@@ -527,9 +527,9 @@ Note: PromptEntry conditions + pattern matching moved to Wave 2 supplement.
   non-chat scan data, generation triggers, character filtering
 - Macro: all ~81 ST macros, scoped blocks (`{{if}}...{{else}}...{{/if}}`),
   variable shorthand (16 operators), flags, typed arg validation, legacy markers
-- Unlock ST World Info characterization tests (5 pending)
-- Unlock ST Macros characterization tests (6 pending)
-- Unlock RisuAI Lorebook characterization tests (4 pending)
+- ✅ Unlocked ST World Info characterization tests
+- ✅ Unlocked ST Macros characterization tests
+- Pending: RisuAI Lorebook characterization tests (Wave 5)
 
 **Deliverable:** `SillyTavern::Lore::Engine` activates world info independently
 with full entry field support (40+ fields). `SillyTavern::Macro::V2Engine`
@@ -568,7 +568,7 @@ Dialect-aware ST behavior:
 | `SillyTavern::Middleware::MacroExpansion` | ST | Macro expansion phase | 40-60 |
 | `SillyTavern::Middleware::PlanAssembly` | ST | Final plan construction, continue/impersonate mode handling (nudge prompts, prefill, postfix types), Claude-specific assistant_impersonation | 100-150 |
 | `SillyTavern::Middleware::Trimming` | ST | Token budget enforcement (delegates to Core Trimmer) | 50-80 |
-| `SillyTavern::HookRegistry` | ST | Before/after hooks, HookContext | 120-160 |
+| `SillyTavern::HookRegistry` | ST | Before/after hooks (hooks receive Prompt::Context) | 120-160 |
 | `SillyTavern::InjectionRegistry` | ST | `/inject` parity (position mapping: before/after/chat/none), idempotent, scan/ephemeral flags, optional filter closures | 120-150 |
 | `SillyTavern::GroupContext` | ST | Multi-character context: 4 activation strategies (NATURAL/LIST/MANUAL/POOLED), 3 generation modes (SWAP/APPEND/APPEND_DISABLED), **Decision sync** (app scheduling vs TavernKit), card merging (join prefix/suffix with `<FIELDNAME>` placeholders), disabled_members, group nudge | 250-300 |
 | `SillyTavern::Pipeline` | ST | Default 9-stage middleware chain | 60-80 |
@@ -586,8 +586,8 @@ Dialect-aware ST behavior:
 - Group context: activation strategies, generation modes, card merging
 - Continue/impersonate: nudge prompts, prefill, postfix types
 - InjectionRegistry: ephemeral flag, position mapping, filter closures
-- Unlock ST Prompt Manager characterization tests (3 pending)
-- Unlock ST Character Cards characterization tests (3 pending)
+- ✅ Unlocked ST Prompt Manager characterization tests
+- ✅ Unlocked ST Character Cards characterization tests
 
 **Deliverable:** `TavernKit::SillyTavern.build()` runs end-to-end.
 `plan.to_messages(dialect)` works for all 8 formats. Full ST middleware
@@ -630,7 +630,7 @@ Scope updated after RisuAI source scan
 
 | Task | Layer | Description |
 |------|-------|-------------|
-| Unlock all 30 pending characterization tests | ST + RisuAI | ST (17) + RisuAI (15) |
+| Unlock remaining pending characterization tests | RisuAI | RisuAI (15) |
 | Port ST Compatibility test suite | ST | 8 test files from original |
 | Port Spec Conformance tests | Core | CCv2, CCv3, ST behavior conformance |
 | Integration verification | All | Ensure Rails app can work with both ST and RisuAI pipelines |
@@ -854,7 +854,7 @@ end
 ### Error handling
 
 ```ruby
-# Core errors (current / planned)
+# Core errors (current)
 TavernKit::Error                     # Base
 TavernKit::InvalidCardError          # Card parsing failure
 TavernKit::UnsupportedVersionError   # Unsupported card format/version
@@ -863,13 +863,14 @@ TavernKit::Png::WriteError
 TavernKit::Lore::ParseError
 TavernKit::StrictModeError           # Warnings are errors
 
-TavernKit::PipelineError             # (planned) middleware chain failure w/ stage name
-TavernKit::TokenBudgetExceeded       # (planned) context overflow / trimming failures
+TavernKit::PipelineError             # Middleware chain failure w/ stage name
+TavernKit::MaxTokensExceededError    # Token budget / soft-limit overflow (MaxTokensMiddleware / Trimmer)
 
 # ST-specific errors
-TavernKit::SillyTavern::InvalidPresetError
 TavernKit::SillyTavern::MacroError
+TavernKit::SillyTavern::InvalidInstructError
 TavernKit::SillyTavern::LoreParseError
+TavernKit::SillyTavern::ByafParseError
 ```
 
 **Strict mode (standardized):**
@@ -883,121 +884,134 @@ TavernKit::SillyTavern::LoreParseError
 
 ```
 lib/tavern_kit/
-  lib/tavern_kit/
-    tavern_kit.rb                    # Entry point, autoloads
+  lib/
+    tavern_kit.rb                    # Entry point (requires all)
+    tavern_kit/
+      version.rb
 
-    # === CORE: Value Objects & Data Models ===
-    character.rb                     # (exists)
-    character_card.rb                # (exists)
-    character_importer.rb            # CharacterImporter            [Wave 2]
-    character/                       # (exists) Character schemas
-    user.rb                          # (exists)
-    participant.rb                   # (exists)
+      # === CORE: Value Objects & Data Models ===
+      character.rb
+      character_card.rb
+      character_importer.rb          # CharacterImporter            [Wave 2]
+      character/                     # Character schemas
+      user.rb
+      participant.rb
 
-    # === CORE: Interface Protocols ===               [Wave 2]
-    preset/
-      base.rb                        # Preset::Base interface
-    lore/
-      engine/
-        base.rb                      # Lore::Engine::Base interface
-      scan_input.rb                  # Lore::ScanInput (messages, books, budget; subclassed by ST/RisuAI)
-      book.rb                        # Lore::Book data            [Wave 2]
-      entry.rb                       # Lore::Entry data (minimal shared + extensions Hash) [Wave 2]
-      result.rb                      # Lore::Result data          [Wave 2]
-    macro/
-      engine/
-        base.rb                      # Macro::Engine::Base (#expand with environment:)
-      environment/
-        base.rb                      # Macro::Environment::Base (character_name, user_name, var access)
-      registry/
-        base.rb                      # Macro::Registry::Base (#register with **metadata)
-    hook_registry/
-      base.rb                        # HookRegistry::Base interface
-    injection_registry/
-      base.rb                        # InjectionRegistry::Base interface
-
-    # === CORE: Platform-Agnostic Implementations ===
-    chat_history.rb                  # ChatHistory::Base           [Wave 2]
-    chat_history/
-      in_memory.rb                   # ChatHistory::InMemory       [Wave 2]
-    chat_variables.rb                # ChatVariables::Base          [Wave 2]
-    chat_variables/
-      in_memory.rb                   # ChatVariables::InMemory     [Wave 2]
-    token_estimator.rb               # TokenEstimator              [Wave 2]
-    trim_report.rb                   # TrimReport + TrimResult     [Wave 2]
-    trimmer.rb                       # Trimmer                     [Wave 4]
-    prompt/
-      pipeline.rb                    # Pipeline (exists)
-      dsl.rb                         # DSL (exists)
-      plan.rb                        # Plan (exists)
-      context.rb                     # Context (exists)
-      trace.rb                       # Trace/build report          [Wave 2]
-      instrumenter.rb                # Instrumenter interface      [Wave 2]
-      block.rb                       # Block (exists)
-      message.rb                     # Message (exists)
-      prompt_entry.rb                # PromptEntry (enhance)       [Wave 3]
-      middleware/
-        base.rb                      # Middleware::Base (exists)
-      dialects/                      #                             [Wave 4]
-        base.rb
-        openai.rb
-        anthropic.rb
-        google.rb
-        cohere.rb
-        ai21.rb
-        mistral.rb
-        xai.rb
-        text.rb
-
-    # === CORE: Utilities ===
-    png/
-      parser.rb                      # (exists)
-      writer.rb                      # (exists)
-    coerce.rb                        # (exists)
-    utils.rb                         # (exists)
-    constants.rb                     # (exists)
-    errors.rb                        # (exists, extend per Wave)
-
-    # === SILLY TAVERN: ST-Specific Implementation ===
-    silly_tavern/
-      silly_tavern.rb                # ST entry, SillyTavern.build()
-      preset.rb                      # SillyTavern::Preset          [Wave 2]
+      # === CORE: Interface Protocols ===            [Wave 2]
       preset/
-        st_importer.rb               # ST preset JSON import        [Wave 2]
-      instruct.rb                    # SillyTavern::Instruct        [Wave 2]
-      context_template.rb            # SillyTavern::ContextTemplate [Wave 2]
-      lore/                          #                              [Wave 3]
-        engine.rb                    # ST Lore::Engine (implements Base)
-        decorator_parser.rb          # ST decorator syntax
-        timed_effects.rb             # sticky/cooldown/delay
-        key_list.rb                  # Keyword matching
-      macro/                         #                              [Wave 3]
-        v1_engine.rb                 # Multi-pass regex
-        v2_engine.rb                 # Parser-based nesting
-        registry.rb                  # ST macro registry (extends Macro::Registry::Base)
-        environment.rb               # ST::Macro::Environment (extends Macro::Environment::Base; adds instruct_config, clock, rng, content_hash, extensions)
-        invocation.rb                # Call-site object
-        phase.rb                     # Multi-pass phase control
-        packs/
-          silly_tavern.rb            # 50+ built-in ST macros
-      macro_context.rb               # Context for custom handlers  [Wave 3]
-      examples_parser.rb             # <START> marker parsing       [Wave 3]
-      expander_vars.rb               # Context -> macro vars        [Wave 3]
-      middleware/                     #                              [Wave 4]
-        hooks.rb
-        lore.rb
-        entries.rb
-        pinned_groups.rb
-        injection.rb
-        compilation.rb
-        macro_expansion.rb
-        plan_assembly.rb
-        trimming.rb
-      hook_registry.rb               #                              [Wave 4]
-      hook_context.rb                #                              [Wave 4]
-      injection_registry.rb          #                              [Wave 4]
-      group_context.rb               #                              [Wave 4]
-      pipeline.rb                    # Default 9-stage chain        [Wave 4]
+        base.rb                      # Preset::Base interface
+      lore/
+        engine/
+          base.rb                    # Lore::Engine::Base interface
+        scan_input.rb                # Lore::ScanInput (subclassed by ST/RisuAI)
+        book.rb                      # Lore::Book data
+        entry.rb                     # Lore::Entry data (shared + extensions Hash)
+        result.rb                    # Lore::Result data
+      macro/
+        engine/
+          base.rb                    # Macro::Engine::Base (#expand with environment:)
+        environment/
+          base.rb                    # Macro::Environment::Base (character_name, user_name, var access)
+        registry/
+          base.rb                    # Macro::Registry::Base (#register with **metadata)
+      hook_registry/
+        base.rb                      # HookRegistry::Base interface
+      injection_registry/
+        base.rb                      # InjectionRegistry::Base interface
+        entry.rb
+
+      # === CORE: Platform-Agnostic Implementations ===
+      chat_history.rb                # ChatHistory::Base
+      chat_history/
+        in_memory.rb                 # ChatHistory::InMemory
+      chat_variables.rb              # ChatVariables::Base
+      chat_variables/
+        in_memory.rb                 # ChatVariables::InMemory
+      token_estimator.rb             # TokenEstimator
+      trim_report.rb                 # TrimReport + TrimResult
+      trimmer.rb                     # Trimmer                     [Wave 4]
+      prompt/
+        pipeline.rb                  # Pipeline
+        dsl.rb                       # DSL
+        plan.rb                      # Plan
+        context.rb                   # Context
+        trace.rb                     # Trace/build report
+        instrumenter.rb              # Instrumenter interface
+        block.rb                     # Block
+        message.rb                   # Message
+        prompt_entry.rb              # PromptEntry
+        middleware/
+          base.rb                    # Middleware base
+          max_tokens.rb              # MaxTokensMiddleware          [Wave 4]
+        dialects/                    # Dialect adapters            [Wave 4]
+          base.rb
+          openai.rb
+          anthropic.rb
+          google.rb
+          cohere.rb
+          ai21.rb
+          mistral.rb
+          xai.rb
+          text.rb
+
+      # === CORE: Utilities ===
+      png/
+        parser.rb
+        writer.rb
+      text/
+        pattern_matcher.rb
+      coerce.rb
+      utils.rb
+      constants.rb
+      errors.rb
+
+      # === SILLY TAVERN: ST-Specific Implementation ===
+      silly_tavern/
+        build.rb                     # TavernKit::SillyTavern.build()
+        pipeline.rb                  # Default 9-stage chain        [Wave 4]
+        preset.rb                    # SillyTavern::Preset
+        preset/
+          st_importer.rb             # ST preset JSON import
+        instruct.rb                  # SillyTavern::Instruct
+        context_template.rb          # SillyTavern::ContextTemplate
+        examples_parser.rb           # <START> marker parsing
+        expander_vars.rb             # Context -> macro vars
+        group_context.rb
+        hook_registry.rb
+        injection_registry.rb
+        injection_planner.rb
+        in_chat_injector.rb
+        byaf_parser.rb
+        lore/
+          engine.rb
+          decorator_parser.rb
+          timed_effects.rb
+          key_list.rb
+          scan_input.rb
+          world_info_importer.rb
+          entry_extensions.rb
+        macro/
+          v1_engine.rb
+          v2_engine.rb
+          registry.rb
+          environment.rb
+          invocation.rb
+          flags.rb
+          preprocessors.rb
+          packs/
+            silly_tavern.rb
+            silly_tavern/
+              *.rb
+        middleware/
+          hooks.rb
+          lore.rb
+          entries.rb
+          pinned_groups.rb
+          injection.rb
+          compilation.rb
+          macro_expansion.rb
+          plan_assembly.rb
+          trimming.rb
 
     # === RISUAI: RisuAI-Specific Implementation === [Wave 5]
     risu_ai/
