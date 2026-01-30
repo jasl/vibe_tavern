@@ -3,10 +3,6 @@
 require "test_helper"
 
 class Wave4TrimmerContractTest < Minitest::Test
-  def pending!(reason)
-    skip("Pending Wave 4 (Trimmer): #{reason}")
-  end
-
   class CharEstimator
     def estimate(text, model_hint: nil)
       text.to_s.length
@@ -14,8 +10,6 @@ class Wave4TrimmerContractTest < Minitest::Test
   end
 
   def test_group_order_examples_evicted_as_bundles
-    pending!("examples blocks sharing metadata[:eviction_bundle] must be enabled/disabled together")
-
     estimator = CharEstimator.new
 
     blocks = [
@@ -45,10 +39,13 @@ class Wave4TrimmerContractTest < Minitest::Test
       ),
     ]
 
-    trimmer = TavernKit::Trimmer.new(strategy: :group_order)
-
     # Only enough budget for one dialogue.
-    result = trimmer.trim(blocks, budget: 10, estimator: estimator)
+    result = TavernKit::Trimmer.trim(
+      blocks,
+      strategy: :group_order,
+      budget_tokens: 10,
+      token_estimator: estimator,
+    )
 
     bundle1_enabled = result.kept.any? { |b| b.metadata[:eviction_bundle] == "ex1" }
     bundle2_enabled = result.kept.any? { |b| b.metadata[:eviction_bundle] == "ex2" }
@@ -64,8 +61,6 @@ class Wave4TrimmerContractTest < Minitest::Test
   end
 
   def test_group_order_preserves_latest_user_message
-    pending!("history trimming must preserve the latest user message")
-
     estimator = CharEstimator.new
 
     blocks = [
@@ -74,24 +69,42 @@ class Wave4TrimmerContractTest < Minitest::Test
       TavernKit::Prompt::Block.new(role: :user, content: "u2", token_budget_group: :history),
     ]
 
-    trimmer = TavernKit::Trimmer.new(strategy: :group_order)
-
     # Budget small enough that at least one history block must be evicted.
-    result = trimmer.trim(blocks, budget: 2, estimator: estimator)
+    result = TavernKit::Trimmer.trim(
+      blocks,
+      strategy: :group_order,
+      budget_tokens: 2,
+      token_estimator: estimator,
+    )
 
     latest_user = blocks.last
     refute_includes result.evicted.map(&:id), latest_user.id
   end
 
   def test_trimming_failure_raises_max_tokens_exceeded_error
-    pending!("trimming stage must raise MaxTokensExceededError(stage: :trimming) when mandatory prompts exceed budget")
+    estimator = CharEstimator.new
 
-    # Contract shape (pseudocode):
-    # preset = TavernKit::SillyTavern::Preset.new(context_window_tokens: 10, reserved_response_tokens: 9)
-    # error = assert_raises(TavernKit::MaxTokensExceededError) do
-    #   TavernKit::SillyTavern.build { preset preset; ... } # mandatory blocks exceed budget
-    # end
-    # assert_equal :trimming, error.stage
-    # assert_operator error.estimated_tokens, :>, error.limit_tokens
+    blocks = [
+      TavernKit::Prompt::Block.new(
+        role: :system,
+        content: "mandatory",
+        removable: false,
+        token_budget_group: :system,
+      ),
+    ]
+
+    error = assert_raises(TavernKit::MaxTokensExceededError) do
+      TavernKit::Trimmer.trim(
+        blocks,
+        strategy: :group_order,
+        max_tokens: 10,
+        reserve_tokens: 9,
+        token_estimator: estimator,
+        stage: :trimming,
+      )
+    end
+
+    assert_equal :trimming, error.stage
+    assert_operator error.estimated_tokens, :>, error.limit_tokens
   end
 end
