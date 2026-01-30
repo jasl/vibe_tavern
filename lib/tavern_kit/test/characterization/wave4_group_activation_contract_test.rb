@@ -5,22 +5,20 @@ require "test_helper"
 class Wave4GroupActivationContractTest < Minitest::Test
   FIXTURES_DIR = File.expand_path("../fixtures/silly_tavern/groups", __dir__)
 
-  def pending!(reason)
-    skip("Pending Wave 4 (GroupContext activation): #{reason}")
-  end
-
   def test_activation_strategies_match_st_group_chats
-    pending!("GroupContext decision algorithm must match ST staging group-chats.js")
-
     data = JSON.parse(File.read(File.join(FIXTURES_DIR, "activation_contract.json")))
 
-    # Contract summary (see docs/rewrite/wave4-contracts.md):
-    # - LIST: enabled members in list order
-    # - NATURAL: mention parsing (extractAllWords) + talkativeness roll + fallback
-    # - POOLED: select member who has not spoken since last user message (or random fallback)
-    #
-    # Determinism:
-    # - RNG must be seedable so app-provided decisions can be recomputed and compared.
-    _ = data
+    Array(data.fetch("cases")).each do |test_case|
+      decision = TavernKit::SillyTavern::GroupContext.decide(
+        config: test_case.fetch("config"),
+        input: test_case.fetch("input"),
+      )
+
+      assert_equal(
+        Array(test_case.dig("expected", "activated_member_ids")),
+        decision.fetch(:activated_member_ids),
+        test_case.fetch("name"),
+      )
+    end
   end
 end
