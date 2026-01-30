@@ -19,8 +19,9 @@ module TavernKit
       # @param entries [Array<InjectionRegistry::Entry>] in-chat entries only
       # @param generation_type [Symbol] :normal, :continue, ...
       # @param prompt_entries [Array<Prompt::PromptEntry>] optional Prompt Manager in-chat entries
+      # @param continue_depth0_shift [Boolean] ST doChatInject() shifts depth=0 injections to depth=1 on continue
       # @return [Array<Prompt::Message>] new message array with injections applied
-      def inject(messages, entries, generation_type:, prompt_entries: [])
+      def inject(messages, entries, generation_type:, prompt_entries: [], continue_depth0_shift: true)
         base = Array(messages)
         injects = Array(entries).select(&:in_chat?)
 
@@ -37,7 +38,8 @@ module TavernKit
           role_messages = build_role_messages(prompts, injects, depth: depth)
           next if role_messages.empty?
 
-          effective_depth = (generation_type.to_sym == :continue && depth == 0) ? 1 : depth
+          shift = continue_depth0_shift == true && generation_type.to_sym == :continue && depth == 0
+          effective_depth = shift ? 1 : depth
           inject_idx = [effective_depth + total_inserted, buf.length].min
 
           buf.insert(inject_idx, *role_messages)

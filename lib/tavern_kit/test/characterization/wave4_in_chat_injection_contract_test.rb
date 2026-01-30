@@ -98,6 +98,41 @@ class Wave4InChatInjectionContractTest < Minitest::Test
     )
   end
 
+  def test_population_injection_prompts_continue_does_not_shift_depth_zero
+    injects = JSON.parse(File.read(File.join(FIXTURES_DIR, "in_chat_order.json")))
+
+    registry = TavernKit::SillyTavern::InjectionRegistry.from_st_json(injects)
+    entries = registry.each.to_a
+
+    history = [
+      TavernKit::Prompt::Message.new(role: :user, content: "m1"),
+      TavernKit::Prompt::Message.new(role: :assistant, content: "m2"),
+      TavernKit::Prompt::Message.new(role: :user, content: "m3"),
+    ]
+
+    out = TavernKit::SillyTavern::InChatInjector.inject(
+      history,
+      entries,
+      generation_type: :continue,
+      continue_depth0_shift: false,
+    )
+
+    assert_equal(
+      [
+        "m1",
+        "m2",
+        "AST D1 First\nAST D1 Second",
+        "USR D1",
+        "SYS D1",
+        "m3",
+        "AST D0",
+        "USR D0",
+        "SYS D0",
+      ],
+      out.map(&:content),
+    )
+  end
+
   def test_prompt_manager_orders_match_st_population_injection_prompts
     # This contract is derived from ST's `populationInjectionPrompts()`:
     # prompt-manager in-chat entries are grouped by injection_order and emitted

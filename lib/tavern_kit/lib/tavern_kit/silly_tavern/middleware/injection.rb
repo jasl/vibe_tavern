@@ -287,6 +287,7 @@ module TavernKit
             injections.chat,
             generation_type: ctx.generation_type,
             prompt_entries: ctx.prompt_entries,
+            continue_depth0_shift: text_dialect?(ctx),
           )
 
           merged_blocks = injected_messages.map do |msg|
