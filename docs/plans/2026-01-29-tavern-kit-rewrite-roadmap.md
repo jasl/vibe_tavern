@@ -633,7 +633,6 @@ Scope updated after RisuAI source scan
 | Unlock all 30 pending characterization tests | ST + RisuAI | ST (17) + RisuAI (15) |
 | Port ST Compatibility test suite | ST | 8 test files from original |
 | Port Spec Conformance tests | Core | CCv2, CCv3, ST behavior conformance |
-| API documentation | All | Usage guide from Rails integrator perspective |
 | Integration verification | All | Ensure Rails app can work with both ST and RisuAI pipelines |
 
 #### 5b. RisuAI CBS Macro Engine
@@ -722,7 +721,7 @@ available.
 - End-to-end: character + RisuAI template + lore + CBS macros -> plan -> messages
 
 **Deliverable:** All characterization tests passing. Full ST + RisuAI spec
-parity verified. Rails integration documented. `TavernKit::RisuAI.build()`
+parity verified. Rails integration verified. `TavernKit::RisuAI.build()`
 runs end-to-end with CBS macros, decorator-driven lorebook, regex scripts,
 and triggers all operational.
 
@@ -736,6 +735,40 @@ and triggers all operational.
   (detected by `type === 'risu'`). TavernKit will focus on ST native +
   Character Book (CCv2/CCv3 embedded) formats; external format importers are
   low priority and can be added via pluggable importer interface if needed.
+
+### Wave 6 -- Documentation, Hardening & Global Review
+
+**Close-out wave.** Ship-ready polish: docs, test hardening, and consistency
+reviews after the major feature work is complete.
+
+#### 6a. Documentation (Write Last, Carefully)
+
+| Task | Layer | Description |
+|------|-------|-------------|
+| README(s) | All | Finalize `lib/tavern_kit/README.md` + top-level usage snippets; clarify supported inputs/outputs and stability guarantees |
+| Rails integration guide | All | Practical guide for the Rails rewrite: ST build vs RisuAI build, persistence model, and where app-owned I/O lives |
+| Pipeline + observability guide | Core | Strict/debug mode, TraceCollector, stage names, “how to debug failures” playbook |
+| Compatibility docs | ST + RisuAI | Update compatibility matrix and conformance rules with what is actually implemented |
+
+#### 6b. Test Hardening
+
+| Task | Layer | Description |
+|------|-------|-------------|
+| Reduce skipped tests | All | Drive characterization tests to green; remaining skips must have written rationale and follow-up issue |
+| Add regression fixtures | ST + RisuAI | Hand-author fixtures derived from behavior (not copied); cover tricky edge cases discovered during implementation |
+| Property/edge tests | Core | Budgeting, trimming, ordering, and forward-compat behavior under random-ish inputs |
+
+#### 6c. Global Review / Cleanup
+
+| Task | Layer | Description |
+|------|-------|-------------|
+| API consistency pass | All | Naming, option shapes, error semantics (warn vs raise), and deprecations |
+| Performance pass | Core | Token estimation hot paths, avoid expensive debug work unless instrumenter is enabled |
+| Trace + fingerprint review | Core | Ensure trace contains enough to reproduce “why this prompt” decisions; confirm fingerprint stability for caching |
+
+**Deliverable:** Documentation is complete and aligned with the implemented
+behavior; test suite is stable with minimal skips; APIs are consistent and
+the system is ready for Rails app rewrite integration.
 
 ## API Design Direction
 
