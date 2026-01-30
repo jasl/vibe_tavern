@@ -27,6 +27,7 @@ module TavernKit
           ctx
         end
       end
+      TERMINAL = Terminal.new
 
       # Entry representing a middleware in the pipeline.
       Entry = Data.define(:middleware, :options, :name)
@@ -180,7 +181,7 @@ module TavernKit
       end
 
       def build_stack
-        app = Terminal.new
+        app = TERMINAL
 
         @entries.reverse_each do |entry|
           # Pass the registered name for observability/debug tracing.
