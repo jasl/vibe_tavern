@@ -32,6 +32,8 @@ module TavernKit
                   :role,
                   :content,
                   :name,
+                  :attachments,
+                  :message_metadata,
                   :slot,
                   :enabled,
                   :removable,
@@ -48,6 +50,8 @@ module TavernKit
         content:,
         id: nil,
         name: nil,
+        attachments: nil,
+        message_metadata: nil,
         slot: nil,
         enabled: true,
         removable: true,
@@ -79,6 +83,16 @@ module TavernKit
           raise ArgumentError, "name must be a String (or nil), got: #{name.class}"
         end
         @name = name
+
+        if !attachments.nil? && !attachments.is_a?(Array)
+          raise ArgumentError, "attachments must be an Array (or nil), got: #{attachments.class}"
+        end
+        @attachments = attachments&.dup&.freeze
+
+        if !message_metadata.nil? && !message_metadata.is_a?(Hash)
+          raise ArgumentError, "message_metadata must be a Hash (or nil), got: #{message_metadata.class}"
+        end
+        @message_metadata = message_metadata&.dup&.freeze
 
         if !slot.nil? && !slot.is_a?(Symbol)
           raise ArgumentError, "slot must be a Symbol (or nil), got: #{slot.class}"
@@ -142,7 +156,7 @@ module TavernKit
       # Convert to a Message for LLM consumption.
       # @return [Message]
       def to_message
-        Message.new(role: role, content: content, name: name)
+        Message.new(role: role, content: content, name: name, attachments: attachments, metadata: message_metadata)
       end
 
       # Serialize to a hash for debugging/inspection.
@@ -153,6 +167,8 @@ module TavernKit
           role: role,
           content: content,
           name: name,
+          attachments: attachments,
+          message_metadata: message_metadata,
           slot: slot,
           enabled: enabled,
           removable: removable,

@@ -540,6 +540,9 @@ Both usable standalone by Rails and as middleware dependencies.
 
 **Core output infra + SillyTavern middleware chain + full build() entry.**
 
+Contracts pinned for implementation alignment:
+- `docs/rewrite/wave4-contracts.md` (Dialects tool/function passthrough, Trimmer bundled eviction, strict/debug conventions)
+
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
 | `Trimmer` | Core | Pluggable eviction strategy: `:group_order` (ST: examples -> lore -> history) or `:priority` (RisuAI: sort by priority, evict lowest first) | 180-230 |

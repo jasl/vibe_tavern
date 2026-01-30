@@ -21,6 +21,8 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
       role: :user,
       content: "Hello!",
       name: "Alice",
+      attachments: [{ type: "image", url: "https://example.test/image.png" }],
+      message_metadata: { tool_call_id: "call_123" },
       slot: :main_prompt,
       enabled: false,
       removable: false,
@@ -37,6 +39,10 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
     assert_equal :user, block.role
     assert_equal "Hello!", block.content
     assert_equal "Alice", block.name
+    assert_equal [{ type: "image", url: "https://example.test/image.png" }], block.attachments
+    assert block.attachments.frozen?
+    assert_equal({ tool_call_id: "call_123" }, block.message_metadata)
+    assert block.message_metadata.frozen?
     assert_equal :main_prompt, block.slot
     refute block.enabled?
     assert block.disabled?
@@ -59,12 +65,20 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
   end
 
   def test_block_to_message
-    block = TavernKit::Prompt::Block.new(role: :user, content: "Hello!", name: "Alice")
+    block = TavernKit::Prompt::Block.new(
+      role: :user,
+      content: "Hello!",
+      name: "Alice",
+      attachments: [{ type: "image", url: "https://example.test/image.png" }],
+      message_metadata: { tool_call_id: "call_123" },
+    )
     msg = block.to_message
     assert_kind_of TavernKit::Prompt::Message, msg
     assert_equal :user, msg.role
     assert_equal "Hello!", msg.content
     assert_equal "Alice", msg.name
+    assert_equal [{ type: "image", url: "https://example.test/image.png" }], msg.attachments
+    assert_equal({ tool_call_id: "call_123" }, msg.metadata)
   end
 
   def test_block_to_h

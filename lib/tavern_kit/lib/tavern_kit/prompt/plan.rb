@@ -106,11 +106,15 @@ module TavernKit
 
           should_squash = block.role == :system &&
             (block.name.nil? || block.name.to_s.empty?) &&
+            (block.attachments.nil? || block.attachments.empty?) &&
+            (block.message_metadata.nil? || block.message_metadata.empty?) &&
             !SQUASH_SYSTEM_EXCLUDE_SLOTS.include?(block.slot)
           last = squashed.last
           last_should_squash = last &&
             last.role == :system &&
             (last.name.nil? || last.name.to_s.empty?) &&
+            (last.attachments.nil? || last.attachments.empty?) &&
+            (last.message_metadata.nil? || last.message_metadata.empty?) &&
             !SQUASH_SYSTEM_EXCLUDE_SLOTS.include?(last.slot)
 
           if should_squash && last_should_squash
@@ -144,7 +148,11 @@ module TavernKit
               prev.in_chat? &&
               prev.role == block.role &&
               prev.depth == block.depth &&
-              prev.order == block.order
+              prev.order == block.order &&
+              (prev.attachments.nil? || prev.attachments.empty?) &&
+              (block.attachments.nil? || block.attachments.empty?) &&
+              (prev.message_metadata.nil? || prev.message_metadata.empty?) &&
+              (block.message_metadata.nil? || block.message_metadata.empty?)
             merged_content = [prev.content.to_s.strip, block.content.to_s.strip].reject(&:empty?).join("\n")
             merged[-1] = prev.with(content: merged_content)
           else

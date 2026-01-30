@@ -78,6 +78,40 @@ class TavernKit::Prompt::PlanTest < Minitest::Test
     assert_equal 3, msgs.size
   end
 
+  def test_squash_does_not_merge_system_blocks_with_message_metadata
+    blocks = [
+      TavernKit::Prompt::Block.new(role: :system, content: "First", message_metadata: { cache_control: "ephemeral" }),
+      TavernKit::Prompt::Block.new(role: :system, content: "Second"),
+      TavernKit::Prompt::Block.new(role: :user, content: "Hello!"),
+    ]
+    plan = TavernKit::Prompt::Plan.new(blocks: blocks)
+
+    msgs = plan.to_messages(dialect: :openai, squash_system_messages: true)
+    assert_equal 3, msgs.size
+    assert_equal "First", msgs[0][:content]
+    assert_equal "Second", msgs[1][:content]
+  end
+
+  def test_messages_does_not_merge_in_chat_blocks_with_message_metadata
+    blocks = [
+      TavernKit::Prompt::Block.new(role: :user, content: "First", insertion_point: :in_chat, depth: 1, order: 10),
+      TavernKit::Prompt::Block.new(
+        role: :user,
+        content: "Second",
+        insertion_point: :in_chat,
+        depth: 1,
+        order: 10,
+        message_metadata: { tool_call_id: "call_123" },
+      ),
+    ]
+    plan = TavernKit::Prompt::Plan.new(blocks: blocks)
+
+    msgs = plan.messages
+    assert_equal 2, msgs.size
+    assert_equal "First", msgs[0].content
+    assert_equal "Second", msgs[1].content
+  end
+
   def test_greeting
     plan = TavernKit::Prompt::Plan.new(blocks: [], greeting: "Hello, traveler!", greeting_index: 0)
     assert plan.greeting?
