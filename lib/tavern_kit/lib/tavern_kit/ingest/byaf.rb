@@ -9,7 +9,8 @@ module TavernKit
       module_function
 
       def call(path, **zip_limits)
-        parsed = TavernKit::Archive::ByafParser.new(::File.binread(path), **zip_limits).parse
+        # Pass the path directly to avoid loading the whole archive into memory.
+        parsed = TavernKit::Archive::ByafParser.new(path, **zip_limits).parse
 
         warnings = []
 
