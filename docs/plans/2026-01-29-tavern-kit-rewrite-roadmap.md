@@ -44,10 +44,14 @@ and SillyTavern/RisuAI spec support.
 - **Data Bank / vector matching:** TavernKit stays **prompt-building focused**.
   Provide **interfaces/hooks** for vector results; **I/O + retrieval lives in
   the application layer**.
-- **CharX (.charx) import/export:** defer to **Wave 6+** as a **RisuAI
-  extension**. Core stays focused on CCv2/CCv3 JSON + PNG wrappers; RisuAI can
-  provide a CharX loader that extracts `card.json` + assets and then calls Core
-  parsing APIs.
+- **BYAF (.byaf) import:** Core supports BYAF (Backyard Archive Format) as a
+  ZIP container that maps into a CCv2-compatible payload. Import is **JSON
+  only** (no asset extraction to disk). Downstream apps can handle assets by
+  consuming ZIP entries via Core archive APIs.
+- **CHARX (.charx) import:** Core supports CHARX as a CCv3 ZIP container with
+  `card.json` at the root. Import extracts and validates `card.json` (CCv3)
+  and exposes embedded asset paths for downstream apps to persist if needed.
+  Export of CHARX containers is deferred to Wave 6+.
 - **RisuAI off-spec card import (OldTavernChar):** defer to **Wave 6+** as a
   **RisuAI extension**. RisuAI can provide a converter that normalizes off-spec
   payloads into CCv2/CCv3 hashes and then calls Core parsing APIs.
@@ -876,7 +880,11 @@ TavernKit::MaxTokensExceededError    # Token budget / soft-limit overflow (MaxTo
 TavernKit::SillyTavern::MacroError
 TavernKit::SillyTavern::InvalidInstructError
 TavernKit::SillyTavern::LoreParseError
-TavernKit::SillyTavern::ByafParseError
+
+# Archive/container errors (Core)
+TavernKit::Archive::ZipError
+TavernKit::Archive::ByafParseError
+TavernKit::Archive::CharXParseError
 ```
 
 **Strict mode (standardized):**
@@ -961,6 +969,10 @@ lib/tavern_kit/
           text.rb
 
       # === CORE: Utilities ===
+      archive/
+        zip_reader.rb
+        byaf.rb
+        charx.rb
       png/
         parser.rb
         writer.rb
@@ -987,7 +999,6 @@ lib/tavern_kit/
         injection_registry.rb
         injection_planner.rb
         in_chat_injector.rb
-        byaf_parser.rb
         lore/
           engine.rb
           decorator_parser.rb
