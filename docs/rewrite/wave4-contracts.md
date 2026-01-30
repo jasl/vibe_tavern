@@ -474,6 +474,7 @@ Pinned behavior:
   1) mention activation: activate any mentioned enabled members (excluding banned member)
   2) talkativeness activation: iterate enabled members in a **shuffled order**
      (excluding banned member); activate if `talkativeness >= rng.rand`
+     - default talkativeness is `0.5` when missing/invalid (ST `talkativeness_default`)
   3) if still none, pick 1 random from `chatty_members` (talkativeness > 0) if any,
      else from all enabled members (excluding banned member)
   4) de-duplicate while preserving first-seen order
