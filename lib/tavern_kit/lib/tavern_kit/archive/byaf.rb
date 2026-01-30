@@ -3,42 +3,43 @@
 require "json"
 require "set"
 require "time"
-require "zip"
+
+require_relative "zip_reader"
 
 module TavernKit
-  module SillyTavern
+  module Archive
     # BYAF (Backyard Archive Format) importer.
     #
-    # Reference (JS): resources/SillyTavern/src/byaf.js
+    # Reference (JS): resources/byaf
     #
     # This importer is intentionally focused on:
-    # - producing a CCv2-compatible hash (SillyTavern import result)
-    # - macro normalization ({user}/{character} -> {{user}}/{{char}})
+    # - producing a CCv2-compatible hash (a common import target)
+    # - placeholder normalization ({user}/{character} -> {{user}}/{{char}})
     #
-    # It does NOT attempt to replicate ST's full BYAF import side effects
-    # (background extraction, chat file generation, etc).
+    # It does NOT attempt to extract assets or replicate app-specific behaviors
+    # (background extraction, chat file generation, etc). Downstream apps can
+    # consume assets via ZipReader directly.
     class ByafParser
-      def initialize(data)
+      def initialize(data, **zip_limits)
         @data = data
+        @zip_limits = zip_limits
       end
 
       # Parse BYAF ZIP bytes into a Character Card v2 hash.
       #
       # @return [Hash] card hash in CCv2 format
       def parse_character
-        zip = Zip::File.open_buffer(@data)
-
-        manifest = read_json(zip, "manifest.json")
-        character = read_character(zip, manifest)
-        scenarios = read_scenarios(zip, manifest)
-        build_card(manifest, character, scenarios)
-      rescue Zip::Error => e
-        raise TavernKit::SillyTavern::ByafParseError, "Invalid BYAF file: #{e.message}"
-      ensure
-        zip&.close
+        ZipReader.open(@data, **@zip_limits) do |zip|
+          manifest = zip.read_json("manifest.json")
+          character = read_character(zip, manifest)
+          scenarios = read_scenarios(zip, manifest)
+          build_card(manifest, character, scenarios)
+        end
+      rescue TavernKit::Archive::ZipError => e
+        raise TavernKit::Archive::ByafParseError, "Invalid BYAF file: #{e.message}"
       end
 
-      # Replace known BYAF macros with ST macro syntax.
+      # Replace known BYAF placeholders with ST-style placeholder syntax.
       #
       # - `#{user}:` -> `{{user}}:`
       # - `#{character}:` -> `{{char}}:`
@@ -54,33 +55,22 @@ module TavernKit
 
       private
 
-      def read_json(zip, path)
-        entry = zip.find_entry(path.to_s)
-        raise TavernKit::SillyTavern::ByafParseError, "Invalid BYAF file: missing #{path.inspect}" unless entry
-
-        raw = entry.get_input_stream.read
-        JSON.parse(raw)
-      rescue JSON::ParserError => e
-        raise TavernKit::SillyTavern::ByafParseError, "Invalid BYAF file: #{path.inspect} is not valid JSON (#{e.message})"
-      end
-
       def read_optional_json(zip, path)
-        entry = zip.find_entry(path.to_s)
-        return nil unless entry
+        return nil unless zip.entry?(path)
 
-        JSON.parse(entry.get_input_stream.read)
-      rescue JSON::ParserError
+        zip.read_json(path)
+      rescue TavernKit::Archive::ZipError
         nil
       end
 
       def read_character(zip, manifest)
         characters = Array(manifest["characters"])
-        raise TavernKit::SillyTavern::ByafParseError, "Invalid BYAF file: missing characters array" if characters.empty?
+        raise TavernKit::Archive::ZipError, "Invalid BYAF file: missing characters array" if characters.empty?
 
         path = characters.first.to_s
-        raise TavernKit::SillyTavern::ByafParseError, "Invalid BYAF file: missing character path" if path.strip.empty?
+        raise TavernKit::Archive::ZipError, "Invalid BYAF file: missing character path" if path.strip.empty?
 
-        read_json(zip, path)
+        zip.read_json(path)
       end
 
       def read_scenarios(zip, manifest)
@@ -124,7 +114,7 @@ module TavernKit
           "spec" => "chara_card_v2",
           "spec_version" => "2.0",
           "data" => data,
-          # Non-standard spec extension used by ST.
+          # Non-standard spec extension used by some apps.
           "create_date" => Time.now.iso8601,
         }
       end

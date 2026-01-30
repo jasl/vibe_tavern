@@ -83,9 +83,20 @@ module TavernKit
 
     # Raised when World Info / Lorebook parsing fails with ST-specific issues.
     class LoreParseError < TavernKit::Lore::ParseError; end
+  end
+
+  module Archive
+    # Base error for archive/package import failures (e.g. ZIP-based formats).
+    class ParseError < TavernKit::Error; end
+
+    # Raised when a ZIP container is malformed or violates safety limits.
+    class ZipError < ParseError; end
 
     # Raised when importing a BYAF archive fails.
-    class ByafParseError < TavernKit::Error; end
+    class ByafParseError < ParseError; end
+
+    # Raised when importing a CHARX archive fails.
+    class CharXParseError < ParseError; end
   end
 
   # Raised when a middleware stage fails during pipeline execution.

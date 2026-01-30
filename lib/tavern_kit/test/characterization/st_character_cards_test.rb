@@ -31,7 +31,7 @@ class StCharacterCardsTest < Minitest::Test
   end
 
   def test_byaf_macro_replacement
-    byaf = TavernKit::SillyTavern::ByafParser.new(File.binread("test/fixtures/files/sample.byaf"))
+    byaf = TavernKit::Archive::ByafParser.new(File.binread("test/fixtures/files/sample.byaf"))
     card = byaf.parse_character
 
     assert_includes card["data"]["first_mes"], "{{user}}"
