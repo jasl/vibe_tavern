@@ -16,6 +16,7 @@ class TavernKit::IngestTest < Minitest::Test
       assert bundle.character.v3?
       assert_nil bundle.tmpdir
       assert_equal [], bundle.files
+      assert_equal [], bundle.assets
     end
   end
 
@@ -32,6 +33,7 @@ class TavernKit::IngestTest < Minitest::Test
         assert_nil bundle.main_image_path
         assert_nil bundle.scenarios
         assert_equal [], bundle.files
+        assert_equal [], bundle.assets
       end
     end
   end
@@ -50,6 +52,7 @@ class TavernKit::IngestTest < Minitest::Test
 
       assert_nil bundle.main_image_path
       assert_equal [], bundle.files
+      assert_equal [], bundle.assets
     end
   end
 
@@ -79,7 +82,11 @@ class TavernKit::IngestTest < Minitest::Test
 
         assert Dir.exist?(tmpdir), "expected tmpdir to exist during block"
         assert File.file?(main_image_path)
-        assert_equal 2, bundle.files.length
+        assert_equal 1, bundle.files.length
+        assert_equal "PNGDATA", File.binread(main_image_path)
+        assert_equal 2, bundle.assets.length
+        bg = bundle.assets.find { |a| a.kind == :background_image }
+        assert_equal "BGDATA", bg.read
         assert_match(/\Atavern_kit-byaf-/, File.basename(tmpdir))
       end
 
@@ -95,11 +102,12 @@ class TavernKit::IngestTest < Minitest::Test
     card_hash = TavernKit::CharacterCard.export_v3(TavernKit::Character.create(name: "ZipChar"))
     card_hash["data"]["assets"] = [
       { "type" => "icon", "uri" => "embeded://assets/icon.png", "name" => "main", "ext" => "png" },
+      { "type" => "background", "uri" => "embeded://assets/bg.png", "name" => "scene", "ext" => "png" },
     ]
 
     zip_bytes = charx_bytes(
       card_hash: card_hash,
-      assets: { "assets/icon.png" => "PNGDATA" },
+      assets: { "assets/icon.png" => "PNGDATA", "assets/bg.png" => "BGDATA" },
     )
 
     Tempfile.create(["bundle", ".charx"]) do |f|
@@ -120,6 +128,9 @@ class TavernKit::IngestTest < Minitest::Test
         assert_equal "ZipChar", bundle.character.name
         assert File.file?(main_image_path)
         assert_equal 1, bundle.files.length
+        assert_equal 2, bundle.assets.length
+        bg = bundle.assets.find { |a| a.source_path == "assets/bg.png" }
+        assert_equal "BGDATA", bg.read
       end
 
       refute Dir.exist?(tmpdir)

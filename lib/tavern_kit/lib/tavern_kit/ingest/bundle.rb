@@ -19,10 +19,25 @@ module TavernKit
         def filename = File.basename(path.to_s)
       end
 
-      def initialize(character:, main_image_path: nil, files: [], scenarios: nil, warnings: [], tmpdir: nil)
+      Asset = Data.define(:container_path, :source_path, :kind, :metadata, :zip_limits) do
+        def filename = File.basename(source_path.to_s)
+
+        def read(max_bytes: nil)
+          TavernKit::Archive::ZipReader.open(container_path, **zip_limits) do |zip|
+            if max_bytes
+              zip.read(source_path, max_bytes: max_bytes)
+            else
+              zip.read(source_path)
+            end
+          end
+        end
+      end
+
+      def initialize(character:, main_image_path: nil, files: [], assets: [], scenarios: nil, warnings: [], tmpdir: nil)
         @character = character
         @main_image_path = main_image_path
         @files = files
+        @assets = assets
         @scenarios = scenarios
         @warnings = warnings
         @tmpdir = tmpdir
@@ -30,7 +45,7 @@ module TavernKit
         @closed = false
       end
 
-      attr_reader :character, :main_image_path, :files, :scenarios, :warnings, :tmpdir
+      attr_reader :character, :main_image_path, :files, :assets, :scenarios, :warnings, :tmpdir
 
       def closed? = @closed
 

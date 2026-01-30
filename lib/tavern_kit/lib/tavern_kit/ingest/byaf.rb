@@ -22,43 +22,58 @@ module TavernKit
 
         image_defs = character_image_defs(parsed)
         background_defs = scenario_background_defs(parsed)
+        asset_defs = image_defs + background_defs
 
-        if image_defs.any? || background_defs.any?
-          tmpdir = Dir.mktmpdir("tavern_kit-byaf-")
+        assets = asset_defs.map do |defn|
+          Bundle::Asset.new(
+            container_path: path,
+            source_path: defn[:source_path],
+            kind: defn[:kind],
+            metadata: defn[:metadata],
+            zip_limits: zip_limits,
+          )
         end
 
-        extract_defs = image_defs + background_defs
-        if extract_defs.any?
-          TavernKit::Archive::ZipReader.open(path, **zip_limits) do |zip|
-            extract_defs.each do |defn|
-              next unless zip.entry?(defn[:source_path])
+        main_image_path = nil
 
-              bytes = zip.read(defn[:source_path])
-              extracted_path = write_tmp_file!(tmpdir, defn[:source_path], bytes)
-              files << Bundle::Resource.new(
-                path: extracted_path,
-                source_path: defn[:source_path],
-                kind: defn[:kind],
-                metadata: defn[:metadata],
-              )
-            rescue TavernKit::Archive::ZipError => e
-              warnings << "Failed to extract BYAF asset #{defn[:source_path].inspect}: #{e.message}"
+        if asset_defs.any?
+          TavernKit::Archive::ZipReader.open(path, **zip_limits) do |zip|
+            # Check referenced assets exist (cheap) and pick a main image.
+            main_def = image_defs.find { |d| zip.entry?(d[:source_path]) }
+
+            missing_assets = asset_defs.reject { |d| zip.entry?(d[:source_path]) }
+            missing_assets.each { |d| warnings << "Missing BYAF asset #{d[:source_path].inspect}" }
+
+            if main_def
+              begin
+                bytes = zip.read(main_def[:source_path])
+                tmpdir = Dir.mktmpdir("tavern_kit-byaf-")
+                extracted_path = write_tmp_file!(tmpdir, main_def[:source_path], bytes)
+                files << Bundle::Resource.new(
+                  path: extracted_path,
+                  source_path: main_def[:source_path],
+                  kind: :main_image,
+                  metadata: main_def[:metadata],
+                )
+                main_image_path = extracted_path
+              rescue TavernKit::Archive::ZipError => e
+                warnings << "Failed to extract BYAF main image #{main_def[:source_path].inspect}: #{e.message}"
+                if tmpdir && Dir.exist?(tmpdir)
+                  FileUtils.remove_entry_secure(tmpdir)
+                  tmpdir = nil
+                end
+              end
             end
           end
         end
 
-        missing_assets = extract_defs.map { |d| d[:source_path] } - files.map(&:source_path)
-        missing_assets.each do |source_path|
-          warnings << "Missing BYAF asset #{source_path.inspect}"
-        end
-
-        main_image_path = resolve_main_image_path(image_defs, files)
         scenarios = parsed.scenarios.map { |s| deep_underscore_keys(s) }
 
         Bundle.new(
           character: TavernKit::CharacterCard.load_hash(parsed.card_hash),
           main_image_path: main_image_path,
           files: files,
+          assets: assets,
           scenarios: scenarios,
           warnings: warnings,
           tmpdir: tmpdir,
@@ -111,11 +126,6 @@ module TavernKit
             metadata: { scenario_indices: indices },
           }
         end
-      end
-
-      def resolve_main_image_path(image_defs, files)
-        first_image_source_path = image_defs.first&.fetch(:source_path, nil)
-        files.find { |f| f.kind == :character_image && f.source_path == first_image_source_path }&.path
       end
 
       def deep_underscore_keys(value)

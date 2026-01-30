@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "set"
 require "tmpdir"
 
 module TavernKit
@@ -13,31 +14,53 @@ module TavernKit
 
         TavernKit::Archive::CharX.open(path, **zip_limits) do |pkg|
           asset_defs = embedded_asset_defs(pkg.card_hash)
-          embedded_paths = pkg.embedded_asset_paths
+          main_source_path = resolve_main_source_path(asset_defs)
 
-          if embedded_paths.any?
-            tmpdir = Dir.mktmpdir("tavern_kit-charx-")
+          warnings = []
+
+          existing = pkg.entry_paths.to_set
+          missing_assets = asset_defs.reject { |d| existing.include?(d[:source_path]) }
+          missing_assets.each { |d| warnings << "Missing CHARX asset #{d[:source_path].inspect}" }
+
+          files = []
+          if main_source_path
+            begin
+              bytes = pkg.read_asset(main_source_path)
+              tmpdir = Dir.mktmpdir("tavern_kit-charx-")
+              extracted_path = write_tmp_file!(tmpdir, main_source_path, bytes)
+              files << Bundle::Resource.new(
+                path: extracted_path,
+                source_path: main_source_path,
+                kind: :main_image,
+                metadata: asset_defs.find { |a| a[:source_path] == main_source_path }&.fetch(:metadata),
+              )
+            rescue TavernKit::Archive::ZipError => e
+              warnings << "Failed to extract CHARX main image #{main_source_path.inspect}: #{e.message}"
+              if tmpdir && Dir.exist?(tmpdir)
+                FileUtils.remove_entry_secure(tmpdir)
+                tmpdir = nil
+              end
+            end
           end
 
-          files = embedded_paths.map do |source_path|
-            bytes = pkg.read_asset(source_path)
-            extracted_path = write_tmp_file!(tmpdir, source_path, bytes)
-
-            Bundle::Resource.new(
-              path: extracted_path,
-              source_path: source_path,
+          assets = asset_defs.map do |defn|
+            Bundle::Asset.new(
+              container_path: path,
+              source_path: defn[:source_path],
               kind: :asset,
-              metadata: asset_defs.find { |a| a[:source_path] == source_path }&.fetch(:metadata),
+              metadata: defn[:metadata],
+              zip_limits: zip_limits,
             )
           end
 
-          main_image_path = resolve_main_image_path(asset_defs, files)
+          main_image_path = files.first&.path
 
           Bundle.new(
             character: pkg.character,
             main_image_path: main_image_path,
             files: files,
-            warnings: [],
+            assets: assets,
+            warnings: warnings,
             tmpdir: tmpdir,
           )
         end
@@ -62,12 +85,9 @@ module TavernKit
         end
       end
 
-      def resolve_main_image_path(asset_defs, files)
-        selected_source_path =
-          asset_defs.find { |a| a[:type].downcase == "icon" && a[:name].downcase == "main" }&.dig(:source_path) ||
+      def resolve_main_source_path(asset_defs)
+        asset_defs.find { |a| a[:type].downcase == "icon" && a[:name].downcase == "main" }&.dig(:source_path) ||
           asset_defs.find { |a| a[:type].downcase == "icon" }&.dig(:source_path)
-
-        files.find { |f| f.source_path == selected_source_path }&.path
       end
 
       def write_tmp_file!(tmpdir, source_path, bytes)
