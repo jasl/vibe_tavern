@@ -15,9 +15,13 @@ module TavernKit
           reserve_tokens = resolve_non_negative_int(option(:reserve_tokens, 0), ctx, allow_nil: false)
           limit_tokens = [max_tokens - reserve_tokens, 0].max
 
-          prompt_tokens = estimate_prompt_tokens(ctx)
+          estimation = estimate_prompt_tokens(ctx)
+          prompt_tokens = estimation.fetch(:total)
 
           ctx.instrument(:stat, key: :estimated_prompt_tokens, value: prompt_tokens, stage: ctx.current_stage)
+          ctx.instrument(:stat, key: :estimated_content_tokens, value: estimation.fetch(:content), stage: ctx.current_stage)
+          ctx.instrument(:stat, key: :message_overhead_tokens, value: estimation.fetch(:overhead_per_message), stage: ctx.current_stage)
+          ctx.instrument(:stat, key: :message_count, value: estimation.fetch(:message_count), stage: ctx.current_stage)
           ctx.instrument(:stat, key: :max_prompt_tokens, value: limit_tokens, stage: ctx.current_stage)
 
           return if prompt_tokens <= limit_tokens
@@ -51,6 +55,7 @@ module TavernKit
         def estimate_prompt_tokens(ctx)
           estimator = option(:token_estimator) || ctx.token_estimator || TavernKit::TokenEstimator.default
           model_hint = resolve_value(option(:model_hint, ctx[:model_hint]), ctx)
+          overhead_per_message = resolve_non_negative_int(option(:message_overhead_tokens, 0), ctx, allow_nil: true) || 0
 
           messages = if ctx.plan
             ctx.plan.messages
@@ -60,9 +65,18 @@ module TavernKit
             []
           end
 
-          messages.sum do |msg|
+          content_tokens = messages.sum do |msg|
             estimator.estimate(msg.content.to_s, model_hint: model_hint)
           end
+
+          overhead_tokens = overhead_per_message * messages.size
+
+          {
+            content: content_tokens,
+            overhead_per_message: overhead_per_message,
+            message_count: messages.size,
+            total: content_tokens + overhead_tokens,
+          }
         end
 
         def resolve_value(value, ctx)
