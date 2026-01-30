@@ -128,6 +128,34 @@ class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
     assert_equal "2 hours", engine.expand("{{idleDuration}}", environment: env)
   end
 
+  def test_chat_and_state_macros
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env =
+      build_env(
+        chat: [
+          { "mes" => "Hello", "is_user" => true, "is_system" => false },
+          { "mes" => "Hi", "is_user" => false, "is_system" => false, "swipes" => ["a", "b"], "swipe_id" => 0 },
+        ],
+        chat_metadata: { "lastInContextMessageId" => 0 },
+        first_displayed_message_id: 0,
+        last_generation_type: "continue",
+        extensions_enabled: { "foo" => true, "bar" => false },
+      )
+
+    assert_equal "Hi", engine.expand("{{lastMessage}}", environment: env)
+    assert_equal "1", engine.expand("{{lastMessageId}}", environment: env)
+    assert_equal "Hello", engine.expand("{{lastUserMessage}}", environment: env)
+    assert_equal "Hi", engine.expand("{{lastCharMessage}}", environment: env)
+    assert_equal "0", engine.expand("{{firstIncludedMessageId}}", environment: env)
+    assert_equal "0", engine.expand("{{firstDisplayedMessageId}}", environment: env)
+    assert_equal "2", engine.expand("{{lastSwipeId}}", environment: env)
+    assert_equal "1", engine.expand("{{currentSwipeId}}", environment: env)
+
+    assert_equal "continue", engine.expand("{{lastGenerationType}}", environment: env)
+    assert_equal "true", engine.expand("{{hasExtension::foo}}", environment: env)
+    assert_equal "false", engine.expand("{{hasExtension::bar}}", environment: env)
+  end
+
   def test_random_macro_is_seeded_by_rng
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
 
