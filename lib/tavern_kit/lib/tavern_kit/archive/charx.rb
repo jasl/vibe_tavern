@@ -76,7 +76,11 @@ module TavernKit
       end
 
       def read_asset(path, max_bytes: nil)
-        @zip.read(path, max_bytes: max_bytes || ZipReader::DEFAULT_MAX_ENTRY_BYTES)
+        if max_bytes
+          @zip.read(path, max_bytes: max_bytes)
+        else
+          @zip.read(path)
+        end
       end
     end
   end
