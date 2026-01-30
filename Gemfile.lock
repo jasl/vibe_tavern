@@ -114,6 +114,7 @@ PATH
     tavern_kit (0.1.0)
       easy_talk (~> 3, >= 3.3.0)
       js_regex_to_ruby (~> 0)
+      rubyzip (>= 1.2.2, < 4.0)
       tiktoken_ruby (~> 0)
 
 GEM

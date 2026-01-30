@@ -83,6 +83,9 @@ module TavernKit
 
     # Raised when World Info / Lorebook parsing fails with ST-specific issues.
     class LoreParseError < TavernKit::Lore::ParseError; end
+
+    # Raised when importing a BYAF archive fails.
+    class ByafParseError < TavernKit::Error; end
   end
 
   # Raised when a middleware stage fails during pipeline execution.
