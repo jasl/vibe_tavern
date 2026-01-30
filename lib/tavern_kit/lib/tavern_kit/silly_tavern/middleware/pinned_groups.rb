@@ -202,17 +202,21 @@ module TavernKit
 
           user_text = ctx.user_message.to_s
           if user_text.strip.empty?
-            last = history.last(1).first
-            send_if_empty = preset.send_if_empty.to_s
-            if last&.role&.to_sym == :assistant && !send_if_empty.strip.empty?
-              blocks << TavernKit::Prompt::Block.new(
-                role: :user,
-                content: send_if_empty,
-                slot: :chat_history,
-                token_budget_group: :history,
-                removable: true,
-                metadata: { source: :send_if_empty },
-              )
+            # ST parity: send_if_empty is only used for normal sends, not for
+            # continue/swipe/quiet/impersonate flows.
+            if ctx.generation_type.to_sym == :normal
+              last = history.last(1).first
+              send_if_empty = preset.send_if_empty.to_s
+              if last&.role&.to_sym == :assistant && !send_if_empty.strip.empty?
+                blocks << TavernKit::Prompt::Block.new(
+                  role: :user,
+                  content: send_if_empty,
+                  slot: :chat_history,
+                  token_budget_group: :history,
+                  removable: true,
+                  metadata: { source: :send_if_empty },
+                )
+              end
             end
           else
             blocks << TavernKit::Prompt::Block.new(

@@ -105,6 +105,25 @@ class TavernKit::SillyTavern::Middleware::PinnedGroupsTest < Minitest::Test
     assert_equal :send_if_empty, blocks.last.metadata[:source]
   end
 
+  def test_send_if_empty_is_not_emitted_for_continue_builds
+    character = TavernKit::Character.create(name: "Alice")
+    preset = TavernKit::SillyTavern::Preset.new(new_chat_prompt: "", send_if_empty: "SEND")
+    entry = TavernKit::Prompt::PromptEntry.new(id: "chat_history", pinned: true, role: :system)
+
+    ctx = base_ctx(
+      character: character,
+      preset: preset,
+      prompt_entries: [entry],
+      history: [{ role: :assistant, content: "A1" }],
+      user_message: "",
+      generation_type: :continue,
+    )
+    run_pinned_groups(ctx)
+
+    blocks = ctx.pinned_groups.fetch("chat_history")
+    assert_equal ["A1"], blocks.map(&:content)
+  end
+
   def test_chat_examples_emits_header_and_bundles
     character = TavernKit::Character.create(name: "Alice", mes_example: "<START>\nExample 1")
     preset = TavernKit::SillyTavern::Preset.new(new_example_chat_prompt: "NEW_EXAMPLE")

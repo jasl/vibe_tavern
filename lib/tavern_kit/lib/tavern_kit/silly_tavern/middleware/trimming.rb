@@ -54,6 +54,7 @@ module TavernKit
             greeting_index: ctx.resolved_greeting_index,
             warnings: ctx.warnings,
             trace: trace,
+            llm_options: ctx.llm_options,
           )
         end
       end

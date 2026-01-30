@@ -46,6 +46,7 @@ class TavernKit::SillyTavern::Middleware::TrimmingTest < Minitest::Test
     )
 
     ctx.blocks = [system_block, history_block]
+    ctx.llm_options = { assistant_prefill: "PREFILL" }
 
     ctx.instrumenter = TavernKit::Prompt::Instrumenter::TraceCollector.new
 
@@ -58,6 +59,7 @@ class TavernKit::SillyTavern::Middleware::TrimmingTest < Minitest::Test
     assert_equal ctx.blocks.map(&:enabled?), ctx.plan.blocks.map(&:enabled?)
     assert ctx.plan.trim_report
     assert ctx.plan.trace
+    assert_equal({ assistant_prefill: "PREFILL" }, ctx.plan.llm_options)
 
     assert_equal ctx.plan.fingerprint(dialect: :openai), ctx.plan.trace.fingerprint
   end

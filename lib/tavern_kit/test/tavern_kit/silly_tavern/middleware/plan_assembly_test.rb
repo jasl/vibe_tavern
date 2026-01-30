@@ -52,6 +52,50 @@ class TavernKit::SillyTavern::Middleware::PlanAssemblyTest < Minitest::Test
     assert_equal :continue_prefill, ctx.blocks.first.metadata[:source]
   end
 
+  def test_claude_source_sets_assistant_prefill_request_option
+    preset = TavernKit::SillyTavern::Preset.new(
+      assistant_prefill: "P {{char}}",
+    )
+
+    ctx = base_ctx(preset: preset, blocks: [])
+    ctx[:chat_completion_source] = "claude"
+    run_plan_assembly(ctx)
+
+    assert_equal({ assistant_prefill: "P Alice" }, ctx.plan.llm_options)
+  end
+
+  def test_continue_prefill_for_claude_prepends_assistant_prefill_to_message_content
+    preset = TavernKit::SillyTavern::Preset.new(
+      continue_prefill: true,
+      continue_postfix: " ",
+      assistant_prefill: "P",
+    )
+
+    blocks = [
+      TavernKit::Prompt::Block.new(role: :assistant, content: "A", token_budget_group: :history, removable: true),
+    ]
+
+    ctx = base_ctx(preset: preset, blocks: blocks, generation_type: :continue)
+    ctx[:chat_completion_source] = "claude"
+    run_plan_assembly(ctx)
+
+    assert_equal "P\n\nA ", ctx.blocks.first.content
+    assert_equal({}, ctx.plan.llm_options)
+  end
+
+  def test_impersonate_for_claude_sets_assistant_impersonation_prefill_request_option
+    preset = TavernKit::SillyTavern::Preset.new(
+      impersonation_prompt: "IMP",
+      assistant_impersonation: "AS {{user}}",
+    )
+
+    ctx = base_ctx(preset: preset, blocks: [], generation_type: :impersonate)
+    ctx[:chat_completion_source] = "claude"
+    run_plan_assembly(ctx)
+
+    assert_equal({ assistant_prefill: "AS Bob" }, ctx.plan.llm_options)
+  end
+
   def test_impersonation_prompt_is_appended_and_macro_expanded
     preset = TavernKit::SillyTavern::Preset.new(
       impersonation_prompt: "IMP {{user}}",

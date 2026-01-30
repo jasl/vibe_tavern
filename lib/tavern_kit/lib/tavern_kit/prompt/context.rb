@@ -119,6 +119,12 @@ module TavernKit
       # @return [Hash, nil] trim report from Trimmer
       attr_accessor :trim_report
 
+      # @return [Hash, nil] provider/request options derived during prompt build
+      #
+      # Example: Claude-style assistant prefill settings are expressed as request
+      # options rather than message content.
+      attr_accessor :llm_options
+
       # ============================================
       # Configuration
       # ============================================
@@ -208,6 +214,7 @@ module TavernKit
         copy.instance_variable_set(:@blocks, @blocks.dup)
         copy.instance_variable_set(:@continue_blocks, @continue_blocks&.dup)
         copy.instance_variable_set(:@prompt_entries, @prompt_entries&.dup)
+        copy.instance_variable_set(:@llm_options, @llm_options&.dup)
 
         copy.instance_variable_set(:@macro_vars, @macro_vars&.dup)
         copy.instance_variable_set(:@authors_note_overrides, @authors_note_overrides&.dup)

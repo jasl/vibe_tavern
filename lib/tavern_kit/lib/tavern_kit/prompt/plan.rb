@@ -14,9 +14,19 @@ module TavernKit
     # - filter to only enabled blocks for LLM consumption
     # - insert custom content at specific points
     class Plan
-      attr_reader :blocks, :outlets, :lore_result, :trim_report, :greeting, :greeting_index, :warnings, :trace
+      attr_reader :blocks, :outlets, :lore_result, :trim_report, :greeting, :greeting_index, :warnings, :trace, :llm_options
 
-      def initialize(blocks:, outlets: {}, lore_result: nil, trim_report: nil, greeting: nil, greeting_index: nil, warnings: nil, trace: nil)
+      def initialize(
+        blocks:,
+        outlets: {},
+        lore_result: nil,
+        trim_report: nil,
+        greeting: nil,
+        greeting_index: nil,
+        warnings: nil,
+        trace: nil,
+        llm_options: nil
+      )
         @blocks = Array(blocks).dup.freeze
         @outlets = (outlets || {}).dup.freeze
         @lore_result = lore_result
@@ -25,6 +35,7 @@ module TavernKit
         @greeting_index = greeting_index
         @warnings = Array(warnings).compact.map(&:to_s).freeze
         @trace = trace
+        @llm_options = (llm_options || {}).dup.freeze
 
         freeze
       end
@@ -71,7 +82,10 @@ module TavernKit
       def fingerprint(dialect: :openai, squash_system_messages: false, **dialect_opts)
         Digest::SHA256.hexdigest(
           JSON.generate(
-            to_messages(dialect: dialect, squash_system_messages: squash_system_messages, **dialect_opts),
+            {
+              messages: to_messages(dialect: dialect, squash_system_messages: squash_system_messages, **dialect_opts),
+              llm_options: @llm_options,
+            },
           ),
         )
       end
