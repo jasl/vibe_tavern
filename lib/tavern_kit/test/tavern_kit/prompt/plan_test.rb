@@ -48,7 +48,7 @@ class TavernKit::Prompt::PlanTest < Minitest::Test
     msgs = plan.to_messages(dialect: :openai)
     assert_kind_of Array, msgs
     assert_equal 2, msgs.size
-    assert_equal :system, msgs[0][:role]
+    assert_equal "system", msgs[0][:role]
     assert_equal "Hello!", msgs[1][:content]
   end
 

@@ -167,13 +167,13 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     output = dsl.to_messages(dialect: :text)
 
     assert_equal :text, dsl.context.dialect
-    assert_equal "text", output.first.fetch(:content)
+    assert_equal "text", output.fetch(:prompt)
   end
 
   def test_tavern_kit_to_messages_sets_ctx_dialect_before_build
     pipeline = dialect_pipeline
     output = TavernKit.to_messages(dialect: :text, pipeline: pipeline) { }
 
-    assert_equal "text", output.first.fetch(:content)
+    assert_equal "text", output.fetch(:prompt)
   end
 end
