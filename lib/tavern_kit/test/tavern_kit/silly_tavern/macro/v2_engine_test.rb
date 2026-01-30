@@ -29,6 +29,38 @@ class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
     assert_equal "x BAR y", out
   end
 
+  def test_input_and_max_prompt_macros
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env(input: "Hello", max_prompt: 2048)
+
+    assert_equal "Hello", engine.expand("{{input}}", environment: env)
+    assert_equal "2048", engine.expand("{{maxPrompt}}", environment: env)
+  end
+
+  def test_reverse_macro
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env
+
+    assert_equal "cba", engine.expand("{{reverse::abc}}", environment: env)
+  end
+
+  def test_roll_macros_support_space_and_colon_syntax
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+
+    out1 = engine.expand("{{roll 6}}", environment: build_env(rng: Random.new(1234)))
+    out2 = engine.expand("{{roll: 6}}", environment: build_env(rng: Random.new(1234)))
+    assert_equal out1, out2
+    assert_includes %w[1 2 3 4 5 6], out1
+  end
+
+  def test_banned_macro_collects_words_for_textgen
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env(main_api: "textgenerationwebui", banned_words: [])
+
+    assert_equal "", engine.expand(%({{banned::"delve"}}), environment: env)
+    assert_equal ["delve"], env.platform_attrs["banned_words"]
+  end
+
   def test_random_macro_is_seeded_by_rng
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
 

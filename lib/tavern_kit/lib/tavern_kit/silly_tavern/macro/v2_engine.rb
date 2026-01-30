@@ -404,7 +404,7 @@ module TavernKit
           name_start = i
           while i < len
             break if whitespace?(s.getbyte(i))
-            break if s.getbyte(i) == ":".ord && s.getbyte(i + 1) == ":".ord
+            break if s.getbyte(i) == ":".ord
 
             i += 1
           end
@@ -422,8 +422,8 @@ module TavernKit
           i = start_idx.to_i
 
           i += 1 while i < len && whitespace?(s.getbyte(i))
-          if s.getbyte(i) == ":".ord && s.getbyte(i + 1) == ":".ord
-            i += 2
+          if s.getbyte(i) == ":".ord
+            i += s.getbyte(i + 1) == ":".ord ? 2 : 1
           end
 
           spans = []

@@ -94,6 +94,26 @@ module TavernKit
 
             registry.register("else") { Preprocessors::ELSE_MARKER }
 
+            registry.register("input") do |inv|
+              attrs = inv.environment.respond_to?(:platform_attrs) ? inv.environment.platform_attrs : {}
+              TavernKit::Utils::HashAccessor.wrap(attrs).fetch(:input, default: "")
+            end
+
+            registry.register("maxPrompt") do |inv|
+              attrs = inv.environment.respond_to?(:platform_attrs) ? inv.environment.platform_attrs : {}
+              max = TavernKit::Utils::HashAccessor.wrap(attrs).fetch(:max_prompt, :maxPrompt, :max_context, default: nil)
+              max.nil? ? "" : max.to_i.to_s
+            end
+
+            registry.register(
+              "reverse",
+              unnamed_args: [
+                { name: "value", type: :string },
+              ],
+            ) do |inv|
+              Array(inv.args).first.to_s.each_char.to_a.reverse.join
+            end
+
             registry.register(
               "//",
               unnamed_args: [
@@ -103,6 +123,38 @@ module TavernKit
               strict_args: false,
             ) { "" }
             registry.register_alias("//", "comment", visible: false)
+
+            registry.register(
+              "roll",
+              unnamed_args: [
+                { name: "formula", type: :string },
+              ],
+            ) do |inv|
+              formula = Array(inv.args).first.to_s.strip
+              return "" if formula.empty?
+
+              formula = "1d#{formula}" if formula.match?(/\A\d+\z/)
+
+              m = formula.match(/\A(\d+)?d(\d+)([+-]\d+)?\z/i)
+              unless m
+                inv.warn("Invalid roll formula: #{formula}")
+                return ""
+              end
+
+              count = (m[1].to_s.empty? ? 1 : m[1].to_i)
+              sides = m[2].to_i
+              mod = m[3].to_i
+
+              count = [[count, 1].max, 1_000].min
+              sides = [[sides, 1].max, 1_000_000].min
+
+              rng = inv.rng_or_new
+              total = 0
+              count.times { total += rng.rand(1..sides) }
+              total += mod
+
+              total.to_s
+            end
 
             registry.register(
               "outlet",
@@ -129,6 +181,27 @@ module TavernKit
               next "" if list.empty?
 
               list[inv.pick_index(list.length)].to_s
+            end
+
+            registry.register(
+              "banned",
+              unnamed_args: [
+                { name: "word", type: :string },
+              ],
+            ) do |inv|
+              raw = Array(inv.args).first.to_s.strip
+              word = raw.gsub(/\A"|"\z/, "")
+              next "" if word.empty?
+
+              env = inv.environment
+              attrs = env.respond_to?(:platform_attrs) ? env.platform_attrs : {}
+              main_api = TavernKit::Utils::HashAccessor.wrap(attrs).fetch(:main_api, :mainApi, default: "").to_s
+              next "" unless main_api == "textgenerationwebui"
+
+              list = attrs["banned_words"] || attrs["bannedWords"] || attrs[:banned_words] || attrs[:bannedWords]
+              list << word if list.is_a?(Array)
+
+              ""
             end
           end
 
