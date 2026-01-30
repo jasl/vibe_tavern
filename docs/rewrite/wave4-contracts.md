@@ -486,6 +486,20 @@ Generation-type overrides (applied before strategy):
   last speaking character; if that character is missing, this is an error.
 - `:impersonate`: pick 1 random member.
 
+Swipe selection (ST `activateSwipe`) contract:
+
+- Input: `chat` (messages oldest→newest), `members`, `allow_system:` boolean, `seed` (for fallback random).
+- The primary intent is: **select the last speaking group member**.
+- Pinned behavior:
+  - If the last chat message is from a group member (has `member_id`), select it.
+  - Else (last message is user/system/narrator), scan backwards for the most
+    recent message from a group member (ignoring user, and ignoring system when
+    `allow_system == false`); select that `member_id`.
+  - If no eligible member message exists, fall back to 1 random member.
+  - Legacy compatibility: if a message lacks `member_id` but has a `name`, apps
+    may map `name` to a member as a best-effort fallback (ST has a pre-update
+    branch for this).
+
 Determinism:
 
 - All randomness (shuffle + random selection) MUST go through the injected RNG
