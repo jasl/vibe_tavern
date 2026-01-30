@@ -8,8 +8,6 @@ class StWorldInfoTest < Minitest::Test
   end
 
   def test_insertion_strategy_ordering
-    pending!("Character/global ordering + chat/persona precedence")
-
     entries = TavernKit::SillyTavern::Lore::Engine.sort_entries(
       global: [{ id: "g1" }],
       character: [{ id: "c1" }],
@@ -22,8 +20,6 @@ class StWorldInfoTest < Minitest::Test
   end
 
   def test_selective_logic
-    pending!("Selective logic AND/NOT variants")
-
     entry = {
       keys: ["dragon"],
       secondary_keys: ["cave"],
@@ -36,21 +32,17 @@ class StWorldInfoTest < Minitest::Test
   end
 
   def test_budget_cap
-    pending!("Budget percent with cap, ignore_budget bypass")
-
     result = TavernKit::SillyTavern::Lore::Engine.apply_budget(
       entries: [{ id: "a", tokens: 50 }, { id: "b", tokens: 60 }],
       max_context: 1000,
-      budget_percent: 1,
-      budget_cap: 5,
+      budget_percent: 10,
+      budget_cap: 55,
     )
 
     assert_equal ["a"], result.map { |e| e[:id] }
   end
 
   def test_recursion_and_delay
-    pending!("Recursive scan + delay_until_recursion + exclude_recursion")
-
     entry = { id: "a", extensions: { delay_until_recursion: 1, exclude_recursion: false } }
     state = TavernKit::SillyTavern::Lore::Engine.scan_state(entry, recursion: true)
 
