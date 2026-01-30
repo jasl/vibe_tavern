@@ -71,8 +71,15 @@ module TavernKit
         result = process_unless_blocks(result, p)
         result = replace_fields(result, p)
 
+        # ST removes leading newlines after Handlebars rendering.
+        result = result.sub(/^\n+/, "")
+
         result = result.rstrip
-        result.empty? ? "" : "#{result}\n"
+        return "" if result.empty?
+
+        # When story_string is injected as an in-chat prompt, ST avoids forcing
+        # a trailing newline (message sequences wrap it).
+        story_string_position == self.class::Position::IN_CHAT ? result : "#{result}\n"
       end
 
       def to_h

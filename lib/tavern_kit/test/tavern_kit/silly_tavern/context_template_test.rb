@@ -30,6 +30,23 @@ class TavernKit::SillyTavern::ContextTemplateTest < Minitest::Test
     assert_equal "A|B\n", rendered
   end
 
+  def test_render_strips_leading_newlines
+    template = TavernKit::SillyTavern::ContextTemplate.new(
+      story_string: "\n\nX",
+    )
+
+    assert_equal "X\n", template.render
+  end
+
+  def test_render_does_not_force_trailing_newline_when_in_chat
+    template = TavernKit::SillyTavern::ContextTemplate.new(
+      story_string_position: :in_chat,
+      story_string: "X",
+    )
+
+    assert_equal "X", template.render
+  end
+
   def test_from_st_json_accepts_name_key
     template = TavernKit::SillyTavern::ContextTemplate.from_st_json(
       {

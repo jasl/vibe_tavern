@@ -212,6 +212,8 @@ In **text dialect mode** (`ctx.dialect == :text`):
   - `anchorAfter`  := concatenation of `position: :after` injection content
   - These are passed into `ContextTemplate#render` params as
     `anchorBefore` / `anchorAfter`.
+  - Parity detail: each prompt string is trimmed, concatenated with `\n`, and
+    the final anchor string is trimmed (no leading/trailing whitespace).
   - Note: they are NOT emitted as standalone blocks unless the template
     includes `{{anchorBefore}}` / `{{anchorAfter}}`.
 - If `story_string_position == :in_chat`, emit the rendered story string as an
@@ -221,6 +223,8 @@ In **text dialect mode** (`ctx.dialect == :text`):
 - Otherwise (`:in_prompt` / `:before_prompt`), the rendered story string is
   used as system-level prompt prefix (and instruct may wrap it via
   `instruct.story_string_prefix/suffix`).
+  - Note: in ST, `:before_prompt` behaves the same as `:in_prompt`; only
+    `:in_chat` changes assembly behavior.
 
 ## InjectionRegistry Contract
 
