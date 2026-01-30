@@ -19,8 +19,6 @@ module TavernKit
           apply_in_chat_injections(ctx, injections)
 
           remove_ephemeral_injections(ctx, injections)
-
-          ctx.blocks = flatten_pinned_groups(ctx)
         end
 
         Injections = Struct.new(
@@ -354,16 +352,6 @@ module TavernKit
           return unless reg
 
           injections.ephemeral_ids.each { |id| reg.remove(id: id) }
-        end
-
-        def flatten_pinned_groups(ctx)
-          blocks = []
-          Array(ctx.prompt_entries).each do |entry|
-            next unless entry.pinned?
-
-            blocks.concat(Array(ctx.pinned_groups[entry.id]))
-          end
-          blocks
         end
 
         def block_from_injection(entry, slot:, group:)

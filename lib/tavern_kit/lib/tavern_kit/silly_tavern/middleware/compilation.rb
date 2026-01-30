@@ -7,8 +7,37 @@ module TavernKit
       class Compilation < TavernKit::Prompt::Middleware::Base
         private
 
-        def before(_ctx)
-          # Implemented in a later Wave 4 commit.
+        def before(ctx)
+          blocks = []
+
+          Array(ctx.prompt_entries).each do |entry|
+            if entry.pinned?
+              blocks.concat(Array(ctx.pinned_groups[entry.id]))
+              next
+            end
+
+            # In-chat entries are converted to injections and applied in Stage 5.
+            next if entry.in_chat?
+
+            content = entry.content.to_s
+            next if content.strip.empty?
+
+            blocks << TavernKit::Prompt::Block.new(
+              role: entry.role,
+              content: content,
+              slot: entry.id.to_sym,
+              token_budget_group: :system,
+              removable: false,
+              metadata: {
+                source: :prompt_entry,
+                prompt_entry_id: entry.id,
+                prompt_entry_name: entry.name,
+              },
+            )
+          end
+
+          ctx.blocks = blocks
+          ctx.instrument(:stat, stage: :compilation, key: :blocks, value: blocks.size)
         end
       end
     end
