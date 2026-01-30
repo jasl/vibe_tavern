@@ -156,6 +156,58 @@ class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
     assert_equal "false", engine.expand("{{hasExtension::bar}}", environment: env)
   end
 
+  def test_instruct_macros
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+
+    instruct =
+      TavernKit::SillyTavern::Instruct.new(
+        enabled: true,
+        story_string_prefix: "PFX",
+        story_string_suffix: "SFX",
+        input_sequence: "IN",
+        input_suffix: "IS",
+        output_sequence: "OUT",
+        output_suffix: "OS",
+        system_sequence: "SYS",
+        system_suffix: "SYSS",
+        first_output_sequence: "FO",
+        last_output_sequence: "LO",
+        last_system_sequence: "LSYS",
+        first_input_sequence: "FI",
+        last_input_sequence: "LI",
+        stop_sequence: "STOP",
+        user_alignment_message: "FILL",
+      )
+
+    ctx = TavernKit::SillyTavern::ContextTemplate.new(chat_start: "<CHAT>", example_separator: "---")
+    char = TavernKit::Character.create(name: "Alice", system_prompt: "CHAR_SYS")
+
+    env =
+      build_env(
+        character: char,
+        instruct: instruct,
+        context_template: ctx,
+        sysprompt_enabled: true,
+        sysprompt_content: "DEFAULT_SYS",
+        prefer_character_prompt: true,
+      )
+
+    assert_equal "PFX", engine.expand("{{instructStoryStringPrefix}}", environment: env)
+    assert_equal "SFX", engine.expand("{{instructStoryStringSuffix}}", environment: env)
+    assert_equal "IN", engine.expand("{{instructInput}}", environment: env)
+    assert_equal "OS", engine.expand("{{instructSeparator}}", environment: env)
+
+    assert_equal "DEFAULT_SYS", engine.expand("{{defaultSystemPrompt}}", environment: env)
+    assert_equal "CHAR_SYS", engine.expand("{{systemPrompt}}", environment: env)
+
+    assert_equal "---", engine.expand("{{exampleSeparator}}", environment: env)
+    assert_equal "---", engine.expand("{{chatSeparator}}", environment: env)
+    assert_equal "<CHAT>", engine.expand("{{chatStart}}", environment: env)
+
+    disabled_env = build_env(instruct: instruct.with(enabled: false))
+    assert_equal "", engine.expand("{{instructInput}}", environment: disabled_env)
+  end
+
   def test_random_macro_is_seeded_by_rng
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
 
