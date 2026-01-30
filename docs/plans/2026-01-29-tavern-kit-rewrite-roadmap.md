@@ -570,7 +570,7 @@ Dialect-aware ST behavior:
 | `SillyTavern::Middleware::Trimming` | ST | Token budget enforcement (delegates to Core Trimmer) | 50-80 |
 | `SillyTavern::HookRegistry` | ST | Before/after hooks, HookContext | 120-160 |
 | `SillyTavern::InjectionRegistry` | ST | `/inject` parity (position mapping: before/after/chat/none), idempotent, scan/ephemeral flags, optional filter closures | 120-150 |
-| `SillyTavern::GroupContext` | ST | Multi-character context: 4 activation strategies (NATURAL/LIST/MANUAL/POOLED), 3 generation modes (SWAP/APPEND/APPEND_DISABLED), card merging (join prefix/suffix with `<FIELDNAME>` placeholders), disabled_members, group nudge | 250-300 |
+| `SillyTavern::GroupContext` | ST | Multi-character context: 4 activation strategies (NATURAL/LIST/MANUAL/POOLED), 3 generation modes (SWAP/APPEND/APPEND_DISABLED), **Decision sync** (app scheduling vs TavernKit), card merging (join prefix/suffix with `<FIELDNAME>` placeholders), disabled_members, group nudge | 250-300 |
 | `SillyTavern::Pipeline` | ST | Default 9-stage middleware chain | 60-80 |
 | `TavernKit::SillyTavern.build()` | ST | Convenience entry with ST defaults | 60-80 |
 | `TavernKit.build()` | Core | Generic entry requiring explicit pipeline | 40-60 |
@@ -582,7 +582,7 @@ Dialect-aware ST behavior:
 - Middleware ordering and insertion tests
 - Trimmer eviction strategy tests
 - Trimmer failure mode: mandatory prompts exceed budget => `MaxTokensExceededError` (`stage: :trimming`)
-- Injection tests: extension prompt types, persona positions, author's note interval, story_string position/depth/role (and instruct prefix/suffix wrapping)
+- Injection tests: extension prompt types, persona positions, author's note interval, story_string position/depth/role (and instruct prefix/suffix wrapping), **doChatInject parity** (depth semantics + continue depth-0 shift + role ordering)
 - Group context: activation strategies, generation modes, card merging
 - Continue/impersonate: nudge prompts, prefill, postfix types
 - InjectionRegistry: ephemeral flag, position mapping, filter closures

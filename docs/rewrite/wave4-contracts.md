@@ -366,6 +366,71 @@ Hooks should NOT:
 
 Hooks run in registration order (FIFO).
 
+## GroupContext Contract (Sync With Application Scheduling)
+
+Group chat behavior spans **two** concerns:
+
+- **Scheduling**: who should respond this turn (NATURAL/LIST/MANUAL/POOLED, swipe/continue/quiet overrides).
+- **Prompt building**: how to merge cards / pick active character / apply group nudge.
+
+Applications may want to own scheduling (UI queue, retries, concurrency), but
+TavernKit needs the *same decision* to build the correct prompt. To avoid
+drift when switching between “app decides” and “TavernKit decides”, Wave 4
+standardizes a decision handshake.
+
+### Config + Decision (single source of truth)
+
+- **Config**: stable group settings (activation_strategy, generation_mode,
+  allow_self_responses, disabled_members, etc.)
+- **Decision**: one build-cycle result (activated member ids + why)
+
+Contract shape (conceptual):
+
+```ruby
+# Stable config (persisted in chat/group metadata)
+config = {
+  activation_strategy: :natural, # :list/:manual/:pooled
+  generation_mode: :swap,        # :append/:append_disabled
+  disabled_members: [...],
+  allow_self_responses: false,
+}
+
+# Per-turn decision (persisted per turn)
+decision = {
+  activated_member_ids: [12, 34],
+  strategy: :natural,
+  generation_type: :normal,
+  is_user_input: true,
+  seed: 123,              # determinism
+  reasons: ["mention:Alice", "talkativeness:Bob"],
+}
+```
+
+### Mode switching (A ⇄ B) without surprises
+
+- **Mode A (TavernKit decides):**
+  - app passes `config` + deterministic `seed` (and inputs like user text)
+  - TavernKit computes `decision`
+  - app persists `decision` for later debugging/replay
+- **Mode B (app decides):**
+  - app passes both `config` + `decision`
+  - TavernKit uses `decision` for prompt building
+
+### Validation (keep rules in sync)
+
+If both an app-provided decision and a TavernKit-computed decision are
+available, TavernKit should compare them:
+
+- mismatch => `ctx.warn("group decision mismatch: ...")` (strict mode: raises)
+- proceed with the **app-provided** decision (avoid surprising behavior)
+
+Determinism requirements:
+
+- Decision computation MUST accept an explicit `seed:` (or RNG injection),
+  so “recompute and compare” is stable and debuggable.
+- Both `config` and `decision` should have stable fingerprints recorded via
+  `ctx.instrument(:stat, ...)` and/or `plan.trace`.
+
 ## Middleware Data Flow Contract
 
 Each middleware stage has defined inputs and outputs. Stages run in order 1→9.
@@ -440,6 +505,34 @@ Behavior:
   - Merge `position: :chat` entries by `(depth, role)` (stable order within group)
   - Final in-chat ordering for the same depth is role-descending: Assistant > User > System (ST parity via reverse-depth insertion)
   - If a merged group is empty after trimming/normalization, do not emit a message for it
+```
+
+#### In-chat insertion (ST `doChatInject()` parity)
+
+SillyTavern's reference implementation lives in `public/script.js#doChatInject()`.
+
+Contract:
+
+- **Depth semantics:** depth is measured from the end of chat history.
+  - depth `0` = after the last message
+  - depth `N` = before the Nth-to-last message
+  - depth is clamped: inserting deeper than the chat length inserts at the start.
+- **Continue special-case:** when `ctx.generation_type == :continue`, depth `0`
+  injections behave as if depth `1` (avoids injecting *after* the continued message).
+- **Role ordering:** for the same depth, the final in-chat order is:
+  `:assistant` → `:user` → `:system`.
+  - In ST this comes from inserting `[system, user, assistant]` into a reversed
+    chat buffer and then reversing back.
+- **Stable concatenation within a role:** for a given `(depth, role)`:
+  - sort entries by `entry.id` lexicographically
+  - join `entry.content.strip` with `"\n"`
+  - do NOT append a trailing newline (message formatting later handles wrapping)
+
+Pseudocode (conceptual):
+
+```ruby
+effective_depth = (ctx.generation_type == :continue && depth == 0) ? 1 : depth
+content = entries.sort_by(&:id).map { |e| e.content.strip }.reject(&:empty?).join("\n")
 ```
 
 ### Stage 6: Compilation

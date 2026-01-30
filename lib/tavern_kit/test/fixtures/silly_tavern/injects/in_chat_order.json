@@ -1,0 +1,59 @@
+{
+  "a_ast_d1_1": {
+    "value": "AST D1 First",
+    "position": 1,
+    "depth": 1,
+    "scan": false,
+    "role": 2,
+    "filter": null
+  },
+  "b_ast_d1_2": {
+    "value": "AST D1 Second",
+    "position": 1,
+    "depth": 1,
+    "scan": false,
+    "role": 2,
+    "filter": null
+  },
+  "c_usr_d1": {
+    "value": "USR D1",
+    "position": 1,
+    "depth": 1,
+    "scan": false,
+    "role": 1,
+    "filter": null
+  },
+  "d_sys_d1": {
+    "value": "SYS D1",
+    "position": 1,
+    "depth": 1,
+    "scan": false,
+    "role": 0,
+    "filter": null
+  },
+  "m_usr_d0": {
+    "value": "USR D0",
+    "position": 1,
+    "depth": 0,
+    "scan": false,
+    "role": 1,
+    "filter": null
+  },
+  "z_sys_d0": {
+    "value": "SYS D0",
+    "position": 1,
+    "depth": 0,
+    "scan": false,
+    "role": 0,
+    "filter": null
+  },
+  "zz_ast_d0": {
+    "value": "AST D0",
+    "position": 1,
+    "depth": 0,
+    "scan": false,
+    "role": 2,
+    "filter": null
+  }
+}
+
