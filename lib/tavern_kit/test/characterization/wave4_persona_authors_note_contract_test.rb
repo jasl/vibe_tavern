@@ -5,34 +5,58 @@ require "test_helper"
 class Wave4PersonaAuthorsNoteContractTest < Minitest::Test
   FIXTURES_DIR = File.expand_path("../fixtures/silly_tavern/authors_note", __dir__)
 
-  def pending!(reason)
-    skip("Pending Wave 4 (Persona + Author's Note): #{reason}")
-  end
-
   def test_persona_top_bottom_an_only_applies_when_authors_note_is_scheduled
-    pending!("Stage 5 must mirror ST addPersonaDescriptionExtensionPrompt() semantics")
-
     data = JSON.parse(File.read(File.join(FIXTURES_DIR, "persona_and_authors_note.json")))
 
-    # Contract summary:
-    # - persona_position TOP_AN/BOTTOM_AN rewrites the Author's Note content,
-    #   but ONLY on turns where Author's Note is scheduled to inject.
-    # - on turns where Author's Note is NOT scheduled, persona MUST NOT be
-    #   injected at all (no separate message).
-    #
-    # Source reference (ST staging):
-    # - public/script.js#addPersonaDescriptionExtensionPrompt()
-    _ = data
+    cases = Array(data.fetch("cases")).select do |c|
+      %w[top_an bottom_an].include?(c.dig("persona", "position"))
+    end
+
+    cases.each do |test_case|
+      an = test_case.fetch("authors_note")
+      persona = test_case.fetch("persona")
+
+      entry = TavernKit::SillyTavern::InjectionPlanner.authors_note_entry(
+        turn_count: test_case.fetch("turn_count"),
+        text: an.fetch("text"),
+        frequency: an.fetch("frequency"),
+        position: an.fetch("position"),
+        depth: an.fetch("depth"),
+        role: an.fetch("role"),
+        persona_text: persona.fetch("text"),
+        persona_position: persona.fetch("position"),
+      )
+
+      expected = test_case.fetch("expected")
+      if expected.fetch("authors_note_injected")
+        assert entry, test_case.fetch("name")
+        assert_equal expected.fetch("authors_note_text"), entry.content, test_case.fetch("name")
+      else
+        assert_nil entry, test_case.fetch("name")
+      end
+    end
   end
 
   def test_persona_at_depth_injects_as_in_chat_message_regardless_of_authors_note_schedule
-    pending!("Stage 5 must support persona_description_positions.AT_DEPTH as in-chat injection")
-
     data = JSON.parse(File.read(File.join(FIXTURES_DIR, "persona_and_authors_note.json")))
 
-    # Contract summary:
-    # - persona AT_DEPTH becomes an in-chat injection at `persona_depth`
-    #   with role `persona_role`, and MUST be WI-scannable (allowWIScan=true in ST).
-    _ = data
+    test_case = Array(data.fetch("cases")).find { |c| c.dig("persona", "position") == "at_depth" }
+    refute_nil test_case
+
+    persona = test_case.fetch("persona")
+    expected = test_case.fetch("expected")
+
+    entry = TavernKit::SillyTavern::InjectionPlanner.persona_at_depth_entry(
+      text: persona.fetch("text"),
+      position: persona.fetch("position"),
+      depth: persona.fetch("depth"),
+      role: persona.fetch("role"),
+    )
+
+    assert entry, test_case.fetch("name")
+    assert_equal :chat, entry.position
+    assert_equal expected.fetch("persona_depth"), entry.depth
+    assert_equal expected.fetch("persona_role").to_sym, entry.role
+    assert entry.scan?
   end
 end
