@@ -12,7 +12,16 @@ module TavernKit
       ) do
         def unnamed_arg_defs
           raw = metadata[:unnamed_args] || metadata["unnamed_args"] || metadata[:unnamedArgs] || metadata["unnamedArgs"]
-          Array(raw)
+          case raw
+          when nil
+            []
+          when Integer
+            # ST supports unnamedArgs as a number (all required). Default to
+            # string type for validation/docs parity.
+            Array.new(raw) { { name: nil, optional: false, type: :string } }
+          else
+            Array(raw)
+          end
         end
 
         def list_spec

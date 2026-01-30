@@ -51,4 +51,33 @@ class StMacrosTest < Minitest::Test
     template = "A\n{{trim}}\nB"
     assert_equal "AB", engine.expand(template, environment: TavernKit::SillyTavern::Macro::Environment.new)
   end
+
+  def test_typed_arg_validation_and_strict_mode
+    registry = TavernKit::SillyTavern::Macro::Registry.new
+    registry.register("num", unnamed_args: [{ name: "n", type: :integer }]) { "OK" }
+    registry.register("lenient", unnamed_args: [{ name: "n", type: :integer }], strict_args: false) { "OK" }
+    registry.register("block", unnamed_args: [{ name: "content", type: :integer }]) { "OK" }
+
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new(registry: registry)
+
+    env = TavernKit::SillyTavern::Macro::Environment.new
+    assert_equal "{{num}}", engine.expand("{{num}}", environment: env)
+    assert_includes env.warnings.join("\n"), "expects"
+
+    env2 = TavernKit::SillyTavern::Macro::Environment.new
+    assert_equal "{{num::abc}}", engine.expand("{{num::abc}}", environment: env2)
+    assert_includes env2.warnings.join("\n"), "expected type"
+
+    env3 = TavernKit::SillyTavern::Macro::Environment.new
+    assert_equal "OK", engine.expand("{{lenient::abc}}", environment: env3)
+    assert_includes env3.warnings.join("\n"), "expected type"
+
+    env4 = TavernKit::SillyTavern::Macro::Environment.new
+    assert_equal "{{block}}abc{{/block}}", engine.expand("{{block}}abc{{/block}}", environment: env4)
+
+    strict_env = TavernKit::SillyTavern::Macro::Environment.new(strict: true)
+    assert_raises(TavernKit::StrictModeError) do
+      engine.expand("{{lenient::abc}}", environment: strict_env)
+    end
+  end
 end

@@ -154,6 +154,7 @@ module TavernKit
               scoped_start = close + 2
               scoped_end = closing[:open] - 1
               raw_scoped = scoped_start > scoped_end ? "" : str[scoped_start..scoped_end].to_s
+              raw_block = str[open...(closing[:close] + 2)].to_s
 
               output =
                 evaluate_invocation(
@@ -175,6 +176,7 @@ module TavernKit
                   close: close,
                   scoped_start: scoped_start,
                   scoped: true,
+                  fallback: raw_block,
                 )
 
               return { output: output, next_index: closing[:close] + 2 }
@@ -206,6 +208,7 @@ module TavernKit
               close: close,
               scoped_start: nil,
               scoped: false,
+              fallback: raw_original,
             )
 
           { output: output, next_index: close + 2 }
@@ -229,7 +232,8 @@ module TavernKit
           open:,
           close:,
           scoped_start:,
-          scoped:
+          scoped:,
+          fallback:
         )
           delay = defn.respond_to?(:delay_arg_resolution?) && defn.delay_arg_resolution?
 
@@ -268,6 +272,9 @@ module TavernKit
               args << scoped_value
             end
           end
+
+          validate_invocation_arity!(defn, args, env: env)
+          validate_invocation_arg_types!(defn, args, env: env)
 
           if key == "original"
             return original_once ? original_once.call : ""
@@ -316,10 +323,10 @@ module TavernKit
               handler.call(inv)
             end
 
-          post_process(env, value, fallback: raw_original)
+          post_process(env, value, fallback: fallback)
         rescue TavernKit::SillyTavern::MacroError => e
           env.warn(e.message) if env.respond_to?(:warn)
-          raw_original.to_s
+          fallback.to_s
         end
 
         def find_matching_closing(text, start_idx, target_key)
@@ -638,6 +645,115 @@ module TavernKit
           end
         rescue StandardError
           fallback.to_s
+        end
+
+        def validate_invocation_arity!(defn, args, env:)
+          count = Array(args).length
+          return if defn.arity_valid?(count)
+
+          list = defn.list_spec
+          expected_min = list ? defn.min_args + list.fetch(:min, 0).to_i : defn.min_args
+          expected_max =
+            if list
+              max = list[:max]
+              max.nil? ? nil : defn.max_args + max.to_i
+            else
+              defn.max_args
+            end
+
+          expectation =
+            if !expected_max.nil? && expected_max != expected_min
+              "between #{expected_min} and #{expected_max}"
+            elsif !expected_max.nil?
+              expected_min.to_s
+            else
+              "at least #{expected_min}"
+            end
+
+          message = %(Macro "#{defn.name}" called with #{count} unnamed arguments but expects #{expectation}.)
+          raise TavernKit::SillyTavern::MacroSyntaxError.new(message, macro_name: defn.name) if defn.strict_args?
+
+          env.warn(message) if env.respond_to?(:warn)
+        end
+
+        def validate_invocation_arg_types!(defn, args, env:)
+          defs = defn.unnamed_arg_defs
+          return if defs.empty?
+
+          all_args = Array(args)
+          unnamed_count = [all_args.length, defn.max_args].min
+          unnamed = all_args.first(unnamed_count)
+          return if unnamed.empty?
+
+          count = [defs.length, unnamed.length].min
+          count.times do |idx|
+            arg_def = defs[idx]
+            value = unnamed[idx].to_s
+
+            raw_type =
+              if arg_def.is_a?(Hash)
+                arg_def[:type] || arg_def["type"] || :string
+              else
+                :string
+              end
+
+            types = Array(raw_type).map { |t| normalize_value_type(t) }.uniq
+            next if types.any? { |t| value_of_type?(value, t) }
+
+            arg_name =
+              if arg_def.is_a?(Hash)
+                arg_def[:name] || arg_def["name"] || "Argument #{idx + 1}"
+              else
+                "Argument #{idx + 1}"
+              end
+
+            optional =
+              if arg_def.is_a?(Hash)
+                arg_def[:optional] || arg_def["optional"]
+              else
+                false
+              end
+
+            optional_label = optional ? " (optional)" : ""
+            message =
+              %(Macro "#{defn.name}" (position #{idx + 1}#{optional_label}) argument "#{arg_name}" expected type #{raw_type} but got value "#{value}".)
+
+            raise TavernKit::SillyTavern::MacroSyntaxError.new(message, macro_name: defn.name, position: idx + 1) if defn.strict_args?
+
+            env.warn(message) if env.respond_to?(:warn)
+          end
+        end
+
+        def normalize_value_type(value)
+          case value
+          when Symbol
+            value.to_s.downcase.to_sym
+          else
+            value.to_s.strip.downcase.to_sym
+          end
+        rescue StandardError
+          :string
+        end
+
+        def value_of_type?(value, type)
+          trimmed = value.to_s.strip
+
+          case type
+          when :string
+            true
+          when :integer
+            trimmed.match?(/\A-?\d+\z/)
+          when :number
+            n = Float(trimmed)
+            n.finite?
+          when :boolean
+            v = trimmed.downcase
+            TavernKit::Coerce::TRUE_STRINGS.include?(v) || TavernKit::Coerce::FALSE_STRINGS.include?(v)
+          else
+            false
+          end
+        rescue ArgumentError, TypeError
+          false
         end
 
         def trim_scoped_content(text, trim_indent: true)
