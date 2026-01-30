@@ -3,49 +3,95 @@
 require "test_helper"
 
 class StPromptManagerTest < Minitest::Test
-  def pending!(reason)
-    skip("Pending ST parity: #{reason}")
-  end
-
   def test_default_prompt_order
-    pending!("Default PromptManager ordering for chat completion")
+    preset = TavernKit::SillyTavern::Preset.new(prefer_char_prompt: false)
+    char = TavernKit::Character.create(
+      name: "Alice",
+      description: "DESC",
+      personality: "PERS",
+      scenario: "SCEN",
+      mes_example: "<START>\nExample 1",
+    )
 
-    identifiers = TavernKit::SillyTavern::PromptManager.default_prompt_order
-    assert_equal %w[
-      main
-      worldInfoBefore
-      personaDescription
-      charDescription
-      charPersonality
-      scenario
-      enhanceDefinitions
-      nsfw
-      worldInfoAfter
-      dialogueExamples
-      chatHistory
-      jailbreak
-    ], identifiers
+    plan = TavernKit::SillyTavern.build do
+      dialect :openai
+      character char
+      user TavernKit::User.new(name: "Bob", persona: "Persona")
+      preset preset
+      history [{ role: :assistant, content: "A1" }]
+      message "U1"
+    end
+
+    slots = plan.blocks.map(&:slot).compact.uniq
+
+    assert_equal(
+      [
+        :main_prompt,
+        :persona_description,
+        :character_description,
+        :character_personality,
+        :scenario,
+        :chat_examples,
+        :chat_history,
+      ],
+      slots,
+    )
   end
 
   def test_continue_nudge_insertion
-    pending!("continue_nudge appended after last chat message")
-
-    prompt = TavernKit::SillyTavern::PromptBuilder.build(
-      type: :continue,
-      last_message: "Hello there"
+    preset = TavernKit::SillyTavern::Preset.new(
+      prefer_char_prompt: false,
+      continue_prefill: false,
+      continue_nudge_prompt: "NUDGE {{char}}",
     )
 
-    assert_equal "continueNudge", prompt.last.identifier
+    plan = TavernKit::SillyTavern.build do
+      dialect :openai
+      generation_type :continue
+
+      character TavernKit::Character.create(name: "Alice")
+      user TavernKit::User.new(name: "Bob", persona: "Persona")
+      preset preset
+
+      history [{ role: :assistant, content: "A1" }]
+      message ""
+    end
+
+    assert_equal :continue_nudge_prompt, plan.blocks.last.slot
+    assert_equal "NUDGE Alice", plan.blocks.last.content
   end
 
   def test_group_nudge_only_for_group
-    pending!("group_nudge is inserted only for group chats and non-impersonate")
+    preset = TavernKit::SillyTavern::Preset.new(prefer_char_prompt: false, group_nudge_prompt: "GROUP {{char}}")
 
-    prompt = TavernKit::SillyTavern::PromptBuilder.build(
-      group: true,
-      type: :normal
-    )
+    plan = TavernKit::SillyTavern.build do
+      dialect :openai
+      generation_type :normal
 
-    assert prompt.any? { |m| m.identifier == "groupNudge" }
+      character TavernKit::Character.create(name: "Alice")
+      user TavernKit::User.new(name: "Bob", persona: "Persona")
+      preset preset
+
+      group({ any: "value" })
+      history []
+      message "hi"
+    end
+
+    assert plan.blocks.any? { |b| b.slot == :group_nudge_prompt }
+
+    plan = TavernKit::SillyTavern.build do
+      dialect :openai
+      generation_type :impersonate
+
+      character TavernKit::Character.create(name: "Alice")
+      user TavernKit::User.new(name: "Bob", persona: "Persona")
+      preset preset
+
+      group({ any: "value" })
+      history []
+      message "hi"
+    end
+
+    refute plan.blocks.any? { |b| b.slot == :group_nudge_prompt }
   end
 end
