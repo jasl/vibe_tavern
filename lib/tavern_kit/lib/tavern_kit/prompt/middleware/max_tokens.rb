@@ -10,7 +10,7 @@ module TavernKit
 
         def after(ctx)
           max_tokens = resolve_non_negative_int(option(:max_tokens), ctx, allow_nil: true)
-          return if max_tokens.nil?
+          return if max_tokens.nil? || max_tokens.zero?
 
           reserve_tokens = resolve_non_negative_int(option(:reserve_tokens, 0), ctx, allow_nil: false)
           limit_tokens = [max_tokens - reserve_tokens, 0].max

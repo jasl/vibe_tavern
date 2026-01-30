@@ -90,6 +90,19 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
     assert_match(/exceeded limit 6/, ctx.warnings.first)
   end
 
+  def test_max_tokens_zero_disables_guard
+    pipeline = build_pipeline(max_tokens: 0, mode: :error)
+    ctx = TavernKit::Prompt::Context.new(
+      token_estimator: CharCountEstimator.new,
+      warning_handler: nil,
+      user_message: "hello!",
+    )
+
+    pipeline.call(ctx)
+
+    assert_equal [], ctx.warnings
+  end
+
   def test_proc_options_are_evaluated_with_context
     pipeline = build_pipeline(
       max_tokens: ->(ctx) { ctx[:max_tokens] },
