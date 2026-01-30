@@ -713,7 +713,8 @@ Output: ctx.blocks (Array<Block> - fully compiled)
 Side effects: Compiles all entries into blocks, resolves outlet insertions
 Behavior:
   - Expand pinned groups into block array
-  - Resolve outlet `{{slot::name}}` insertions from ctx.outlets
+  - Outlets are expanded via the `{{outlet::key}}` macro in Stage 7 (MacroExpansion);
+    Stage 6 does not do any special outlet placeholder substitution
   - Set token_budget_group on each block
   - Set removable flag based on entry/slot requirements
 ```
@@ -743,7 +744,10 @@ Side effects: Creates final Plan with blocks, greeting, outlets, warnings
 Behavior:
   - Handle continue mode: nudge prompt, prefill, postfix (NONE/SPACE/NEWLINE/DOUBLE_NEWLINE)
   - Handle impersonate mode: impersonation_prompt, assistant_impersonation (Claude)
-  - Set assistant prefill for Claude sources
+  - Set assistant prefill for Claude sources via `ctx.llm_options[:assistant_prefill]`
+    (exposed as `plan.llm_options`), except:
+    - quiet gens (no prefill)
+    - continue gens when `continue_prefill == true` (prefill is applied to the continued message instead)
   - Populate plan.warnings from ctx.warnings
 ```
 

@@ -219,7 +219,7 @@ class TavernKit::SillyTavern::Middleware::InjectionTest < Minitest::Test
     assert_equal ["m1", "m2", "SS"], blocks.map(&:content)
   end
 
-  def test_ephemeral_injections_are_removed_from_registry_after_build
+  def test_ephemeral_injections_are_not_auto_removed
     character = TavernKit::Character.create(name: "Alice")
     preset = TavernKit::SillyTavern::Preset.new(main_prompt: "BASE", prefer_char_prompt: false)
     prompt_entries = [
@@ -235,6 +235,7 @@ class TavernKit::SillyTavern::Middleware::InjectionTest < Minitest::Test
 
     ids = registry.each.map(&:id)
     assert_includes ids, "persist"
-    refute_includes ids, "temp"
+    assert_includes ids, "temp"
+    assert_equal ["temp"], registry.ephemeral_ids
   end
 end

@@ -17,15 +17,12 @@ module TavernKit
 
           apply_before_after_injections(ctx, injections) unless text_dialect?(ctx)
           apply_in_chat_injections(ctx, injections)
-
-          remove_ephemeral_injections(ctx, injections)
         end
 
         Injections = Struct.new(
           :before,         # Array<InjectionRegistry::Entry>
           :after,          # Array<InjectionRegistry::Entry>
           :chat,           # Array<InjectionRegistry::Entry>
-          :ephemeral_ids,  # Array<String>
           keyword_init: true,
         )
 
@@ -33,7 +30,6 @@ module TavernKit
           before_entries = []
           after_entries = []
           chat_entries = []
-          ephemeral_ids = []
 
           registry = ctx.injection_registry
           if registry
@@ -51,8 +47,6 @@ module TavernKit
               when :chat
                 chat_entries << entry
               end
-
-              ephemeral_ids << entry.id if entry.ephemeral?
             end
           end
 
@@ -120,7 +114,6 @@ module TavernKit
             before: before_entries,
             after: after_entries,
             chat: chat_entries,
-            ephemeral_ids: ephemeral_ids,
           )
         end
 
@@ -345,13 +338,6 @@ module TavernKit
           end
 
           [head, rest]
-        end
-
-        def remove_ephemeral_injections(ctx, injections)
-          reg = ctx.injection_registry
-          return unless reg
-
-          injections.ephemeral_ids.each { |id| reg.remove(id: id) }
         end
 
         def block_from_injection(entry, slot:, group:)
