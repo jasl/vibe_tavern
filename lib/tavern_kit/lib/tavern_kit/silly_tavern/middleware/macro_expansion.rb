@@ -25,7 +25,7 @@ module TavernKit
           end
 
           ctx.blocks = expanded
-          ctx.instrument(:stat, stage: :macro_expansion, key: :expanded_blocks, value: expanded.size)
+          ctx.instrument(:stat, stage: :macro_expansion, key: :expanded_blocks, value: expanded.size) if ctx.instrumenter
         end
       end
     end

@@ -50,8 +50,10 @@ module TavernKit
           ctx.lore_result = ctx.lore_engine.scan(input)
           ctx.outlets = build_outlets(ctx.lore_result)
 
-          ctx.instrument(:stat, stage: :lore, key: :world_info_activated, value: ctx.lore_result.activated_entries.size)
-          ctx.instrument(:stat, stage: :lore, key: :world_info_tokens, value: ctx.lore_result.total_tokens)
+          if ctx.instrumenter
+            ctx.instrument(:stat, stage: :lore, key: :world_info_activated, value: ctx.lore_result.activated_entries.size)
+            ctx.instrument(:stat, stage: :lore, key: :world_info_tokens, value: ctx.lore_result.total_tokens)
+          end
         end
 
         def build_scan_messages(ctx)

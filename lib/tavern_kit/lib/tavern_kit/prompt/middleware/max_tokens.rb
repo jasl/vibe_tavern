@@ -20,13 +20,15 @@ module TavernKit
           estimation = estimate_prompt_tokens(ctx)
           prompt_tokens = estimation.fetch(:total)
 
-          ctx.instrument(:stat, key: :estimated_prompt_tokens, value: prompt_tokens, stage: ctx.current_stage)
-          ctx.instrument(:stat, key: :estimated_content_tokens, value: estimation.fetch(:content), stage: ctx.current_stage)
-          ctx.instrument(:stat, key: :estimated_metadata_tokens, value: estimation.fetch(:metadata), stage: ctx.current_stage)
-          ctx.instrument(:stat, key: :message_overhead_per_message_tokens, value: estimation.fetch(:overhead_per_message), stage: ctx.current_stage)
-          ctx.instrument(:stat, key: :message_overhead_tokens, value: estimation.fetch(:overhead_total), stage: ctx.current_stage)
-          ctx.instrument(:stat, key: :message_count, value: estimation.fetch(:message_count), stage: ctx.current_stage)
-          ctx.instrument(:stat, key: :max_prompt_tokens, value: limit_tokens, stage: ctx.current_stage)
+          if ctx.instrumenter
+            ctx.instrument(:stat, key: :estimated_prompt_tokens, value: prompt_tokens, stage: ctx.current_stage)
+            ctx.instrument(:stat, key: :estimated_content_tokens, value: estimation.fetch(:content), stage: ctx.current_stage)
+            ctx.instrument(:stat, key: :estimated_metadata_tokens, value: estimation.fetch(:metadata), stage: ctx.current_stage)
+            ctx.instrument(:stat, key: :message_overhead_per_message_tokens, value: estimation.fetch(:overhead_per_message), stage: ctx.current_stage)
+            ctx.instrument(:stat, key: :message_overhead_tokens, value: estimation.fetch(:overhead_total), stage: ctx.current_stage)
+            ctx.instrument(:stat, key: :message_count, value: estimation.fetch(:message_count), stage: ctx.current_stage)
+            ctx.instrument(:stat, key: :max_prompt_tokens, value: limit_tokens, stage: ctx.current_stage)
+          end
 
           return if prompt_tokens <= limit_tokens
 

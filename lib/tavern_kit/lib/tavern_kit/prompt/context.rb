@@ -232,7 +232,7 @@ module TavernKit
         msg = message.to_s
 
         @warnings << msg
-        instrument(:warning, message: msg, stage: @current_stage)
+        @instrumenter&.call(:warning, message: msg, stage: @current_stage)
 
         if @strict
           raise TavernKit::StrictModeError, msg

@@ -48,14 +48,14 @@ module TavernKit
           prev_stage = ctx.current_stage
           ctx.current_stage = stage
 
-          ctx.instrument(:middleware_start, name: stage)
+          ctx.instrument(:middleware_start, name: stage) if ctx.instrumenter
           before(ctx)
           @app.call(ctx)
           after(ctx)
-          ctx.instrument(:middleware_finish, name: stage)
+          ctx.instrument(:middleware_finish, name: stage) if ctx.instrumenter
           ctx
         rescue => e
-          ctx.instrument(:middleware_error, name: stage, error: e)
+          ctx.instrument(:middleware_error, name: stage, error: e) if ctx&.instrumenter
 
           raise e if e.is_a?(TavernKit::PipelineError)
 

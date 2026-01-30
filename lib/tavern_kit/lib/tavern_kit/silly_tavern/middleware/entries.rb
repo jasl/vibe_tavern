@@ -42,7 +42,7 @@ module TavernKit
           forced_last, rest = filtered.partition { |e| FORCE_LAST_IDS.include?(e.id) }
           ctx.prompt_entries = (rest + forced_last)
 
-          ctx.instrument(:stat, stage: :entries, key: :prompt_entries, value: ctx.prompt_entries.size)
+          ctx.instrument(:stat, stage: :entries, key: :prompt_entries, value: ctx.prompt_entries.size) if ctx.instrumenter
         end
 
         def build_chat_scan_messages(ctx)

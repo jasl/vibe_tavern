@@ -30,7 +30,7 @@ module TavernKit
           end
 
           ctx.pinned_groups = groups
-          ctx.instrument(:stat, stage: :pinned_groups, key: :pinned_groups, value: groups.size)
+          ctx.instrument(:stat, stage: :pinned_groups, key: :pinned_groups, value: groups.size) if ctx.instrumenter
         end
 
         def build_group_blocks(entry, ctx, preset, fields, by_wi_position)
