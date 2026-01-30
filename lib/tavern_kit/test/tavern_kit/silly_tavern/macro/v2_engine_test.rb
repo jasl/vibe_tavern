@@ -117,6 +117,19 @@ class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
     assert_equal "false", engine.expand("{{deletevar::name}}{{hasvar::name}}", environment: env)
   end
 
+  def test_variable_macros_add_and_inc_dec
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env
+
+    assert_equal "2", engine.expand("{{setvar::n::1}}{{addvar::n::1}}{{getvar::n}}", environment: env)
+    assert_equal "12", engine.expand("{{incvar::x}}{{incvar::x}}", environment: env)
+    assert_equal "-1", engine.expand("{{decvar::y}}", environment: env)
+
+    assert_equal "2", engine.expand("{{setglobalvar::g::1}}{{addglobalvar::g::1}}{{getglobalvar::g}}", environment: env)
+    assert_equal "12", engine.expand("{{incglobalvar::gx}}{{incglobalvar::gx}}", environment: env)
+    assert_equal "-1", engine.expand("{{decglobalvar::gy}}", environment: env)
+  end
+
   def test_original_expands_only_once
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
     env = build_env(original: "ORIG")

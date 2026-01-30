@@ -15,8 +15,45 @@ module TavernKit
             ) do |inv|
               name, value = Array(inv.args)
               key = name.to_s.strip
-              inv.environment.set_var(key, value.to_s, scope: :local) if !key.empty? && inv.environment.respond_to?(:set_var)
+              if !key.empty? && inv.environment.respond_to?(:set_var)
+                inv.environment.set_var(key, coerce_number(value) || value.to_s, scope: :local)
+              end
               ""
+            end
+
+            registry.register(
+              "addvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+                { name: "value", type: %i[string number] },
+              ],
+            ) do |inv|
+              name, value = Array(inv.args)
+              key = name.to_s.strip
+              next "" if key.empty?
+
+              add_to_var(inv.environment, key, value, scope: :local)
+              ""
+            end
+
+            registry.register(
+              "incvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
+              name = Array(inv.args).first.to_s.strip
+              increment_var(inv.environment, name, scope: :local, delta: 1)
+            end
+
+            registry.register(
+              "decvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
+              name = Array(inv.args).first.to_s.strip
+              increment_var(inv.environment, name, scope: :local, delta: -1)
             end
 
             registry.register(
@@ -63,8 +100,45 @@ module TavernKit
             ) do |inv|
               name, value = Array(inv.args)
               key = name.to_s.strip
-              inv.environment.set_var(key, value.to_s, scope: :global) if !key.empty? && inv.environment.respond_to?(:set_var)
+              if !key.empty? && inv.environment.respond_to?(:set_var)
+                inv.environment.set_var(key, coerce_number(value) || value.to_s, scope: :global)
+              end
               ""
+            end
+
+            registry.register(
+              "addglobalvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+                { name: "value", type: %i[string number] },
+              ],
+            ) do |inv|
+              name, value = Array(inv.args)
+              key = name.to_s.strip
+              next "" if key.empty?
+
+              add_to_var(inv.environment, key, value, scope: :global)
+              ""
+            end
+
+            registry.register(
+              "incglobalvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
+              name = Array(inv.args).first.to_s.strip
+              increment_var(inv.environment, name, scope: :global, delta: 1)
+            end
+
+            registry.register(
+              "decglobalvar",
+              unnamed_args: [
+                { name: "name", type: :string },
+              ],
+            ) do |inv|
+              name = Array(inv.args).first.to_s.strip
+              increment_var(inv.environment, name, scope: :global, delta: -1)
             end
 
             registry.register(
@@ -103,8 +177,58 @@ module TavernKit
             registry.register_alias("deleteglobalvar", "flushglobalvar")
           end
 
+          def self.increment_var(env, name, scope:, delta:)
+            return "" unless env.respond_to?(:get_var) && env.respond_to?(:set_var)
+
+            key = name.to_s.strip
+            return "" if key.empty?
+
+            current = env.get_var(key, scope: scope)
+            num = coerce_number(current) || 0
+            next_val = num + delta.to_i
+            env.set_var(key, next_val, scope: scope)
+            normalize(next_val)
+          end
+
+          def self.add_to_var(env, name, value, scope:)
+            return nil unless env.respond_to?(:get_var) && env.respond_to?(:set_var)
+
+            current = env.get_var(name, scope: scope)
+            rhs = coerce_number(value) || value.to_s
+            cur_num = coerce_number(current)
+            rhs_num = coerce_number(rhs)
+
+            if !rhs_num.nil? && (current.nil? || !cur_num.nil?)
+              env.set_var(name, (cur_num || 0) + rhs_num, scope: scope)
+            else
+              env.set_var(name, "#{current}#{rhs}", scope: scope)
+            end
+          end
+
+          def self.coerce_number(value)
+            return value if value.is_a?(Numeric)
+
+            s = value.to_s.strip
+            return nil if s.empty?
+
+            if s.match?(/\A[-+]?\d+\z/)
+              Integer(s, 10)
+            else
+              Float(s)
+            end
+          rescue ArgumentError, TypeError
+            nil
+          end
+
           def self.normalize(value)
             case value
+            when Numeric
+              return value.to_s if value.is_a?(Integer)
+
+              f = value.to_f
+              return f.to_i.to_s if f.finite? && (f % 1).zero?
+
+              f.to_s
             when nil then ""
             when TrueClass then "true"
             when FalseClass then "false"
@@ -114,7 +238,7 @@ module TavernKit
             ""
           end
 
-          private_class_method :register_variable_macros, :normalize
+          private_class_method :register_variable_macros, :add_to_var, :coerce_number, :increment_var, :normalize
         end
       end
     end
