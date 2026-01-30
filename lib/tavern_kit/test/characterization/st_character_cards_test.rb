@@ -3,31 +3,35 @@
 require "test_helper"
 
 class StCharacterCardsTest < Minitest::Test
-  def pending!(reason)
-    skip("Pending ST parity: #{reason}")
-  end
-
   def test_png_read_prefers_ccv3
-    pending!("PNG metadata read prefers ccv3 over chara")
-
-    png = File.binread("test/fixtures/files/ccv3_over_chara.png")
-    card = TavernKit::SillyTavern::CharacterCard.read_png(png)
-
-    assert_equal "3.0", card.spec_version
+    character = TavernKit::CharacterCard.load_file("test/fixtures/files/ccv3_over_chara.png")
+    assert character.v3?
   end
 
   def test_png_write_includes_chara_and_ccv3
-    pending!("PNG write strips existing chunks and writes chara + ccv3")
+    output = Tempfile.new(["tavern_kit_st_write", ".png"])
 
-    card = { "spec" => "chara_card_v2", "spec_version" => "2.0", "data" => { "name" => "Test" } }
-    png = TavernKit::SillyTavern::CharacterCard.write_png(File.binread("test/fixtures/files/base.png"), card)
+    character = TavernKit::Character.create(name: "Test")
+    TavernKit::Png::Writer.embed_character(
+      "test/fixtures/files/ccv3_over_chara.png",
+      output.path,
+      character,
+      format: :both,
+    )
 
-    assert TavernKit::SillyTavern::CharacterCard.png_has_chunk?(png, "chara")
-    assert TavernKit::SillyTavern::CharacterCard.png_has_chunk?(png, "ccv3")
+    chunks = TavernKit::Png::Parser.extract_text_chunks(output.path)
+    keywords = chunks.map { |c| c[:keyword] }
+
+    assert_includes keywords, "chara"
+    assert_includes keywords, "ccv3"
+    assert_equal 1, keywords.count { |k| k == "chara" }
+    assert_equal 1, keywords.count { |k| k == "ccv3" }
+  ensure
+    output&.close!
   end
 
   def test_byaf_macro_replacement
-    pending!('BYAF replaces {user}/{character} and #{user}: syntax')
+    skip('Pending ST parity: BYAF replaces {user}/{character} and #{user}: syntax')
 
     byaf = TavernKit::SillyTavern::ByafParser.new(File.binread("test/fixtures/files/sample.byaf"))
     card = byaf.parse_character
