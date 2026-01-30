@@ -24,6 +24,7 @@ require_relative "tavern_kit/chat_variables"
 require_relative "tavern_kit/chat_variables/in_memory"
 require_relative "tavern_kit/token_estimator"
 require_relative "tavern_kit/trim_report"
+require_relative "tavern_kit/trimmer"
 
 require_relative "tavern_kit/preset/base"
 
