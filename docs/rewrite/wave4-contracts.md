@@ -102,6 +102,17 @@ Keep it simple:
 Trimmer operates on `Array<Prompt::Block>` and enforces a token budget by
 disabling blocks in-place (returns modified copies, does not remove).
 
+### Budget rule (SillyTavern)
+
+SillyTavern uses the same budgeting rule as ST's `ChatCompletion.setTokenBudget(context, response)`:
+
+- `context_window_tokens` = model context window (ST: `openai_max_context`)
+- `reserved_response_tokens` = reserved output tokens (ST: `openai_max_tokens`)
+- `max_prompt_tokens = context_window_tokens - reserved_response_tokens`
+
+In TavernKit these live on `TavernKit::SillyTavern::Preset` and are imported by
+`TavernKit::SillyTavern::Preset::StImporter`.
+
 `strategy: :group_order` (ST default):
 
 - Eviction priority: `:examples` -> `:lore` -> `:history`
@@ -126,6 +137,14 @@ If a bundle is evicted, each block still gets an `EvictionRecord` (for
 observability), but the reason should indicate group eviction, e.g.
 `:group_overflow`.
 
+### Failure mode (mandatory prompts exceed budget)
+
+Default behavior (chosen): **error**.
+
+If, after evicting every eligible block (i.e. `removable: true` and evictable by
+strategy), the prompt is still above budget, the trimming stage must raise an
+error (do not silently disable protected blocks).
+
 ### Observability
 
 Trimmer must produce:
@@ -148,4 +167,3 @@ Stage naming:
 
 - All ST pipeline stages must have stable names (symbols) via Pipeline entry names.
 - Exceptions bubble; Base middleware wraps them into `PipelineError(stage: ...)`.
-
