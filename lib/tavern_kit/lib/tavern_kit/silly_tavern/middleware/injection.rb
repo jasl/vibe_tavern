@@ -50,26 +50,6 @@ module TavernKit
             end
           end
 
-          # PromptManager-style in-chat prompt entries.
-          Array(ctx.prompt_entries).each do |entry|
-            next if entry.pinned?
-            next unless entry.in_chat?
-
-            content = entry.content.to_s.strip
-            next if content.empty?
-
-            chat_entries << TavernKit::InjectionRegistry::Entry.new(
-              id: entry.id,
-              content: content,
-              position: :chat,
-              depth: entry.depth,
-              role: entry.role,
-              scan: false,
-              ephemeral: false,
-              filter: nil,
-            )
-          end
-
           persona_text = ctx.user.respond_to?(:persona_text) ? ctx.user.persona_text.to_s : ""
           persona_position = ctx.fetch(:persona_position, :in_prompt)
           persona_depth = ctx.fetch(:persona_depth, 0)
@@ -306,6 +286,7 @@ module TavernKit
             base_messages,
             injections.chat,
             generation_type: ctx.generation_type,
+            prompt_entries: ctx.prompt_entries,
           )
 
           merged_blocks = injected_messages.map do |msg|

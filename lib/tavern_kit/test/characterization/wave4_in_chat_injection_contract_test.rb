@@ -97,4 +97,49 @@ class Wave4InChatInjectionContractTest < Minitest::Test
       out.map(&:content),
     )
   end
+
+  def test_prompt_manager_orders_match_st_population_injection_prompts
+    # This contract is derived from ST's `populationInjectionPrompts()`:
+    # prompt-manager in-chat entries are grouped by injection_order and emitted
+    # as separate messages per (order, role). Extension prompts are appended into
+    # the order=100 group per role.
+    history = [
+      TavernKit::Prompt::Message.new(role: :user, content: "m1"),
+      TavernKit::Prompt::Message.new(role: :assistant, content: "m2"),
+      TavernKit::Prompt::Message.new(role: :user, content: "m3"),
+    ]
+
+    prompt_entries = [
+      TavernKit::Prompt::PromptEntry.new(id: "p100a", pinned: false, role: :assistant, position: :in_chat, depth: 1, order: 100, content: "PM100 AST"),
+      TavernKit::Prompt::PromptEntry.new(id: "p100s1", pinned: false, role: :system, position: :in_chat, depth: 1, order: 100, content: "PM100 SYS 1"),
+      TavernKit::Prompt::PromptEntry.new(id: "p100s2", pinned: false, role: :system, position: :in_chat, depth: 1, order: 100, content: "PM100 SYS 2"),
+      TavernKit::Prompt::PromptEntry.new(id: "p200a", pinned: false, role: :assistant, position: :in_chat, depth: 1, order: 200, content: "PM200 AST"),
+      TavernKit::Prompt::PromptEntry.new(id: "p200s", pinned: false, role: :system, position: :in_chat, depth: 1, order: 200, content: "PM200 SYS"),
+    ]
+
+    injects = [
+      TavernKit::InjectionRegistry::Entry.new(id: "ext_a", content: "EXT SYS A", position: :chat, depth: 1, role: :system),
+      TavernKit::InjectionRegistry::Entry.new(id: "ext_b", content: "EXT SYS B", position: :chat, depth: 1, role: :system),
+    ]
+
+    out = TavernKit::SillyTavern::InChatInjector.inject(
+      history,
+      injects,
+      generation_type: :normal,
+      prompt_entries: prompt_entries,
+    )
+
+    assert_equal(
+      [
+        "m1",
+        "m2",
+        "PM100 AST",
+        "PM100 SYS 1\nPM100 SYS 2\nEXT SYS A\nEXT SYS B",
+        "PM200 AST",
+        "PM200 SYS",
+        "m3",
+      ],
+      out.map(&:content),
+    )
+  end
 end
