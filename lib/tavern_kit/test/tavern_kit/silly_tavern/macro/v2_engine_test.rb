@@ -61,6 +61,32 @@ class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
     assert_equal ["delve"], env.platform_attrs["banned_words"]
   end
 
+  def test_time_macros
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env = build_env(clock: -> { Time.utc(2020, 1, 1, 0, 0, 0) })
+
+    assert_equal "January 1, 2020", engine.expand("{{date}}", environment: env)
+    assert_equal "Wednesday", engine.expand("{{weekday}}", environment: env)
+    assert_equal "00:00", engine.expand("{{isotime}}", environment: env)
+    assert_equal "2020-01-01", engine.expand("{{isodate}}", environment: env)
+    assert_equal "2020-01-01 00:00:00", engine.expand("{{datetimeformat::YYYY-MM-DD HH:mm:ss}}", environment: env)
+    assert_equal "in 3 hours", engine.expand("{{timeDiff::2020-01-01 03:00:00::2020-01-01 00:00:00}}", environment: env)
+  end
+
+  def test_idle_duration_macro
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new
+    env =
+      build_env(
+        clock: -> { Time.utc(2020, 1, 1, 2, 0, 0) },
+        chat: [
+          { "is_user" => true, "is_system" => false, "send_date" => Time.utc(2020, 1, 1, 0, 0, 0) },
+          { "is_user" => false, "is_system" => false, "send_date" => Time.utc(2020, 1, 1, 0, 10, 0) },
+        ],
+      )
+
+    assert_equal "2 hours", engine.expand("{{idleDuration}}", environment: env)
+  end
+
   def test_random_macro_is_seeded_by_rng
     engine = TavernKit::SillyTavern::Macro::V2Engine.new
 
