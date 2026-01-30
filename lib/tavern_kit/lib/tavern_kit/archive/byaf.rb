@@ -20,23 +20,40 @@ module TavernKit
     # (background extraction, chat file generation, etc). Downstream apps can
     # consume assets via ZipReader directly.
     class ByafParser
+      Parsed = Data.define(:manifest, :character, :scenarios, :card_hash)
+
       def initialize(data, **zip_limits)
         @data = data
         @zip_limits = zip_limits
+      end
+
+      def parse
+        parsed = nil
+
+        ZipReader.open(@data, **@zip_limits) do |zip|
+          manifest = zip.read_json("manifest.json")
+          character = read_character(zip, manifest)
+          scenarios = read_scenarios(zip, manifest)
+          card_hash = build_card(manifest, character, scenarios)
+
+          parsed = Parsed.new(
+            manifest: manifest,
+            character: character,
+            scenarios: scenarios,
+            card_hash: card_hash,
+          )
+        end
+
+        parsed
+      rescue TavernKit::Archive::ZipError => e
+        raise TavernKit::Archive::ByafParseError, "Invalid BYAF file: #{e.message}"
       end
 
       # Parse BYAF ZIP bytes into a Character Card v2 hash.
       #
       # @return [Hash] card hash in CCv2 format
       def parse_character
-        ZipReader.open(@data, **@zip_limits) do |zip|
-          manifest = zip.read_json("manifest.json")
-          character = read_character(zip, manifest)
-          scenarios = read_scenarios(zip, manifest)
-          build_card(manifest, character, scenarios)
-        end
-      rescue TavernKit::Archive::ZipError => e
-        raise TavernKit::Archive::ByafParseError, "Invalid BYAF file: #{e.message}"
+        parse.card_hash
       end
 
       # Replace known BYAF placeholders with ST-style placeholder syntax.

@@ -123,37 +123,6 @@ class TavernKit::CharacterCardTest < Minitest::Test
     assert_raises(TavernKit::UnsupportedVersionError) { TavernKit::CharacterCard.load(hash) }
   end
 
-  # --- Loading from JSON string ---
-
-  def test_load_json_string
-    hash = v2_card_hash(name: "JSONChar")
-    json_str = JSON.generate(hash)
-    character = TavernKit::CharacterCard.load(json_str)
-
-    assert_equal "JSONChar", character.name
-  end
-
-  def test_load_invalid_json_string_raises
-    assert_raises(ArgumentError) { TavernKit::CharacterCard.load("not json") }
-  end
-
-  # --- Loading from files ---
-
-  def test_load_file_json
-    hash = v2_card_hash(name: "FileChar")
-    path = File.join(FIXTURES_DIR, "test_card.json")
-    File.write(path, JSON.generate(hash))
-
-    character = TavernKit::CharacterCard.load_file(path)
-    assert_equal "FileChar", character.name
-  ensure
-    File.delete(path) if path && File.exist?(path)
-  end
-
-  def test_load_file_unsupported_extension_raises
-    assert_raises(ArgumentError) { TavernKit::CharacterCard.load_file("card.txt") }
-  end
-
   def test_load_unsupported_input_type_raises
     assert_raises(ArgumentError) { TavernKit::CharacterCard.load(42) }
   end
@@ -364,8 +333,9 @@ class TavernKit::CharacterCardTest < Minitest::Test
       format: :both,
     )
 
-    # Reload from PNG
-    reloaded = TavernKit::CharacterCard.load_png(output_path)
+    # Reload from PNG via Png::Parser (file ingestion lives outside core).
+    hash = TavernKit::Png::Parser.extract_card_payload(output_path)
+    reloaded = TavernKit::CharacterCard.load(hash)
 
     # V3 is preferred (ccv3 keyword)
     assert_equal :v3, reloaded.source_version
@@ -373,23 +343,6 @@ class TavernKit::CharacterCardTest < Minitest::Test
     assert_equal "Character in PNG", reloaded.data.description
     assert_equal "Hello from PNG!", reloaded.data.first_mes
     assert_equal "Pong", reloaded.data.nickname
-  ensure
-    File.delete(output_path) if output_path && File.exist?(output_path)
-  end
-
-  def test_load_auto_detects_png_path
-    character = TavernKit::Character.create(name: "AutoDetect", first_mes: "Hi!")
-
-    output_path = File.join(FIXTURES_DIR, "test_autodetect_#{object_id}.png")
-    TavernKit::CharacterCard.write_to_png(
-      character,
-      input_png: File.join(FIXTURES_DIR, "base.png"),
-      output_png: output_path,
-    )
-
-    # load() should auto-detect .png extension
-    reloaded = TavernKit::CharacterCard.load(output_path)
-    assert_equal "AutoDetect", reloaded.name
   ensure
     File.delete(output_path) if output_path && File.exist?(output_path)
   end

@@ -14,12 +14,12 @@ require_relative "tavern_kit/user"
 
 require_relative "tavern_kit/character"
 require_relative "tavern_kit/character_card"
-require_relative "tavern_kit/character_importer"
 require_relative "tavern_kit/png/parser"
 require_relative "tavern_kit/png/writer"
 require_relative "tavern_kit/archive/zip_reader"
 require_relative "tavern_kit/archive/byaf"
 require_relative "tavern_kit/archive/charx"
+require_relative "tavern_kit/ingest"
 
 require_relative "tavern_kit/chat_history"
 require_relative "tavern_kit/chat_history/in_memory"
@@ -95,11 +95,14 @@ require_relative "tavern_kit/silly_tavern/build"
 
 module TavernKit
   class << self
-    # Load a character from any supported source.
-    # @param input [String, Hash] file path, JSON string, or Hash
+    # Parse a character from a Hash (e.g. JSON.parse result).
+    #
+    # For file-based formats (png/byaf/charx), use TavernKit::Ingest.
+    #
+    # @param hash [Hash]
     # @return [Character]
-    def load_character(input)
-      CharacterImporter.load(input)
+    def load_character(hash)
+      CharacterCard.load(hash)
     end
 
     # Build a prompt using the DSL-based pipeline.

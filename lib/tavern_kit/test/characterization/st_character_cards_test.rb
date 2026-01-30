@@ -4,8 +4,9 @@ require "test_helper"
 
 class StCharacterCardsTest < Minitest::Test
   def test_png_read_prefers_ccv3
-    character = TavernKit::CharacterCard.load_file("test/fixtures/files/ccv3_over_chara.png")
-    assert character.v3?
+    TavernKit::Ingest.open("test/fixtures/files/ccv3_over_chara.png") do |bundle|
+      assert bundle.character.v3?
+    end
   end
 
   def test_png_write_includes_chara_and_ccv3

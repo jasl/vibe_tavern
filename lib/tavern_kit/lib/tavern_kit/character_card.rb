@@ -1,18 +1,16 @@
 # frozen_string_literal: true
 
 module TavernKit
-  # Unified module for loading and exporting Character Cards.
+  # Unified module for parsing and exporting Character Cards.
   #
-  # Handles loading from multiple sources (PNG, JSON files, hashes) and
-  # auto-detects V2/V3 format. Always returns a Character instance.
+  # Core operates on Ruby hashes (already parsed JSON). File-based formats
+  # (PNG/APNG wrappers, BYAF, CHARX, etc) are handled by TavernKit::Ingest.
   #
   # Design principle: "strict in, strict out"
   # - Requires spec-compliant payloads (no legacy field fallbacks)
   # - Exports spec-compliant V2/V3 hashes
   #
-  # @example Load from any source
-  #   character = TavernKit::CharacterCard.load("card.png")
-  #   character = TavernKit::CharacterCard.load("card.json")
+  # @example Parse from a Hash (e.g. JSON.parse result)
   #   character = TavernKit::CharacterCard.load(hash)
   #
   # @example Export to specific version
@@ -40,53 +38,21 @@ module TavernKit
     V1_REQUIRED_FIELDS = %w[name description first_mes].freeze
 
     class << self
-      # Load a Character from any supported source.
+      # Parse a Character from a parsed hash.
       #
-      # Auto-detects the input type:
-      # - String ending in .json: load as JSON file
-      # - String ending in .png/.apng: load as PNG file
-      # - Hash: parse directly
-      # - Other string: try to parse as JSON
-      #
-      # @param input [String, Hash] file path, JSON string, or parsed hash
+      # @param input [Hash] parsed hash
       # @return [Character] loaded character
       # @raise [InvalidCardError] if card format is unsupported
       # @raise [ArgumentError] if input type is not supported
       def load(input)
-        hash = extract_hash(input)
-        parse_hash(hash)
+        raise ArgumentError, "Character Card must be a Hash" unless input.is_a?(Hash)
+
+        parse_hash(TavernKit::Utils.deep_stringify_keys(input))
       end
 
-      # Load a Character from a file path.
-      #
-      # @param path [String] .json, .png, or .apng file path
-      # @return [Character]
-      def load_file(path)
-        ext = File.extname(path.to_s).downcase
-        case ext
-        when ".json"
-          parse_hash(JSON.parse(File.read(path)))
-        when ".png", ".apng"
-          load_png(path)
-        else
-          raise ArgumentError, "Unsupported file type: #{ext.inspect}. Expected .json/.png/.apng."
-        end
-      end
-
-      # Load a Character from a PNG/APNG file.
-      #
-      # @param path [String] .png/.apng file path
-      # @return [Character]
-      def load_png(path)
-        parse_hash(TavernKit::Png::Parser.extract_card_payload(path))
-      end
-
-      # Load a Character from a parsed hash.
-      #
-      # @param hash [Hash] character card hash
-      # @return [Character]
+      # Convenience wrapper (same as .load).
       def load_hash(hash)
-        parse_hash(hash)
+        load(hash)
       end
 
       # Write a Character to a PNG file with embedded metadata.
@@ -216,34 +182,6 @@ module TavernKit
       end
 
       private
-
-      # Extract a hash from various input types.
-      #
-      # @param input [String, Hash] file path, JSON string, or hash
-      # @return [Hash] parsed hash
-      def extract_hash(input)
-        case input
-        when Hash
-          input
-        when String
-          ext = File.extname(input).downcase
-          case ext
-          when ".json"
-            JSON.parse(File.read(input))
-          when ".png", ".apng"
-            TavernKit::Png::Parser.extract_card_payload(input)
-          else
-            # Try to parse as JSON string
-            begin
-              JSON.parse(input)
-            rescue JSON::ParserError
-              raise ArgumentError, "Unsupported input: expected .json/.png/.apng file path, Hash, or JSON string"
-            end
-          end
-        else
-          raise ArgumentError, "Unsupported input type: #{input.class}. Expected String (path) or Hash."
-        end
-      end
 
       # Parse a hash into a Character.
       #
