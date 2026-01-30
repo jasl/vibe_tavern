@@ -766,6 +766,12 @@ reviews after the major feature work is complete.
 | Performance pass | Core | Token estimation hot paths, avoid expensive debug work unless instrumenter is enabled |
 | Trace + fingerprint review | Core | Ensure trace contains enough to reproduce “why this prompt” decisions; confirm fingerprint stability for caching |
 
+#### 6d. CLI / Tools
+
+| Task | Layer | Description |
+|------|-------|-------------|
+| CLI parity (optional) | ST/Core | Add `exe/tavern_kit` with the minimal “developer tools” commands used for debugging/validation (validate/extract/convert/embed cards, prompt preview, lore test). Keep fixtures hand-authored (no ST/RisuAI fixture copying). |
+
 **Deliverable:** Documentation is complete and aligned with the implemented
 behavior; test suite is stable with minimal skips; APIs are consistent and
 the system is ready for Rails app rewrite integration.
