@@ -17,12 +17,15 @@ module TavernKit
   # "user" in pure AI-to-AI conversations.
   #
   # @example Load a character
-  #   character = TavernKit::CharacterCard.load("card.png")
+  #   character = nil
+  #   TavernKit::Ingest.open("card.png") { |bundle| character = bundle.character }
   #   character.data.name  # => "Seraphina"
   #
   # @example Use a Character as User (AI-to-AI conversation)
-  #   alice = TavernKit::CharacterCard.load("alice.png")
-  #   bob = TavernKit::CharacterCard.load("bob.png")
+  #   alice = nil
+  #   bob = nil
+  #   TavernKit::Ingest.open("alice.png") { |bundle| alice = bundle.character }
+  #   TavernKit::Ingest.open("bob.png") { |bundle| bob = bundle.character }
   #
   #   plan = TavernKit.build(pipeline: TavernKit::SillyTavern::Pipeline) do
   #     character alice

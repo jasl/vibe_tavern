@@ -6,7 +6,7 @@ require "tempfile"
 require "zip"
 
 class TavernKit::IngestTest < Minitest::Test
-  FIXTURES_DIR = File.expand_path("../fixtures/files", __dir__)
+  FIXTURES_DIR = File.expand_path("../../fixtures/files", __dir__)
 
   def test_ingest_png_keeps_original_path
     path = File.join(FIXTURES_DIR, "ccv3_over_chara.png")

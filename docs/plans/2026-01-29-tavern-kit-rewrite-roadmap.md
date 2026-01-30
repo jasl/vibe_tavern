@@ -229,7 +229,7 @@ end
 
 Delivered modules:
 - **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (basic), Coerce/Utils/Constants/Errors
-- **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, CharacterImporter, TrimReport, Prompt::Trace/Instrumenter, PromptEntry enhancements (conditions + pattern matching)
+- **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/ChatVariables, TokenEstimator, Ingest, TrimReport, Prompt::Trace/Instrumenter, PromptEntry enhancements (conditions + pattern matching)
 - **SillyTavern (Wave 2):** Preset + Instruct + ContextTemplate (config/data only; middleware chain lands in Wave 4)
 - **SillyTavern (Wave 3):** Lore engine (World Info) + Macro engines (V1+V2) + ExamplesParser + ExpanderVars
 - **Core (Wave 4):** Trimmer + Dialects (8 formats) + MaxTokensMiddleware guardrails
@@ -447,7 +447,7 @@ These must be preserved in the SillyTavern layer:
 | `ChatHistory::Base` + `InMemory` | Core | Abstract protocol + default impl | 150-200 |
 | `ChatVariables::Base` + `InMemory` | Core | Type-safe variable storage + default impl; `scope:` parameter (Core: `:local`/`:global`; RisuAI extends with `:temp`/`:function_arg`) | 150-200 |
 | `TokenEstimator` | Core | Token counting (tiktoken_ruby), optional `model_hint:`, **pluggable adapter interface** | 100-150 |
-| `CharacterImporter` | Core | Unified character import helper for CCv2/CCv3 sources (JSON/PNG/Hash) with **pluggable importers** for extra formats (e.g., CharX via RisuAI extension) | 80-120 |
+| `Ingest` | Core | File-based ingestion returning `Ingest::Bundle` (character + main image + lazy assets + warnings). Core parsing stays Hash-only. | 80-120 |
 | `TrimReport` + `TrimResult` | Core | Shared budgeting result value objects (Lore budget trimming + Trimmer); include eviction reasons + provenance for debugging | 60-100 |
 | `Prompt::Trace` + `Prompt::Instrumenter` | Core | Optional pipeline instrumentation (stage timings + key counters + fingerprint); opt-in via `context.instrumenter` (nil by default); integrates with `Context#warnings`; no ActiveSupport dependency | 100-150 |
 
@@ -468,7 +468,7 @@ These must be preserved in the SillyTavern layer:
 - ContextTemplate story_string Handlebars compilation tests
 - Instruct stop sequence assembly tests
 - Preset stopping strings integration tests
-- CharacterImporter behavior tests (JSON/PNG/Hash), plus extension registration tests
+- Ingest behavior tests (JSON/PNG/APNG/BYAF/CHARX), incl. tmp lifecycle + lazy assets
 
 **Deliverable:** Core interfaces defined. Lore data structures ready for engine
 implementations. ST Preset loadable from JSON with all prompt-affecting fields.
@@ -910,7 +910,8 @@ lib/tavern_kit/
       # === CORE: Value Objects & Data Models ===
       character.rb
       character_card.rb
-      character_importer.rb          # CharacterImporter            [Wave 2]
+      ingest.rb                      # Ingest (file adapters)       [Wave 2]
+      ingest/
       character/                     # Character schemas
       user.rb
       participant.rb

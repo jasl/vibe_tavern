@@ -8,8 +8,10 @@ module TavernKit
   # conversations where a Character card can act as the "user" role.
   #
   # @example Using a Character as User
-  #   alice = TavernKit::CharacterCard.load("alice.png")
-  #   bob = TavernKit::CharacterCard.load("bob.png")
+  #   alice = nil
+  #   bob = nil
+  #   TavernKit::Ingest.open("alice.png") { |bundle| alice = bundle.character }
+  #   TavernKit::Ingest.open("bob.png") { |bundle| bob = bundle.character }
   #
   #   # Alice is the assistant, Bob acts as the user
   #   plan = TavernKit.build(pipeline: TavernKit::SillyTavern::Pipeline) do
