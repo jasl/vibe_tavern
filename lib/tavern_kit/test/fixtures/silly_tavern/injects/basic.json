@@ -1,0 +1,43 @@
+{
+  "alpha": {
+    "value": "Alpha after-prompt injection",
+    "position": 0,
+    "depth": 4,
+    "scan": false,
+    "role": 0,
+    "filter": null
+  },
+  "beta": {
+    "value": "Beta before-prompt injection",
+    "position": 2,
+    "depth": 4,
+    "scan": false,
+    "role": 0,
+    "filter": null
+  },
+  "gamma": {
+    "value": "Gamma in-chat system injection at depth 1",
+    "position": 1,
+    "depth": 1,
+    "scan": true,
+    "role": 0,
+    "filter": null
+  },
+  "delta": {
+    "value": "Delta in-chat user injection at depth 2 (scan off)",
+    "position": 1,
+    "depth": 2,
+    "scan": false,
+    "role": 1,
+    "filter": "({ ctx }) => ctx.generation_type === 'continue'"
+  },
+  "epsilon": {
+    "value": "Epsilon hidden (scan only)",
+    "position": -1,
+    "depth": 0,
+    "scan": true,
+    "role": 0,
+    "filter": null
+  }
+}
+

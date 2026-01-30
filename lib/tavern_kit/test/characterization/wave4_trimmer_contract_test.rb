@@ -82,4 +82,16 @@ class Wave4TrimmerContractTest < Minitest::Test
     latest_user = blocks.last
     refute_includes result.evicted.map(&:id), latest_user.id
   end
+
+  def test_trimming_failure_raises_max_tokens_exceeded_error
+    pending!("trimming stage must raise MaxTokensExceededError(stage: :trimming) when mandatory prompts exceed budget")
+
+    # Contract shape (pseudocode):
+    # preset = TavernKit::SillyTavern::Preset.new(context_window_tokens: 10, reserved_response_tokens: 9)
+    # error = assert_raises(TavernKit::MaxTokensExceededError) do
+    #   TavernKit::SillyTavern.build { preset preset; ... } # mandatory blocks exceed budget
+    # end
+    # assert_equal :trimming, error.stage
+    # assert_operator error.estimated_tokens, :>, error.limit_tokens
+  end
 end

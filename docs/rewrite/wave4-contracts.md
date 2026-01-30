@@ -139,11 +139,17 @@ observability), but the reason should indicate group eviction, e.g.
 
 ### Failure mode (mandatory prompts exceed budget)
 
-Default behavior (chosen): **error**.
+Default behavior (chosen): **error** (`TavernKit::MaxTokensExceededError`).
 
 If, after evicting every eligible block (i.e. `removable: true` and evictable by
-strategy), the prompt is still above budget, the trimming stage must raise an
-error (do not silently disable protected blocks).
+strategy), the prompt is still above budget, the trimming stage must raise
+`TavernKit::MaxTokensExceededError` (do not silently disable protected blocks).
+
+Error params mapping (for consistency with MaxTokensMiddleware):
+- `stage:` `:trimming`
+- `max_tokens:` `context_window_tokens`
+- `reserve_tokens:` `reserved_response_tokens`
+- `estimated_tokens:` estimated prompt tokens after the final trimming attempt
 
 ### Observability
 
@@ -154,6 +160,44 @@ Trimmer must produce:
 
 SillyTavern trimming middleware should attach `trim_report` to `ctx.trim_report`
 and instrument summary stats (initial/final/budget, eviction_count).
+
+## SillyTavern ContextTemplate (Story String) Contract
+
+SillyTavern has a "story string" (ContextTemplate) used to assemble prompt
+text from multiple fields.
+
+Core object: `TavernKit::SillyTavern::ContextTemplate`.
+
+### Template syntax
+
+Wave 4 only relies on a restricted Handlebars-like subset:
+
+- `{{field}}` substitution for known fields
+- `{{#if field}}...{{/if}}` conditional blocks
+- `{{#unless field}}...{{/unless}}` negative conditional blocks
+
+Unknown `{{macro}}` placeholders must be preserved so Stage 7 MacroExpansion
+can expand them (tolerant mode).
+
+### Output normalization
+
+ST behavior (and our renderer) normalizes the rendered output:
+
+- Trim trailing whitespace.
+- If non-empty, ensure it ends with `\n`.
+
+### Injection behavior
+
+ContextTemplate includes `story_string_position`, `story_string_depth`, and
+`story_string_role` (mirrors ST `extension_prompt_types` / `extension_prompt_roles`).
+
+- If `story_string_position == :in_chat`, emit an in-chat message at
+  `story_string_depth` with role `story_string_role`.
+  - In instruct mode, do NOT apply `instruct.story_string_prefix/suffix`
+    (chat message sequences already wrap the injected message).
+- Otherwise (`:in_prompt` / `:before_prompt`), treat the story string as
+  system-level prompt content at the corresponding position, and instruct
+  may wrap it via `instruct.story_string_prefix/suffix`.
 
 ## InjectionRegistry Contract
 
@@ -210,6 +254,13 @@ Aliases are allowed for convenience:
 ### Idempotency
 
 Registering with an existing `id:` replaces the previous entry (no duplicates).
+
+### Ordering
+
+`each` must yield entries in a stable order.
+
+For ST parity, the default implementation should iterate in lexicographic `id`
+order (ST sorts extension prompt keys before concatenation).
 
 ### Ephemeral lifecycle
 
@@ -317,7 +368,9 @@ Behavior:
   - Apply extension_prompt_types mapping
   - Handle author's note interval logic (note_interval)
   - Handle persona description positions (IN_PROMPT/TOP_AN/BOTTOM_AN/AT_DEPTH/NONE)
-  - Merge same-depth entries by order, then role (Assistant > User > System)
+  - Merge `position: :chat` entries by `(depth, role)` (stable order within group)
+  - Final in-chat ordering for the same depth is role-descending: Assistant > User > System (ST parity via reverse-depth insertion)
+  - If a merged group is empty after trimming/normalization, do not emit a message for it
 ```
 
 ### Stage 6: Compilation
@@ -374,7 +427,7 @@ Behavior:
   - Delegate to Core Trimmer with strategy selected by the pipeline
   - Default strategy is fixed by pipeline: :group_order (ST), :priority (RisuAI)
   - Respect eviction_bundle for grouped eviction
-  - Raise error if budget cannot be met (mandatory prompts exceed limit)
+  - Raise `MaxTokensExceededError` if budget cannot be met (mandatory prompts exceed limit)
   - Instrument: initial_tokens, final_tokens, budget_tokens, eviction_count
 ```
 

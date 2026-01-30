@@ -559,7 +559,7 @@ Contracts pinned for implementation alignment:
 | `SillyTavern::Middleware::Lore` | ST | World info activation + plan injection | 300-400 |
 | `SillyTavern::Middleware::Entries` | ST | Entry normalization (FORCE_RELATIVE, FORCE_LAST) | 150-200 |
 | `SillyTavern::Middleware::PinnedGroups` | ST | 14 pinned group slots | 300-400 |
-| `SillyTavern::Middleware::Injection` | ST | In-chat depth/order/role rules, extension prompt injection (extension_prompt_types: NONE/-1, IN_PROMPT/0, IN_CHAT/1, BEFORE_PROMPT/2), author's note interval logic, persona description positions (IN_PROMPT/TOP_AN/BOTTOM_AN/AT_DEPTH/NONE) | 500-600 |
+| `SillyTavern::Middleware::Injection` | ST | In-chat depth/order/role rules, extension prompt injection (extension_prompt_types: NONE/-1, IN_PROMPT/0, IN_CHAT/1, BEFORE_PROMPT/2), author's note interval logic, persona description positions (IN_PROMPT/TOP_AN/BOTTOM_AN/AT_DEPTH/NONE), ContextTemplate story_string injection (position/depth/role) | 500-600 |
 | `SillyTavern::Middleware::Compilation` | ST | Block compilation from entries | 250-350 |
 | `SillyTavern::Middleware::MacroExpansion` | ST | Macro expansion phase | 40-60 |
 | `SillyTavern::Middleware::PlanAssembly` | ST | Final plan construction, continue/impersonate mode handling (nudge prompts, prefill, postfix types), Claude-specific assistant_impersonation | 100-150 |
@@ -577,7 +577,8 @@ Contracts pinned for implementation alignment:
 - Dialects: tool calls/tool results passthrough + conversion tests (OpenAI/Anthropic)
 - Middleware ordering and insertion tests
 - Trimmer eviction strategy tests
-- Injection tests: extension prompt types, persona positions, author's note interval
+- Trimmer failure mode: mandatory prompts exceed budget => `MaxTokensExceededError` (`stage: :trimming`)
+- Injection tests: extension prompt types, persona positions, author's note interval, story_string position/depth/role (and instruct prefix/suffix wrapping)
 - Group context: activation strategies, generation modes, card merging
 - Continue/impersonate: nudge prompts, prefill, postfix types
 - InjectionRegistry: ephemeral flag, position mapping, filter closures
