@@ -88,6 +88,7 @@ require_relative "tavern_kit/silly_tavern/lore/engine"
 require_relative "tavern_kit/silly_tavern/lore/scan_input"
 require_relative "tavern_kit/silly_tavern/lore/timed_effects"
 require_relative "tavern_kit/silly_tavern/lore/world_info_importer"
+require_relative "tavern_kit/silly_tavern/build"
 
 module TavernKit
   class << self

@@ -69,11 +69,11 @@ module TavernKit
 
         def to_trace(fingerprint:)
           Trace.new(
-            stages: @stages.freeze,
+            stages: @stages.dup.freeze,
             fingerprint: fingerprint.to_s,
             started_at: @started_at,
             finished_at: Time.now,
-            total_warnings: @warnings.freeze,
+            total_warnings: @warnings.dup.freeze,
           )
         end
 
