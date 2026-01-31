@@ -103,6 +103,10 @@ module TavernKit
             inner_eval, next_i, ended = expand_stream(str, inner_start, environment: environment, stop_on_end: true)
             return unless ended
             [eval_parsed_block(block, inner_eval), next_i]
+          when :code
+            inner_eval, next_i, ended = expand_stream(str, inner_start, environment: environment, stop_on_end: true)
+            return unless ended
+            [normalize_code(inner_eval), next_i]
           else
             nil
           end
@@ -113,6 +117,7 @@ module TavernKit
 
           return Block.new(type: :pure) if name == "pure"
           return Block.new(type: :puredisplay) if name == "puredisplay" || name == "pure_display"
+          return Block.new(type: :code) if name == "code"
           if name.start_with?("escape")
             mode = name.include?("::keep") ? :keep : nil
             return Block.new(type: :escape, mode: mode)
@@ -261,7 +266,8 @@ module TavernKit
           when :puredisplay
             inner.strip.gsub("{{", "\\{\\{").gsub("}}", "\\}\\}")
           when :escape
-            block.mode == :keep ? inner : inner.strip
+            text = block.mode == :keep ? inner : inner.strip
+            risu_escape(text)
           else
             ""
           end
@@ -447,7 +453,7 @@ module TavernKit
 
         def truthy?(value)
           s = value.to_s
-          s == "true" || s == "1"
+          s == "1" || s.downcase == "true"
         end
 
         def truthy_condition?(value, environment:)
@@ -461,7 +467,7 @@ module TavernKit
 
         def close_token?(token)
           t = token.to_s
-          t.start_with?("/") && !t.start_with?("//") && t.strip == BLOCK_END_TOKEN
+          t.start_with?("/") && !t.start_with?("//")
         end
 
         def find_close_idx(str, open_idx)
@@ -491,6 +497,47 @@ module TavernKit
           nil
         end
 
+        def normalize_code(text)
+          # Upstream: trim -> remove newlines/tabs -> process \uXXXX and other escapes.
+          t = text.to_s.strip
+          t = t.delete("\n").delete("\t")
+
+          t = t.gsub(/\\u([0-9A-Fa-f]{4})/) do
+            Regexp.last_match(1).to_i(16).chr(Encoding::UTF_8)
+          end
+
+          t.gsub(/\\(.)/) do
+            ch = Regexp.last_match(1)
+            case ch
+            when "n" then "\n"
+            when "r" then "\r"
+            when "t" then "\t"
+            when "b" then "\b"
+            when "f" then "\f"
+            when "v" then "\v"
+            when "a" then "\a"
+            when "x" then "\x00"
+            else
+              ch
+            end
+          end
+        end
+
+        def risu_escape(text)
+          # Upstream: replaces { } ( ) with Private Use Area characters
+          # \uE9B8-\uE9BB so downstream rendering can safely unescape later.
+          text.to_s.gsub(/[{}()]/) do |ch|
+            case ch
+            when "{" then "\u{E9B8}"
+            when "}" then "\u{E9B9}"
+            when "(" then "\u{E9BA}"
+            when ")" then "\u{E9BB}"
+            else
+              ch
+            end
+          end
+        end
+
         def chat_var(environment, name)
           environment.get_var(name, scope: :local)
         rescue NotImplementedError
@@ -504,6 +551,8 @@ module TavernKit
         end
 
         def expand_tag(raw, token:, environment:)
+          return "" if token.start_with?("//")
+
           if token.start_with?("? ")
             return calc_token(token, environment: environment)
           end

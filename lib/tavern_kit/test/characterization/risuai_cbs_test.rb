@@ -20,18 +20,26 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "\\n", render("{{cbr}}")
 
     assert_equal "abc", render("{{#pure}}  abc  {{/}}")
+    assert_equal "abc", render("{{#pure}}abc{{/pure}}")
     assert_equal "\\{\\{x\\}\\}", render("{{#puredisplay}}{{x}}{{/}}")
-    assert_equal "{x}", render("{{#escape}}{x}{{/}}")
-    assert_equal "\n{x}\n", render("{{#escape::keep}}\n{x}\n{{/}}")
+    assert_equal "\u{E9B8}x\u{E9B9}", render("{{#escape}}{x}{{/}}")
+    assert_equal "\n\u{E9B8}x\u{E9B9}\n", render("{{#escape::keep}}\n{x}\n{{/}}")
+
+    assert_equal "ab", render("a{{// comment}}b")
+    assert_equal "\n", render("{{#code}}\\n{{/}}")
+    assert_equal "A", render("{{#code}}\\u0041{{/}}")
   end
 
   def test_if_and_when_blocks
     assert_equal "ok", render("{{#if 1}}ok{{/}}")
     assert_equal "", render("{{#if 0}}ok{{/}}")
+    assert_equal "ok", render("{{#if TRUE}}ok{{/}}")
+    assert_equal "ok", render("{{#if 1}}ok{{/if}}")
     assert_equal "a", render("{{#when::1}}a{{:else}}b{{/}}")
     assert_equal "b", render("{{#when::0}}a{{:else}}b{{/}}")
     assert_equal "yes", render("{{#when::1::is::1}}yes{{/}}")
     assert_equal "", render("{{#when::1::is::2}}yes{{/}}")
+    assert_equal "yes", render("{{#when::1}}yes{{/when}}")
   end
 
   def test_each_and_slot
