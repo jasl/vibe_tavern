@@ -41,11 +41,8 @@ module TavernKit
 
           groups = build_groups(ctx)
 
-          ctx.blocks = TavernKit::RisuAI::TemplateCards.assemble(
-            template: template,
-            groups: groups,
-            lore_entries: ctx.lore_result.activated_entries,
-          )
+          ctx[:risuai_template] = template
+          ctx[:risuai_groups] = groups
         end
 
         def extract_prompt_template(preset)

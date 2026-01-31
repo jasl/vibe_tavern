@@ -154,6 +154,7 @@ module TavernKit
           persona: normalize_message_list(h[:persona] || h["persona"]),
           description: normalize_message_list(h[:description] || h["description"]),
           lorebook: normalize_message_list(h[:lorebook] || h["lorebook"]),
+          memory: normalize_message_list(h[:memory] || h["memory"]),
           authornote: normalize_message_list(h[:authornote] || h["authornote"]),
           post_everything: normalize_message_list(h[:post_everything] || h["post_everything"] || h[:postEverything] || h["postEverything"]),
           chats: normalize_message_list(h[:chats] || h["chats"] || h[:chat] || h["chat"]),
@@ -163,6 +164,8 @@ module TavernKit
       def normalize_message_list(value)
         Array(value).filter_map do |m|
           case m
+          when TavernKit::Prompt::Block
+            m
           when TavernKit::Prompt::Message
             m
           when Hash
@@ -301,18 +304,29 @@ module TavernKit
         list = groups.fetch(key, [])
 
         inner = card["innerFormat"]
-        return list.map { |m| block_from_message(m, token_budget_group: token_budget_group_for_typed(type), metadata: { risuai: { type: type } }) } if inner.nil?
+        if inner.nil?
+          return list.map do |item|
+            coerce_to_block(item, token_budget_group: token_budget_group_for_typed(type), metadata: { risuai: { type: type } })
+          end
+        end
 
         inner2 = position_parser(inner.to_s, loc: type, injection_map: injection_map, position_map: position_map)
 
-        list.map do |m|
-          content = inner2.gsub("{{slot}}", m.content.to_s)
-          TavernKit::Prompt::Block.new(
-            role: m.role,
-            content: content,
-            token_budget_group: token_budget_group_for_typed(type),
-            metadata: { risuai: { type: type } },
-          )
+        list.map do |item|
+          role = item.respond_to?(:role) ? item.role : :system
+          slot = item.respond_to?(:content) ? item.content.to_s : ""
+          content = inner2.gsub("{{slot}}", slot)
+
+          if item.is_a?(TavernKit::Prompt::Block)
+            item.with(content: content)
+          else
+            TavernKit::Prompt::Block.new(
+              role: role.to_sym,
+              content: content,
+              token_budget_group: token_budget_group_for_typed(type),
+              metadata: { risuai: { type: type } },
+            )
+          end
         end
       end
 
@@ -330,14 +344,21 @@ module TavernKit
 
         base = list.any? ? list : [TavernKit::Prompt::Message.new(role: :system, content: default_text)]
 
-        base.map do |m|
-          content = inner2.gsub("{{slot}}", m.content.to_s)
-          TavernKit::Prompt::Block.new(
-            role: m.role,
-            content: content,
-            token_budget_group: :system,
-            metadata: { risuai: { type: "authornote" } },
-          )
+        base.map do |item|
+          role = item.respond_to?(:role) ? item.role : :system
+          slot = item.respond_to?(:content) ? item.content.to_s : ""
+          content = inner2.gsub("{{slot}}", slot)
+
+          if item.is_a?(TavernKit::Prompt::Block)
+            item.with(content: content)
+          else
+            TavernKit::Prompt::Block.new(
+              role: role.to_sym,
+              content: content,
+              token_budget_group: :system,
+              metadata: { risuai: { type: "authornote" } },
+            )
+          end
         end
       end
 
@@ -362,13 +383,13 @@ module TavernKit
         return [] if start >= finish
 
         slice = list[start...finish]
-        slice.map { |m| block_from_message(m, token_budget_group: :history, metadata: { risuai: { type: "chat" } }) }
+        slice.map { |m| coerce_to_block(m, token_budget_group: :history, metadata: { risuai: { type: "chat" } }) }
       end
 
       def build_chat_ml_card(card)
         text = card.fetch("text", "").to_s
         parse_chat_ml(text).map do |m|
-          block_from_message(m, token_budget_group: :system, metadata: { risuai: { type: "chatML" } })
+          coerce_to_block(m, token_budget_group: :system, metadata: { risuai: { type: "chatML" } })
         end
       end
 
@@ -417,14 +438,18 @@ module TavernKit
       def token_budget_group_for_typed(type)
         case type
         when "lorebook" then :lore
-        when "memory" then :lore
+        when "memory" then :memory
         when "chats" then :history
         else
           :system
         end
       end
 
-      def block_from_message(message, token_budget_group:, metadata:)
+      def coerce_to_block(item, token_budget_group:, metadata:)
+        return item if item.is_a?(TavernKit::Prompt::Block)
+
+        message = item.is_a?(TavernKit::Prompt::Message) ? item : TavernKit::ChatHistory.coerce_message(item)
+
         TavernKit::Prompt::Block.new(
           role: message.role,
           content: message.content.to_s,
