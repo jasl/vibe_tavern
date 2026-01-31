@@ -50,8 +50,6 @@ class RisuaiLorebookTest < Minitest::Test
   end
 
   def test_regex_matching
-    pending!("Regex lorebook keys with /pattern/flags syntax")
-
     lore = {
       key: "/drag(on|oon)/i",
       secondkey: "",
