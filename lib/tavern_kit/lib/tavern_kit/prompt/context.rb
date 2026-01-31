@@ -8,6 +8,24 @@ module TavernKit
     # through each middleware stage. Middlewares can read and modify the
     # context to transform inputs into the final prompt plan.
     class Context
+      # Minimal delegate helper (inspired by ActiveSupport::CoreExt::Module#delegate).
+      #
+      # We keep this local to avoid a hard dependency on ActiveSupport.
+      def self.delegate(*methods, to:, allow_nil: true)
+        methods.each do |method_name|
+          define_method(method_name) do |*args, &block|
+            target = public_send(to)
+            if target.nil?
+              return nil if allow_nil
+
+              raise NoMethodError, "undefined method `#{method_name}` for nil:NilClass"
+            end
+
+            target.public_send(method_name, *args, &block)
+          end
+        end
+      end
+
       # ============================================
       # Input data (typically set at initialization)
       # ============================================
@@ -64,6 +82,8 @@ module TavernKit
       #
       # This object must not be replaced during pipeline execution.
       attr_reader :runtime
+
+      delegate :type, :id, :chat_vars, to: :runtime, allow_nil: true
 
       # ============================================
       # Intermediate state (set by middlewares)
@@ -323,16 +343,6 @@ module TavernKit
         raise ArgumentError, "user is required" if @user.nil?
 
         self
-      end
-
-      def respond_to_missing?(method_name, include_private = false)
-        (@runtime && @runtime.respond_to?(method_name)) || super
-      end
-
-      def method_missing(method_name, *args, &block)
-        return @runtime.public_send(method_name, *args, &block) if @runtime&.respond_to?(method_name)
-
-        super
       end
 
       private
