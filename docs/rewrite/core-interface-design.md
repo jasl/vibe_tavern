@@ -89,10 +89,13 @@ Do **not** blanket-symbolize the entire payload, because it would also convert
 `extensions` keys to Symbols (breaking the passthrough contract).
 
 ```ruby
-# In CharacterCard.load, Preset.load, etc.
-def self.load(input)
-  raw = JSON.parse(input)         # String keys from JSON
-  parse_internal(raw)             # Parse owned fields explicitly
+# In CharacterCard.load, Preset.from_st_json, etc.
+# NOTE: JSON parsing happens in the application layer (or TavernKit::Ingest).
+def self.load_hash(raw)
+  raise ArgumentError, "expected Hash" unless raw.is_a?(Hash)
+
+  raw = Utils.deep_stringify_keys(raw)  # Keep string keys like JSON.parse output
+  parse_internal(raw)                  # Parse owned fields explicitly
 end
 
 def self.parse_internal(raw)

@@ -564,7 +564,7 @@ Dialect-aware ST behavior:
 | `Dialects::Google` | Core | `{contents, system_instruction}` | 80-100 |
 | `Dialects::Cohere` | Core | `{chat_history}` | 60-80 |
 | `Dialects::AI21` | Core | `[{role, content}]` | 60-80 |
-| `Dialects::Mistral` | Core | `[{role, content}]`, use_prefix option | 60-80 |
+| `Dialects::Mistral` | Core | `[{role, content}]` | 60-80 |
 | `Dialects::XAI` | Core | `[{role, content}]` | 60-80 |
 | `Dialects::Text` | Core | `{prompt, stop_sequences}`, instruct formatting | 80-100 |
 | `SillyTavern::Middleware::Hooks` | ST | Before/after build hook execution | 80-100 |

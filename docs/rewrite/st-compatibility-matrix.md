@@ -3,6 +3,12 @@
 Reference: SillyTavern v1.15.0
 TavernKit Layer: `TavernKit::SillyTavern`
 
+NOTE (2026-01-31): This matrix is currently stale (it was written before the
+Wave 3/4 implementation landed). Many items below marked as "not started" are
+now implemented. Use `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md` and
+`docs/rewrite/wave4-contracts.md` as the current source of truth. We will
+refresh this matrix in Wave 6.
+
 This matrix tracks TavernKit's implementation status against SillyTavern v1.15.0
 features. Use this document both as:
 1. **Behavior documentation** - understanding ST/TavernKit differences

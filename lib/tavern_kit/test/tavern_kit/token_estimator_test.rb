@@ -15,4 +15,25 @@ class TavernKit::TokenEstimatorTest < Minitest::Test
     estimator = TavernKit::TokenEstimator.default
     assert_kind_of Integer, estimator.estimate("hello", model_hint: "unknown-model-xyz")
   end
+
+  def test_tiktoken_adapter_caches_encoding_per_model_hint
+    adapter = TavernKit::TokenEstimator::Adapter::Tiktoken.new
+
+    calls = 0
+    verbose, $VERBOSE = $VERBOSE, nil
+    original = ::Tiktoken.method(:encoding_for_model)
+    ::Tiktoken.define_singleton_method(:encoding_for_model) do |name|
+      calls += 1
+      original.call(name)
+    end
+
+    adapter.estimate("hello", model_hint: "gpt-4")
+    adapter.estimate("world", model_hint: "gpt-4")
+
+    assert_equal 1, calls
+  ensure
+    $VERBOSE = nil
+    ::Tiktoken.define_singleton_method(:encoding_for_model, original) if original
+    $VERBOSE = verbose
+  end
 end

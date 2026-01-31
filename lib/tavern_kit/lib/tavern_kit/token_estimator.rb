@@ -15,6 +15,7 @@ module TavernKit
 
         def initialize(default_encoding: DEFAULT_ENCODING)
           @default = ::Tiktoken.get_encoding(default_encoding)
+          @encodings = {}
         end
 
         def estimate(text, model_hint: nil)
@@ -26,7 +27,12 @@ module TavernKit
         def encoding_for(model_hint)
           return @default if model_hint.nil?
 
-          ::Tiktoken.encoding_for_model(model_hint.to_s) || @default
+          key = model_hint.to_s
+          return @default if key.empty?
+
+          # Cache the encoding per model hint. This is a CPU-bound hot path when
+          # trimming/budgeting repeatedly estimates token counts.
+          @encodings[key] ||= (::Tiktoken.encoding_for_model(key) || @default)
         rescue StandardError
           @default
         end
