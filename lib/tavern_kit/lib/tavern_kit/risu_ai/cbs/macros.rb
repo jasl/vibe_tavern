@@ -36,6 +36,34 @@ module TavernKit
             resolve_settempvar(args, environment: environment)
           when "return"
             resolve_return(args, environment: environment)
+          when "startswith"
+            resolve_startswith(args)
+          when "endswith"
+            resolve_endswith(args)
+          when "contains"
+            resolve_contains(args)
+          when "replace"
+            resolve_replace(args)
+          when "trim"
+            resolve_trim(args)
+          when "length"
+            resolve_length(args)
+          when "lower"
+            resolve_lower(args)
+          when "upper"
+            resolve_upper(args)
+          when "capitalize"
+            resolve_capitalize(args)
+          when "round"
+            resolve_round(args)
+          when "floor"
+            resolve_floor(args)
+          when "ceil"
+            resolve_ceil(args)
+          when "abs"
+            resolve_abs(args)
+          when "remaind"
+            resolve_remaind(args)
           else
             nil
           end
@@ -168,6 +196,113 @@ module TavernKit
           ""
         end
         private_class_method :resolve_return
+
+        def resolve_startswith(args)
+          args[0].to_s.start_with?(args[1].to_s) ? "1" : "0"
+        end
+        private_class_method :resolve_startswith
+
+        def resolve_endswith(args)
+          args[0].to_s.end_with?(args[1].to_s) ? "1" : "0"
+        end
+        private_class_method :resolve_endswith
+
+        def resolve_contains(args)
+          args[0].to_s.include?(args[1].to_s) ? "1" : "0"
+        end
+        private_class_method :resolve_contains
+
+        def resolve_replace(args)
+          args[0].to_s.gsub(args[1].to_s, args[2].to_s)
+        end
+        private_class_method :resolve_replace
+
+        def resolve_trim(args)
+          args[0].to_s.strip
+        end
+        private_class_method :resolve_trim
+
+        def resolve_length(args)
+          args[0].to_s.length.to_s
+        end
+        private_class_method :resolve_length
+
+        def resolve_lower(args)
+          args[0].to_s.downcase
+        end
+        private_class_method :resolve_lower
+
+        def resolve_upper(args)
+          args[0].to_s.upcase
+        end
+        private_class_method :resolve_upper
+
+        def resolve_capitalize(args)
+          s = args[0].to_s
+          return "" if s.empty?
+
+          s[0].upcase + s[1..].to_s
+        end
+        private_class_method :resolve_capitalize
+
+        def resolve_round(args)
+          v = parse_js_number(args[0])
+          return v if v.is_a?(String)
+
+          ((v + 0.5).floor).to_s
+        end
+        private_class_method :resolve_round
+
+        def resolve_floor(args)
+          v = parse_js_number(args[0])
+          return v if v.is_a?(String)
+
+          v.floor.to_s
+        end
+        private_class_method :resolve_floor
+
+        def resolve_ceil(args)
+          v = parse_js_number(args[0])
+          return v if v.is_a?(String)
+
+          v.ceil.to_s
+        end
+        private_class_method :resolve_ceil
+
+        def resolve_abs(args)
+          v = parse_js_number(args[0])
+          return v.sub("-", "") if v.is_a?(String) && v.start_with?("-Infinity")
+          return v if v.is_a?(String)
+
+          format_number(v.abs)
+        end
+        private_class_method :resolve_abs
+
+        def resolve_remaind(args)
+          a = parse_js_number(args[0])
+          b = parse_js_number(args[1])
+          return "NaN" if a.is_a?(String) || b.is_a?(String)
+          return "NaN" if b.zero?
+
+          format_number(a % b)
+        rescue ZeroDivisionError
+          "NaN"
+        end
+        private_class_method :resolve_remaind
+
+        def parse_js_number(value)
+          s = value.to_s.strip
+          return 0.0 if s.empty?
+
+          f = Float(s)
+          return f.to_s if f.nan?
+          return f.to_s if f.infinite?
+
+          f
+        rescue ArgumentError, TypeError
+          "NaN"
+        end
+        private_class_method :parse_js_number
 
         def run_var?(environment)
           environment.respond_to?(:run_var) && environment.run_var == true

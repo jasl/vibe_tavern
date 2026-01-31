@@ -43,7 +43,7 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_each_and_slot
-    assert_equal "a::b::c", render("{{#each [a,b,c] as item}}{{slot::item}}::{{/}}").chomp("::")
+    assert_equal "a::b::c", render("{{#each [\"a\",\"b\",\"c\"] as item}}{{slot::item}}::{{/}}").chomp("::")
     assert_equal "1-2-3", render("{{#each [1,2,3] as n}}{{slot::n}}-{{/}}").chomp("-")
   end
 
@@ -122,5 +122,28 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "7", render("{{? 1 + 2 * 3}}")
     assert_equal "1", render("{{? 3 > 2}}")
     assert_equal "0", render("{{? 3 < 2}}")
+  end
+
+  def test_string_and_number_helpers
+    assert_equal "1", render("{{startswith::Hello World::Hello}}")
+    assert_equal "0", render("{{startswith::Hello World::World}}")
+    assert_equal "1", render("{{endswith::Hello World::World}}")
+    assert_equal "0", render("{{endswith::Hello World::Hello}}")
+    assert_equal "1", render("{{contains::Hello World::lo Wo}}")
+    assert_equal "0", render("{{contains::Hello World::x}}")
+
+    assert_equal "Hell0 W0rld", render("{{replace::Hello World::o::0}}")
+    assert_equal "hello world", render("{{trim::  hello world  }}")
+    assert_equal "5", render("{{length::Hello}}")
+    assert_equal "hello world", render("{{lower::Hello WORLD}}")
+    assert_equal "HELLO WORLD", render("{{upper::Hello world}}")
+    assert_equal "Hello world", render("{{capitalize::hello world}}")
+
+    assert_equal "4", render("{{round::3.7}}")
+    assert_equal "-1", render("{{round::-1.5}}") # JS: Math.round(-1.5) => -1
+    assert_equal "3", render("{{floor::3.9}}")
+    assert_equal "4", render("{{ceil::3.1}}")
+    assert_equal "5", render("{{abs::-5}}")
+    assert_equal "1", render("{{remaind::10::3}}")
   end
 end

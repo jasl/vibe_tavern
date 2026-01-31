@@ -345,21 +345,17 @@ module TavernKit
         end
 
         def parse_array(expr)
+          # Upstream: JSON.parse when possible; otherwise split by "§".
           s = expr.to_s.strip
-          s = s[1..-2] if s.start_with?("[") && s.end_with?("]")
 
-          parts = s.split(",").map { |v| v.strip }.reject(&:empty?)
-          parts.map do |part|
-            if (part.start_with?("\"") && part.end_with?("\"")) || (part.start_with?("'") && part.end_with?("'"))
-              part[1..-2]
-            elsif part.match?(/\A-?\d+\z/)
-              part.to_i
-            elsif part.match?(/\A-?\d+\.\d+\z/)
-              part.to_f
-            else
-              part
-            end
+          begin
+            arr = ::JSON.parse(s)
+            return arr if arr.is_a?(Array)
+          rescue ::JSON::ParserError
+            nil
           end
+
+          s.split("§")
         end
 
         def expand_with_call_stack(str, environment:)
