@@ -83,26 +83,26 @@ module TavernKit
           when :ignore
             _, next_i, ended = read_raw_until_close(str, inner_start)
             return unless ended
-            return ["", next_i]
+            ["", next_i]
           when :pure, :puredisplay, :escape
             inner_raw, next_i, ended = read_raw_until_close(str, inner_start)
             return unless ended
-            return [eval_raw_block(block, inner_raw), next_i]
+            [eval_raw_block(block, inner_raw), next_i]
           when :each
             inner_raw, next_i, ended = read_raw_until_close(str, inner_start)
             return unless ended
-            return [eval_each(block, inner_raw, environment: environment), next_i]
+            [eval_each(block, inner_raw, environment: environment), next_i]
           when :func
             inner_raw, next_i, ended = read_raw_until_close(str, inner_start)
             return unless ended
 
             func_name = block.expr.to_s
             @functions[func_name] = inner_raw.strip unless func_name.empty?
-            return ["", next_i]
+            ["", next_i]
           when :parse, :ifpure, :newif, :newif_falsy
             inner_eval, next_i, ended = expand_stream(str, inner_start, environment: environment, stop_on_end: true)
             return unless ended
-            return [eval_parsed_block(block, inner_eval), next_i]
+            [eval_parsed_block(block, inner_eval), next_i]
           else
             nil
           end
