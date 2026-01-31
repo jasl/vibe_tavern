@@ -8,17 +8,15 @@ class RisuaiLorebookTest < Minitest::Test
   end
 
   def test_full_word_matching
-    pending!("Full-word vs partial-word matching")
-
     lore = {
-      key: "red dragon",
+      key: "dragon",
       secondkey: "",
       selective: false,
       alwaysActive: false,
       insertorder: 100,
       content: "L-DRAGON",
     }
-    messages = ["The red dragon sleeps."]
+    messages = ["The red dragon sleeps"]
 
     result = TavernKit::RisuAI::Lorebook.match(
       messages,

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "risu_ai/cbs"
+require_relative "risu_ai/lorebook"
 
 module TavernKit
   # RisuAI platform layer (Wave 5+).
@@ -10,4 +11,3 @@ module TavernKit
   module RisuAI
   end
 end
-
