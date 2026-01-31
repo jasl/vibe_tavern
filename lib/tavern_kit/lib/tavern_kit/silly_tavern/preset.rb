@@ -341,6 +341,7 @@ module TavernKit
       end
 
       def self.from_st_preset_json(hash)
+        # Hash-only: the caller is responsible for file I/O and `JSON.parse`.
         Preset::StImporter.new(hash).to_preset
       end
 

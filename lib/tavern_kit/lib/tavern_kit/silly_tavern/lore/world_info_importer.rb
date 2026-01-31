@@ -5,6 +5,9 @@ module TavernKit
     module Lore
       # Import SillyTavern native World Info JSON into core Lore::Book/Entry.
       #
+      # This importer is hash-only. The caller is responsible for file I/O and
+      # `JSON.parse` (if the source is a JSON string/file).
+      #
       # The ST format differs from CCv2/CCv3 Character Book:
       # - entry keys use `key` / `keysecondary` instead of `keys` / `secondary_keys`
       # - disabled entries use `disable` (inverted enabled)

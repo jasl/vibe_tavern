@@ -4,6 +4,8 @@ module TavernKit
   module SillyTavern
     class Preset
       # Responsible for importing SillyTavern chat completion preset JSON into a Preset.
+      #
+      # Hash-only: the caller is responsible for file I/O and `JSON.parse`.
       class StImporter
         # ST pinned prompt identifiers (Prompt Manager).
         #
