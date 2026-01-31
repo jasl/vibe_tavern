@@ -56,7 +56,7 @@ module TavernKit
 
           next unless activated
 
-          actives << [insertion_order, content]
+          actives << [insertion_order, strip_decorators(content)]
         end
 
         prompts = actives.sort_by { |order, _| -order }.map { |_, prompt| prompt }
@@ -124,7 +124,23 @@ module TavernKit
       rescue RegexpError
         nil
       end
+
+      def strip_decorators(content)
+        lines = content.to_s.lines
+        out = []
+        skipping = true
+
+        lines.each do |line|
+          if skipping && line.start_with?("@")
+            next
+          end
+
+          skipping = false
+          out << line
+        end
+
+        out.join.strip
+      end
     end
   end
 end
-

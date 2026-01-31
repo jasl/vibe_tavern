@@ -71,8 +71,6 @@ class RisuaiLorebookTest < Minitest::Test
   end
 
   def test_decorators_depth_and_injection
-    pending!("Depth decorators and inject_* behavior")
-
     lores = [
       {
         key: "dragon",
