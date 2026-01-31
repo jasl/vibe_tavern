@@ -79,6 +79,7 @@ module TavernKit
 
       def initialize(hash)
         @hash = hash.is_a?(Hash) ? hash : {}
+        @candidate_cache = {}
       end
 
       def valid?
@@ -153,14 +154,16 @@ module TavernKit
 
       def candidate_keys(key)
         base = key.to_s
-        underscore = Utils.underscore(base)
-        camel = Utils.camelize_lower(base)
+        @candidate_cache[base] ||= begin
+          underscore = Utils.underscore(base)
+          camel = Utils.camelize_lower(base)
 
-        variants = [base, underscore, camel].uniq
+          variants = [base, underscore, camel].uniq
 
-        # Hashes coming from JSON parsing are typically string-keyed, but we also
-        # accept symbol keys for ergonomics.
-        variants.flat_map { |v| [v, v.to_sym] }
+          # Hashes coming from JSON parsing are typically string-keyed, but we also
+          # accept symbol keys for ergonomics.
+          variants.flat_map { |v| [v, v.to_sym] }
+        end
       end
 
       def to_bool(val, default)
