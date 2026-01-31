@@ -910,9 +910,9 @@ end
 | **Token budget exceeded** | `raise TokenBudgetExceeded` | Trim + `warn` | Recoverable via trimming |
 | **Invalid preset field value** | `raise InvalidPresetError` | `warn` + use default | Config error, but can continue |
 | **Lore entry parse error** | `raise LoreParseError` | `warn` + skip entry | One bad entry shouldn't kill build |
-| **CBS block unclosed** | `raise CBSSyntaxError` | `warn` + preserve | RisuAI: syntax error |
-| **CBS stack overflow** | `raise CBSStackOverflowError` | `raise CBSStackOverflowError` | Always fatal (infinite recursion) |
-| **Trigger recursion limit** | `raise TriggerRecursionError` | `raise TriggerRecursionError` | Always fatal (infinite loop) |
+| **CBS block unclosed** | `raise CBSSyntaxError` | preserve (tolerant) | RisuAI keeps rendering by preserving raw tokens |
+| **CBS stack overflow** (call stack > 20) | `raise CBSStackOverflowError` | inline `"ERROR: Call stack limit reached"` | Match RisuAI UI behavior; strict/debug should surface as an error |
+| **Trigger recursion limit** (runtrigger > 10) | `raise TriggerRecursionError` | skip nested runtrigger | Match RisuAI behavior: prevent infinite loops without killing the render |
 
 #### 11c. Strict Mode
 
