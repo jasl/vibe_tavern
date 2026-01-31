@@ -643,6 +643,30 @@ Scope updated after RisuAI source scan
 | Spec conformance tests | Core | CCv2 + CCv3 spec conformance and TavernKit-defined intentional divergences |
 | Integration verification | All | Ensure Rails app can work with both ST and RisuAI pipelines |
 
+**Concrete worklist (Wave 5a):**
+
+- **RisuAI pending tests (15)** (already in place; unskip as modules land):
+  - `lib/tavern_kit/test/characterization/risuai_cbs_test.rb` (5)
+  - `lib/tavern_kit/test/characterization/risuai_lorebook_test.rb` (4)
+  - `lib/tavern_kit/test/characterization/risuai_regex_scripts_test.rb` (3)
+  - `lib/tavern_kit/test/characterization/risuai_triggers_test.rb` (3)
+- **ST compatibility suite (8 areas)** (behavior-derived, not copied):
+  - Entry normalization + prompt entries ordering/enable rules
+  - In-chat injection ordering (depth / reverse-depth / role effects)
+  - Macro v1/v2 deltas + variables (locals/global) + unknown macro tolerance
+  - Preset loading + computed stopping strings behavior
+  - Prompt assembly order (default + custom relative entries) + PHI positioning
+  - Scan buffer / lore scan inputs (messages + injects + outlets)
+  - Utility prompts (continue / impersonate / group nudge) + displacement rules
+  - World Info positions mapping + timed effects + forced activation hooks
+- **Conformance tests (Core)**:
+  - `lib/tavern_kit/test/conformance/ccv2_conformance_test.rb`
+  - `lib/tavern_kit/test/conformance/ccv3_conformance_test.rb`
+  - Zip safety limits for BYAF/CHARX (zip-slip/zip-bomb guardrails) (see `TavernKit::Archive::ZipReader`)
+- **Integration tests (All)**:
+  - `lib/tavern_kit/test/integration/silly_tavern_build_test.rb`
+  - RisuAI end-to-end test: character + template + lore + CBS -> plan -> dialect messages (to be written once Wave 5b-5f land)
+
 ##### Wave 5a Execution Plan (Test Taxonomy + Guardrails)
 
 **Test taxonomy (to avoid “跑偏”):**
@@ -662,6 +686,8 @@ Scope updated after RisuAI source scan
 - `cd lib/tavern_kit && bundle exec rake test:guardrails`
   - Runs Wave 4 contract tests + ST characterization tests (fast subset).
   - Must stay green before each Wave 5 commit.
+- `cd lib/tavern_kit && bundle exec rake test:conformance`
+- `cd lib/tavern_kit && bundle exec rake test:integration`
 
 #### 5b. RisuAI CBS Macro Engine
 

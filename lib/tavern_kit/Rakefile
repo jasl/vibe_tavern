@@ -18,9 +18,25 @@ Minitest::TestTask.create(:guardrails) do |t|
   ]
 end
 
+Minitest::TestTask.create(:conformance) do |t|
+  t.framework = %(require_relative "./test/test_helper")
+  t.test_globs = [
+    "test/conformance/**/*_test.rb",
+  ]
+end
+
+Minitest::TestTask.create(:integration) do |t|
+  t.framework = %(require_relative "./test/test_helper")
+  t.test_globs = [
+    "test/integration/**/*_test.rb",
+  ]
+end
+
 namespace :test do
   # Alias to align with the main app's `rake test:*` conventions.
   task guardrails: :guardrails
+  task conformance: :conformance
+  task integration: :integration
 end
 
 require "rubocop/rake_task"
