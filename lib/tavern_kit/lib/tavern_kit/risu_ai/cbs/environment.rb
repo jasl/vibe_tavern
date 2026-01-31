@@ -4,7 +4,7 @@ module TavernKit
   module RisuAI
     module CBS
       class Environment < TavernKit::Macro::Environment::Base
-        attr_reader :character, :user, :chat_index, :message_index, :dialect, :model_hint
+        attr_reader :character, :user, :chat_index, :message_index, :dialect, :model_hint, :run_var, :rm_var
 
         def self.build(**kwargs)
           new(**kwargs)
@@ -19,6 +19,8 @@ module TavernKit
           model_hint: nil,
           variables: nil,
           toggles: nil,
+          run_var: nil,
+          rm_var: nil,
           **_kwargs
         )
           @character = character
@@ -31,12 +33,34 @@ module TavernKit
           @variables = variables
           @toggles = toggles.is_a?(Hash) ? toggles : {}
 
+          @run_var = run_var == true
+          @rm_var = rm_var == true
+
           @temp_vars = {}
           @function_arg_vars = {}
         end
 
         def character_name = @character&.name.to_s
         def user_name = @user&.name.to_s
+
+        # Start a fresh CBS evaluation frame.
+        #
+        # Upstream behavior: functions persist across nested call:: expansions,
+        # but temp variables reset for each parse frame.
+        def call_frame
+          self.class.build(
+            character: @character,
+            user: @user,
+            chat_index: @chat_index,
+            message_index: @message_index,
+            dialect: @dialect,
+            model_hint: @model_hint,
+            variables: @variables,
+            toggles: @toggles,
+            run_var: @run_var,
+            rm_var: @rm_var,
+          )
+        end
 
         def get_var(name, scope: :local)
           scope = normalize_scope(scope)

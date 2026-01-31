@@ -23,6 +23,15 @@ module TavernKit
 
         private
 
+        ForceReturn = Class.new(StandardError) do
+          attr_reader :value
+
+          def initialize(value)
+            super()
+            @value = value
+          end
+        end
+
         Block = Struct.new(:type, :mode, :keep, :expr, :args, keyword_init: true)
 
         def expand_stream(str, index, environment:, stop_on_end:)
@@ -357,8 +366,12 @@ module TavernKit
           @call_stack += 1
           return "ERROR: Call stack limit reached" if @call_stack > 20
 
-          out, = expand_stream(str, 0, environment: environment, stop_on_end: false)
+          env = environment.respond_to?(:call_frame) ? environment.call_frame : environment
+
+          out, = expand_stream(str, 0, environment: env, stop_on_end: false)
           out
+        rescue ForceReturn => e
+          e.value
         ensure
           @call_stack -= 1
         end
@@ -551,18 +564,30 @@ module TavernKit
         end
 
         def expand_tag(raw, token:, environment:)
-          return "" if token.start_with?("//")
+          raw_text = raw.to_s
+          expanded_raw =
+            if raw_text.include?(OPEN)
+              # Nested tags inside {{...}} are expanded before macro lookup, like upstream.
+              expanded, = expand_stream(raw_text, 0, environment: environment, stop_on_end: false)
+              expanded.to_s
+            else
+              raw_text
+            end
 
-          if token.start_with?("? ")
-            return calc_token(token, environment: environment)
+          tok = expanded_raw.strip
+
+          return "" if tok.start_with?("//")
+
+          if tok.start_with?("? ")
+            return calc_token(tok, environment: environment)
           end
 
-          if token.start_with?("call::")
-            rendered = expand_call(token, environment: environment)
+          if tok.start_with?("call::")
+            rendered = expand_call(tok, environment: environment)
             return rendered if rendered
           end
 
-          case token
+          case tok
           when "bo" then "{{"
           when "bc" then "}}"
           when "decbo" then "{"
@@ -570,17 +595,33 @@ module TavernKit
           when "br" then "\n"
           when "cbr" then "\\n"
           else
-            parts = token.split("::")
+            parts =
+              if tok.include?("::")
+                tok.split("::")
+              elsif tok.include?(":")
+                tok.split(":")
+              else
+                [tok]
+              end
             if parts.any?
               name = parts[0].to_s
               args = parts.drop(1)
 
               resolved = TavernKit::RisuAI::CBS::Macros.resolve(name, args, environment: environment)
-              return resolved.to_s unless resolved.nil?
+              unless resolved.nil?
+                if environment.respond_to?(:has_var?) &&
+                   environment.has_var?("__force_return__", scope: :temp) &&
+                   truthy?(environment.get_var("__force_return__", scope: :temp))
+                  value = environment.get_var("__return__", scope: :temp)
+                  raise ForceReturn, value.nil? ? "null" : value.to_s
+                end
+
+                return resolved.to_s
+              end
             end
 
             # Unknown tokens are preserved as-is for later expansion stages.
-            "{{#{raw}}}"
+            "{{#{expanded_raw}}}"
           end
         end
 

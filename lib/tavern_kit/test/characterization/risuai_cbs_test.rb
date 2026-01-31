@@ -79,6 +79,40 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "5", render("{{? $x + @y}}", variables: store)
   end
 
+  def test_variable_macros_and_return
+    store = TavernKit::ChatVariables::InMemory.new
+
+    # Upstream: setvar/addvar/setdefaultvar only run when runVar=true.
+    assert_equal "{{setvar::flag::1}}", render("{{setvar::flag::1}}", variables: store)
+    assert_nil store.get("flag", scope: :local)
+
+    assert_equal "", render("{{setvar::flag::1}}", variables: store, run_var: true)
+    assert_equal "1", store.get("flag", scope: :local)
+    assert_equal "1", render("{{getvar::flag}}", variables: store)
+
+    assert_equal "", render("{{addvar::flag::2}}", variables: store, run_var: true)
+    assert_equal "3", store.get("flag", scope: :local)
+
+    assert_equal "", render("{{setdefaultvar::flag::999}}", variables: store, run_var: true)
+    assert_equal "3", store.get("flag", scope: :local)
+
+    store.set("g", "ok", scope: :global)
+    assert_equal "ok", render("{{getglobalvar::g}}", variables: store)
+    assert_equal "1", render("{{getglobalvar::toggle_x}}", toggles: { x: "1" })
+
+    assert_equal "1", render("{{settempvar::x::1}}{{tempvar::x}}")
+
+    assert_equal "b", render("a{{return::b}}c")
+
+    input = "{{#func f}}{{settempvar::x::1}}{{return::{{tempvar::x}}}}IGNORED{{/}}{{call::f}}|{{tempvar::x}}"
+    assert_equal "1|", render(input)
+
+    # rmVar: removes setter macros without mutating variables (used for stripping).
+    store2 = TavernKit::ChatVariables::InMemory.new
+    assert_equal "", render("{{setvar::flag::1}}", variables: store2, run_var: true, rm_var: true)
+    assert_nil store2.get("flag", scope: :local)
+  end
+
   def test_call_stack_limit
     input = "{{#func loop}}{{call::loop}}{{/}}{{call::loop}}"
     assert_equal "ERROR: Call stack limit reached", render(input)

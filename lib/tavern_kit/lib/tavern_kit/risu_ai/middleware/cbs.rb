@@ -13,6 +13,10 @@ module TavernKit
           risu = ctx[:risuai].is_a?(Hash) ? ctx[:risuai] : {}
           chat_index = (risu[:chat_index] || risu["chat_index"] || 0).to_i
           message_index = (risu[:message_index] || risu["message_index"] || inferred_message_index(ctx)).to_i
+          run_var_raw = risu[:run_var] || risu["run_var"] || risu[:runVar] || risu["runVar"]
+          rm_var_raw = risu[:rm_var] || risu["rm_var"] || risu[:rmVar] || risu["rmVar"]
+          run_var = run_var_raw.nil? ? true : TavernKit::Coerce.bool(run_var_raw, default: false)
+          rm_var = rm_var_raw.nil? ? false : TavernKit::Coerce.bool(rm_var_raw, default: false)
 
           env = TavernKit::RisuAI::CBS::Environment.build(
             character: ctx.character,
@@ -23,6 +27,8 @@ module TavernKit
             dialect: ctx.dialect,
             model_hint: ctx[:model_hint],
             toggles: (risu[:toggles] || risu["toggles"]),
+            run_var: run_var,
+            rm_var: rm_var,
           )
 
           engine = ctx.expander || TavernKit::RisuAI::CBS::Engine.new
