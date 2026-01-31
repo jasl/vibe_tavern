@@ -300,9 +300,9 @@ module EasyTalk
       # Validates that ActiveModel and JSON Schema validations produce the same result
       #
       # @example
-      #   expect(User).to have_matching_validations_for(name: "John", age: 30)
+      #   expect(User).to matching_validations_for?(name: "John", age: 30)
       #
-      def have_matching_validations_for(data)
+      def matching_validations_for?(data)
         MatchingValidationsMatcher.new(data)
       end
 

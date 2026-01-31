@@ -121,10 +121,10 @@ RSpec.describe 'Schema Validation Matcher' do
     end
   end
 
-  describe 'have_matching_validations_for matcher' do
+  describe 'matching_validations_for? matcher' do
     context 'when validations agree' do
       it 'passes for valid data' do
-        expect(Employee).to have_matching_validations_for(
+        expect(Employee).to matching_validations_for?(
           name: 'John Doe',
           gender: 'male',
           department: 'Engineering',
@@ -134,7 +134,7 @@ RSpec.describe 'Schema Validation Matcher' do
       end
 
       it 'passes for invalid enum value' do
-        expect(Employee).to have_matching_validations_for(
+        expect(Employee).to matching_validations_for?(
           name: 'Jane Doe',
           gender: 'invalid_gender',
           department: nil,
@@ -144,7 +144,7 @@ RSpec.describe 'Schema Validation Matcher' do
       end
 
       it 'passes for nil boolean (both catch it)' do
-        expect(Employee).to have_matching_validations_for(
+        expect(Employee).to matching_validations_for?(
           name: 'Test User',
           gender: 'male',
           department: nil,
@@ -158,7 +158,7 @@ RSpec.describe 'Schema Validation Matcher' do
       it 'detects mismatch for empty string (schema valid, ActiveModel invalid)' do
         # JSON Schema type: "string" allows empty strings
         # ActiveModel presence: true rejects empty strings
-        expect(Employee).not_to have_matching_validations_for(
+        expect(Employee).not_to matching_validations_for?(
           name: '',
           gender: 'male',
           department: nil,
@@ -172,7 +172,7 @@ RSpec.describe 'Schema Validation Matcher' do
         # - JSON Schema reports at `/addresses/0` (specific array index)
         # - ActiveModel reports on `addresses` (the field name)
         # The matcher detects this as a path mismatch, not a validation gap.
-        expect(Employee).not_to have_matching_validations_for(
+        expect(Employee).not_to matching_validations_for?(
           name: 'Test',
           gender: 'male',
           department: nil,
@@ -269,7 +269,7 @@ RSpec.describe 'Schema Validation Matcher' do
         # JSON Schema allows empty strings (type: "string")
         # ActiveModel rejects empty strings (presence: true)
         # This is a known semantic difference, not a bug
-        expect(Employee).not_to have_matching_validations_for(invalid_nested_data)
+        expect(Employee).not_to matching_validations_for?(invalid_nested_data)
       end
     end
 
@@ -287,7 +287,7 @@ RSpec.describe 'Schema Validation Matcher' do
       end
 
       it 'both validators agree valid data is valid' do
-        expect(Employee).to have_matching_validations_for(valid_nested_data)
+        expect(Employee).to matching_validations_for?(valid_nested_data)
       end
     end
   end

@@ -67,7 +67,7 @@ class JsonSchemaConverter
 
     # If schema has object-level constraints (minProperties, maxProperties, etc.),
     # treat as object schema - these constraints apply to objects only
-    return false if has_object_constraints?
+    return false if object_constraints?
 
     # Everything else needs wrapping (primitives, arrays, schemas with only constraints)
     true
@@ -80,11 +80,11 @@ class JsonSchemaConverter
     return false if @schema.key?('properties')
     return false if @schema['type'] && @schema['type'] != 'object'
 
-    has_object_constraints?
+    object_constraints?
   end
 
   # Check if the schema has object-level constraints
-  def has_object_constraints?
+  def object_constraints?
     return false unless @schema.is_a?(Hash)
 
     OBJECT_CONSTRAINT_KEYS.keys.any? { |key| @schema.key?(key) }
@@ -223,13 +223,13 @@ class JsonSchemaConverter
     end
 
     # If no explicit type but has array constraints, infer array type
-    return determine_array_type(prop_def) if type_value.nil? && has_array_constraints?(prop_def)
+    return determine_array_type(prop_def) if type_value.nil? && array_constraints?(prop_def)
 
     # Handle single type
     resolve_single_type(type_value, prop_def)
   end
 
-  def has_array_constraints?(prop_def)
+  def array_constraints?(prop_def)
     ARRAY_CONSTRAINT_KEYS.intersect?(prop_def.keys)
   end
 
