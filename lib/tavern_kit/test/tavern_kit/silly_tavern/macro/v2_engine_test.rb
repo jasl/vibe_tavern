@@ -111,6 +111,7 @@ class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
     assert_equal "00:00", engine.expand("{{isotime}}", environment: env)
     assert_equal "2020-01-01", engine.expand("{{isodate}}", environment: env)
     assert_equal "2020-01-01 00:00:00", engine.expand("{{datetimeformat::YYYY-MM-DD HH:mm:ss}}", environment: env)
+    assert_equal "1/1 12:00", engine.expand("{{datetimeformat::M/D h:mm}}", environment: env)
     assert_equal "in 3 hours", engine.expand("{{timeDiff::2020-01-01 03:00:00::2020-01-01 00:00:00}}", environment: env)
   end
 

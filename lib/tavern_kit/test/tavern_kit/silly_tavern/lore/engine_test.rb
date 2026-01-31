@@ -218,6 +218,29 @@ class TavernKit::SillyTavern::Lore::EngineTest < Minitest::Test
     assert_includes result.activated_entries.map(&:content), "hit inject"
   end
 
+  def test_js_regex_conversion_is_cached_for_regex_keys
+    buffer = TavernKit::SillyTavern::Lore::Engine::Buffer
+    buffer.instance_variable_set(:@js_regex_cache, {})
+
+    calls = 0
+    verbose, $VERBOSE = $VERBOSE, nil
+
+    original = ::JsRegexToRuby.method(:try_convert)
+    ::JsRegexToRuby.define_singleton_method(:try_convert) do |pattern, literal_only:|
+      calls += 1
+      original.call(pattern, literal_only: literal_only)
+    end
+
+    buffer.match?("hello", "/h.llo/", nil, case_sensitive: false, match_whole_words: false)
+    buffer.match?("hello", "/h.llo/", nil, case_sensitive: false, match_whole_words: false)
+
+    assert_equal 1, calls
+  ensure
+    $VERBOSE = nil
+    ::JsRegexToRuby.define_singleton_method(:try_convert, original) if original
+    $VERBOSE = verbose
+  end
+
   def test_generation_triggers_and_character_filtering
     engine = build_engine
 

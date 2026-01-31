@@ -163,22 +163,24 @@ module TavernKit
             "MMMM" => "%B",
             "MMM" => "%b",
             "MM" => "%m",
+            "M" => "%-m",
             "DD" => "%d",
+            "D" => "%-d",
             "dddd" => "%A",
             "ddd" => "%a",
             "HH" => "%H",
             "hh" => "%I",
+            "h" => "%-I",
             "mm" => "%M",
             "ss" => "%S",
           }.freeze
+          MOMENT_TOKEN_PATTERN = Regexp.union(MOMENT_TOKEN_MAP.keys.sort_by { |k| -k.length })
 
           def self.moment_to_strftime(format)
-            out = format.to_s.dup
-            # Replace longer tokens first to avoid partial matches.
-            MOMENT_TOKEN_MAP.sort_by { |k, _v| -k.length }.each do |token, strftime|
-              out = out.gsub(token, strftime)
-            end
-            out
+            # Single-pass substitution to avoid corrupting strftime tokens that
+            # were inserted by earlier replacements (e.g. "M" would otherwise
+            # replace the "M" in "%M").
+            format.to_s.gsub(MOMENT_TOKEN_PATTERN) { |token| MOMENT_TOKEN_MAP.fetch(token) }
           end
 
           private_class_method :register_time_macros, :idle_duration, :coerce_time, :humanize_seconds, :moment_to_strftime

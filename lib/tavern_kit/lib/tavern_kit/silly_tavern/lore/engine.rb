@@ -669,6 +669,8 @@ module TavernKit
 
         # Scan buffer builder + matching helpers (ST-like).
         class Buffer
+          JS_REGEX_CACHE_MAX = 512
+
           def initialize(messages:, default_depth:, scan_context:, scan_injects:)
             @depth_buffer = Array(messages).first(MAX_SCAN_DEPTH).map { |m| m.to_s.strip }
             @default_depth = default_depth.to_i
@@ -751,7 +753,7 @@ module TavernKit
             n = needle.to_s.strip
             return false if n.empty?
 
-            regex = JsRegexToRuby.try_convert(n, literal_only: true)
+            regex = cached_js_regex(n)
             return regex.match?(h) if regex
 
             if case_sensitive
@@ -773,6 +775,23 @@ module TavernKit
               hay.include?(nee)
             end
           end
+
+          def self.cached_js_regex(value)
+            v = value.to_s
+            return nil unless v.start_with?("/")
+
+            @js_regex_cache ||= {}
+            cached = @js_regex_cache[v]
+            return cached if cached
+
+            regex = JsRegexToRuby.try_convert(v, literal_only: true)
+            return nil unless regex
+
+            @js_regex_cache[v] = regex
+            @js_regex_cache.shift while @js_regex_cache.size > JS_REGEX_CACHE_MAX
+            regex
+          end
+          private_class_method :cached_js_regex
 
           private
 
