@@ -16,7 +16,7 @@ module TavernKit
           normalize_risuai_runtime!(ctx)
 
           ctx.token_estimator ||= TavernKit::TokenEstimator.default
-          ctx.variables_store ||= TavernKit::ChatVariables::InMemory.new
+          ctx.variables_store!
 
           template = extract_prompt_template(ctx.preset)
           ctx.warn("RisuAI preset is missing promptTemplate; using empty template") if template.nil?
@@ -47,11 +47,16 @@ module TavernKit
           ctx[:risuai_groups] = groups
         end
 
-        # Normalize `ctx[:risuai]` once at the pipeline entrypoint so downstream
-        # middlewares can rely on canonical snake_case symbol keys.
+        # Ensure the application-owned runtime contract is available once at the
+        # pipeline entrypoint so downstream middlewares can rely on it.
         def normalize_risuai_runtime!(ctx)
-          runtime = TavernKit::RisuAI::Runtime.build(ctx[:risuai], context: ctx, strict: ctx.strict?)
-          ctx[:risuai] = runtime.to_h
+          return if ctx.runtime
+
+          # Runtime input is provided by the application as `ctx[:runtime]`.
+          raw = ctx.key?(:runtime) ? ctx[:runtime] : nil
+
+          ctx.variables_store!
+          ctx.runtime = TavernKit::RisuAI::Runtime.build(raw, context: ctx, strict: ctx.strict?, chat_vars: ctx.variables_store)
         end
 
         def extract_prompt_template(preset)

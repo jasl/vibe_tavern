@@ -693,11 +693,14 @@ Wave 5 from drifting while implementing RisuAI.
 - `cd lib/tavern_kit && bundle exec rake test:wave5` (meta task)
 
 **RisuAI runtime contract (to avoid hidden coupling):**
-- RisuAI-specific runtime state should be passed via `ctx[:risuai]` (a Hash),
-  never by modifying Core internals.
-- Canonical form: **snake_case symbol keys** (e.g. `chat_index:`). The pipeline
-  normalizes string/camelCase keys once at Stage 1 so later stages can rely on
-  the canonical form.
+- RisuAI-specific runtime state should be passed via `ctx.runtime` (a Runtime
+  object), never by modifying Core internals.
+- The pipeline builds the runtime once at Stage 1 from app-provided runtime
+  input (`ctx[:runtime]` or `DSL#runtime({ ... })`) and then treats it as
+  immutable for the rest of the pipeline (must not be replaced by middleware).
+- Canonical form for runtime input: **snake_case symbol keys**
+  (e.g. `chat_index:`). The runtime normalizes string/camelCase keys once at
+  Stage 1 so later stages can rely on the canonical form.
 - Recommended shape (all optional unless stated):
   - `chat_index` (Integer) -- current message index in the chat
     (RisuAI `matcherArg.chatID` / `chat.chatIndex`). `-1` means “no message
@@ -711,7 +714,7 @@ Wave 5 from drifting while implementing RisuAI.
   - `metadata` (Hash) -- free-form (RisuAI exposes 15+ metadata macros).
   - `modules` (Array) -- enabled modules list (for module_* macros).
   - `assets` (Hash/Array) -- app-provided asset manifest (for media macros).
-- The generic DSL supports this via `meta(:risuai, {...})` (Core; no platform hacks).
+- The generic DSL supports this via `runtime({ ... })` or `meta(:runtime, { ... })`.
 
 **Defaulting policy (TavernKit-only):**
 - Upstream RisuAI runs inside an app that always provides chat/message state.

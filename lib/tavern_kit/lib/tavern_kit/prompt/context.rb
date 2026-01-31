@@ -60,6 +60,11 @@ module TavernKit
       # @return [Hash, nil] macro variables
       attr_accessor :macro_vars
 
+      # @return [Runtime::Base, nil] application-owned runtime state (sync contract)
+      #
+      # This object must not be replaced during pipeline execution.
+      attr_reader :runtime
+
       # ============================================
       # Intermediate state (set by middlewares)
       # ============================================
@@ -79,8 +84,11 @@ module TavernKit
       # @return [Array<Block>] compiled blocks
       attr_accessor :blocks
 
-      # @return [Object, nil] variables store
-      attr_accessor :variables_store
+      # @return [Object, nil] variables store (ChatVariables::Base)
+      #
+      # This is application-owned session state; treat it as stable during
+      # pipeline execution (do not replace in middleware).
+      attr_reader :variables_store
 
       # @return [Array<String>] scan messages for World Info
       attr_accessor :scan_messages
@@ -189,6 +197,26 @@ module TavernKit
 
       def strict? = @strict == true
 
+      def runtime=(value)
+        unless value.nil? || value.is_a?(TavernKit::Runtime::Base)
+          raise ArgumentError, "runtime must be a TavernKit::Runtime::Base (pass runtime input via ctx[:runtime])"
+        end
+
+        if !@runtime.nil? && @runtime != value && @current_stage
+          raise ArgumentError, "runtime cannot be replaced once set"
+        end
+
+        @runtime = value
+      end
+
+      def variables_store=(value)
+        if !@variables_store.nil? && @variables_store != value && @current_stage
+          raise ArgumentError, "variables_store cannot be replaced once set"
+        end
+
+        @variables_store = value
+      end
+
       # Ensure the context has a variables store.
       #
       # ChatVariables are application-owned, session-level state (not per-build),
@@ -295,6 +323,16 @@ module TavernKit
         raise ArgumentError, "user is required" if @user.nil?
 
         self
+      end
+
+      def respond_to_missing?(method_name, include_private = false)
+        (@runtime && @runtime.respond_to?(method_name)) || super
+      end
+
+      def method_missing(method_name, *args, &block)
+        return @runtime.public_send(method_name, *args, &block) if @runtime&.respond_to?(method_name)
+
+        super
       end
 
       private

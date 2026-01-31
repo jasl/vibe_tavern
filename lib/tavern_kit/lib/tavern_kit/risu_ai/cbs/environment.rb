@@ -37,7 +37,7 @@ module TavernKit
           @metadata = metadata.is_a?(Hash) ? metadata : {}
 
           @variables = variables
-          @toggles = toggles.is_a?(Hash) ? toggles : {}
+          @toggles = normalize_toggles(toggles)
 
           @run_var = run_var == true
           @rm_var = rm_var == true
@@ -78,7 +78,7 @@ module TavernKit
 
           if scope == :global && key.start_with?("toggle_")
             toggle_name = key.delete_prefix("toggle_")
-            return fetch_hash(@toggles, toggle_name) || fetch_hash(@toggles, key)
+            return @toggles[toggle_name] || @toggles[key]
           end
 
           case scope
@@ -123,9 +123,7 @@ module TavernKit
 
           if scope == :global && key.start_with?("toggle_")
             toggle_name = key.delete_prefix("toggle_")
-            return true if @toggles.key?(toggle_name) || @toggles.key?(key)
-            return true if @toggles.key?(toggle_name.to_sym) || @toggles.key?(key.to_sym)
-            return false
+            return @toggles.key?(toggle_name) || @toggles.key?(key)
           end
 
           case scope
@@ -152,8 +150,21 @@ module TavernKit
           scope.to_s.downcase.to_sym
         end
 
-        def fetch_hash(hash, key)
-          hash[key] || hash[key.to_s] || hash[key.to_sym]
+        def normalize_toggles(toggles)
+          return {} unless toggles.is_a?(Hash)
+
+          all_string = true
+          toggles.each_key do |key|
+            next if key.is_a?(String)
+
+            all_string = false
+            break
+          end
+          return toggles if all_string
+
+          toggles.each_with_object({}) do |(k, v), out|
+            out[k.to_s] = v
+          end
         end
       end
     end

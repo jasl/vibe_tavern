@@ -41,7 +41,7 @@ class RisuaiBuildTest < Minitest::Test
       history(history)
       message("hi")
       lore_book(lore_book)
-      meta(:risuai, { chat_index: 1 })
+      runtime({ chat_index: 1 })
     end
 
     msgs = plan.to_messages(dialect: :openai)

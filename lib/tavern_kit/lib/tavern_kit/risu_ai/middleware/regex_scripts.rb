@@ -16,8 +16,8 @@ module TavernKit
           scripts = ctx[:risuai_regex_scripts]
           return unless scripts.is_a?(Array) && scripts.any?
 
-          risu = ctx[:risuai].is_a?(Hash) ? ctx[:risuai] : {}
-          chat_id = risu.fetch(:chat_index, -1).to_i
+          runtime = ctx.runtime
+          chat_id = runtime ? runtime.chat_index.to_i : -1
 
           history = TavernKit::ChatHistory.wrap(ctx.history).to_a
           history_hashes = history.map { |m| { role: m.role.to_s, data: m.content.to_s } }

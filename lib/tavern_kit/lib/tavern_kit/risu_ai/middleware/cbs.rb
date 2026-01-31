@@ -10,14 +10,12 @@ module TavernKit
         def before(ctx)
           ctx.blocks ||= []
 
-          risu = ctx[:risuai].is_a?(Hash) ? ctx[:risuai] : {}
-          chat_index = risu.fetch(:chat_index, -1).to_i
-          message_index = risu.fetch(:message_index, inferred_message_index(ctx)).to_i
-          rng_word = risu[:rng_word].to_s
-          run_var_raw = risu.key?(:run_var) ? risu[:run_var] : nil
-          rm_var_raw = risu.key?(:rm_var) ? risu[:rm_var] : nil
-          run_var = run_var_raw.nil? ? true : TavernKit::Coerce.bool(run_var_raw, default: false)
-          rm_var = rm_var_raw.nil? ? false : TavernKit::Coerce.bool(rm_var_raw, default: false)
+          runtime = ctx.runtime
+          chat_index = runtime ? runtime.chat_index.to_i : -1
+          message_index = runtime ? runtime.message_index.to_i : inferred_message_index(ctx)
+          rng_word = runtime ? runtime.rng_word.to_s : ""
+          run_var = runtime ? (runtime.run_var == true) : true
+          rm_var = runtime ? (runtime.rm_var == true) : false
 
           env_kwargs = {
             character: ctx.character,
@@ -27,8 +25,8 @@ module TavernKit
             variables: ctx.variables_store,
             dialect: ctx.dialect,
             model_hint: ctx[:model_hint],
-            toggles: risu[:toggles],
-            metadata: risu[:metadata],
+            toggles: runtime&.toggles,
+            metadata: runtime&.metadata,
             run_var: run_var,
             rm_var: rm_var,
             rng_word: rng_word,

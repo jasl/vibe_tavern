@@ -5,12 +5,14 @@ module TavernKit
     # Application-owned runtime contract for RisuAI pipelines.
     #
     # This is the synchronization boundary between an app (chat state, settings)
-    # and prompt building. Middlewares should assume `ctx[:risuai]` is normalized
-    # once at pipeline entry.
+    # and prompt building. Middlewares should assume `ctx.runtime` is set once
+    # at pipeline entry and not replaced.
     class Runtime < TavernKit::Runtime::Base
-      def self.build(raw, context: nil, strict: false)
+      TYPE = :risuai
+
+      def self.build(raw, context: nil, strict: false, chat_vars: nil, id: nil)
         data = normalize(raw, context: context, strict: strict)
-        runtime = new(data)
+        runtime = new(data, type: TYPE, id: id, chat_vars: chat_vars)
         runtime.validate!(strict: strict)
         runtime
       end
@@ -26,7 +28,7 @@ module TavernKit
         out[:run_var] = coerce_bool(h, :run_var, default: true, strict: strict)
         out[:rm_var] = coerce_bool(h, :rm_var, default: false, strict: strict)
 
-        out[:toggles] = coerce_hash(h, :toggles, default: {}, strict: strict)
+        out[:toggles] = normalize_string_keys(coerce_hash(h, :toggles, default: {}, strict: strict))
         out[:metadata] = normalize_metadata(coerce_hash(h, :metadata, default: {}, strict: strict))
         out[:modules] = coerce_array(h, :modules, default: [], strict: strict)
 
@@ -47,6 +49,15 @@ module TavernKit
         validate_type!(h[:modules], Array, key: :modules)
         self
       end
+
+      def chat_index = @data[:chat_index]
+      def message_index = @data[:message_index]
+      def rng_word = @data[:rng_word]
+      def run_var = @data[:run_var]
+      def rm_var = @data[:rm_var]
+      def toggles = @data[:toggles]
+      def metadata = @data[:metadata]
+      def modules = @data[:modules]
 
       private_class_method def self.coerce_int(hash, key, default:, strict:)
         return default unless hash.key?(key)
@@ -92,7 +103,7 @@ module TavernKit
 
         # Upstream uses `chaId + chat.id` as the seed word. TavernKit cannot
         # infer those IDs, so fall back to character name unless app provides
-        # a stable string via `ctx[:risuai][:rng_word]`.
+        # a stable string via runtime injection (`rng_word:`).
         char = context && context.respond_to?(:character) ? context.character : nil
         name = char&.respond_to?(:name) ? char.name.to_s : ""
 
@@ -149,6 +160,23 @@ module TavernKit
           # Match CBS macro normalization: lowercased and stripped of separators.
           key = k.to_s.downcase.gsub(/[\s_-]+/, "")
           out[key] = v
+        end
+      end
+
+      private_class_method def self.normalize_string_keys(hash)
+        return {} unless hash.is_a?(Hash)
+
+        all_string = true
+        hash.each_key do |key|
+          next if key.is_a?(String)
+
+          all_string = false
+          break
+        end
+        return hash if all_string
+
+        hash.each_with_object({}) do |(k, v), out|
+          out[k.to_s] = v
         end
       end
 

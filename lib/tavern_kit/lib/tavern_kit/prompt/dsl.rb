@@ -208,6 +208,19 @@ module TavernKit
         self
       end
 
+      # Set the application-owned runtime state (sync contract).
+      #
+      # Pass a runtime object (recommended) or a Hash (which will be treated as
+      # runtime input and normalized by the pipeline entry middleware).
+      def runtime(value)
+        if value.is_a?(Hash)
+          @context[:runtime] = value
+        else
+          @context.runtime = value
+        end
+        self
+      end
+
       # Set the debug instrumenter (typically nil in production).
       def instrumenter(instrumenter)
         @context.instrumenter = instrumenter
