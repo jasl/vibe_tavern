@@ -20,24 +20,6 @@ class TavernKit::IngestTest < Minitest::Test
     end
   end
 
-  def test_ingest_json_file
-    character = TavernKit::Character.create(name: "JsonChar")
-    hash = TavernKit::CharacterCard.export_v2(character)
-
-    Tempfile.create(["character", ".json"]) do |f|
-      f.write(JSON.generate(hash))
-      f.flush
-
-      TavernKit::Ingest.open(f.path) do |bundle|
-        assert_equal "JsonChar", bundle.character.name
-        assert_nil bundle.main_image_path
-        assert_nil bundle.scenarios
-        assert_equal [], bundle.files
-        assert_equal [], bundle.assets
-      end
-    end
-  end
-
   def test_ingest_byaf_normalizes_scenarios
     path = File.join(FIXTURES_DIR, "sample.byaf")
 

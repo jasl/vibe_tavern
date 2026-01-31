@@ -3,7 +3,6 @@
 require_relative "ingest/bundle"
 require_relative "ingest/byaf"
 require_relative "ingest/charx"
-require_relative "ingest/json"
 require_relative "ingest/png"
 
 module TavernKit
@@ -11,7 +10,7 @@ module TavernKit
   #
   # Core objects (Character, Lore, Prompt) operate on Ruby hashes/objects.
   # This namespace provides safe-ish adapters to load common on-disk formats
-  # (PNG/APNG wrappers, JSON, ZIP-based containers like BYAF/CHARX).
+  # (PNG/APNG wrappers, ZIP-based containers like BYAF/CHARX).
   module Ingest
     @handlers_by_ext = {}
 
@@ -62,7 +61,6 @@ module TavernKit
   end
 end
 
-TavernKit::Ingest.register(".json", TavernKit::Ingest::Json)
 TavernKit::Ingest.register(".png", TavernKit::Ingest::Png)
 TavernKit::Ingest.register(".apng", TavernKit::Ingest::Png)
 TavernKit::Ingest.register(".byaf", TavernKit::Ingest::Byaf)

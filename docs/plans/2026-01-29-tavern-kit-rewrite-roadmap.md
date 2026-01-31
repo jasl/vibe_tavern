@@ -704,6 +704,17 @@ Wave 5 from drifting while implementing RisuAI.
   - `assets` (Hash/Array) -- app-provided asset manifest (for media macros).
 - The generic DSL supports this via `meta(:risuai, {...})` (Core; no platform hacks).
 
+**Defaulting policy (TavernKit-only):**
+- Upstream RisuAI runs inside an app that always provides chat/message state.
+  TavernKit may be used in smaller scripts/tests, so missing runtime keys are
+  treated as an **app integration gap**.
+- In tolerant mode, missing keys default to safe values:
+  - `chat_index`: `0`
+  - `message_index`: derived from history size when available; otherwise `0`
+  - `toggles`: `{}`; `metadata`: `{}`; `modules`: `[]`; `assets`: `{}`/`[]`
+- In strict/debug mode, missing runtime keys may raise to make integration bugs
+  obvious during tests.
+
 **I/O boundary policy (Wave 5):**
 - TavernKit remains prompt-building focused; anything requiring file/network/UI
   access must be provided via environment hooks/data from the application layer.
