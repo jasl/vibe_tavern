@@ -8,8 +8,6 @@ class RisuaiTriggersTest < Minitest::Test
   end
 
   def test_condition_var_true
-    pending!("Trigger condition 'true' accepts 'true' or '1'")
-
     trigger = {
       type: "output",
       conditions: [{ type: "var", var: "flag", value: "", operator: "true" }],
