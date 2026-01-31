@@ -74,9 +74,8 @@ module TavernKit
           while matching
             matching = false
 
-            entries.each do |entry|
-              key = entry_identity(entry)
-              next if activated_ids.key?(key)
+            entries.each_with_index do |entry, idx|
+              next if activated_ids[idx]
 
               active = build_active(
                 entry,
@@ -109,7 +108,7 @@ module TavernKit
               next unless activated
 
               actives << active
-              activated_ids[key] = true
+              activated_ids[idx] = true
 
               if active.keep_activate_after_match
                 variables.set(internal_keep_key(active.entry), "true", scope: :global)
@@ -178,14 +177,6 @@ module TavernKit
 
         def empty_result
           TavernKit::Lore::Result.new(activated_entries: [], total_tokens: 0, trim_report: nil)
-        end
-
-        def entry_identity(entry)
-          # Prefer explicit ids when present; otherwise fall back to content hash.
-          return entry.id.to_s unless entry.id.to_s.empty?
-
-          # Stable within Ruby; doesn't need to match upstream.
-          "content:#{entry.content.hash}"
         end
 
         def internal_keep_key(entry)
