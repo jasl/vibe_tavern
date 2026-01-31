@@ -30,8 +30,6 @@ class RisuaiLorebookTest < Minitest::Test
   end
 
   def test_selective_requires_secondkey
-    pending!("Selective lore requires primary and secondary keys")
-
     lore = {
       key: "dragon",
       secondkey: "cave",
