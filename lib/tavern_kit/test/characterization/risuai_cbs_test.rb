@@ -50,8 +50,6 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_calc_expression
-    pending!("CBS ? expression with operators and vars")
-
     assert_equal "7", render("{{? 1 + 2 * 3}}")
     assert_equal "1", render("{{? 3 > 2}}")
     assert_equal "0", render("{{? 3 < 2}}")
