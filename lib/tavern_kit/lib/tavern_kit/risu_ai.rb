@@ -4,6 +4,7 @@ require_relative "risu_ai/utils"
 require_relative "risu_ai/cbs"
 require_relative "risu_ai/lore"
 require_relative "risu_ai/lorebook"
+require_relative "risu_ai/template_cards"
 require_relative "risu_ai/regex_scripts"
 require_relative "risu_ai/triggers"
 
