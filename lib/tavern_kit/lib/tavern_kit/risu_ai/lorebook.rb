@@ -126,20 +126,7 @@ module TavernKit
       end
 
       def strip_decorators(content)
-        lines = content.to_s.lines
-        out = []
-        skipping = true
-
-        lines.each do |line|
-          if skipping && line.start_with?("@")
-            next
-          end
-
-          skipping = false
-          out << line
-        end
-
-        out.join.strip
+        TavernKit::RisuAI::Lore::DecoratorParser.parse(content).content.to_s
       end
     end
   end

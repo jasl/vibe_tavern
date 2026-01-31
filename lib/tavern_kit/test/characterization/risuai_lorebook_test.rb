@@ -74,14 +74,14 @@ class RisuaiLorebookTest < Minitest::Test
     lores = [
       {
         key: "dragon",
-        content: "@depth 1\nL-DEPTH",
+        content: "@@depth 1\nL-DEPTH",
         insertorder: 100,
         alwaysActive: false,
         selective: false,
       },
       {
         key: "dragon",
-        content: "@inject_at L-DEPTH\nL-INJECT",
+        content: "@@inject_at L-DEPTH\nL-INJECT",
         insertorder: 90,
         alwaysActive: false,
         selective: false,
