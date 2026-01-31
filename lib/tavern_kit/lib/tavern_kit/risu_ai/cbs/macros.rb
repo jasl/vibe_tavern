@@ -20,6 +20,14 @@ module TavernKit
             resolve_user(environment)
           when "prefillsupported", "prefill"
             resolve_prefill_supported(environment)
+          when "chatindex"
+            resolve_chatindex(environment)
+          when "messageindex"
+            resolve_messageindex(environment)
+          when "model"
+            resolve_model(environment)
+          when "role"
+            resolve_role(environment)
           when "getvar"
             resolve_getvar(args, environment: environment)
           when "setvar"
@@ -54,6 +62,12 @@ module TavernKit
             resolve_tonumber(args)
           when "pow"
             resolve_pow(args)
+          when "hash"
+            resolve_hash(args)
+          when "pick"
+            resolve_pick(args, environment: environment)
+          when "rollp", "rollpick"
+            resolve_rollp(args, environment: environment)
           when "arrayelement"
             resolve_arrayelement(args)
           when "trim"
@@ -124,6 +138,32 @@ module TavernKit
           supported ? "1" : "0"
         end
         private_class_method :resolve_prefill_supported
+
+        def resolve_chatindex(environment)
+          (environment.respond_to?(:chat_index) ? (environment.chat_index || -1) : -1).to_i.to_s
+        end
+        private_class_method :resolve_chatindex
+
+        def resolve_messageindex(environment)
+          (environment.respond_to?(:message_index) ? (environment.message_index || 0) : 0).to_i.to_s
+        end
+        private_class_method :resolve_messageindex
+
+        def resolve_model(environment)
+          environment.respond_to?(:model_hint) ? environment.model_hint.to_s : ""
+        end
+        private_class_method :resolve_model
+
+        def resolve_role(environment)
+          role =
+            if environment.respond_to?(:role)
+              environment.role
+            else
+              nil
+            end
+          role.nil? ? "null" : role.to_s
+        end
+        private_class_method :resolve_role
 
         def resolve_getvar(args, environment:)
           name = args[0].to_s
@@ -271,6 +311,54 @@ module TavernKit
         end
         private_class_method :resolve_pow
 
+        def resolve_hash(args)
+          word = args[0].to_s
+          num = (TavernKit::RisuAI::Utils.pick_hash_rand(0, word) * 10_000_000) + 1
+          num.round.to_i.to_s.rjust(7, "0")
+        end
+        private_class_method :resolve_hash
+
+        def resolve_pick(args, environment:)
+          cid = deterministic_cid(environment)
+          rand = TavernKit::RisuAI::Utils.pick_hash_rand(cid, deterministic_word(environment))
+          random_pick_impl(args, rand: rand)
+        end
+        private_class_method :resolve_pick
+
+        def resolve_rollp(args, environment:)
+          return "1" if args.empty?
+
+          notation = args[0].to_s.split("d")
+          num = 1.0
+          sides = 6.0
+
+          if notation.length == 2
+            num = notation[0].to_s.empty? ? 1.0 : Float(notation[0])
+            sides = notation[1].to_s.empty? ? 6.0 : Float(notation[1])
+          elsif notation.length == 1
+            sides = Float(notation[0])
+          end
+
+          return "NaN" if num.nan? || sides.nan?
+          return "NaN" if num < 1 || sides < 1
+
+          total = 0
+          count = num.ceil
+          base = deterministic_cid(environment)
+          word = deterministic_word(environment)
+
+          count.times do |i|
+            cid = base + (i * 15)
+            rand = TavernKit::RisuAI::Utils.pick_hash_rand(cid, word)
+            total += (rand * sides).floor + 1
+          end
+
+          total.to_s
+        rescue ArgumentError, TypeError
+          "NaN"
+        end
+        private_class_method :resolve_rollp
+
         def resolve_arrayelement(args)
           list = parse_cbs_array(args[0])
           index = args[1].to_s.to_i
@@ -388,6 +476,70 @@ module TavernKit
           s.split("§")
         end
         private_class_method :parse_cbs_array
+
+        def random_pick_impl(args, rand:)
+          return rand.to_s if args.empty?
+
+          arr =
+            if args.length == 1
+              parsed = parse_pick_array(args[0])
+              parsed.nil? ? split_pick_args(args[0]) : parsed
+            else
+              args
+            end
+
+          return "" if arr.empty?
+
+          index = (rand * arr.length).floor
+          element = arr[index]
+
+          if element.is_a?(String)
+            element.gsub("§X", ",")
+          else
+            ::JSON.generate(element) || ""
+          end
+        end
+        private_class_method :random_pick_impl
+
+        def parse_pick_array(value)
+          s = value.to_s
+          return nil unless s.start_with?("[") && s.end_with?("]")
+
+          arr = ::JSON.parse(s)
+          arr.is_a?(Array) ? arr : nil
+        rescue ::JSON::ParserError
+          nil
+        end
+        private_class_method :parse_pick_array
+
+        def split_pick_args(value)
+          value.to_s.gsub("\\,", "§X").split(/[:\,]/)
+        end
+        private_class_method :split_pick_args
+
+        def deterministic_cid(environment)
+          (environment.respond_to?(:message_index) ? (environment.message_index || 0) : 0).to_i
+        end
+        private_class_method :deterministic_cid
+
+        def deterministic_word(environment)
+          word =
+            if environment.respond_to?(:rng_word)
+              environment.rng_word.to_s
+            else
+              ""
+            end
+
+          return word unless word.empty?
+
+          if environment.respond_to?(:character_name)
+            fallback = environment.character_name.to_s
+            return fallback unless fallback.empty?
+          end
+
+          "0"
+        end
+        private_class_method :deterministic_word
 
         def make_array(array)
           ::JSON.generate(

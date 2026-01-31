@@ -155,4 +155,45 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "5", render("{{abs::-5}}")
     assert_equal "1", render("{{remaind::10::3}}")
   end
+
+  def test_deterministic_rng_and_metadata_macros
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (hash/pick/rollp/chatindex/model/role)
+    # resources/Risuai/src/ts/util.ts (pickHashRand)
+
+    expected_hash = ((TavernKit::RisuAI::Utils.pick_hash_rand(0, "hello") * 10_000_000) + 1).round.to_i.to_s.rjust(7, "0")
+    assert_equal expected_hash, render("{{hash::hello}}")
+
+    cid = 42
+    seed = "seed-word"
+    rand = TavernKit::RisuAI::Utils.pick_hash_rand(cid, seed)
+
+    assert_equal rand.to_s, render("{{pick}}", message_index: cid, rng_word: seed)
+
+    list = %w[a b c]
+    assert_equal list[(rand * list.length).floor], render("{{pick::a,b,c}}", message_index: cid, rng_word: seed)
+    assert_equal list[(rand * 2).floor], render("{{pick::[\"a\",\"b\"]}}", message_index: cid, rng_word: seed)
+    assert_equal "a,b", render("{{pick::a\\,b,c}}", message_index: cid, rng_word: seed)
+
+    sides = 6
+    expected_total = (0...2).sum do |i|
+      ((TavernKit::RisuAI::Utils.pick_hash_rand(cid + (i * 15), seed) * sides).floor + 1)
+    end
+    assert_equal expected_total.to_s, render("{{rollp::2d6}}", message_index: cid, rng_word: seed)
+    assert_equal expected_total.to_s, render("{{rollpick::2d6}}", message_index: cid, rng_word: seed)
+
+    expected_d20 = ((TavernKit::RisuAI::Utils.pick_hash_rand(cid, seed) * 20).floor + 1).to_s
+    assert_equal expected_d20, render("{{rollp::20}}", message_index: cid, rng_word: seed)
+
+    assert_equal "1", render("{{rollp}}")
+    assert_equal "NaN", render("{{rollp::0d6}}")
+    assert_equal "NaN", render("{{rollp::2d0}}")
+    assert_equal "NaN", render("{{rollp::abc}}")
+
+    assert_equal "-1", render("{{chatindex}}", chat_index: -1)
+    assert_equal "9", render("{{chat_index}}", chat_index: 9)
+    assert_equal "42", render("{{message_index}}", message_index: 42)
+    assert_equal "gpt-4o", render("{{model}}", model_hint: "gpt-4o")
+    assert_equal "assistant", render("{{role}}", role: :assistant)
+  end
 end

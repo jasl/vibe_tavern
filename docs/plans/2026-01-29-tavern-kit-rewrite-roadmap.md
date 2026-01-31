@@ -699,8 +699,14 @@ Wave 5 from drifting while implementing RisuAI.
   normalizes string/camelCase keys once at Stage 1 so later stages can rely on
   the canonical form.
 - Recommended shape (all optional unless stated):
-  - `chat_index` (Integer) -- stable per chat; used for deterministic RNG seeds.
-  - `message_index` (Integer) -- stable within chat; used for metadata macros.
+  - `chat_index` (Integer) -- current message index in the chat
+    (RisuAI `matcherArg.chatID` / `chat.chatIndex`). `-1` means “no message
+    context” (common during prompt building).
+  - `message_index` (Integer) -- current chat length (message count). Used as
+    the deterministic RNG `cid` seed for `pick`/`rollp`.
+  - `rng_word` (String) -- deterministic RNG seed word. Upstream uses
+    `chaId + chat.id`; TavernKit cannot infer those IDs, so applications should
+    pass a stable string when exact parity matters.
   - `toggles` (Hash) -- toggle name → string value (RisuAI truthiness rules apply).
   - `metadata` (Hash) -- free-form (RisuAI exposes 15+ metadata macros).
   - `modules` (Array) -- enabled modules list (for module_* macros).
@@ -712,8 +718,9 @@ Wave 5 from drifting while implementing RisuAI.
   TavernKit may be used in smaller scripts/tests, so missing runtime keys are
   treated as an **app integration gap**.
 - In tolerant mode, missing keys default to safe values:
-  - `chat_index`: `0`
+  - `chat_index`: `-1`
   - `message_index`: derived from history size when available; otherwise `0`
+  - `rng_word`: `character.name` when available; otherwise `"0"`
   - `toggles`: `{}`; `metadata`: `{}`; `modules`: `[]`; `assets`: `{}`/`[]`
 - In strict/debug mode, missing runtime keys may raise to make integration bugs
   obvious during tests.

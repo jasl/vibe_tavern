@@ -16,7 +16,7 @@ module TavernKit
           return unless triggers.is_a?(Array) && triggers.any?
 
           risu = ctx[:risuai].is_a?(Hash) ? ctx[:risuai] : {}
-          chat_index = risu.fetch(:chat_index, 0).to_i
+          chat_index = risu.fetch(:chat_index, -1).to_i
 
           scriptstate = ctx[:risuai_scriptstate]
           scriptstate = {} unless scriptstate.is_a?(Hash)

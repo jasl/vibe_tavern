@@ -4,7 +4,7 @@ module TavernKit
   module RisuAI
     module CBS
       class Environment < TavernKit::Macro::Environment::Base
-        attr_reader :character, :user, :chat_index, :message_index, :dialect, :model_hint, :run_var, :rm_var
+        attr_reader :character, :user, :chat_index, :message_index, :dialect, :model_hint, :role, :rng_word, :run_var, :rm_var
 
         def self.build(**kwargs)
           new(**kwargs)
@@ -17,6 +17,8 @@ module TavernKit
           message_index: nil,
           dialect: nil,
           model_hint: nil,
+          role: nil,
+          rng_word: nil,
           variables: nil,
           toggles: nil,
           run_var: nil,
@@ -29,6 +31,8 @@ module TavernKit
           @message_index = message_index
           @dialect = dialect&.to_sym
           @model_hint = model_hint.to_s
+          @role = role
+          @rng_word = rng_word.to_s
 
           @variables = variables
           @toggles = toggles.is_a?(Hash) ? toggles : {}
@@ -47,7 +51,7 @@ module TavernKit
         #
         # Upstream behavior: functions persist across nested call:: expansions,
         # but temp variables reset for each parse frame.
-        def call_frame
+        def call_frame(**overrides)
           self.class.build(
             character: @character,
             user: @user,
@@ -55,10 +59,13 @@ module TavernKit
             message_index: @message_index,
             dialect: @dialect,
             model_hint: @model_hint,
+            role: @role,
+            rng_word: @rng_word,
             variables: @variables,
             toggles: @toggles,
             run_var: @run_var,
             rm_var: @rm_var,
+            **overrides,
           )
         end
 

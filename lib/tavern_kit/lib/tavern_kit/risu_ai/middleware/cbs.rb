@@ -11,14 +11,15 @@ module TavernKit
           ctx.blocks ||= []
 
           risu = ctx[:risuai].is_a?(Hash) ? ctx[:risuai] : {}
-          chat_index = risu.fetch(:chat_index, 0).to_i
+          chat_index = risu.fetch(:chat_index, -1).to_i
           message_index = risu.fetch(:message_index, inferred_message_index(ctx)).to_i
+          rng_word = risu[:rng_word].to_s
           run_var_raw = risu.key?(:run_var) ? risu[:run_var] : nil
           rm_var_raw = risu.key?(:rm_var) ? risu[:rm_var] : nil
           run_var = run_var_raw.nil? ? true : TavernKit::Coerce.bool(run_var_raw, default: false)
           rm_var = rm_var_raw.nil? ? false : TavernKit::Coerce.bool(rm_var_raw, default: false)
 
-          env = TavernKit::RisuAI::CBS::Environment.build(
+          env_kwargs = {
             character: ctx.character,
             user: ctx.user,
             chat_index: chat_index,
@@ -29,13 +30,15 @@ module TavernKit
             toggles: risu[:toggles],
             run_var: run_var,
             rm_var: rm_var,
-          )
+            rng_word: rng_word,
+          }
 
           engine = ctx.expander || TavernKit::RisuAI::CBS::Engine.new
 
           ctx.blocks = Array(ctx.blocks).map do |block|
             next block unless block.is_a?(TavernKit::Prompt::Block)
 
+            env = TavernKit::RisuAI::CBS::Environment.build(**env_kwargs.merge(role: block.role))
             expanded = engine.expand(block.content.to_s, environment: env)
             block.with(content: expanded)
           end
