@@ -85,6 +85,70 @@ module TavernKit
     class LoreParseError < TavernKit::Lore::ParseError; end
   end
 
+  module RisuAI
+    # Base error class for RisuAI CBS parsing/evaluation failures.
+    class CBSError < TavernKit::Error
+      attr_reader :position, :block_type
+
+      def initialize(message, position: nil, block_type: nil)
+        @position = position
+        @block_type = block_type
+
+        msg = message.to_s
+        meta = []
+        meta << "position=#{position}" if position
+        meta << "block_type=#{block_type}" if block_type
+
+        super(meta.any? ? "#{msg} (#{meta.join(", ")})" : msg)
+      end
+    end
+
+    # Raised when a CBS template has invalid syntax (e.g., an unclosed block).
+    class CBSSyntaxError < CBSError; end
+
+    # Raised when CBS function call depth exceeds the configured limit.
+    class CBSStackOverflowError < CBSError
+      attr_reader :depth, :max_depth
+
+      def initialize(message, depth:, max_depth:, **kwargs)
+        @depth = Integer(depth)
+        @max_depth = Integer(max_depth)
+        super("#{message} (depth: #{@depth}, max: #{@max_depth})", **kwargs)
+      end
+    end
+
+    # Raised when parsing inline decorators fails.
+    class DecoratorParseError < TavernKit::Error; end
+
+    # Raised when the trigger system encounters an unrecoverable error.
+    class TriggerError < TavernKit::Error
+      attr_reader :trigger_type, :effect_type
+
+      def initialize(message, trigger_type: nil, effect_type: nil)
+        @trigger_type = trigger_type
+        @effect_type = effect_type
+
+        msg = message.to_s
+        meta = []
+        meta << "trigger_type=#{trigger_type}" if trigger_type
+        meta << "effect_type=#{effect_type}" if effect_type
+
+        super(meta.any? ? "#{msg} (#{meta.join(", ")})" : msg)
+      end
+    end
+
+    # Raised when trigger recursion depth exceeds the configured limit.
+    class TriggerRecursionError < TriggerError
+      attr_reader :depth, :max_depth
+
+      def initialize(message, depth:, max_depth:, **kwargs)
+        @depth = Integer(depth)
+        @max_depth = Integer(max_depth)
+        super("#{message} (depth: #{@depth}, max: #{@max_depth})", **kwargs)
+      end
+    end
+  end
+
   module Archive
     # Base error for archive/package import failures (e.g. ZIP-based formats).
     class ParseError < TavernKit::Error; end

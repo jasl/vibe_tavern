@@ -30,6 +30,15 @@ and SillyTavern/RisuAI spec support.
 
 ## Scope Clarifications (2026-01-29 Update)
 
+- **Reference source pins (for parity):**
+  - SillyTavern (staging): `resources/SillyTavern` @ `bba43f332`
+  - RisuAI: `resources/Risuai` @ `b8076cae`
+  - Legacy TavernKit (baseline): `resources/tavern_kit` @ `5e54d324`
+  - BYAF spec: `resources/byaf` @ `7ebf2fd`
+  - CCv3 spec: `resources/character-card-spec-v3` @ `f3a86af`
+  - When updating any reference source, record the new commit hash here to
+    keep characterization tests traceable.
+
 - **RisuAI parity scope (this batch):** include **memory system integration**
   (HypaMemory/SupaMemory stage) as part of the RisuAI pipeline. Tokenizer parity
   is acknowledged but will be **interface-first** and can be completed later.

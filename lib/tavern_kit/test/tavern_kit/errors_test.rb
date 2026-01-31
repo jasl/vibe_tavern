@@ -113,4 +113,51 @@ class TavernKit::ErrorsTest < Minitest::Test
     assert_raises(TavernKit::Lore::ParseError) { raise error }
     assert_raises(TavernKit::Error) { raise error }
   end
+
+  # --- RisuAI Error Hierarchy Tests ---
+
+  def test_risuai_error_hierarchy
+    assert TavernKit::RisuAI::CBSError < TavernKit::Error
+    assert TavernKit::RisuAI::CBSSyntaxError < TavernKit::RisuAI::CBSError
+    assert TavernKit::RisuAI::CBSStackOverflowError < TavernKit::RisuAI::CBSError
+    assert TavernKit::RisuAI::DecoratorParseError < TavernKit::Error
+    assert TavernKit::RisuAI::TriggerError < TavernKit::Error
+    assert TavernKit::RisuAI::TriggerRecursionError < TavernKit::RisuAI::TriggerError
+  end
+
+  def test_risuai_cbs_error_includes_metadata
+    error = TavernKit::RisuAI::CBSError.new("bad", position: 12, block_type: "when")
+    assert_equal 12, error.position
+    assert_equal "when", error.block_type
+    assert_includes error.message, "bad"
+    assert_includes error.message, "12"
+    assert_includes error.message, "when"
+  end
+
+  def test_risuai_cbs_stack_overflow_error
+    error = TavernKit::RisuAI::CBSStackOverflowError.new("overflow", depth: 21, max_depth: 20, position: 99)
+    assert_equal 21, error.depth
+    assert_equal 20, error.max_depth
+    assert_includes error.message, "overflow"
+    assert_includes error.message, "21"
+    assert_includes error.message, "20"
+    assert_includes error.message, "99"
+  end
+
+  def test_risuai_trigger_error_includes_metadata
+    error = TavernKit::RisuAI::TriggerError.new("boom", trigger_type: "output", effect_type: "setvar")
+    assert_equal "output", error.trigger_type
+    assert_equal "setvar", error.effect_type
+    assert_includes error.message, "boom"
+    assert_includes error.message, "output"
+    assert_includes error.message, "setvar"
+  end
+
+  def test_risuai_trigger_recursion_error
+    error = TavernKit::RisuAI::TriggerRecursionError.new("loop", depth: 11, max_depth: 10)
+    assert_equal 11, error.depth
+    assert_equal 10, error.max_depth
+    assert_includes error.message, "11"
+    assert_includes error.message, "10"
+  end
 end
