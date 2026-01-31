@@ -917,6 +917,7 @@ reviews after the major feature work is complete.
 | Trace + fingerprint review | Core | Ensure trace contains enough to reproduce “why this prompt” decisions; confirm fingerprint stability for caching |
 | Large-file split pass | ST | Split `SillyTavern::Lore::Engine` and `SillyTavern::Macro::V2Engine` into internal helpers to meet the 800 LOC guideline, without behavior changes |
 | Regex safety hardening | ST | Review JS-regex handling for ReDoS risk; consider timeouts/limits for untrusted patterns (keep tolerant mode behavior) |
+| Extract LRU cache helper | Core | Add a small bounded LRU cache helper (no ActiveSupport dependency) and reuse it for regex compilation caches (ST regex scripts) and other hot-path bounded caches (e.g., JS-regex conversion in lore scanning) |
 | Micro-perf audit backlog | Core/ST | Consider bounded caching for regex conversions, token count memoization, and precomputed sort keys where hot paths justify it |
 
 #### 6d. CLI / Tools
