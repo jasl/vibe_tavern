@@ -232,7 +232,17 @@ module TavernKit
           acc = TavernKit::Utils::HashAccessor.wrap(ext)
           keys.each do |k|
             v = acc.fetch(k, default: nil)
-            return v unless v.nil?
+            next if v.nil?
+
+            # ST parity: depth_prompt is typically a nested object
+            # (`extensions.depth_prompt.prompt`). Scan only the prompt text.
+            if v.is_a?(Hash)
+              nested = TavernKit::Utils::HashAccessor.wrap(v).fetch(:prompt, default: nil)
+              return nested unless nested.nil?
+              next
+            end
+
+            return v
           end
           nil
         end

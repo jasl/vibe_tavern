@@ -57,6 +57,21 @@ class TavernKit::SillyTavern::Middleware::EntriesTest < Minitest::Test
     assert_equal :relative, entry.position
   end
 
+  def test_forces_chat_examples_to_relative
+    preset = TavernKit::SillyTavern::Preset.new(
+      prompt_entries: [
+        TavernKit::Prompt::PromptEntry.new(id: "chat_examples", pinned: true, position: :in_chat, depth: 2),
+      ],
+    )
+
+    ctx = build_ctx(preset: preset)
+    run_entries(ctx)
+
+    entry = ctx.prompt_entries.first
+    assert_equal "chat_examples", entry.id
+    assert_equal :relative, entry.position
+  end
+
   def test_forces_post_history_instructions_to_end
     preset = TavernKit::SillyTavern::Preset.new(
       prompt_entries: [
