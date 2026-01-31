@@ -189,6 +189,28 @@ module TavernKit
 
       def strict? = @strict == true
 
+      # Ensure the context has a variables store.
+      #
+      # ChatVariables are application-owned, session-level state (not per-build),
+      # but the pipeline reads/writes them via the Context.
+      def variables_store!
+        @variables_store ||= TavernKit::ChatVariables::InMemory.new
+      end
+
+      # Convenience setter for chat variables (application injection).
+      def set_chat_var(name, value, scope: :local)
+        variables_store!.set(name, value, scope: scope)
+        self
+      end
+
+      # Convenience multi-set for chat variables (application injection).
+      def set_chat_vars(hash, scope: :local)
+        hash = hash.is_a?(Hash) ? hash : {}
+        store = variables_store!
+        hash.each { |k, v| store.set(k, v, scope: scope) }
+        self
+      end
+
       # Create a shallow copy suitable for pipeline branching.
       def dup
         copy = super

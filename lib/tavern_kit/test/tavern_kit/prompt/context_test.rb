@@ -92,4 +92,17 @@ class TavernKit::Prompt::ContextTest < Minitest::Test
     assert_equal 1, ctx.pinned_groups["chat_history"].length
     assert_equal 2, copy.pinned_groups["chat_history"].length
   end
+
+  def test_chat_variables_helpers
+    ctx = TavernKit::Prompt::Context.new
+    assert_nil ctx.variables_store
+
+    ctx.set_chat_var("x", "1")
+    assert_kind_of TavernKit::ChatVariables::InMemory, ctx.variables_store
+    assert_equal "1", ctx.variables_store.get("x", scope: :local)
+
+    ctx.set_chat_vars({ y: 2, z: "ok" }, scope: :global)
+    assert_equal 2, ctx.variables_store.get("y", scope: :global)
+    assert_equal "ok", ctx.variables_store.get("z", scope: :global)
+  end
 end

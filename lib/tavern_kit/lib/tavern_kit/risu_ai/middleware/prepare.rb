@@ -50,17 +50,8 @@ module TavernKit
         # Normalize `ctx[:risuai]` once at the pipeline entrypoint so downstream
         # middlewares can rely on canonical snake_case symbol keys.
         def normalize_risuai_runtime!(ctx)
-          raw = ctx[:risuai]
-          ctx[:risuai] = normalize_risuai_hash(raw)
-        end
-
-        def normalize_risuai_hash(value)
-          h = value.is_a?(Hash) ? value : {}
-
-          h.each_with_object({}) do |(key, val), out|
-            canonical = TavernKit::Utils.underscore(key).to_sym
-            out[canonical] = val
-          end
+          runtime = TavernKit::RisuAI::Runtime.build(ctx[:risuai], context: ctx, strict: ctx.strict?)
+          ctx[:risuai] = runtime.to_h
         end
 
         def extract_prompt_template(preset)

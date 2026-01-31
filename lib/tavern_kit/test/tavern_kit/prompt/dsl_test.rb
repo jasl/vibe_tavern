@@ -152,6 +152,21 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     assert_equal 123, dsl.context[:chat_index]
   end
 
+  def test_dsl_chat_variables_helpers
+    pipeline = simple_pipeline
+    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+
+    dsl.set_chat_var("x", "1")
+    assert_kind_of TavernKit::ChatVariables::InMemory, dsl.context.variables_store
+    assert_equal "1", dsl.context.variables_store.get("x", scope: :local)
+
+    store = TavernKit::ChatVariables::InMemory.new
+    dsl.chat_variables(store)
+    dsl.set_chat_vars({ y: 2 }, scope: :global)
+    assert_same store, dsl.context.variables_store
+    assert_equal 2, store.get("y", scope: :global)
+  end
+
   def test_tavern_kit_build_requires_pipeline
     assert_raises(ArgumentError) do
       TavernKit.build(pipeline: nil) { message "Hello!" }

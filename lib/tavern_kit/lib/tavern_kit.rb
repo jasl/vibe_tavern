@@ -8,6 +8,7 @@ require_relative "tavern_kit/constants"
 require_relative "tavern_kit/coerce"
 require_relative "tavern_kit/errors"
 require_relative "tavern_kit/utils"
+require_relative "tavern_kit/runtime"
 
 require_relative "tavern_kit/participant"
 require_relative "tavern_kit/user"

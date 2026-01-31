@@ -160,6 +160,27 @@ module TavernKit
         self
       end
 
+      # Set the chat variables store (session-level state).
+      #
+      # This store is application-owned and should usually persist across
+      # multiple prompt builds within the same chat.
+      def chat_variables(store)
+        @context.variables_store = store
+        self
+      end
+
+      # Convenience setter for chat variables (application injection).
+      def set_chat_var(name, value, scope: :local)
+        @context.set_chat_var(name, value, scope: scope)
+        self
+      end
+
+      # Convenience multi-set for chat variables (application injection).
+      def set_chat_vars(hash, scope: :local)
+        @context.set_chat_vars(hash, scope: scope)
+        self
+      end
+
       # Set the lore engine.
       def lore_engine(engine)
         @context.lore_engine = engine
