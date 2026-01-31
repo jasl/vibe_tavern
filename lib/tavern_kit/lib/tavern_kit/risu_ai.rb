@@ -7,6 +7,8 @@ require_relative "risu_ai/lorebook"
 require_relative "risu_ai/template_cards"
 require_relative "risu_ai/regex_scripts"
 require_relative "risu_ai/triggers"
+require_relative "risu_ai/pipeline"
+require_relative "risu_ai/build"
 
 module TavernKit
   # RisuAI platform layer (Wave 5+).
