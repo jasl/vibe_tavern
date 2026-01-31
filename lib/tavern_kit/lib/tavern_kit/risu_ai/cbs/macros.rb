@@ -50,6 +50,12 @@ module TavernKit
             resolve_join(args)
           when "spread"
             resolve_spread(args)
+          when "tonumber"
+            resolve_tonumber(args)
+          when "pow"
+            resolve_pow(args)
+          when "arrayelement"
+            resolve_arrayelement(args)
           when "trim"
             resolve_trim(args)
           when "length"
@@ -243,6 +249,39 @@ module TavernKit
           list.map { |v| v.is_a?(String) ? v : ::JSON.generate(v) }.join("::")
         end
         private_class_method :resolve_spread
+
+        def resolve_tonumber(args)
+          args[0].to_s.each_char.filter_map do |ch|
+            if ch == "." || ch.match?(/\A\d\z/) || ch.match?(/\A\s\z/)
+              ch
+            end
+          end.join
+        end
+        private_class_method :resolve_tonumber
+
+        def resolve_pow(args)
+          a = parse_js_number(args[0])
+          b = parse_js_number(args[1])
+          return "NaN" if a.is_a?(String) || b.is_a?(String)
+          return "NaN" if a.negative? && (b % 1) != 0
+
+          format_number(a**b)
+        rescue StandardError
+          "NaN"
+        end
+        private_class_method :resolve_pow
+
+        def resolve_arrayelement(args)
+          list = parse_cbs_array(args[0])
+          index = args[1].to_s.to_i
+          element = list[index]
+          return "null" if element.nil?
+
+          element.is_a?(Hash) || element.is_a?(Array) ? ::JSON.generate(element) : element.to_s
+        rescue StandardError
+          "null"
+        end
+        private_class_method :resolve_arrayelement
 
         def resolve_trim(args)
           args[0].to_s.strip
