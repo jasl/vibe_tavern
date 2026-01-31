@@ -690,6 +690,26 @@ Wave 5 from drifting while implementing RisuAI.
 - `cd lib/tavern_kit && bundle exec rake test:conformance`
 - `cd lib/tavern_kit && bundle exec rake test:integration`
 - `cd lib/tavern_kit && bundle exec rake test:risuai`
+- `cd lib/tavern_kit && bundle exec rake test:wave5` (meta task)
+
+**RisuAI runtime contract (to avoid hidden coupling):**
+- RisuAI-specific runtime state should be passed via `ctx[:risuai]` (a Hash),
+  never by modifying Core internals.
+- Recommended shape (all optional unless stated):
+  - `chat_index` (Integer) -- stable per chat; used for deterministic RNG seeds.
+  - `message_index` (Integer) -- stable within chat; used for metadata macros.
+  - `toggles` (Hash) -- toggle name → string value (RisuAI truthiness rules apply).
+  - `metadata` (Hash) -- free-form (RisuAI exposes 15+ metadata macros).
+  - `modules` (Array) -- enabled modules list (for module_* macros).
+  - `assets` (Hash/Array) -- app-provided asset manifest (for media macros).
+- The generic DSL supports this via `meta(:risuai, {...})` (Core; no platform hacks).
+
+**I/O boundary policy (Wave 5):**
+- TavernKit remains prompt-building focused; anything requiring file/network/UI
+  access must be provided via environment hooks/data from the application layer.
+- CBS macros / triggers that depend on app-owned I/O should:
+  - Return `""` / no-op in tolerant mode when capability is missing.
+  - Raise in strict/debug mode (or emit a warning that strict mode escalates).
 
 **Anti-drift checklist (run after each Wave 5 step / commit):**
 - Does this follow `docs/rewrite/risuai-alignment-delta.md`?
