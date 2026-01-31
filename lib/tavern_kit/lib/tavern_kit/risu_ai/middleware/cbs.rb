@@ -19,6 +19,10 @@ module TavernKit
             user: ctx.user,
             chat_index: chat_index,
             message_index: message_index,
+            variables: ctx.variables_store,
+            dialect: ctx.dialect,
+            model_hint: ctx[:model_hint],
+            toggles: (risu[:toggles] || risu["toggles"]),
           )
 
           engine = ctx.expander || TavernKit::RisuAI::CBS::Engine.new

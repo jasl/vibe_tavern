@@ -44,6 +44,33 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "Hello world", render(input)
   end
 
+  def test_basic_macros
+    char = TavernKit::Character.create(name: "Seraphina")
+    user = TavernKit::User.new(name: "Alice", persona: "A curious adventurer")
+
+    assert_equal "Seraphina", render("{{char}}", character: char, user: user)
+    assert_equal "Seraphina", render("{{bot}}", character: char, user: user)
+    assert_equal "Alice", render("{{user}}", character: char, user: user)
+
+    assert_equal "1", render("{{prefill_supported}}", dialect: :anthropic)
+    assert_equal "0", render("{{prefill_supported}}", dialect: :openai)
+    assert_equal "1", render("{{prefill_supported}}", model_hint: "claude-3-haiku-20240307")
+
+    assert_equal "ok", render("{{#if {{prefill_supported}}}}ok{{/}}", dialect: :anthropic)
+    assert_equal "", render("{{#if {{prefill_supported}}}}ok{{/}}", dialect: :openai)
+
+    assert_equal "yes", render("{{#when::toggle::x}}yes{{/}}", toggles: { x: "1" })
+    assert_equal "", render("{{#when::toggle::x}}yes{{/}}", toggles: { x: "0" })
+  end
+
+  def test_calc_expression_with_variables
+    store = TavernKit::ChatVariables::InMemory.new
+    store.set("x", 2, scope: :local)
+    store.set("y", 3, scope: :global)
+
+    assert_equal "5", render("{{? $x + @y}}", variables: store)
+  end
+
   def test_call_stack_limit
     input = "{{#func loop}}{{call::loop}}{{/}}{{call::loop}}"
     assert_equal "ERROR: Call stack limit reached", render(input)

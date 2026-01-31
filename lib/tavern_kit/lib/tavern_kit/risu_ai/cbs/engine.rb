@@ -32,7 +32,7 @@ module TavernKit
           while (open_idx = str.index(OPEN, i))
             out << str[i...open_idx]
 
-            close_idx = str.index(CLOSE, open_idx + OPEN.length)
+            close_idx = find_close_idx(str, open_idx)
             unless close_idx
               out << str[open_idx..]
               return [out, str.length, false]
@@ -143,17 +143,17 @@ module TavernKit
 
           if name.start_with?("if_pure ")
             state = name.split(" ", 2)[1].to_s
-            return truthy?(state) ? Block.new(type: :ifpure) : Block.new(type: :ignore)
+            return truthy_condition?(state, environment: environment) ? Block.new(type: :ifpure) : Block.new(type: :ignore)
           end
 
           if name.start_with?("if ")
             state = name.split(" ", 2)[1].to_s
-            return truthy?(state) ? Block.new(type: :parse) : Block.new(type: :ignore)
+            return truthy_condition?(state, environment: environment) ? Block.new(type: :parse) : Block.new(type: :ignore)
           end
 
           if name.start_with?("when ")
             state = name.split(" ", 2)[1].to_s
-            return truthy?(state) ? Block.new(type: :newif) : Block.new(type: :newif_falsy)
+            return truthy_condition?(state, environment: environment) ? Block.new(type: :newif) : Block.new(type: :newif_falsy)
           end
 
           if name.start_with?("when::")
@@ -167,7 +167,7 @@ module TavernKit
         def parse_when_statement(statement, environment:)
           if statement.length == 1
             state = statement[0].to_s
-            return truthy?(state) ? Block.new(type: :newif) : Block.new(type: :newif_falsy)
+            return truthy_condition?(state, environment: environment) ? Block.new(type: :newif) : Block.new(type: :newif_falsy)
           end
 
           mode = :normal
@@ -179,7 +179,7 @@ module TavernKit
 
             case operator
             when "not"
-              parts << (truthy?(condition) ? "0" : "1")
+              parts << (truthy_condition?(condition, environment: environment) ? "0" : "1")
             when "keep"
               mode = :keep
               parts << condition
@@ -188,10 +188,10 @@ module TavernKit
               parts << condition
             when "and"
               condition2 = parts.pop.to_s
-              parts << (truthy?(condition) && truthy?(condition2) ? "1" : "0")
+              parts << (truthy_condition?(condition, environment: environment) && truthy_condition?(condition2, environment: environment) ? "1" : "0")
             when "or"
               condition2 = parts.pop.to_s
-              parts << (truthy?(condition) || truthy?(condition2) ? "1" : "0")
+              parts << (truthy_condition?(condition, environment: environment) || truthy_condition?(condition2, environment: environment) ? "1" : "0")
             when "is"
               condition2 = parts.pop.to_s
               parts << (condition == condition2 ? "1" : "0")
@@ -211,9 +211,9 @@ module TavernKit
               condition2 = parts.pop.to_s
               parts << (condition2.to_f <= condition.to_f ? "1" : "0")
             when "var"
-              parts << (truthy?(chat_var(environment, condition)) ? "1" : "0")
+              parts << (truthy_condition?(chat_var(environment, condition), environment: environment) ? "1" : "0")
             when "toggle"
-              parts << (truthy?(global_var(environment, "toggle_#{condition}")) ? "1" : "0")
+              parts << (truthy_condition?(global_var(environment, "toggle_#{condition}"), environment: environment) ? "1" : "0")
             when "vis"
               var_name = parts.pop.to_s
               parts << (chat_var(environment, var_name).to_s == condition ? "1" : "0")
@@ -227,7 +227,7 @@ module TavernKit
               toggle_name = parts.pop.to_s
               parts << (global_var(environment, "toggle_#{toggle_name}").to_s != condition ? "1" : "0")
             else
-              parts << (truthy?(condition) ? "1" : "0")
+              parts << (truthy_condition?(condition, environment: environment) ? "1" : "0")
             end
           end
 
@@ -367,7 +367,7 @@ module TavernKit
           while (open_idx = str.index(OPEN, i))
             out << str[i...open_idx]
 
-            close_idx = str.index(CLOSE, open_idx + OPEN.length)
+            close_idx = find_close_idx(str, open_idx)
             unless close_idx
               out << str[open_idx..]
               return [out, str.length, false]
@@ -450,9 +450,45 @@ module TavernKit
           s == "true" || s == "1"
         end
 
+        def truthy_condition?(value, environment:)
+          s = value.to_s.strip
+          return truthy?(s) unless s.start_with?(OPEN) && s.end_with?(CLOSE)
+
+          inner_raw = s.delete_prefix(OPEN).delete_suffix(CLOSE)
+          token = inner_raw.to_s.strip
+          truthy?(expand_tag(inner_raw, token: token, environment: environment))
+        end
+
         def close_token?(token)
           t = token.to_s
           t.start_with?("/") && !t.start_with?("//") && t.strip == BLOCK_END_TOKEN
+        end
+
+        def find_close_idx(str, open_idx)
+          i = open_idx + OPEN.length
+          depth = 0
+
+          while i < str.length
+            next_open = str.index(OPEN, i)
+            next_close = str.index(CLOSE, i)
+            return nil unless next_close
+
+            if next_open && next_open < next_close
+              depth += 1
+              i = next_open + OPEN.length
+              next
+            end
+
+            if depth > 0
+              depth -= 1
+              i = next_close + CLOSE.length
+              next
+            end
+
+            return next_close
+          end
+
+          nil
         end
 
         def chat_var(environment, name)
@@ -485,6 +521,15 @@ module TavernKit
           when "br" then "\n"
           when "cbr" then "\\n"
           else
+            parts = token.split("::")
+            if parts.any?
+              name = parts[0].to_s
+              args = parts.drop(1)
+
+              resolved = TavernKit::RisuAI::CBS::Macros.resolve(name, args, environment: environment)
+              return resolved.to_s unless resolved.nil?
+            end
+
             # Unknown tokens are preserved as-is for later expansion stages.
             "{{#{raw}}}"
           end

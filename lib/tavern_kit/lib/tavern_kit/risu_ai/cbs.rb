@@ -2,6 +2,7 @@
 
 require_relative "cbs/engine"
 require_relative "cbs/environment"
+require_relative "cbs/macros"
 
 module TavernKit
   module RisuAI
