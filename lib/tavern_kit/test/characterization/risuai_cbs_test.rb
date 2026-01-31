@@ -35,9 +35,7 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_each_and_slot
-    pending!("CBS #each + slot substitution")
-
-    assert_equal "a::b::c", render("{{#each [a,b,c] as item}}{{slot::item}}::{{/}}")
+    assert_equal "a::b::c", render("{{#each [a,b,c] as item}}{{slot::item}}::{{/}}").chomp("::")
     assert_equal "1-2-3", render("{{#each [1,2,3] as n}}{{slot::n}}-{{/}}").chomp("-")
   end
 

@@ -20,7 +20,7 @@ module TavernKit
 
         private
 
-        Block = Struct.new(:type, :mode, :keep, keyword_init: true)
+        Block = Struct.new(:type, :mode, :keep, :expr, keyword_init: true)
 
         def expand_stream(str, index, environment:, stop_on_end:)
           out = +""
@@ -85,6 +85,10 @@ module TavernKit
             inner_raw, next_i, ended = read_raw_until_close(str, inner_start)
             return unless ended
             return [eval_raw_block(block, inner_raw), next_i]
+          when :each
+            inner_raw, next_i, ended = read_raw_until_close(str, inner_start)
+            return unless ended
+            return [eval_each(block, inner_raw, environment: environment), next_i]
           when :parse, :ifpure, :newif, :newif_falsy
             inner_eval, next_i, ended = expand_stream(str, inner_start, environment: environment, stop_on_end: true)
             return unless ended
@@ -102,6 +106,19 @@ module TavernKit
           if name.start_with?("escape")
             mode = name.include?("::keep") ? :keep : nil
             return Block.new(type: :escape, mode: mode)
+          end
+
+          if name.start_with?("each")
+            rest = name.delete_prefix("each").strip
+            mode = nil
+
+            if rest.start_with?("::keep ")
+              mode = :keep
+              rest = rest.delete_prefix("::keep ").strip
+            end
+
+            rest = rest.delete_prefix("as ").strip if rest.start_with?("as ")
+            return Block.new(type: :each, mode: mode, expr: rest)
           end
 
           if name.start_with?("if_pure ")
@@ -242,6 +259,71 @@ module TavernKit
             eval_newif(inner, truthy: false, keep: block.keep == true)
           else
             ""
+          end
+        end
+
+        def eval_each(block, inner, environment:)
+          template =
+            if block.mode == :keep
+              inner
+            else
+              trim_lines(inner.strip)
+            end
+
+          array, var_name = parse_each_expr(block.expr.to_s)
+          return "" if array.empty? || var_name.to_s.strip.empty?
+
+          out = +""
+          slot = "{{slot::#{var_name}}}"
+
+          array.each do |value|
+            rendered =
+              if value.is_a?(String)
+                value
+              else
+                ::JSON.generate(value)
+              end
+            out << template.gsub(slot, rendered)
+          end
+
+          out = out.strip unless block.mode == :keep
+          expanded, = expand_stream(out, 0, environment: environment, stop_on_end: false)
+          expanded
+        end
+
+        def parse_each_expr(expr)
+          s = expr.to_s
+
+          as_index = s.rindex(" as ")
+          if as_index
+            array_expr = s[0...as_index]
+            var_name = s[(as_index + 4)..]
+            return [parse_array(array_expr), var_name.to_s.strip]
+          end
+
+          last_space = s.rindex(" ")
+          return [[], nil] unless last_space
+
+          array_expr = s[0...last_space]
+          var_name = s[(last_space + 1)..]
+          [parse_array(array_expr), var_name.to_s.strip]
+        end
+
+        def parse_array(expr)
+          s = expr.to_s.strip
+          s = s[1..-2] if s.start_with?("[") && s.end_with?("]")
+
+          parts = s.split(",").map { |v| v.strip }.reject(&:empty?)
+          parts.map do |part|
+            if (part.start_with?("\"") && part.end_with?("\"")) || (part.start_with?("'") && part.end_with?("'"))
+              part[1..-2]
+            elsif part.match?(/\A-?\d+\z/)
+              part.to_i
+            elsif part.match?(/\A-?\d+\.\d+\z/)
+              part.to_f
+            else
+              part
+            end
           end
         end
 
