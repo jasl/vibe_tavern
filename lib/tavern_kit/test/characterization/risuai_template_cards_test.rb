@@ -71,4 +71,43 @@ class RisuaiTemplateCardsTest < Minitest::Test
 
     assert_equal ["----\nDEFAULT"], blocks.map(&:content)
   end
+
+  def test_st_chat_convert
+    st = {
+      "prompts" => [
+        { "identifier" => "main", "content" => "M", "role" => "system" },
+        { "identifier" => "chatHistory", "content" => "", "role" => "system" },
+        { "identifier" => "worldInfoBefore", "content" => "", "role" => "system" },
+        { "identifier" => "charDescription", "content" => "", "role" => "system" },
+        { "identifier" => "personaDescription", "content" => "", "role" => "system" },
+        { "identifier" => "nsfw", "content" => "NSFW", "role" => "system" },
+      ],
+      "prompt_order" => [
+        {
+          "order" => [
+            { "enabled" => true, "identifier" => "main" },
+            { "enabled" => true, "identifier" => "chatHistory" },
+            { "enabled" => true, "identifier" => "worldInfoBefore" },
+            { "enabled" => true, "identifier" => "charDescription" },
+            { "enabled" => true, "identifier" => "personaDescription" },
+            { "enabled" => true, "identifier" => "nsfw" },
+          ],
+        },
+      ],
+      "assistant_prefill" => "PREFILL",
+    }
+
+    template = TavernKit::RisuAI::TemplateCards.st_chat_convert(st)
+
+    assert_equal [
+      { "type" => "plain", "type2" => "main", "text" => "M", "role" => "system" },
+      { "type" => "chat", "rangeStart" => 0, "rangeEnd" => "end" },
+      { "type" => "lorebook" },
+      { "type" => "description" },
+      { "type" => "persona" },
+      { "type" => "jailbreak", "type2" => "normal", "text" => "NSFW", "role" => "system" },
+      { "type" => "postEverything" },
+      { "type" => "plain", "type2" => "main", "text" => "{{#if {{prefill_supported}}}}PREFILL{{/if}}", "role" => "bot" },
+    ], template
+  end
 end
