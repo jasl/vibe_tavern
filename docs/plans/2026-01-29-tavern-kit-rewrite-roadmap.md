@@ -639,9 +639,29 @@ Scope updated after RisuAI source scan
 | Task | Layer | Description |
 |------|-------|-------------|
 | Unlock remaining pending characterization tests | RisuAI | RisuAI (15) |
-| Port ST Compatibility test suite | ST | 8 test files from original |
-| Port Spec Conformance tests | Core | CCv2, CCv3, ST behavior conformance |
+| Recreate ST compatibility test suite | ST | 8 test files worth of coverage (behavior-derived, not copied) |
+| Spec conformance tests | Core | CCv2 + CCv3 spec conformance and TavernKit-defined intentional divergences |
 | Integration verification | All | Ensure Rails app can work with both ST and RisuAI pipelines |
+
+##### Wave 5a Execution Plan (Test Taxonomy + Guardrails)
+
+**Test taxonomy (to avoid “跑偏”):**
+
+- **Conformance tests** (normative): prove we implement *a written spec* correctly.
+  - Example: CCv2/CCv3 parsing/export invariants, BYAF/CHARX safety limits, known enum/value coercions.
+  - Location suggestion: `lib/tavern_kit/test/conformance/`.
+- **Characterization tests** (descriptive): lock down behavior observed in ST/RisuAI, without copying their fixtures/tests.
+  - Location: `lib/tavern_kit/test/characterization/` (already in use).
+  - Each contract test must state which upstream function(s) it was derived from (file + function name).
+- **Integration tests** (end-to-end): exercise “real” pipelines from build inputs to provider messages (dialects),
+  including trimming and warnings/trace surfaces.
+  - Location suggestion: `lib/tavern_kit/test/integration/`.
+
+**Regression guardrails (run continuously during Wave 5):**
+
+- `cd lib/tavern_kit && bundle exec rake test:guardrails`
+  - Runs Wave 4 contract tests + ST characterization tests (fast subset).
+  - Must stay green before each Wave 5 commit.
 
 #### 5b. RisuAI CBS Macro Engine
 

@@ -10,6 +10,19 @@ Minitest::TestTask.create do |t|
   t.framework = %(require_relative "./test/test_helper")
 end
 
+Minitest::TestTask.create(:guardrails) do |t|
+  t.framework = %(require_relative "./test/test_helper")
+  t.test_globs = [
+    "test/characterization/wave4_*_contract_test.rb",
+    "test/characterization/st_*_test.rb",
+  ]
+end
+
+namespace :test do
+  # Alias to align with the main app's `rake test:*` conventions.
+  task guardrails: :guardrails
+end
+
 require "rubocop/rake_task"
 
 RuboCop::RakeTask.new
