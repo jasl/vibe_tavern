@@ -12,8 +12,6 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_basic_escapes
-    pending!("CBS escape tokens and pure blocks")
-
     assert_equal "{{", render("{{bo}}")
     assert_equal "}}", render("{{bc}}")
     assert_equal "{", render("{{decbo}}")
@@ -23,8 +21,8 @@ class RisuaiCbsTest < Minitest::Test
 
     assert_equal "abc", render("{{#pure}}  abc  {{/}}")
     assert_equal "\\{\\{x\\}\\}", render("{{#puredisplay}}{{x}}{{/}}")
-    assert_equal "x", render("{{#escape}}{x}{{/}}")
-    assert_equal "{x}", render("{{#escape::keep}}{x}{{/}}")
+    assert_equal "{x}", render("{{#escape}}{x}{{/}}")
+    assert_equal "\n{x}\n", render("{{#escape::keep}}\n{x}\n{{/}}")
   end
 
   def test_if_and_when_blocks

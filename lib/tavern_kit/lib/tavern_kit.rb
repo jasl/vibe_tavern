@@ -93,6 +93,8 @@ require_relative "tavern_kit/silly_tavern/lore/timed_effects"
 require_relative "tavern_kit/silly_tavern/lore/world_info_importer"
 require_relative "tavern_kit/silly_tavern/build"
 
+require_relative "tavern_kit/risu_ai"
+
 module TavernKit
   class << self
     # Parse a character from a Hash (e.g. JSON.parse result).
