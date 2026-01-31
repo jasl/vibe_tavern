@@ -26,8 +26,6 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_if_and_when_blocks
-    pending!("CBS #if/#when semantics and else handling")
-
     assert_equal "ok", render("{{#if 1}}ok{{/}}")
     assert_equal "", render("{{#if 0}}ok{{/}}")
     assert_equal "a", render("{{#when::1}}a{{:else}}b{{/}}")
