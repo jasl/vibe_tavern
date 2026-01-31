@@ -231,4 +231,19 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "NaN", render("{{roll::2d0}}")
     assert_equal "NaN", render("{{roll::abc}}")
   end
+
+  def test_metadata_macros_are_app_injected
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (metadata/iserror)
+
+    assert_equal "gpt-4o", render("{{metadata::modelName}}", metadata: { "modelname" => "gpt-4o" })
+    assert_equal "1", render("{{metadata::mobile}}", metadata: { "mobile" => true })
+    assert_equal "0", render("{{metadata::node}}", metadata: { "node" => false })
+    assert_equal "{\"a\":1}", render("{{metadata::obj}}", metadata: { "obj" => { a: 1 } })
+
+    err = render("{{metadata::unknown_key}}", metadata: {})
+    assert_match(/\AError:/, err)
+    assert_equal "1", render("{{iserror::#{err}}}")
+    assert_equal "0", render("{{iserror::ok}}")
+  end
 end

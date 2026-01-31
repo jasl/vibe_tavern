@@ -28,6 +28,7 @@ module TavernKit
             dialect: ctx.dialect,
             model_hint: ctx[:model_hint],
             toggles: risu[:toggles],
+            metadata: risu[:metadata],
             run_var: run_var,
             rm_var: rm_var,
             rng_word: rng_word,

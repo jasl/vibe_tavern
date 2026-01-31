@@ -28,6 +28,10 @@ module TavernKit
             resolve_model(environment)
           when "role"
             resolve_role(environment)
+          when "metadata"
+            resolve_metadata(args, environment: environment)
+          when "iserror"
+            resolve_iserror(args)
           when "getvar"
             resolve_getvar(args, environment: environment)
           when "setvar"
@@ -172,6 +176,33 @@ module TavernKit
           role.nil? ? "null" : role.to_s
         end
         private_class_method :resolve_role
+
+        def resolve_metadata(args, environment:)
+          key_raw = args[0].to_s
+          key = normalize_name(key_raw)
+
+          metadata =
+            if environment.respond_to?(:metadata)
+              environment.metadata
+            else
+              nil
+            end
+
+          unless metadata.is_a?(Hash) && metadata.key?(key)
+            return "Error: #{key_raw} is not a valid metadata key."
+          end
+
+          value = metadata[key]
+          return value ? "1" : "0" if value == true || value == false
+
+          value.is_a?(Hash) || value.is_a?(Array) ? ::JSON.generate(value) : value.to_s
+        end
+        private_class_method :resolve_metadata
+
+        def resolve_iserror(args)
+          args[0].to_s.downcase.start_with?("error:") ? "1" : "0"
+        end
+        private_class_method :resolve_iserror
 
         def resolve_getvar(args, environment:)
           name = args[0].to_s

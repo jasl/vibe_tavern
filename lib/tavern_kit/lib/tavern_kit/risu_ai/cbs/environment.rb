@@ -4,7 +4,7 @@ module TavernKit
   module RisuAI
     module CBS
       class Environment < TavernKit::Macro::Environment::Base
-        attr_reader :character, :user, :chat_index, :message_index, :dialect, :model_hint, :role, :rng_word, :run_var, :rm_var
+        attr_reader :character, :user, :chat_index, :message_index, :dialect, :model_hint, :role, :rng_word, :metadata, :run_var, :rm_var
 
         def self.build(**kwargs)
           new(**kwargs)
@@ -19,6 +19,7 @@ module TavernKit
           model_hint: nil,
           role: nil,
           rng_word: nil,
+          metadata: nil,
           variables: nil,
           toggles: nil,
           run_var: nil,
@@ -33,6 +34,7 @@ module TavernKit
           @model_hint = model_hint.to_s
           @role = role
           @rng_word = rng_word.to_s
+          @metadata = metadata.is_a?(Hash) ? metadata : {}
 
           @variables = variables
           @toggles = toggles.is_a?(Hash) ? toggles : {}
@@ -61,6 +63,7 @@ module TavernKit
             model_hint: @model_hint,
             role: @role,
             rng_word: @rng_word,
+            metadata: @metadata,
             variables: @variables,
             toggles: @toggles,
             run_var: @run_var,
