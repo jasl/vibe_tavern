@@ -23,20 +23,18 @@ class RisuaiRegexScriptsTest < Minitest::Test
   end
 
   def test_move_top_and_move_bottom
-    pending!("@@move_top / @@move_bottom directives")
-
     scripts = [
       { in: "dragon", out: "@@move_top DRAGON", type: "editoutput" },
       { in: "knight", out: "@@move_bottom KNIGHT", type: "editoutput" },
     ]
 
     result = TavernKit::RisuAI::RegexScripts.apply(
-      "dragon meets knight",
+      "dragon|knight",
       scripts,
       mode: "editoutput"
     )
 
-    assert_equal "DRAGON\ndragon meets knight\nKNIGHT", result
+    assert_equal "DRAGON\n|\nKNIGHT", result
   end
 
   def test_repeat_back
