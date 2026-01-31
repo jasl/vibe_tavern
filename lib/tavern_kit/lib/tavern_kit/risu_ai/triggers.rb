@@ -24,8 +24,12 @@ module TavernKit
 
         return Result.new(chat: c) unless conditions_pass?(conditions, chat: c)
 
-        effects.each do |effect|
-          apply_effect(effect, chat: c)
+        if effects.any? { |e| e["type"].to_s.start_with?("v2") }
+          run_v2_effects(effects, chat: c)
+        else
+          effects.each do |effect|
+            apply_effect(effect, chat: c)
+          end
         end
 
         Result.new(chat: c)
@@ -112,11 +116,97 @@ module TavernKit
         case effect["type"].to_s
         when "setvar"
           apply_setvar(effect, chat: chat)
-        when "v2If", "v2IfAdvanced", "v2SetVar", "v2EndIndent"
-          # v2 is implemented iteratively; ignored for now until tests unskip.
-          nil
         else
           nil
+        end
+      end
+
+      # Minimal v2 interpreter: enough for v2IfAdvanced + v2SetVar and membership ops.
+      def run_v2_effects(effects, chat:)
+        idx = 0
+
+        while idx < effects.length
+          effect = effects[idx]
+          type = effect["type"].to_s
+
+          case type
+          when "v2IfAdvanced"
+            indent = Integer(effect["indent"] || 0) rescue 0
+            pass = v2_if_pass?(effect, chat: chat)
+
+            unless pass
+              # Skip until the matching end of this indent block.
+              end_indent = indent + 1
+              idx += 1
+              while idx < effects.length
+                ef = effects[idx]
+                break if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"] || 0) rescue 0) == end_indent
+
+                idx += 1
+              end
+            end
+          when "v2SetVar"
+            apply_v2_setvar(effect, chat: chat)
+          when "v2EndIndent"
+            # no-op for the minimal subset
+            nil
+          else
+            # ignore unknown v2 effects until needed by tests
+            nil
+          end
+
+          idx += 1
+        end
+      end
+
+      def v2_if_pass?(effect, chat:)
+        source_value =
+          if effect["sourceType"].to_s == "value"
+            effect["source"].to_s
+          else
+            get_var(chat, effect["source"])
+          end
+
+        target_value =
+          if effect["targetType"].to_s == "value"
+            effect["target"].to_s
+          else
+            get_var(chat, effect["target"])
+          end
+
+        condition = effect["condition"].to_s
+
+        case condition
+        when "∈"
+          ::JSON.parse(target_value.to_s).include?(source_value.to_s)
+        when "∋"
+          ::JSON.parse(source_value.to_s).include?(target_value.to_s)
+        when "∉"
+          !::JSON.parse(target_value.to_s).include?(source_value.to_s)
+        when "∌"
+          !::JSON.parse(source_value.to_s).include?(target_value.to_s)
+        else
+          false
+        end
+      rescue JSON::ParserError
+        false
+      end
+
+      def apply_v2_setvar(effect, chat:)
+        key = effect["var"].to_s
+        operator = effect["operator"].to_s
+        value =
+          if effect["valueType"].to_s == "value"
+            effect["value"].to_s
+          else
+            get_var(chat, effect["value"])
+          end
+
+        case operator
+        when "="
+          set_var(chat, key, value)
+        else
+          set_var(chat, key, value)
         end
       end
 

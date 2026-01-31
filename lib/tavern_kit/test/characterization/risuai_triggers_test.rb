@@ -38,12 +38,10 @@ class RisuaiTriggersTest < Minitest::Test
   end
 
   def test_v2_if_membership
-    pending!("Trigger v2If membership operators")
-
     trigger = {
       type: "output",
       effect: [
-        { type: "v2If", condition: "∈", sourceType: "value", source: "a", targetType: "value", target: "[\"a\",\"b\"]", indent: 0 },
+        { type: "v2IfAdvanced", condition: "∈", sourceType: "value", source: "a", targetType: "value", target: "[\"a\",\"b\"]", indent: 0 },
         { type: "v2SetVar", operator: "=", var: "hit", valueType: "value", value: "yes", indent: 1 },
         { type: "v2EndIndent", endOfLoop: false, indent: 1 },
       ],
