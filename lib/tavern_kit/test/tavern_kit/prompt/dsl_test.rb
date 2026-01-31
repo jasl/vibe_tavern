@@ -144,6 +144,14 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     assert_equal "value", dsl.context.macro_vars[:myvar]
   end
 
+  def test_dsl_meta_sets_context_metadata
+    pipeline = simple_pipeline
+    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl.meta(:chat_index, 123)
+
+    assert_equal 123, dsl.context[:chat_index]
+  end
+
   def test_tavern_kit_build_requires_pipeline
     assert_raises(ArgumentError) do
       TavernKit.build(pipeline: nil) { message "Hello!" }

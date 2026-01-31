@@ -178,6 +178,15 @@ module TavernKit
         self
       end
 
+      # Set arbitrary context metadata (escape hatch for platform layers).
+      #
+      # Prefer first-class DSL methods when available; use metadata only for
+      # platform-specific runtime fields.
+      def meta(key, value)
+        @context[key] = value
+        self
+      end
+
       # Set the debug instrumenter (typically nil in production).
       def instrumenter(instrumenter)
         @context.instrumenter = instrumenter
