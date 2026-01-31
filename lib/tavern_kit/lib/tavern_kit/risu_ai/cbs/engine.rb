@@ -592,12 +592,12 @@ module TavernKit
           when "cbr" then "\\n"
           else
             parts =
-              if tok.include?("::")
-                tok.split("::")
-              elsif tok.include?(":")
-                tok.split(":")
+              if expanded_raw.include?("::")
+                expanded_raw.split("::")
+              elsif expanded_raw.include?(":")
+                expanded_raw.split(":")
               else
-                [tok]
+                [expanded_raw]
               end
             if parts.any?
               name = parts[0].to_s

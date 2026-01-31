@@ -44,10 +44,18 @@ module TavernKit
             resolve_contains(args)
           when "replace"
             resolve_replace(args)
+          when "split"
+            resolve_split(args)
+          when "join"
+            resolve_join(args)
+          when "spread"
+            resolve_spread(args)
           when "trim"
             resolve_trim(args)
           when "length"
             resolve_length(args)
+          when "arraylength"
+            resolve_arraylength(args)
           when "lower"
             resolve_lower(args)
           when "upper"
@@ -217,6 +225,25 @@ module TavernKit
         end
         private_class_method :resolve_replace
 
+        def resolve_split(args)
+          delimiter = args[1].to_s
+          make_array(args[0].to_s.split(delimiter))
+        end
+        private_class_method :resolve_split
+
+        def resolve_join(args)
+          list = parse_cbs_array(args[0])
+          delimiter = args[1].to_s
+          list.map { |v| v.is_a?(String) ? v : ::JSON.generate(v) }.join(delimiter)
+        end
+        private_class_method :resolve_join
+
+        def resolve_spread(args)
+          list = parse_cbs_array(args[0])
+          list.map { |v| v.is_a?(String) ? v : ::JSON.generate(v) }.join("::")
+        end
+        private_class_method :resolve_spread
+
         def resolve_trim(args)
           args[0].to_s.strip
         end
@@ -226,6 +253,11 @@ module TavernKit
           args[0].to_s.length.to_s
         end
         private_class_method :resolve_length
+
+        def resolve_arraylength(args)
+          parse_cbs_array(args[0]).length.to_s
+        end
+        private_class_method :resolve_arraylength
 
         def resolve_lower(args)
           args[0].to_s.downcase
@@ -303,6 +335,29 @@ module TavernKit
           "NaN"
         end
         private_class_method :parse_js_number
+
+        def parse_cbs_array(value)
+          s = value.to_s
+
+          begin
+            arr = ::JSON.parse(s)
+            return arr if arr.is_a?(Array)
+          rescue ::JSON::ParserError
+            nil
+          end
+
+          s.split("§")
+        end
+        private_class_method :parse_cbs_array
+
+        def make_array(array)
+          ::JSON.generate(
+            Array(array).map do |v|
+              v.is_a?(String) ? v.gsub("::", "\\u003A\\u003A") : v
+            end,
+          )
+        end
+        private_class_method :make_array
 
         def run_var?(environment)
           environment.respond_to?(:run_var) && environment.run_var == true

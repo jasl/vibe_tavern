@@ -133,6 +133,11 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "0", render("{{contains::Hello World::x}}")
 
     assert_equal "Hell0 W0rld", render("{{replace::Hello World::o::0}}")
+    assert_equal "[\"apple\",\"banana\",\"cherry\"]", render("{{split::apple,banana,cherry::,}}")
+    assert_equal "apple, banana", render("{{join::[\"apple\",\"banana\"]::, }}")
+    assert_equal "a::b::c", render("{{spread::[\"a\",\"b\",\"c\"]}}")
+    assert_equal "3", render("{{arraylength::[\"a\",\"b\",\"c\"]}}")
+    assert_equal "3", render("{{arraylength::a\u00A7b\u00A7c}}")
     assert_equal "hello world", render("{{trim::  hello world  }}")
     assert_equal "5", render("{{length::Hello}}")
     assert_equal "hello world", render("{{lower::Hello WORLD}}")
