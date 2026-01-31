@@ -146,4 +146,74 @@ class TavernKit::SillyTavern::Middleware::PlanAssemblyTest < Minitest::Test
     assert_equal "IMP Bob", ctx.blocks.last.content
     assert_equal :impersonation_prompt, ctx.blocks.last.metadata[:source]
   end
+
+  def test_names_behavior_none_drops_message_names
+    preset = TavernKit::SillyTavern::Preset.new(names_behavior: :none)
+
+    blocks = [
+      TavernKit::Prompt::Block.new(role: :assistant, name: "Alice", content: "A", slot: :chat_history, token_budget_group: :history, removable: true),
+    ]
+
+    ctx = base_ctx(preset: preset, blocks: blocks)
+    run_plan_assembly(ctx)
+
+    assert_nil ctx.blocks.first.name
+    assert_equal "A", ctx.blocks.first.content
+  end
+
+  def test_names_behavior_default_prefixes_non_user_names_in_group_chats
+    preset = TavernKit::SillyTavern::Preset.new(names_behavior: :default)
+
+    blocks = [
+      TavernKit::Prompt::Block.new(role: :user, name: "Bob", content: "U", slot: :chat_history, token_budget_group: :history, removable: true),
+      TavernKit::Prompt::Block.new(role: :assistant, name: "Alice", content: "A", slot: :chat_history, token_budget_group: :history, removable: true),
+    ]
+
+    ctx = base_ctx(preset: preset, blocks: blocks, group: { members: [] })
+    run_plan_assembly(ctx)
+
+    assert_nil ctx.blocks[0].name
+    assert_equal "U", ctx.blocks[0].content
+
+    assert_nil ctx.blocks[1].name
+    assert_equal "Alice: A", ctx.blocks[1].content
+  end
+
+  def test_names_behavior_content_prefixes_any_named_non_system_message
+    preset = TavernKit::SillyTavern::Preset.new(names_behavior: :content)
+
+    blocks = [
+      TavernKit::Prompt::Block.new(role: :user, name: "Bob", content: "U", slot: :chat_history, token_budget_group: :history, removable: true),
+      TavernKit::Prompt::Block.new(role: :assistant, name: "Alice", content: "A", slot: :chat_history, token_budget_group: :history, removable: true),
+    ]
+
+    ctx = base_ctx(preset: preset, blocks: blocks)
+    run_plan_assembly(ctx)
+
+    assert_nil ctx.blocks[0].name
+    assert_equal "Bob: U", ctx.blocks[0].content
+
+    assert_nil ctx.blocks[1].name
+    assert_equal "Alice: A", ctx.blocks[1].content
+  end
+
+  def test_names_behavior_completion_sanitizes_names_and_keeps_name_field
+    preset = TavernKit::SillyTavern::Preset.new(names_behavior: :completion, continue_prefill: true)
+
+    ctx = base_ctx(preset: preset, blocks: [], generation_type: :continue)
+    ctx[:st_continue_prefill_block] = TavernKit::Prompt::Block.new(
+      role: :assistant,
+      name: "Alice Smith",
+      content: "A",
+      slot: :chat_history,
+      token_budget_group: :history,
+      removable: true,
+    )
+
+    run_plan_assembly(ctx)
+
+    assert_equal 1, ctx.blocks.size
+    assert_equal "Alice_Smith", ctx.blocks.first.name
+    assert_equal "A", ctx.blocks.first.content
+  end
 end

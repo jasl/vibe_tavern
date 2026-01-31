@@ -50,6 +50,8 @@ module TavernKit
             )
           end
 
+          blocks = apply_names_behavior(blocks, ctx)
+
           ctx.blocks = blocks
 
           ctx.plan = TavernKit::Prompt::Plan.new(
@@ -246,6 +248,60 @@ module TavernKit
             end
 
           TavernKit::SillyTavern::Macro::V2Engine.new(registry: registry)
+        end
+
+        def apply_names_behavior(blocks, ctx)
+          behavior = ctx.preset&.names_behavior
+          behavior = TavernKit::SillyTavern::Preset::NamesBehavior.coerce(behavior)
+
+          user_name = ctx.user&.name.to_s
+          group_chat = !ctx.group.nil?
+
+          Array(blocks).map do |block|
+            name = block.name.to_s.strip
+            next block if name.empty?
+            next block if block.role == :system
+            next block if block.role == :tool
+            next block if block.role == :function
+
+            case behavior
+            when TavernKit::SillyTavern::Preset::NamesBehavior::NONE
+              block.with(name: nil)
+            when TavernKit::SillyTavern::Preset::NamesBehavior::CONTENT
+              block.with(content: prefix_name(block.content, name), name: nil)
+            when TavernKit::SillyTavern::Preset::NamesBehavior::COMPLETION
+              sanitized = sanitize_message_name(name)
+              sanitized.empty? ? block.with(name: nil) : block.with(name: sanitized)
+            else
+              # DEFAULT behavior:
+              # - in group chats, prefix non-user names into content
+              # - always drop name field for chat completion payloads
+              if group_chat && name != user_name
+                block.with(content: prefix_name(block.content, name), name: nil)
+              else
+                block.with(name: nil)
+              end
+            end
+          end
+        end
+
+        def prefix_name(content, name)
+          prefix = "#{name.strip}: "
+          str = content.to_s
+          str.start_with?(prefix) ? str : "#{prefix}#{str}"
+        end
+
+        def sanitize_message_name(name)
+          raw = name.to_s.strip
+          return "" if raw.empty?
+
+          # OpenAI name constraints are strict; keep this sanitizer simple and
+          # deterministic (ST uses promptManager.sanitizeName()).
+          raw
+            .gsub(/\s+/, "_")
+            .gsub(/[^a-zA-Z0-9_-]/, "_")
+            .gsub(/_+/, "_")
+            .slice(0, 64)
         end
 
         def text_dialect?(ctx)
