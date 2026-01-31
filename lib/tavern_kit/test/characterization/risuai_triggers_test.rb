@@ -23,8 +23,6 @@ class RisuaiTriggersTest < Minitest::Test
   end
 
   def test_condition_exists_modes
-    pending!("Trigger exists condition strict/loose/regex")
-
     trigger = {
       type: "output",
       conditions: [{ type: "exists", value: "Dragon", type2: "loose", depth: 2 }],
