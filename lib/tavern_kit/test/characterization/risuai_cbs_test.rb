@@ -40,10 +40,13 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_function_and_call
-    pending!("CBS #func and call:: expansion")
-
     input = "{{#func greet who}}Hello {{arg::1}}{{/}}{{call::greet::world}}"
     assert_equal "Hello world", render(input)
+  end
+
+  def test_call_stack_limit
+    input = "{{#func loop}}{{call::loop}}{{/}}{{call::loop}}"
+    assert_equal "ERROR: Call stack limit reached", render(input)
   end
 
   def test_calc_expression

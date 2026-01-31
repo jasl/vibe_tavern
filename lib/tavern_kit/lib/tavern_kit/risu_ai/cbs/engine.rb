@@ -13,14 +13,17 @@ module TavernKit
         BLOCK_END_TOKEN = "/"
 
         def expand(text, environment:)
-          # CBS is tolerant by default: malformed/unknown tokens are preserved.
-          out, = expand_stream(text.to_s, 0, environment: environment, stop_on_end: false)
-          out
+          # Per-parse state (mirrors upstream): functions persist across nested
+          # call:: expansions, but reset for each top-level render.
+          @functions = {}
+          @call_stack = 0
+
+          expand_with_call_stack(text.to_s, environment: environment)
         end
 
         private
 
-        Block = Struct.new(:type, :mode, :keep, :expr, keyword_init: true)
+        Block = Struct.new(:type, :mode, :keep, :expr, :args, keyword_init: true)
 
         def expand_stream(str, index, environment:, stop_on_end:)
           out = +""
@@ -89,6 +92,13 @@ module TavernKit
             inner_raw, next_i, ended = read_raw_until_close(str, inner_start)
             return unless ended
             return [eval_each(block, inner_raw, environment: environment), next_i]
+          when :func
+            inner_raw, next_i, ended = read_raw_until_close(str, inner_start)
+            return unless ended
+
+            func_name = block.expr.to_s
+            @functions[func_name] = inner_raw.strip unless func_name.empty?
+            return ["", next_i]
           when :parse, :ifpure, :newif, :newif_falsy
             inner_eval, next_i, ended = expand_stream(str, inner_start, environment: environment, stop_on_end: true)
             return unless ended
@@ -119,6 +129,16 @@ module TavernKit
 
             rest = rest.delete_prefix("as ").strip if rest.start_with?("as ")
             return Block.new(type: :each, mode: mode, expr: rest)
+          end
+
+          if name.start_with?("func")
+            parts = name.split
+            return nil if parts.length < 2
+
+            func_name = parts[1].to_s
+            return nil if func_name.empty?
+
+            return Block.new(type: :func, expr: func_name, args: parts.drop(2))
           end
 
           if name.start_with?("if_pure ")
@@ -327,6 +347,16 @@ module TavernKit
           end
         end
 
+        def expand_with_call_stack(str, environment:)
+          @call_stack += 1
+          return "ERROR: Call stack limit reached" if @call_stack > 20
+
+          out, = expand_stream(str, 0, environment: environment, stop_on_end: false)
+          out
+        ensure
+          @call_stack -= 1
+        end
+
         # Raw-mode parsing: nested block openers increment a counter so the next
         # close tag is treated as literal (prevents premature closing).
         def read_raw_until_close(str, index)
@@ -438,6 +468,11 @@ module TavernKit
         end
 
         def expand_tag(raw, token:, environment:)
+          if token.start_with?("call::")
+            rendered = expand_call(token, environment: environment)
+            return rendered if rendered
+          end
+
           case token
           when "bo" then "{{"
           when "bc" then "}}"
@@ -449,6 +484,22 @@ module TavernKit
             # Unknown tokens are preserved as-is for later expansion stages.
             "{{#{raw}}}"
           end
+        end
+
+        def expand_call(token, environment:)
+          parts = token.split("::").drop(1)
+          return nil if parts.empty?
+
+          func_name = parts[0].to_s
+          body = @functions[func_name]
+          return nil unless body
+
+          data = body.dup
+          parts.each_with_index do |value, idx|
+            data = data.gsub("{{arg::#{idx}}}", value.to_s)
+          end
+
+          expand_with_call_stack(data, environment: environment)
         end
       end
     end
