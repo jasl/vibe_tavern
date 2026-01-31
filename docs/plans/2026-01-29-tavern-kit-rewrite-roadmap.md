@@ -912,6 +912,7 @@ reviews after the major feature work is complete.
 | Task | Layer | Description |
 |------|-------|-------------|
 | API consistency pass | All | Naming, option shapes, error semantics (warn vs raise), and deprecations |
+| Store unification decision | Core | Revisit variable/state storage API naming + shape (ChatVariables vs Store). Evaluate whether ST vars/globalvars and RisuAI metadata should be represented as scoped Stores, and clarify lifecycles/persistence + replacement rules |
 | Performance pass | Core | Token estimation hot paths, avoid expensive debug work unless instrumenter is enabled |
 | Trace + fingerprint review | Core | Ensure trace contains enough to reproduce “why this prompt” decisions; confirm fingerprint stability for caching |
 | Large-file split pass | ST | Split `SillyTavern::Lore::Engine` and `SillyTavern::Macro::V2Engine` into internal helpers to meet the 800 LOC guideline, without behavior changes |
