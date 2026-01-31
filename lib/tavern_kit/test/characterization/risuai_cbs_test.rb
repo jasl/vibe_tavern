@@ -196,4 +196,39 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "gpt-4o", render("{{model}}", model_hint: "gpt-4o")
     assert_equal "assistant", render("{{role}}", role: :assistant)
   end
+
+  def test_nondeterministic_rng_macros
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (random/randint/dice/roll)
+
+    v = Float(render("{{random}}"))
+    assert_operator v, :>=, 0
+    assert_operator v, :<, 1
+
+    # Deterministic assertion: all candidates are identical.
+    assert_equal "a", render("{{random::a,a,a}}")
+
+    randint = Integer(render("{{randint::1::10}}"))
+    assert_operator randint, :>=, 1
+    assert_operator randint, :<=, 10
+    assert_equal "NaN", render("{{randint::a::10}}")
+
+    dice = Integer(render("{{dice::2d6}}"))
+    assert_operator dice, :>=, 2
+    assert_operator dice, :<=, 12
+    assert_equal "NaN", render("{{dice::ad6}}")
+
+    roll = Integer(render("{{roll::2d6}}"))
+    assert_operator roll, :>=, 2
+    assert_operator roll, :<=, 12
+
+    d20 = Integer(render("{{roll::20}}"))
+    assert_operator d20, :>=, 1
+    assert_operator d20, :<=, 20
+
+    assert_equal "1", render("{{roll}}")
+    assert_equal "NaN", render("{{roll::0d6}}")
+    assert_equal "NaN", render("{{roll::2d0}}")
+    assert_equal "NaN", render("{{roll::abc}}")
+  end
 end

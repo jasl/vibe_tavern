@@ -66,6 +66,14 @@ module TavernKit
             resolve_hash(args)
           when "pick"
             resolve_pick(args, environment: environment)
+          when "random"
+            resolve_random(args)
+          when "randint"
+            resolve_randint(args)
+          when "dice"
+            resolve_dice(args)
+          when "roll"
+            resolve_roll(args)
           when "rollp", "rollpick"
             resolve_rollp(args, environment: environment)
           when "arrayelement"
@@ -324,6 +332,65 @@ module TavernKit
           random_pick_impl(args, rand: rand)
         end
         private_class_method :resolve_pick
+
+        def resolve_random(args)
+          random_pick_impl(args, rand: Random.rand)
+        end
+        private_class_method :resolve_random
+
+        def resolve_randint(args)
+          min = parse_js_number(args[0])
+          max = parse_js_number(args[1])
+          return "NaN" if min.is_a?(String) || max.is_a?(String)
+
+          format_number((Random.rand * (max - min + 1)).floor + min)
+        rescue StandardError
+          "NaN"
+        end
+        private_class_method :resolve_randint
+
+        def resolve_dice(args)
+          notation = args[0].to_s.split("d")
+          num = parse_js_number(notation[0])
+          sides = parse_js_number(notation[1])
+          return "NaN" if num.is_a?(String) || sides.is_a?(String)
+
+          count = num.ceil
+          count = 0 if count.negative?
+
+          total = 0
+          count.times { total += (Random.rand * sides).floor + 1 }
+          total.to_s
+        rescue StandardError
+          "NaN"
+        end
+        private_class_method :resolve_dice
+
+        def resolve_roll(args)
+          return "1" if args.empty?
+
+          notation = args[0].to_s.split("d")
+          num = 1.0
+          sides = 6.0
+
+          if notation.length == 2
+            num = notation[0].to_s.empty? ? 1.0 : Float(notation[0])
+            sides = notation[1].to_s.empty? ? 6.0 : Float(notation[1])
+          elsif notation.length == 1
+            sides = Float(notation[0])
+          end
+
+          return "NaN" if num.nan? || sides.nan?
+          return "NaN" if num < 1 || sides < 1
+
+          total = 0
+          count = num.ceil
+          count.times { total += (Random.rand * sides).floor + 1 }
+          total.to_s
+        rescue ArgumentError, TypeError
+          "NaN"
+        end
+        private_class_method :resolve_roll
 
         def resolve_rollp(args, environment:)
           return "1" if args.empty?
