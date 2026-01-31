@@ -135,6 +135,16 @@ TavernKit::RisuAI (Wave 5)
 
 **No ST or RisuAI specifics leak into Core.**
 
+- **Redundancy is allowed in platform layers.** ST and RisuAI often have
+  intentionally different semantics. When behaviors diverge, we prefer
+  duplicating implementation inside `TavernKit::SillyTavern` and
+  `TavernKit::RisuAI` over sharing “almost the same” code that later forces
+  hacks or cross-regressions.
+  - Reuse Core **interfaces and primitives** (Pipeline, Lore/Macro base
+    protocols, Trimmer, TokenEstimator), not platform logic.
+  - Avoid `if platform == ...` switches inside Core; Core should be usable by
+    multiple concrete implementations without special-casing.
+
 - Exception: `Prompt::Context` is a mutable build workspace and may temporarily
   carry ST-flavored accessors for ergonomics; those should migrate into
   `ctx.metadata` as the ST/RisuAI layers land (see `docs/rewrite/core-interface-design.md`).
@@ -629,43 +639,25 @@ Special generation types override activation strategy:
 - `swipe` / `continue`: members chosen from swipe logic (last speaker), error if deleted.
 - `impersonate`: pick 1 random member.
 
-### Wave 5 -- Parity Verification & RisuAI
+### Wave 5 -- RisuAI Implementation + Parity Gate
 
 Scope updated after RisuAI source scan
 (see `docs/rewrite/risuai-alignment-delta.md`).
 
-#### 5a. Parity Verification
+Because ST and RisuAI semantics differ, Wave 5 prefers **independent platform
+implementations** over shared “almost-the-same” helpers. Redundancy is OK; avoid
+introducing hacks or cross-coupling to keep both sides passing.
 
-| Task | Layer | Description |
-|------|-------|-------------|
-| Unlock remaining pending characterization tests | RisuAI | RisuAI (15) |
-| Recreate ST compatibility test suite | ST | 8 test files worth of coverage (behavior-derived, not copied) |
-| Spec conformance tests | Core | CCv2 + CCv3 spec conformance and TavernKit-defined intentional divergences |
-| Integration verification | All | Ensure Rails app can work with both ST and RisuAI pipelines |
+**Recommended execution order (to reduce drift):**
+1. 5b → 5c → 5d (CBS Engine → Lorebook → Template Cards) -- core functionality
+2. 5e → 5f (Regex Scripts → Triggers) -- extensions
+3. 5g (Memory interface) -- contract only
+4. 5h (Parity Verification) -- final gate
 
-**Concrete worklist (Wave 5a):**
+#### 5a. Wave 5 Kickoff (Test Harness + Guardrails)
 
-- **RisuAI pending tests (15)** (already in place; unskip as modules land):
-  - `lib/tavern_kit/test/characterization/risuai_cbs_test.rb` (5)
-  - `lib/tavern_kit/test/characterization/risuai_lorebook_test.rb` (4)
-  - `lib/tavern_kit/test/characterization/risuai_regex_scripts_test.rb` (3)
-  - `lib/tavern_kit/test/characterization/risuai_triggers_test.rb` (3)
-- **ST compatibility suite (8 areas)** (behavior-derived, not copied):
-  - Entry normalization + prompt entries ordering/enable rules
-  - In-chat injection ordering (depth / reverse-depth / role effects)
-  - Macro v1/v2 deltas + variables (locals/global) + unknown macro tolerance
-  - Preset loading + computed stopping strings behavior
-  - Prompt assembly order (default + custom relative entries) + PHI positioning
-  - Scan buffer / lore scan inputs (messages + injects + outlets)
-  - Utility prompts (continue / impersonate / group nudge) + displacement rules
-  - World Info positions mapping + timed effects + forced activation hooks
-- **Conformance tests (Core)**:
-  - `lib/tavern_kit/test/conformance/ccv2_conformance_test.rb`
-  - `lib/tavern_kit/test/conformance/ccv3_conformance_test.rb`
-  - Zip safety limits for BYAF/CHARX (zip-slip/zip-bomb guardrails) (see `TavernKit::Archive::ZipReader`)
-- **Integration tests (All)**:
-  - `lib/tavern_kit/test/integration/silly_tavern_build_test.rb`
-  - RisuAI end-to-end test: character + template + lore + CBS -> plan -> dialect messages (to be written once Wave 5b-5f land)
+This sub-wave is intentionally small: it provides the scaffolding that keeps
+Wave 5 from drifting while implementing RisuAI.
 
 ##### Wave 5a Execution Plan (Test Taxonomy + Guardrails)
 
@@ -689,11 +681,19 @@ Scope updated after RisuAI source scan
 - `cd lib/tavern_kit && bundle exec rake test:conformance`
 - `cd lib/tavern_kit && bundle exec rake test:integration`
 
+**Anti-drift checklist (run after each Wave 5 step / commit):**
+- Does this follow `docs/rewrite/risuai-alignment-delta.md`?
+- Did we cite the correct upstream RisuAI source location (file + function and/or line range) in code comments/tests?
+- Did we reuse Core interfaces (`Macro::Engine::Base`, `Lore::Engine::Base`, Pipeline/Context/Trimmer)?
+- Is code style consistent with the ST layer (small files, clear naming, tolerant input handling, strict mode for tests/debug)?
+- Did we unskip and pass the relevant pending characterization tests for this step?
+- Did we avoid ST-specific concepts leaking into `TavernKit::RisuAI` (and vice versa)?
+
 #### 5b. RisuAI CBS Macro Engine
 
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
-| `RisuAI::CBS::Engine` | RisuAI | CBS parser: 10 block types (#when/#if/#each/#func/#escape/#puredisplay/#pure/#code/#if_pure/:else), 13+ #when operators (is/isnot, >/>=/</<= , and/or/not, var/toggle, vis/tis), stack-based evaluation, 10 processing modes, 20-depth call stack limit, #func/call function system, §-delimited arrays, deterministic RNG (message-index seed) | 800-1,000 |
+| `RisuAI::CBS::Engine` | RisuAI | Implements `Macro::Engine::Base` via `#expand(text, environment:)` but uses CBS-specific semantics. CBS parser: 10 block types (#when/#if/#each/#func/#escape/#puredisplay/#pure/#code/#if_pure/:else), 13+ #when operators (is/isnot, >/>=/</<= , and/or/not, var/toggle, vis/tis), stack-based evaluation, 10 processing modes, 20-depth call stack limit, #func/call function system, §-delimited arrays, deterministic RNG (message-index seed) | 800-1,000 |
 | `RisuAI::CBS::Macros` | RisuAI | 130+ built-in macros with aliases (character/user 8, chat history 8, time/date 10, system 14, variables 8, math 14, strings 11, arrays 10, dicts 4, logic 11, unicode 7, media 13, crypto 3, modules 3, escapes 10, aggregates 4, misc 15+), math expression engine (calc, {{? expr}}), metadata introspection (15+ keys) | 600-800 |
 
 #### 5c. RisuAI Lorebook
@@ -774,10 +774,49 @@ available.
 - Memory: interface compliance tests (mock adapter), block injection, budget participation
 - End-to-end: character + RisuAI template + lore + CBS macros -> plan -> messages
 
-**Deliverable:** All characterization tests passing. Full ST + RisuAI spec
-parity verified. Rails integration verified. `TavernKit::RisuAI.build()`
-runs end-to-end with CBS macros, decorator-driven lorebook, regex scripts,
-and triggers all operational.
+#### 5h. Parity Verification (Final Gate)
+
+This is the Wave 5 “stop the line” gate. Run it only after 5b-5g are landed.
+
+| Task | Layer | Description |
+|------|-------|-------------|
+| Unlock remaining pending characterization tests | RisuAI | RisuAI (15) |
+| Recreate ST compatibility test suite | ST | 8 areas worth of coverage (behavior-derived, not copied) |
+| Spec conformance tests | Core | CCv2 + CCv3 spec conformance and TavernKit-defined intentional divergences |
+| Integration verification | All | Ensure downstream Rails app can work with both ST and RisuAI pipelines |
+
+**Concrete worklist (Wave 5h):**
+
+- **RisuAI pending tests (15)** (already in place; unskip as modules land):
+  - `lib/tavern_kit/test/characterization/risuai_cbs_test.rb` (5)
+  - `lib/tavern_kit/test/characterization/risuai_lorebook_test.rb` (4)
+  - `lib/tavern_kit/test/characterization/risuai_regex_scripts_test.rb` (3)
+  - `lib/tavern_kit/test/characterization/risuai_triggers_test.rb` (3)
+- **ST compatibility suite (8 areas)** (behavior-derived, not copied):
+  - Entry normalization + prompt entries ordering/enable rules
+  - In-chat injection ordering (depth / reverse-depth / role effects)
+  - Macro v1/v2 deltas + variables (locals/global) + unknown macro tolerance
+  - Preset loading + computed stopping strings behavior
+  - Prompt assembly order (default + custom relative entries) + PHI positioning
+  - Scan buffer / lore scan inputs (messages + injects + outlets)
+  - Utility prompts (continue / impersonate / group nudge) + displacement rules
+  - World Info positions mapping + timed effects + forced activation hooks
+- **Conformance tests (Core)**:
+  - `lib/tavern_kit/test/conformance/ccv2_conformance_test.rb`
+  - `lib/tavern_kit/test/conformance/ccv3_conformance_test.rb`
+  - Zip safety limits for BYAF/CHARX (zip-slip/zip-bomb guardrails) (see `TavernKit::Archive::ZipReader`)
+- **Integration tests (All)**:
+  - `lib/tavern_kit/test/integration/silly_tavern_build_test.rb`
+  - RisuAI end-to-end test: character + template + lore + CBS -> plan -> dialect messages
+
+**Gate commands:**
+- `cd lib/tavern_kit && bundle exec rake test`
+- `cd lib/tavern_kit && bundle exec rake test:guardrails test:conformance test:integration`
+
+**Deliverable:** All Wave 5 characterization tests passing (no skips for
+implemented modules). Full ST + RisuAI parity verified. Rails integration
+verified. `TavernKit::RisuAI.build()` runs end-to-end with CBS macros,
+decorator-driven lorebook, regex scripts, and triggers all operational.
 
 #### Deferred / Out of Scope (This Batch)
 
