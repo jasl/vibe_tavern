@@ -680,6 +680,7 @@ Wave 5 from drifting while implementing RisuAI.
   - Must stay green before each Wave 5 commit.
 - `cd lib/tavern_kit && bundle exec rake test:conformance`
 - `cd lib/tavern_kit && bundle exec rake test:integration`
+- `cd lib/tavern_kit && bundle exec rake test:risuai`
 
 **Anti-drift checklist (run after each Wave 5 step / commit):**
 - Does this follow `docs/rewrite/risuai-alignment-delta.md`?
@@ -695,11 +696,13 @@ Wave 5 from drifting while implementing RisuAI.
 |--------|-------|-------------|----------|
 | `RisuAI::CBS::Engine` | RisuAI | Implements `Macro::Engine::Base` via `#expand(text, environment:)` but uses CBS-specific semantics. CBS parser: 10 block types (#when/#if/#each/#func/#escape/#puredisplay/#pure/#code/#if_pure/:else), 13+ #when operators (is/isnot, >/>=/</<= , and/or/not, var/toggle, vis/tis), stack-based evaluation, 10 processing modes, 20-depth call stack limit, #func/call function system, §-delimited arrays, deterministic RNG (message-index seed) | 800-1,000 |
 | `RisuAI::CBS::Macros` | RisuAI | 130+ built-in macros with aliases (character/user 8, chat history 8, time/date 10, system 14, variables 8, math 14, strings 11, arrays 10, dicts 4, logic 11, unicode 7, media 13, crypto 3, modules 3, escapes 10, aggregates 4, misc 15+), math expression engine (calc, {{? expr}}), metadata introspection (15+ keys) | 600-800 |
+| `RisuAI::CBS::Environment` | RisuAI | Implements `Macro::Environment::Base` for CBS evaluation. Manages variable scopes (`:local/:global` + RisuAI-only `:temp/:function_arg`) without changing Core behavior. Integrates with Core `ChatVariables` for persisted scopes and uses in-memory storage for ephemeral scopes. | 120-180 |
 
 #### 5c. RisuAI Lorebook
 
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
+| `RisuAI::Lore::ScanInput` | RisuAI | Subclass/parameter object for `Lore::Engine::Base#scan`, carrying RisuAI-specific scan config (depth, recursion flags, decorator-driven injection ops, etc.) while keeping Core contract stable. | 80-120 |
 | `RisuAI::Lore::Engine` | RisuAI | Iterative activation loop with recursive scanning, keyword matching (full-word/partial/regex), selective AND logic, token budget with priority sorting, injection graph (4 ops: append/prepend/replace/inject_at), lore sources (character + chat + module), `@ignore_on_max_context` (priority -1000), `@keep/@dont_activate_after_match` via chat vars | 400-500 |
 | `RisuAI::Lore::DecoratorParser` | RisuAI | 30+ decorators parsed via CCardLib.decorator.parse(): @depth/@reverse_depth, @role, @position (pt_*,after_desc,before_desc,personality,scenario), @scan_depth, @priority, @activate/@dont_activate, @activate_only_after/@activate_only_every, @is_greeting, @probability, @additional_keys/@exclude_keys/@exclude_keys_all, @match_full_word/@match_partial_word, @recursive/@unrecursive/@no_recursive_search, @inject_lore/@inject_at/@inject_replace/@inject_prepend, @ignore_on_max_context, @disable_ui_prompt | 250-300 |
 

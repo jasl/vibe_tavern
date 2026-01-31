@@ -32,11 +32,20 @@ Minitest::TestTask.create(:integration) do |t|
   ]
 end
 
+Minitest::TestTask.create(:risuai) do |t|
+  t.framework = %(require_relative "./test/test_helper")
+  t.test_globs = [
+    "test/characterization/risuai_*_test.rb",
+    "test/integration/risuai_*_test.rb",
+  ]
+end
+
 namespace :test do
   # Alias to align with the main app's `rake test:*` conventions.
   task guardrails: :guardrails
   task conformance: :conformance
   task integration: :integration
+  task risuai: :risuai
 end
 
 require "rubocop/rake_task"
