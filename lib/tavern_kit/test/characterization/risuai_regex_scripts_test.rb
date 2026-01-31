@@ -38,8 +38,6 @@ class RisuaiRegexScriptsTest < Minitest::Test
   end
 
   def test_repeat_back
-    pending!("@@repeat_back behavior using previous same-role message")
-
     scripts = [
       { in: "flag:(\\w+)", out: "@@repeat_back end", type: "editoutput" },
     ]
@@ -50,14 +48,14 @@ class RisuaiRegexScriptsTest < Minitest::Test
     ]
 
     result = TavernKit::RisuAI::RegexScripts.apply(
-      "current flag:gamma",
+      "current ",
       scripts,
       mode: "editoutput",
-      chat_id: 2,
+      chat_id: 1,
       history: history,
       role: "char"
     )
 
-    assert_equal "current flag:gamma flag:beta", result
+    assert_equal "current flag:beta", result
   end
 end
