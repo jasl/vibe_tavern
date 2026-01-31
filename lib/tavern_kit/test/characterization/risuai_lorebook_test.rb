@@ -20,7 +20,7 @@ class RisuaiLorebookTest < Minitest::Test
     }
     messages = ["The red dragon sleeps."]
 
-    result = TavernKit::Risuai::Lorebook.match(
+    result = TavernKit::RisuAI::Lorebook.match(
       messages,
       [lore],
       full_word_matching: true,
@@ -44,7 +44,7 @@ class RisuaiLorebookTest < Minitest::Test
     }
     messages = ["A dragon appears."]
 
-    result = TavernKit::Risuai::Lorebook.match(
+    result = TavernKit::RisuAI::Lorebook.match(
       messages,
       [lore],
       scan_depth: 5
@@ -67,7 +67,7 @@ class RisuaiLorebookTest < Minitest::Test
     }
     messages = ["A DRAGOON appears."]
 
-    result = TavernKit::Risuai::Lorebook.match(
+    result = TavernKit::RisuAI::Lorebook.match(
       messages,
       [lore],
       scan_depth: 5
@@ -97,7 +97,7 @@ class RisuaiLorebookTest < Minitest::Test
     ]
     messages = ["dragon"]
 
-    result = TavernKit::Risuai::Lorebook.match(messages, lores, scan_depth: 5)
+    result = TavernKit::RisuAI::Lorebook.match(messages, lores, scan_depth: 5)
 
     assert_includes result.prompts, "L-DEPTH"
     assert_includes result.prompts, "L-INJECT"

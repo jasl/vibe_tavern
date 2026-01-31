@@ -4,7 +4,7 @@ require "test_helper"
 
 class RisuaiCbsTest < Minitest::Test
   def render(text, **context)
-    TavernKit::Risuai::CBS.render(text, **context)
+    TavernKit::RisuAI::CBS.render(text, **context)
   end
 
   def pending!(reason)

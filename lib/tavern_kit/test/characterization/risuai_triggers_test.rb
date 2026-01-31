@@ -16,7 +16,7 @@ class RisuaiTriggersTest < Minitest::Test
       effect: [{ type: "setvar", var: "hit", value: "yes", operator: "=" }],
     }
 
-    result = TavernKit::Risuai::Triggers.run(
+    result = TavernKit::RisuAI::Triggers.run(
       trigger,
       chat: { scriptstate: { "$flag" => "1" }, message: [] }
     )
@@ -33,7 +33,7 @@ class RisuaiTriggersTest < Minitest::Test
       effect: [{ type: "setvar", var: "hit", value: "yes", operator: "=" }],
     }
 
-    result = TavernKit::Risuai::Triggers.run(
+    result = TavernKit::RisuAI::Triggers.run(
       trigger,
       chat: { message: [{ data: "a dragon" }, { data: "sleeps" }] }
     )
@@ -53,7 +53,7 @@ class RisuaiTriggersTest < Minitest::Test
       ],
     }
 
-    result = TavernKit::Risuai::Triggers.run(
+    result = TavernKit::RisuAI::Triggers.run(
       trigger,
       chat: { scriptstate: {}, message: [] }
     )

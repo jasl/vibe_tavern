@@ -15,7 +15,7 @@ class RisuaiRegexScriptsTest < Minitest::Test
       { in: "a", out: "B", type: "editinput", flag: "", ableFlag: true },
     ]
 
-    result = TavernKit::Risuai::RegexScripts.apply(
+    result = TavernKit::RisuAI::RegexScripts.apply(
       "a",
       scripts,
       mode: "editinput"
@@ -32,7 +32,7 @@ class RisuaiRegexScriptsTest < Minitest::Test
       { in: "knight", out: "@@move_bottom KNIGHT", type: "editoutput" },
     ]
 
-    result = TavernKit::Risuai::RegexScripts.apply(
+    result = TavernKit::RisuAI::RegexScripts.apply(
       "dragon meets knight",
       scripts,
       mode: "editoutput"
@@ -53,7 +53,7 @@ class RisuaiRegexScriptsTest < Minitest::Test
       { role: "char", data: "flag:beta" },
     ]
 
-    result = TavernKit::Risuai::RegexScripts.apply(
+    result = TavernKit::RisuAI::RegexScripts.apply(
       "current flag:gamma",
       scripts,
       mode: "editoutput",
