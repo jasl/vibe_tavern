@@ -8,8 +8,6 @@ class RisuaiRegexScriptsTest < Minitest::Test
   end
 
   def test_ordering_and_flags
-    pending!("Regex scripts ordered by <order N> and sanitized flags")
-
     scripts = [
       { in: "a", out: "A", type: "editinput", flag: "<order 10>", ableFlag: true },
       { in: "a", out: "B", type: "editinput", flag: "", ableFlag: true },

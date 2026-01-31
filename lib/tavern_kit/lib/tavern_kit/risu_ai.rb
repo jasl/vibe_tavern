@@ -2,6 +2,7 @@
 
 require_relative "risu_ai/cbs"
 require_relative "risu_ai/lorebook"
+require_relative "risu_ai/regex_scripts"
 
 module TavernKit
   # RisuAI platform layer (Wave 5+).
