@@ -695,6 +695,9 @@ Wave 5 from drifting while implementing RisuAI.
 **RisuAI runtime contract (to avoid hidden coupling):**
 - RisuAI-specific runtime state should be passed via `ctx[:risuai]` (a Hash),
   never by modifying Core internals.
+- Canonical form: **snake_case symbol keys** (e.g. `chat_index:`). The pipeline
+  normalizes string/camelCase keys once at Stage 1 so later stages can rely on
+  the canonical form.
 - Recommended shape (all optional unless stated):
   - `chat_index` (Integer) -- stable per chat; used for deterministic RNG seeds.
   - `message_index` (Integer) -- stable within chat; used for metadata macros.

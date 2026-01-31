@@ -11,10 +11,10 @@ module TavernKit
           ctx.blocks ||= []
 
           risu = ctx[:risuai].is_a?(Hash) ? ctx[:risuai] : {}
-          chat_index = (risu[:chat_index] || risu["chat_index"] || 0).to_i
-          message_index = (risu[:message_index] || risu["message_index"] || inferred_message_index(ctx)).to_i
-          run_var_raw = risu[:run_var] || risu["run_var"] || risu[:runVar] || risu["runVar"]
-          rm_var_raw = risu[:rm_var] || risu["rm_var"] || risu[:rmVar] || risu["rmVar"]
+          chat_index = risu.fetch(:chat_index, 0).to_i
+          message_index = risu.fetch(:message_index, inferred_message_index(ctx)).to_i
+          run_var_raw = risu.key?(:run_var) ? risu[:run_var] : nil
+          rm_var_raw = risu.key?(:rm_var) ? risu[:rm_var] : nil
           run_var = run_var_raw.nil? ? true : TavernKit::Coerce.bool(run_var_raw, default: false)
           rm_var = rm_var_raw.nil? ? false : TavernKit::Coerce.bool(rm_var_raw, default: false)
 
@@ -26,7 +26,7 @@ module TavernKit
             variables: ctx.variables_store,
             dialect: ctx.dialect,
             model_hint: ctx[:model_hint],
-            toggles: (risu[:toggles] || risu["toggles"]),
+            toggles: risu[:toggles],
             run_var: run_var,
             rm_var: rm_var,
           )

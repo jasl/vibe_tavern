@@ -13,6 +13,8 @@ module TavernKit
         private
 
         def before(ctx)
+          normalize_risuai_runtime!(ctx)
+
           ctx.token_estimator ||= TavernKit::TokenEstimator.default
           ctx.variables_store ||= TavernKit::ChatVariables::InMemory.new
 
@@ -43,6 +45,22 @@ module TavernKit
 
           ctx[:risuai_template] = template
           ctx[:risuai_groups] = groups
+        end
+
+        # Normalize `ctx[:risuai]` once at the pipeline entrypoint so downstream
+        # middlewares can rely on canonical snake_case symbol keys.
+        def normalize_risuai_runtime!(ctx)
+          raw = ctx[:risuai]
+          ctx[:risuai] = normalize_risuai_hash(raw)
+        end
+
+        def normalize_risuai_hash(value)
+          h = value.is_a?(Hash) ? value : {}
+
+          h.each_with_object({}) do |(key, val), out|
+            canonical = TavernKit::Utils.underscore(key).to_sym
+            out[canonical] = val
+          end
         end
 
         def extract_prompt_template(preset)

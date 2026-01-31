@@ -17,7 +17,7 @@ module TavernKit
           return unless scripts.is_a?(Array) && scripts.any?
 
           risu = ctx[:risuai].is_a?(Hash) ? ctx[:risuai] : {}
-          chat_id = (risu[:chat_index] || risu["chat_index"] || -1).to_i
+          chat_id = risu.fetch(:chat_index, -1).to_i
 
           history = TavernKit::ChatHistory.wrap(ctx.history).to_a
           history_hashes = history.map { |m| { role: m.role.to_s, data: m.content.to_s } }
