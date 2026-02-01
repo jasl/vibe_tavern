@@ -10,9 +10,9 @@ module TavernKit
     class Runtime < TavernKit::Runtime::Base
       TYPE = :risuai
 
-      def self.build(raw, context: nil, strict: false, chat_vars: nil, id: nil)
+      def self.build(raw, context: nil, strict: false, id: nil)
         data = normalize(raw, context: context, strict: strict)
-        runtime = new(data, type: TYPE, id: id, chat_vars: chat_vars)
+        runtime = new(data, type: TYPE, id: id)
         runtime.validate!(strict: strict)
         runtime
       end

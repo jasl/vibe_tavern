@@ -169,15 +169,15 @@ module TavernKit
         self
       end
 
-      # Convenience setter for chat variables (application injection).
-      def set_chat_var(name, value, scope: :local)
-        @context.set_chat_var(name, value, scope: scope)
+      # Convenience setter for variables store (application injection).
+      def set_variable(name, value, scope: :local)
+        @context.set_variable(name, value, scope: scope)
         self
       end
 
-      # Convenience multi-set for chat variables (application injection).
-      def set_chat_vars(hash, scope: :local)
-        @context.set_chat_vars(hash, scope: scope)
+      # Convenience multi-set for variables store (application injection).
+      def set_variables(hash, scope: :local)
+        @context.set_variables(hash, scope: scope)
         self
       end
 

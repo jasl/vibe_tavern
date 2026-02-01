@@ -152,17 +152,17 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     assert_equal 123, dsl.context[:chat_index]
   end
 
-  def test_dsl_chat_variables_helpers
+  def test_dsl_variables_store_helpers
     pipeline = simple_pipeline
     dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
 
-    dsl.set_chat_var("x", "1")
+    dsl.set_variable("x", "1")
     assert_kind_of TavernKit::VariablesStore::InMemory, dsl.context.variables_store
     assert_equal "1", dsl.context.variables_store.get("x", scope: :local)
 
     store = TavernKit::VariablesStore::InMemory.new
     dsl.variables_store(store)
-    dsl.set_chat_vars({ y: 2 }, scope: :global)
+    dsl.set_variables({ y: 2 }, scope: :global)
     assert_same store, dsl.context.variables_store
     assert_equal 2, store.get("y", scope: :global)
   end

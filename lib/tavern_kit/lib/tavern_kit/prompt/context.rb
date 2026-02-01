@@ -245,14 +245,14 @@ module TavernKit
         @variables_store ||= TavernKit::VariablesStore::InMemory.new
       end
 
-      # Convenience setter for chat variables (application injection).
-      def set_chat_var(name, value, scope: :local)
+      # Convenience setter for variables store (application injection).
+      def set_variable(name, value, scope: :local)
         variables_store!.set(name, value, scope: scope)
         self
       end
 
-      # Convenience multi-set for chat variables (application injection).
-      def set_chat_vars(hash, scope: :local)
+      # Convenience multi-set for variables store (application injection).
+      def set_variables(hash, scope: :local)
         hash = hash.is_a?(Hash) ? hash : {}
         vars = variables_store!
         hash.each { |k, v| vars.set(k, v, scope: scope) }

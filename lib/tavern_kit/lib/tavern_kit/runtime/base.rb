@@ -9,7 +9,7 @@ module TavernKit
     # toggles). It is intentionally separate from Prompt::Context, which is
     # per-build working memory.
     class Base
-      attr_reader :type, :id, :chat_vars
+      attr_reader :type, :id
 
       def self.build(raw, **kwargs)
         new(normalize(raw, **kwargs), **kwargs)
@@ -28,10 +28,9 @@ module TavernKit
       end
       private_class_method :normalize_hash_keys
 
-      def initialize(data = {}, type: nil, id: nil, chat_vars: nil, **_kwargs)
+      def initialize(data = {}, type: nil, id: nil, **_kwargs)
         @type = type&.to_sym
         @id = id&.to_s
-        @chat_vars = chat_vars
         @data = data.is_a?(Hash) ? data : {}
       end
 
