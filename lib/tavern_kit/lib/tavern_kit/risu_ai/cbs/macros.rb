@@ -245,6 +245,8 @@ module TavernKit
             resolve_reverse(name, args)
           when "comment"
             resolve_comment(args, environment: environment)
+          when "file"
+            resolve_file(args, environment: environment)
           when "tex", "latex", "katex"
             resolve_tex(args)
           when "ruby", "furigana"

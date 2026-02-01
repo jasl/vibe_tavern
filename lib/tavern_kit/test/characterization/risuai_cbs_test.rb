@@ -183,6 +183,16 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "ERROR: Call stack limit reached", render(input)
   end
 
+  def test_file_and_comment_display_mode
+    encoded = Base64.strict_encode64("hello")
+
+    assert_equal "hello", render("{{file::name.txt::#{encoded}}}")
+    assert_equal "<br><div class=\"risu-file\">name.txt</div><br>", render("{{file::name.txt::#{encoded}}}", displaying: true)
+
+    assert_equal "", render("{{comment::hi}}")
+    assert_equal "<div class=\"risu-comment\">hi</div>", render("{{comment::hi}}", displaying: true)
+  end
+
   def test_calc_expression
     assert_equal "7", render("{{? 1 + 2 * 3}}")
     assert_equal "1", render("{{? 3 > 2}}")

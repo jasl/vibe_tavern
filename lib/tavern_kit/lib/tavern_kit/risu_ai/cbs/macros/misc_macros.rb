@@ -1,10 +1,29 @@
 # frozen_string_literal: true
 
+require "base64"
+
 module TavernKit
   module RisuAI
     module CBS
       module Macros
         module_function
+
+        def resolve_file(args, environment:)
+          # Upstream reference:
+          # resources/Risuai/src/ts/cbs.ts (file)
+          return "" if args.empty?
+
+          if environment.respond_to?(:displaying) && environment.displaying == true
+            name = args[0].to_s
+            return %(<br><div class="risu-file">#{name}</div><br>)
+          end
+
+          encoded = args[1].to_s
+          Base64.decode64(encoded).force_encoding(Encoding::UTF_8).scrub
+        rescue StandardError
+          ""
+        end
+        private_class_method :resolve_file
 
         def resolve_calc(args, environment:)
           expr = args[0].to_s
