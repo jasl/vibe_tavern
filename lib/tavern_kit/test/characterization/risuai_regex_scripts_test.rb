@@ -121,4 +121,24 @@ class RisuaiRegexScriptsTest < Minitest::Test
       ),
     )
   end
+
+  def test_emo_and_inject_directives_are_tolerant_and_do_not_pollute_output
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/scripts.ts (@@emo / @@inject)
+
+    scripts = [
+      { in: "X", out: "@@emo smile", type: "editoutput" },
+    ]
+    assert_equal "aXb", TavernKit::RisuAI::RegexScripts.apply("aXb", scripts, mode: "editoutput")
+
+    inject = [
+      { in: "X", out: "@@inject", type: "editoutput" },
+    ]
+
+    # Without chat context, TavernKit treats @@inject as a no-op (tolerant).
+    assert_equal "aXbX", TavernKit::RisuAI::RegexScripts.apply("aXbX", inject, mode: "editoutput")
+
+    # With chat_id, mirror the upstream "remove match from data" behavior.
+    assert_equal "ab", TavernKit::RisuAI::RegexScripts.apply("aXbX", inject, mode: "editoutput", chat_id: 0)
+  end
 end

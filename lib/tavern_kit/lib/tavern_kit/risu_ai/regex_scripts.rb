@@ -90,6 +90,20 @@ module TavernKit
 
         if out_script.start_with?("@@") || actions.any?
           if regex.match?(data)
+            # UI-only directive in upstream: does not modify the message text.
+            if out_script.start_with?("@@emo ")
+              return data
+            end
+
+            # Upstream mutates the underlying chat message when chatID is known.
+            # TavernKit stays prompt-building focused, so we only apply the text
+            # removal behavior and treat missing chat_id as a no-op (tolerant).
+            if out_script.start_with?("@@inject") || actions.include?("inject")
+              return data if chat_id == -1
+
+              return replace_data(data, regex, "", global: flags.include?("g"))
+            end
+
             if out_script.start_with?("@@move_top") || out_script.start_with?("@@move_bottom") ||
                actions.include?("move_top") || actions.include?("move_bottom")
               return apply_move(data, regex, out_script: out_script, flags: flags, actions: actions)
