@@ -206,17 +206,19 @@ module TavernKit
 
         def resolve_getvar(args, environment:)
           name = args[0].to_s
-          environment.get_var(name, scope: :local).to_s
+          value = environment.get_var(name, scope: :local)
+          value.nil? ? "null" : value.to_s
         rescue NotImplementedError
-          ""
+          "null"
         end
         private_class_method :resolve_getvar
 
         def resolve_getglobalvar(args, environment:)
           name = args[0].to_s
-          environment.get_var(name, scope: :global).to_s
+          value = environment.get_var(name, scope: :global)
+          value.nil? ? "null" : value.to_s
         rescue NotImplementedError
-          ""
+          "null"
         end
         private_class_method :resolve_getglobalvar
 
@@ -239,8 +241,9 @@ module TavernKit
 
           name = args[0].to_s
           value = args[1].to_s
-          current = environment.get_var(name, scope: :local).to_s
-          environment.set_var(name, value, scope: :local) if current.empty?
+          current = environment.get_var(name, scope: :local)
+          current_s = current.nil? ? "null" : current.to_s
+          environment.set_var(name, value, scope: :local) if current_s.empty?
           ""
         rescue NotImplementedError
           ""
@@ -254,8 +257,10 @@ module TavernKit
           name = args[0].to_s
           delta = args[1].to_s
 
-          current = environment.get_var(name, scope: :local).to_s
-          sum = current.to_f + delta.to_f
+          current = environment.get_var(name, scope: :local)
+          current_s = current.nil? ? "null" : current.to_s
+
+          sum = js_number(current_s) + js_number(delta)
           environment.set_var(name, format_number(sum), scope: :local)
           ""
         rescue NotImplementedError
@@ -663,6 +668,16 @@ module TavernKit
           (v.to_f % 1).zero? ? v.to_i.to_s : v.to_f.to_s
         end
         private_class_method :format_number
+
+        def js_number(value)
+          s = value.to_s
+          return 0.0 if s.strip.empty?
+
+          Float(s)
+        rescue ArgumentError, TypeError
+          Float::NAN
+        end
+        private_class_method :js_number
       end
     end
   end

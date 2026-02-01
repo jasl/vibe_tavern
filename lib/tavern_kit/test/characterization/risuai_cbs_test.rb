@@ -113,6 +113,25 @@ class RisuaiCbsTest < Minitest::Test
     assert_nil store2.get("flag", scope: :local)
   end
 
+  def test_missing_chat_variables_return_null_and_match_upstream_edge_cases
+    # Upstream reference:
+    # resources/Risuai/src/ts/parser/chatVar.svelte.ts (getChatVar/getGlobalChatVar)
+    # resources/Risuai/src/ts/cbs.ts (setdefaultvar/addvar)
+
+    store = TavernKit::ChatVariables::InMemory.new
+
+    assert_equal "null", render("{{getvar::missing}}", variables: store)
+    assert_equal "null", render("{{getglobalvar::missing}}", variables: store)
+
+    # Upstream quirk: setdefaultvar checks `if(!getChatVar(name))`, but getChatVar
+    # returns the string "null" for missing variables (truthy in JS). Therefore
+    # missing variables do NOT get defaulted by this macro.
+    assert_equal "null", render("{{setdefaultvar::x::999}}{{getvar::x}}", variables: store, run_var: true)
+
+    # Upstream: addvar uses Number(getChatVar(name)). Number("null") => NaN.
+    assert_equal "NaN", render("{{addvar::y::2}}{{getvar::y}}", variables: store, run_var: true)
+  end
+
   def test_call_stack_limit
     input = "{{#func loop}}{{call::loop}}{{/}}{{call::loop}}"
     assert_equal "ERROR: Call stack limit reached", render(input)

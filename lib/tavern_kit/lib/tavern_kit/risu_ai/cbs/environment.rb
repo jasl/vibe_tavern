@@ -78,22 +78,22 @@ module TavernKit
 
           if scope == :global && key.start_with?("toggle_")
             toggle_name = key.delete_prefix("toggle_")
-            return @toggles[toggle_name] || @toggles[key]
+            value = @toggles[toggle_name] || @toggles[key]
+            return "null" if value.nil?
+            return value.to_s
           end
 
           case scope
           when :local, :global
-            return nil unless @variables
+            return "null" unless @variables&.respond_to?(:get)
 
-            if @variables.respond_to?(:get)
-              @variables.get(key, scope: scope)
-            else
-              nil
-            end
+            value = @variables.get(key, scope: scope)
+            return "null" if value.nil?
+            value.to_s
           when :temp
-            @temp_vars[key]
+            @temp_vars[key] || ""
           when :function_arg
-            @function_arg_vars[key]
+            @function_arg_vars[key] || ""
           else
             nil
           end
