@@ -36,7 +36,7 @@ its own configuration parsing.
 |-----------|------|-----------------|
 | Macro/CBS Engine | **High** | `#expand(text, vars)` too narrow; needs `environment:` parameter object |
 | Lore Engine | **Medium-High** | `#scan(text, books:, budget:)` too narrow; needs `ScanInput` parameter object |
-| ChatVariables | **Medium** | Missing `temp`/`function_arg` scopes for RisuAI |
+| Store | **Medium** | Missing `temp`/`function_arg` scopes for RisuAI |
 | Prompt::Block | **Low** | Implemented in Core: flexible role/points/groups + `removable` flag |
 | Prompt::Message | **Low** | Implemented in Core: `attachments`/`metadata` passthrough fields |
 | Trimmer | **Low** | Needs pluggable strategy (`:group_order` vs `:priority`) |
@@ -233,7 +233,7 @@ end
 ### 2. Lore::Engine::Base
 
 Accepts a `ScanInput` parameter object instead of positional arguments. ST
-passes scan_context + timed_state; RisuAI passes chat_variables + message_index
+passes scan_context + timed_state; RisuAI passes store + message_index
 + recursive flag.
 
 ```ruby
@@ -264,7 +264,7 @@ end
 | Platform | ScanInput Extensions |
 |----------|---------------------|
 | ST | `scan_context` (persona/desc/personality/depth_prompt/scenario/creator_notes), `scan_injects` (Author's Note + extension prompts), `trigger` (generation type), `timed_state`, `character_filter`, `forced_activations`, `min_activations`, `min_activations_depth_max` |
-| RisuAI | `chat_variables`, `message_index`, `recursive_scanning`, `greeting_index` |
+| RisuAI | `store`, `message_index`, `recursive_scanning`, `greeting_index` |
 
 ---
 
@@ -288,14 +288,14 @@ Minimal shared schema + `extensions` Hash for platform-specific fields:
 
 ---
 
-### 4. ChatVariables::Base
+### 4. Store::Base
 
 Adds `scope:` parameter. Core guarantees `:local` and `:global`; RisuAI extends
 with `:temp` and `:function_arg`.
 
 ```ruby
 module TavernKit
-  class ChatVariables::Base
+  class Store::Base
     CORE_SCOPES = %i[local global].freeze
 
     def get(name, scope: :local) = raise NotImplementedError
@@ -978,7 +978,7 @@ end
 | P0 | `Macro::Engine::Base` + `Environment::Base` | Wave 2 |
 | P0 | `Lore::Engine::Base` + `ScanInput` | Wave 2 |
 | P1 | `ChatHistory::Base` + message contract | Wave 2 |
-| P1 | `ChatVariables::Base` scope parameter | Wave 2 |
+| P1 | `Store::Base` scope parameter | Wave 2 |
 | P1 | `Block` validation relaxation | Done (2026-01-29) |
 | P1 | `Prompt::Message` multimodal/metadata scaffolding | Done (2026-01-29) |
 | P1 | `Prompt::Trace` + instrumentation hooks | Wave 2 |
