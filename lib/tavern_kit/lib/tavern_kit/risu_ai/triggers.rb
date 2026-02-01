@@ -1126,6 +1126,143 @@ module TavernKit
                 set_var(chat, output_var, "0", local_vars: local_vars, current_indent: current_indent)
               end
             end
+          when "v2GetLastMessage"
+            messages = Array(chat[:message])
+            last = messages.last
+            data = last.is_a?(Hash) ? last[:data].to_s : nil
+            set_var(chat, effect["outputVar"], data.nil? ? "null" : data, local_vars: local_vars, current_indent: current_indent)
+          when "v2GetMessageAtIndex"
+            raw_index =
+              if effect["indexType"].to_s == "value"
+                effect["index"].to_s
+              else
+                get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            index = safe_float(raw_index)
+            messages = Array(chat[:message])
+            msg =
+              if index.nan? || index.infinite? || !(index % 1).zero? || index.negative?
+                nil
+              else
+                messages[index.to_i]
+              end
+
+            data = msg.is_a?(Hash) ? msg[:data].to_s : nil
+            set_var(chat, effect["outputVar"], data.nil? ? "null" : data, local_vars: local_vars, current_indent: current_indent)
+          when "v2GetMessageCount"
+            set_var(chat, effect["outputVar"], Array(chat[:message]).length.to_s, local_vars: local_vars, current_indent: current_indent)
+          when "v2CutChat"
+            raw_start =
+              if effect["startType"].to_s == "value"
+                effect["start"].to_s
+              else
+                get_var(chat, effect["start"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            raw_end =
+              if effect["endType"].to_s == "value"
+                effect["end"].to_s
+              else
+                get_var(chat, effect["end"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            messages = Array(chat[:message])
+            len = messages.length
+
+            start = safe_float(raw_start)
+            end_v = safe_float(raw_end)
+
+            start_i = start.nan? ? 0 : js_slice_index(start, len)
+            end_i = end_v.nan? ? len : js_slice_index(end_v, len)
+
+            chat[:message] = messages[start_i...end_i] || []
+          when "v2ModifyChat"
+            raw_index =
+              if effect["indexType"].to_s == "value"
+                effect["index"].to_s
+              else
+                get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            index = safe_float(raw_index)
+            messages = Array(chat[:message])
+
+            if !index.nan? && !index.infinite? && (index % 1).zero? && index >= 0
+              i = index.to_i
+              if (msg = messages[i]).is_a?(Hash)
+                msg[:data] = value
+                messages[i] = msg
+                chat[:message] = messages
+              end
+            end
+          when "v2SystemPrompt"
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            apply_systemprompt({ "location" => effect["location"], "value" => value }, chat: chat)
+          when "v2Impersonate"
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            apply_impersonate({ "role" => effect["role"], "value" => value }, chat: chat)
+          when "v2QuickSearchChat"
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            depth_raw =
+              if effect["depthType"].to_s == "value"
+                effect["depth"].to_s
+              else
+                get_var(chat, effect["depth"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            depth = safe_float(depth_raw)
+            output_var = effect["outputVar"].to_s
+            if depth.nan?
+              set_var(chat, output_var, "0", local_vars: local_vars, current_indent: current_indent)
+            else
+              messages = Array(chat[:message])
+              slice_start = js_slice_index(-depth, messages.length)
+              da = (messages[slice_start..] || []).map { |m| m.is_a?(Hash) ? m[:data].to_s : m.to_s }.join(" ")
+
+              pass =
+                case effect["condition"].to_s
+                when "strict"
+                  da.split(" ").include?(value)
+                when "loose"
+                  da.downcase.include?(value.downcase)
+                when "regex"
+                  begin
+                    Regexp.new(value).match?(da)
+                  rescue RegexpError
+                    false
+                  end
+                else
+                  false
+                end
+
+              set_var(chat, output_var, pass ? "1" : "0", local_vars: local_vars, current_indent: current_indent)
+            end
           when "v2ConsoleLog"
             source =
               if effect["sourceType"].to_s == "value"
@@ -1341,6 +1478,22 @@ module TavernKit
         Float(s)
       rescue ArgumentError, TypeError
         Float::NAN
+      end
+
+      # JS Array#slice index conversion (ToIntegerOrInfinity + bounds clamp).
+      def js_slice_index(value, len)
+        num = value.is_a?(Numeric) ? value.to_f : safe_float(value)
+        inf = num.infinite?
+        idx = inf ? (inf.positive? ? len : 0) : num.truncate
+
+        if idx.negative?
+          idx += len
+          idx = 0 if idx.negative?
+        elsif idx > len
+          idx = len
+        end
+
+        idx
       end
 
       # Format a Float like JS `Number(...).toString()`:

@@ -807,4 +807,65 @@ class RisuaiTriggersTest < Minitest::Test
     result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
     assert_equal "{\"k\":\"v\"}", result2.chat[:scriptstate]["$d"]
   end
+
+  def test_v2_chat_operations_and_quick_search
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2GetLastMessage/v2GetMessageAtIndex/v2GetMessageCount/v2CutChat/v2ModifyChat/v2QuickSearchChat)
+
+    chat = {
+      scriptstate: {},
+      message: [
+        { role: "user", data: "hello dragon" },
+        { role: "char", data: "hi" },
+        { role: "user", data: "bye" },
+      ],
+    }
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2GetMessageCount", outputVar: "count", indent: 0 },
+        { type: "v2GetLastMessage", outputVar: "last", indent: 0 },
+        { type: "v2GetMessageAtIndex", indexType: "value", index: "0", outputVar: "m0", indent: 0 },
+        { type: "v2QuickSearchChat", valueType: "value", value: "dragon", condition: "loose", depthType: "value", depth: "2", outputVar: "has2", indent: 0 },
+        { type: "v2QuickSearchChat", valueType: "value", value: "dragon", condition: "loose", depthType: "value", depth: "3", outputVar: "has3", indent: 0 },
+        { type: "v2QuickSearchChat", valueType: "value", value: "dragon", condition: "loose", depthType: "value", depth: "Infinity", outputVar: "has_inf", indent: 0 },
+        { type: "v2QuickSearchChat", valueType: "value", value: "dragon", condition: "loose", depthType: "value", depth: "-Infinity", outputVar: "has_neg_inf", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: chat)
+    assert_equal "3", result.chat[:scriptstate]["$count"]
+    assert_equal "bye", result.chat[:scriptstate]["$last"]
+    assert_equal "hello dragon", result.chat[:scriptstate]["$m0"]
+    assert_equal "0", result.chat[:scriptstate]["$has2"]
+    assert_equal "1", result.chat[:scriptstate]["$has3"]
+    assert_equal "1", result.chat[:scriptstate]["$has_inf"]
+    assert_equal "0", result.chat[:scriptstate]["$has_neg_inf"]
+
+    trigger2 = {
+      type: "output",
+      effect: [
+        { type: "v2CutChat", startType: "value", start: "1", endType: "value", end: "3", indent: 0 },
+        { type: "v2ModifyChat", indexType: "value", index: "0", valueType: "value", value: "HI", indent: 0 },
+        { type: "v2Impersonate", role: "user", valueType: "value", value: "X", indent: 0 },
+        { type: "v2SystemPrompt", location: "start", valueType: "value", value: "SYS", indent: 0 },
+      ],
+    }
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: chat)
+    assert_equal ["HI", "bye", "X"], result2.chat[:message].map { |m| m[:data] }
+    assert_equal "SYS\n\n", result2.chat[:additional_sys_prompt][:start]
+
+    trigger3 = {
+      type: "output",
+      effect: [
+        { type: "v2CutChat", startType: "value", start: "Infinity", endType: "value", end: "3", indent: 0 },
+        { type: "v2GetMessageCount", outputVar: "count", indent: 0 },
+      ],
+    }
+
+    result3 = TavernKit::RisuAI::Triggers.run(trigger3, chat: chat)
+    assert_equal "0", result3.chat[:scriptstate]["$count"]
+  end
 end
