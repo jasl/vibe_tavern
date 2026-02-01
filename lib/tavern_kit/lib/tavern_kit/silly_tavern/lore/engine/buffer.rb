@@ -66,13 +66,35 @@ module TavernKit
             scan_text = get(scan_entry.ext, scan_state)
             return 0 if scan_text.empty?
 
+            scan_text_downcase = case_sensitive ? nil : scan_text.downcase
+
             primary = Array(scan_entry.entry.keys)
             secondary = Array(scan_entry.entry.secondary_keys)
 
-            primary_score = primary.count { |k| Buffer.match?(scan_text, k, scan_entry, case_sensitive: case_sensitive, match_whole_words: match_whole_words) }
+            primary_score =
+              primary.count do |k|
+                Buffer.match_pre_normalized?(
+                  scan_text,
+                  scan_text_downcase,
+                  k,
+                  scan_entry,
+                  case_sensitive: case_sensitive,
+                  match_whole_words: match_whole_words,
+                )
+              end
             return 0 if primary.empty?
 
-            secondary_score = secondary.count { |k| Buffer.match?(scan_text, k, scan_entry, case_sensitive: case_sensitive, match_whole_words: match_whole_words) }
+            secondary_score =
+              secondary.count do |k|
+                Buffer.match_pre_normalized?(
+                  scan_text,
+                  scan_text_downcase,
+                  k,
+                  scan_entry,
+                  case_sensitive: case_sensitive,
+                  match_whole_words: match_whole_words,
+                )
+              end
 
             # Only positive logic influences group scoring (ST parity).
             return primary_score if secondary.empty?
@@ -87,7 +109,11 @@ module TavernKit
             end
           end
 
-          def self.match?(haystack, needle, _scan_entry, case_sensitive:, match_whole_words:)
+          def self.match?(haystack, needle, scan_entry, case_sensitive:, match_whole_words:)
+            match_pre_normalized?(haystack, nil, needle, scan_entry, case_sensitive: case_sensitive, match_whole_words: match_whole_words)
+          end
+
+          def self.match_pre_normalized?(haystack, haystack_downcase, needle, _scan_entry, case_sensitive:, match_whole_words:)
             h = haystack.to_s
             n = needle.to_s.strip
             return false if n.empty?
@@ -99,7 +125,7 @@ module TavernKit
               hay = h
               nee = n
             else
-              hay = h.downcase
+              hay = haystack_downcase || h.downcase
               nee = n.downcase
             end
 
@@ -160,4 +186,3 @@ module TavernKit
     end
   end
 end
-

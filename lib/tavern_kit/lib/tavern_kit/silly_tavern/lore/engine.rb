@@ -69,7 +69,11 @@ module TavernKit
           return false if keys.empty?
 
           scan = text.to_s
-          primary_matched = keys.any? { |k| Buffer.match?(scan, k, nil, case_sensitive: case_sensitive, match_whole_words: match_whole_words) }
+          scan_downcase = case_sensitive ? nil : scan.downcase
+          primary_matched =
+            keys.any? do |k|
+              Buffer.match_pre_normalized?(scan, scan_downcase, k, nil, case_sensitive: case_sensitive, match_whole_words: match_whole_words)
+            end
           return false unless primary_matched
 
           selective = ha.bool(:selective, default: false)
@@ -92,7 +96,7 @@ module TavernKit
           has_all = true
 
           secondary.each do |key|
-            matched = Buffer.match?(scan, key, nil, case_sensitive: case_sensitive, match_whole_words: match_whole_words)
+            matched = Buffer.match_pre_normalized?(scan, scan_downcase, key, nil, case_sensitive: case_sensitive, match_whole_words: match_whole_words)
 
             has_any ||= matched
             has_all &&= matched
@@ -505,11 +509,20 @@ module TavernKit
         end
 
         def first_primary_match(keys, scan_text, scan_entry)
+          scan_text_downcase = case_sensitive(scan_entry) ? nil : scan_text.to_s.downcase
+
           Array(keys).find do |key|
             k = key.to_s.strip
             next false if k.empty?
 
-            Buffer.match?(scan_text, k, scan_entry, case_sensitive: case_sensitive(scan_entry), match_whole_words: match_whole_words(scan_entry))
+            Buffer.match_pre_normalized?(
+              scan_text,
+              scan_text_downcase,
+              k,
+              scan_entry,
+              case_sensitive: case_sensitive(scan_entry),
+              match_whole_words: match_whole_words(scan_entry),
+            )
           end
         end
 
@@ -521,13 +534,22 @@ module TavernKit
           secondary = Array(entry.secondary_keys).map { |k| k.to_s.strip }.reject(&:empty?)
           return true if secondary.empty?
 
+          scan_text_downcase = case_sensitive(scan_entry) ? nil : scan_text.to_s.downcase
           logic = scan_entry.ext.selective_logic
 
           has_any = false
           has_all = true
 
           secondary.each do |key|
-            matched = Buffer.match?(scan_text, key, scan_entry, case_sensitive: case_sensitive(scan_entry), match_whole_words: match_whole_words(scan_entry))
+            matched =
+              Buffer.match_pre_normalized?(
+                scan_text,
+                scan_text_downcase,
+                key,
+                scan_entry,
+                case_sensitive: case_sensitive(scan_entry),
+                match_whole_words: match_whole_words(scan_entry),
+              )
 
             has_any ||= matched
             has_all &&= matched
