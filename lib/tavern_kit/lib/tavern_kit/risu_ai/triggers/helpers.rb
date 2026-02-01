@@ -475,8 +475,8 @@ module TavernKit
         out = effect["result"].to_s
         input_var = effect["inputVar"].to_s
 
-        re = Regexp.new(pattern, regex_options(flags))
-        match = re.match(text)
+        re = TavernKit::RegexSafety.compile(pattern, options: regex_options(flags))
+        match = re ? TavernKit::RegexSafety.match(re, text) : nil
         return unless match
 
         result = out.gsub(/\$\d+/) do |m|
@@ -487,8 +487,6 @@ module TavernKit
         result = result.gsub("$$", "$")
 
         set_var(chat, input_var, result, local_vars: local_vars, current_indent: current_indent)
-      rescue RegexpError
-        nil
       end
 
       def regex_options(flags)

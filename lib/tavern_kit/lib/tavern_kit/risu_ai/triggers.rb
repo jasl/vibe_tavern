@@ -233,12 +233,11 @@ module TavernKit
         when "loose"
           da.downcase.include?(val.downcase)
         when "regex"
-          Regexp.new(val).match?(da)
+          re = TavernKit::RegexSafety.compile(val)
+          re ? TavernKit::RegexSafety.match?(re, da) : false
         else
           false
         end
-      rescue RegexpError
-        false
       end
 
       def apply_effect(effect, chat:, trigger:, triggers:, recursion_count:, local_vars:, current_indent:)

@@ -61,13 +61,8 @@ module TavernKit
           else
             get_var(chat, effect["flags"], local_vars: local_vars, current_indent: current_indent).to_s
           end
-        hit =
-          begin
-            re = Regexp.new(pattern, regex_options(flags))
-            re.match?(value) ? "1" : "0"
-          rescue RegexpError
-            "0"
-          end
+        re = TavernKit::RegexSafety.compile(pattern, options: regex_options(flags))
+        hit = re && TavernKit::RegexSafety.match?(re, value) ? "1" : "0"
 
         set_var(chat, effect["outputVar"], hit, local_vars: local_vars, current_indent: current_indent)
       end
@@ -101,8 +96,8 @@ module TavernKit
             get_var(chat, effect["result"], local_vars: local_vars, current_indent: current_indent).to_s
           end
 
-        re = Regexp.new(pattern, regex_options(flags))
-        match = re.match(value)
+        re = TavernKit::RegexSafety.compile(pattern, options: regex_options(flags))
+        match = re ? TavernKit::RegexSafety.match(re, value) : nil
 
         result =
           if match
@@ -256,16 +251,16 @@ module TavernKit
 
         parts =
           if delimiter_type == "regex"
-            begin
-              if (m = delimiter.match(%r{\A/(.+)/([gimuy]*)\z}))
-                pattern = m[1].to_s
-                flags = m[2].to_s
-                source.split(Regexp.new(pattern, regex_options(flags)))
-              else
-                source.split(Regexp.new(delimiter))
-              end
-            rescue RegexpError
+            if TavernKit::RegexSafety.input_too_large?(source)
               [source]
+            elsif (m = delimiter.match(%r{\A/(.+)/([gimuy]*)\z}))
+              pattern = m[1].to_s
+              flags = m[2].to_s
+              re = TavernKit::RegexSafety.compile(pattern, options: regex_options(flags))
+              re ? source.split(re) : [source]
+            else
+              re = TavernKit::RegexSafety.compile(delimiter)
+              re ? source.split(re) : [source]
             end
           else
             source.split(delimiter)
@@ -370,9 +365,13 @@ module TavernKit
 
         result =
           begin
-            re = Regexp.new(regex_pattern, regex_options(flags))
-            fn = ->(m) { v2_replace_string_replacement(m, result_format, replacement) }
-            flags.include?("g") ? source.gsub(re) { fn.call(Regexp.last_match) } : source.sub(re) { fn.call(Regexp.last_match) }
+            re = TavernKit::RegexSafety.compile(regex_pattern, options: regex_options(flags))
+            if re.nil? || TavernKit::RegexSafety.input_too_large?(source)
+              source
+            else
+              fn = ->(m) { v2_replace_string_replacement(m, result_format, replacement) }
+              flags.include?("g") ? source.gsub(re) { fn.call(Regexp.last_match) } : source.sub(re) { fn.call(Regexp.last_match) }
+            end
           rescue StandardError
             source
           end
@@ -411,11 +410,8 @@ module TavernKit
             when "loose"
               da.downcase.include?(value.downcase)
             when "regex"
-              begin
-                Regexp.new(value).match?(da)
-              rescue RegexpError
-                false
-              end
+              re = TavernKit::RegexSafety.compile(value)
+              re ? TavernKit::RegexSafety.match?(re, da) : false
             else
               false
             end
