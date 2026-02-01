@@ -930,34 +930,17 @@ Before declaring Wave 6 done, also run:
 | Task | Layer | Description |
 |------|-------|-------------|
 | API consistency pass | All | Naming, option shapes, error semantics (warn vs raise), and deprecations |
-| VariablesStore naming decision | Core | **DONE:** renamed Core `ChatVariables` to `VariablesStore` and standardized on `ctx.variables_store` (DSL: `variables_store(...)`). Remaining decision: whether `runtime.metadata`/toggles should become read-only Stores or stay plain Hashes |
+| VariablesStore naming decision | Core | **DONE:** standardized on `VariablesStore` (`ctx.variables_store`, DSL: `variables_store(...)`, helpers: `set_variable`/`set_variables`). Remaining decision: whether `runtime.metadata`/toggles should become read-only Stores or stay plain Hashes |
 | Performance pass | Core | Token estimation hot paths (incl. Trimmer token-estimate memoization via bounded cache), avoid expensive debug work unless instrumenter is enabled |
 | Trace + fingerprint review | Core | Ensure trace contains enough to reproduce “why this prompt” decisions; confirm fingerprint stability for caching |
 | Large-file split pass | ST + RisuAI | Split `SillyTavern::Lore::Engine`, `SillyTavern::Macro::V2Engine`, `RisuAI::CBS::Engine`, and `RisuAI::Triggers` into internal helpers to meet the 800 LOC guideline, without behavior changes |
-| Regex safety hardening | Core/ST/RisuAI | Review regex handling for ReDoS risk across the stack (JS-regex conversion caches, `Text::PatternMatcher`, RisuAI triggers/regex scripts, etc.); add timeouts/length limits for untrusted patterns, plus strict-mode error policy (tolerant default should warn and continue) |
+| Regex safety hardening | Core/ST/RisuAI | Review regex handling for ReDoS risk across the stack (JS-regex conversion caches, `Text::PatternMatcher`, RisuAI triggers/regex scripts, etc.); add basic length / input-size guardrails for untrusted patterns (no regex timeouts), plus strict-mode error policy (tolerant default should warn and continue) |
 | Extract LRU cache helper | Core | Add a small bounded LRU cache helper (no ActiveSupport dependency) and reuse it for regex compilation caches (ST regex scripts) and other hot-path bounded caches (e.g., JS-regex conversion in lore scanning) |
 | Micro-perf audit backlog | Core/ST | Consider bounded caching for regex conversions, token count memoization, lore scan pre-normalization (downcase/strip once per message), and precomputed sort keys where hot paths justify it |
 | RisuAI triggers adapters (optional) | RisuAI | If needed by downstream apps, add adapter/hooks for UI/DB effects (alerts/LLM/imggen/lorebook persistence) so TavernKit can stay prompt-building focused while still supporting parity |
 
-#### 6d. CLI / Tools
-
-| Task | Layer | Description |
-|------|-------|-------------|
-| CLI parity (optional) | ST/Core | Add `exe/tavern_kit` with the minimal “developer tools” commands used for debugging/validation (validate/extract/convert/embed cards, prompt preview, lore test). Keep fixtures hand-authored (no ST/RisuAI fixture copying). |
-
-#### 6e. UI Directives + Examples (Optional)
-
-TavernKit does not ship a UI, but downstream apps may want to implement a
-RisuAI-like “interactive chat” experience (buttons, code blocks, file cards,
-etc.). The goal of this section is to support those apps **without**
-introducing UI/HTML into model-bound prompt building.
-
-| Task | Layer | Description |
-|------|-------|-------------|
-| Display-bound parsing | RisuAI | Add a `RisuAI::UI.parse(text, runtime:, context:)` helper that runs CBS in “visualize/display” semantics, but returns `{ text:, directives: [...] }` instead of HTML. |
-| Model-bound sanitization | Core/RisuAI | Add a helper/middleware to ensure UI/HTML never enters model-bound prompt output; optionally preserve UI macro placeholders for post-processing. |
-| Runtime sync contract | Core | Document and enforce that all app-owned state (global prompts/toggles/DB-derived values) is injected via `runtime.metadata` / runtime stores. Add conformance tests to prevent “hidden DB access” regressions. |
-| Examples / PoC | All | Add hand-authored examples (not fixture copies) showing an interactive guide + VN-like branching using `directives` + runtime synchronization. |
+Note: CLI tooling and UI-directive / examples work is tracked separately in
+`docs/rewrite/backlogs.md` (out of scope for the rewrite plan).
 
 **Deliverable:** Documentation is complete and aligned with the implemented
 behavior; test suite is stable with minimal skips; APIs are consistent and
