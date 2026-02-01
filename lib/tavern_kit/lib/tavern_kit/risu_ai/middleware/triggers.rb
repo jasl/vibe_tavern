@@ -29,6 +29,8 @@ module TavernKit
             # Prefer the Core ChatVariables store as the scriptstate backend so
             # CBS/lore/triggers all share one source of truth.
             variables: ctx.variables_store,
+            token_estimator: ctx.token_estimator,
+            model_hint: ctx[:model_hint],
             scriptstate: {},
           }
 

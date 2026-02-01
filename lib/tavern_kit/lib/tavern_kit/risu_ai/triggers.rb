@@ -1321,6 +1321,26 @@ module TavernKit
 
               set_var(chat, output_var, pass ? "1" : "0", local_vars: local_vars, current_indent: current_indent)
             end
+          when "v2Tokenize"
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            estimator = chat[:token_estimator]
+            estimator = TavernKit::TokenEstimator.default unless estimator&.respond_to?(:estimate)
+            model_hint = chat[:model_hint]
+
+            tokens =
+              begin
+                estimator.estimate(value, model_hint: model_hint).to_i
+              rescue StandardError
+                0
+              end
+
+            set_var(chat, effect["outputVar"], tokens.to_s, local_vars: local_vars, current_indent: current_indent)
           when "v2ConsoleLog"
             source =
               if effect["sourceType"].to_s == "value"

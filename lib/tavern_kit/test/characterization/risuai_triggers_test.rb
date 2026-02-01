@@ -997,4 +997,35 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "[b:abc:abc:$]", result.chat[:scriptstate]["$out4"]
     assert_equal "abc", result.chat[:scriptstate]["$out5"]
   end
+
+  def test_v2_tokenize_uses_injected_estimator
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2Tokenize)
+
+    estimator_class = Class.new do
+      attr_reader :seen
+
+      def estimate(text, model_hint: nil)
+        @seen = [text, model_hint]
+        42
+      end
+    end
+
+    estimator = estimator_class.new
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2Tokenize", valueType: "value", value: "hello", outputVar: "t", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(
+      trigger,
+      chat: { scriptstate: {}, message: [], token_estimator: estimator, model_hint: "gpt-4o" }
+    )
+
+    assert_equal ["hello", "gpt-4o"], estimator.seen
+    assert_equal "42", result.chat[:scriptstate]["$t"]
+  end
 end
