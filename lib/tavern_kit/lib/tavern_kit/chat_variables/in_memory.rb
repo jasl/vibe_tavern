@@ -8,6 +8,7 @@ module TavernKit
     class InMemory < Base
       def initialize
         @scopes = Hash.new { |h, k| h[k] = {} }
+        @cache_version = 0
       end
 
       def get(name, scope: :local)
@@ -15,6 +16,7 @@ module TavernKit
       end
 
       def set(name, value, scope: :local)
+        @cache_version += 1
         @scopes[normalize_scope(scope)][normalize_name(name)] = value
       end
 
@@ -23,10 +25,12 @@ module TavernKit
       end
 
       def delete(name, scope: :local)
+        @cache_version += 1
         @scopes[normalize_scope(scope)].delete(normalize_name(name))
       end
 
       def add(name, value, scope: :local)
+        @cache_version += 1
         scope_hash = @scopes[normalize_scope(scope)]
         key = normalize_name(name)
 
@@ -39,6 +43,8 @@ module TavernKit
           scope_hash[key] = "#{current}#{value}"
         end
       end
+
+      def cache_version = @cache_version
 
       private
 

@@ -38,4 +38,19 @@ class TavernKit::ChatVariablesTest < Minitest::Test
     vars.add("s", "b")
     assert_equal "ab", vars.get("s")
   end
+
+  def test_cache_version_increments_on_writes
+    vars = TavernKit::ChatVariables::InMemory.new
+
+    v0 = vars.cache_version
+    vars.set("a", "1")
+    assert_operator vars.cache_version, :>, v0
+
+    v1 = vars.cache_version
+    vars.get("a")
+    assert_equal v1, vars.cache_version
+
+    vars.add("a", "2")
+    assert_operator vars.cache_version, :>, v1
+  end
 end

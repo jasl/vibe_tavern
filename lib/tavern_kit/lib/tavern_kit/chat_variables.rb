@@ -14,6 +14,9 @@ module TavernKit
       def has?(name, scope: :local) = raise NotImplementedError
       def delete(name, scope: :local) = raise NotImplementedError
       def add(name, value, scope: :local) = raise NotImplementedError
+
+      # Optional monotonic version for cache keying (nil when unsupported).
+      def cache_version = nil
     end
   end
 end

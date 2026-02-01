@@ -72,6 +72,34 @@ module TavernKit
         def character_name = @character&.name.to_s
         def user_name = @user&.name.to_s
 
+        # Lightweight fingerprint for cache keys. This is best-effort and only
+        # intended for in-process memoization.
+        def cache_fingerprint
+          vars = @variables
+          vars_id = vars ? vars.object_id : 0
+          vars_version = vars.respond_to?(:cache_version) ? vars.cache_version : nil
+
+          [
+            character_name,
+            user_name,
+            @greeting_index,
+            @chat_index,
+            @message_index,
+            @dialect,
+            @model_hint,
+            @role.to_s,
+            @rng_word,
+            @modules,
+            @metadata,
+            @toggles,
+            @displaying,
+            @run_var,
+            @rm_var,
+            vars_id,
+            vars_version,
+          ].hash
+        end
+
         # Start a fresh CBS evaluation frame.
         #
         # Upstream behavior: functions persist across nested call:: expansions,
