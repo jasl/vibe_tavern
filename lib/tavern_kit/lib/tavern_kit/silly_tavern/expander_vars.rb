@@ -26,10 +26,11 @@ module TavernKit
           end
 
         macro_vars = ctx.respond_to?(:macro_vars) ? ctx.macro_vars : nil
-        locals = macro_vars.is_a?(Hash) ? (macro_vars[:locals] || macro_vars["locals"]) : nil
-        globals = macro_vars.is_a?(Hash) ? (macro_vars[:globals] || macro_vars["globals"]) : nil
+        macro_acc = TavernKit::Utils::HashAccessor.wrap(macro_vars.is_a?(Hash) ? macro_vars : {})
+        locals = macro_acc.fetch(:locals, default: nil)
+        globals = macro_acc.fetch(:globals, default: nil)
 
-        dynamic_macros = extract_dynamic_macros(macro_vars)
+        dynamic_macros = extract_dynamic_macros(macro_acc)
 
         user_message = ctx.respond_to?(:user_message) ? ctx.user_message.to_s : ""
 
@@ -58,7 +59,7 @@ module TavernKit
 
         not_char = build_not_char(group, group_members, char_name, user_name)
 
-        content_hash = ctx.respond_to?(:[]) ? (ctx[:content_hash] || ctx["content_hash"]) : nil
+        content_hash = ctx.respond_to?(:[]) ? ctx[:content_hash] : nil
 
         env =
           TavernKit::SillyTavern::Macro::Environment.new(
@@ -84,10 +85,8 @@ module TavernKit
         env
       end
 
-      def extract_dynamic_macros(macro_vars)
-        return {} unless macro_vars.is_a?(Hash)
-
-        raw = macro_vars[:dynamic_macros] || macro_vars["dynamic_macros"] || macro_vars[:extensions] || macro_vars["extensions"]
+      def extract_dynamic_macros(macro_acc)
+        raw = macro_acc.fetch(:dynamic_macros, :extensions, default: {})
         raw.is_a?(Hash) ? raw : {}
       end
 
@@ -95,7 +94,7 @@ module TavernKit
         return [] if group.nil?
 
         if group.is_a?(Hash)
-          group[:members] || group["members"] || []
+          TavernKit::Utils::HashAccessor.wrap(group).fetch(:members, default: [])
         elsif group.respond_to?(:members)
           group.members || []
         else
@@ -107,7 +106,7 @@ module TavernKit
         return [] if group.nil?
 
         if group.is_a?(Hash)
-          group[:muted] || group["muted"] || []
+          TavernKit::Utils::HashAccessor.wrap(group).fetch(:muted, default: [])
         elsif group.respond_to?(:muted)
           group.muted || []
         else
