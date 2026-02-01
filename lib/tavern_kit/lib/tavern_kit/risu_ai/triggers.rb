@@ -9,6 +9,49 @@ module TavernKit
     module Triggers
       Result = Data.define(:chat)
 
+      class LocalVars
+        def initialize
+          @by_indent = {}
+        end
+
+        def get(key, current_indent:)
+          i = current_indent.to_i
+          while i >= 0
+            scope = @by_indent[i]
+            return scope[key] if scope && scope.key?(key)
+
+            i -= 1
+          end
+
+          nil
+        end
+
+        def set(key, value, indent:)
+          final_value = value.nil? ? "null" : value.to_s
+
+          found_indent = nil
+          i = indent.to_i
+          while i >= 0
+            scope = @by_indent[i]
+            if scope && scope.key?(key)
+              found_indent = i
+              break
+            end
+            i -= 1
+          end
+
+          target_indent = found_indent || indent.to_i
+          (@by_indent[target_indent] ||= {})[key] = final_value
+        end
+
+        def clear_at_indent(indent)
+          threshold = indent.to_i
+          @by_indent.keys.each do |i|
+            @by_indent.delete(i) if i >= threshold
+          end
+        end
+      end
+
       # Upstream reference:
       # resources/Risuai/src/ts/process/triggers.ts (safeSubset/displayAllowList/requestAllowList)
       SAFE_SUBSET = %w[
@@ -86,7 +129,8 @@ module TavernKit
       def run_all(triggers, chat:, mode: nil, manual_name: nil, recursion_count: 0)
         t_list = normalize_triggers(triggers)
         c = deep_symbolize(chat.is_a?(Hash) ? chat : {})
-        run_all_normalized(t_list, chat: c, mode: mode, manual_name: manual_name, recursion_count: recursion_count)
+        local_vars = LocalVars.new
+        run_all_normalized(t_list, chat: c, mode: mode, manual_name: manual_name, recursion_count: recursion_count, local_vars: local_vars)
         Result.new(chat: c)
       end
 
@@ -102,14 +146,16 @@ module TavernKit
         conditions = Array(t["conditions"]).select { |v| v.is_a?(Hash) }
         effects = Array(t["effect"]).select { |v| v.is_a?(Hash) }
 
-        return Result.new(chat: c) unless conditions_pass?(conditions, chat: c)
+        local_vars = LocalVars.new
 
-        run_effects(effects, chat: c, trigger: t, triggers: nil, recursion_count: 0)
+        return Result.new(chat: c) unless conditions_pass?(conditions, chat: c, local_vars: local_vars)
+
+        run_effects(effects, chat: c, trigger: t, triggers: nil, recursion_count: 0, local_vars: local_vars)
 
         Result.new(chat: c)
       end
 
-      def run_all_normalized(triggers, chat:, mode:, manual_name:, recursion_count:)
+      def run_all_normalized(triggers, chat:, mode:, manual_name:, recursion_count:, local_vars:)
         triggers.each do |t|
           next unless t.is_a?(Hash)
 
@@ -119,26 +165,28 @@ module TavernKit
             next unless t["type"].to_s == mode.to_s
           end
 
-          run_one_normalized(t, triggers: triggers, chat: chat, recursion_count: recursion_count)
+          run_one_normalized(t, triggers: triggers, chat: chat, recursion_count: recursion_count, local_vars: local_vars)
         end
       end
       private_class_method :run_all_normalized
 
-      def run_one_normalized(trigger, triggers:, chat:, recursion_count:)
+      def run_one_normalized(trigger, triggers:, chat:, recursion_count:, local_vars:)
         conditions = Array(trigger["conditions"]).select { |v| v.is_a?(Hash) }
         effects = Array(trigger["effect"]).select { |v| v.is_a?(Hash) }
 
-        return unless conditions_pass?(conditions, chat: chat)
+        return unless conditions_pass?(conditions, chat: chat, local_vars: local_vars)
 
-        run_effects(effects, chat: chat, trigger: trigger, triggers: triggers, recursion_count: recursion_count)
+        run_effects(effects, chat: chat, trigger: trigger, triggers: triggers, recursion_count: recursion_count, local_vars: local_vars)
       end
       private_class_method :run_one_normalized
 
-      def conditions_pass?(conditions, chat:)
+      def conditions_pass?(conditions, chat:, local_vars:)
+        current_indent = 0
+
         conditions.all? do |condition|
           case condition["type"].to_s
           when "var", "chatindex", "value"
-            check_var_condition(condition, chat: chat)
+            check_var_condition(condition, chat: chat, local_vars: local_vars, current_indent: current_indent)
           when "exists"
             check_exists_condition(condition, chat: chat)
           else
@@ -147,11 +195,11 @@ module TavernKit
         end
       end
 
-      def check_var_condition(condition, chat:)
+      def check_var_condition(condition, chat:, local_vars:, current_indent:)
         var_value =
           case condition["type"].to_s
           when "var"
-            get_var(chat, condition["var"]) || "null"
+            get_var(chat, condition["var"], local_vars: local_vars, current_indent: current_indent) || "null"
           when "chatindex"
             Array(chat[:message]).length.to_s
           when "value"
@@ -211,10 +259,10 @@ module TavernKit
         false
       end
 
-      def apply_effect(effect, chat:, trigger:, triggers:, recursion_count:)
+      def apply_effect(effect, chat:, trigger:, triggers:, recursion_count:, local_vars:, current_indent:)
         case effect["type"].to_s
         when "setvar"
-          apply_setvar(effect, chat: chat)
+          apply_setvar(effect, chat: chat, local_vars: local_vars, current_indent: current_indent)
         when "systemprompt"
           apply_systemprompt(effect, chat: chat)
         when "impersonate"
@@ -228,7 +276,7 @@ module TavernKit
         when "modifychat"
           apply_modifychat(effect, chat: chat)
         when "extractRegex"
-          apply_extract_regex(effect, chat: chat, trigger: trigger)
+          apply_extract_regex(effect, chat: chat, trigger: trigger, local_vars: local_vars, current_indent: current_indent)
         else
           nil
         end
@@ -238,9 +286,10 @@ module TavernKit
         trigger.is_a?(Hash) && trigger["lowLevelAccess"] == true
       end
 
-      def run_effects(effects, chat:, trigger:, triggers:, recursion_count:)
+      def run_effects(effects, chat:, trigger:, triggers:, recursion_count:, local_vars:)
         idx = 0
         mode = trigger["type"].to_s
+        current_indent = 0
 
         while idx < effects.length
           effect = effects[idx]
@@ -250,10 +299,13 @@ module TavernKit
             next
           end
 
+          indent_value = Integer(effect["indent"].to_s, exception: false)
+          current_indent = indent_value && indent_value >= 0 ? indent_value : 0
+
           case type
           when "v2IfAdvanced"
-            indent = Integer(effect["indent"] || 0) rescue 0
-            pass = v2_if_pass?(effect, chat: chat)
+            indent = Integer(effect["indent"].to_s, exception: false) || 0
+            pass = v2_if_pass?(effect, chat: chat, local_vars: local_vars, current_indent: current_indent)
 
             unless pass
               # Skip until the matching end of this indent block.
@@ -261,11 +313,11 @@ module TavernKit
               idx += 1
               while idx < effects.length
                 ef = effects[idx]
-                if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"] || 0) rescue 0) == end_indent
+                if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"].to_s, exception: false) || 0) == end_indent
                   # If there's an else clause, jump to it so the loop increment
                   # lands on the first else-body effect.
                   next_ef = effects[idx + 1]
-                  if next_ef.is_a?(Hash) && next_ef["type"].to_s == "v2Else" && (Integer(next_ef["indent"] || 0) rescue 0) == indent
+                  if next_ef.is_a?(Hash) && next_ef["type"].to_s == "v2Else" && (Integer(next_ef["indent"].to_s, exception: false) || 0) == indent
                     idx += 1
                   end
                   break
@@ -275,29 +327,45 @@ module TavernKit
               end
             end
           when "v2SetVar"
-            apply_v2_setvar(effect, chat: chat)
+            apply_v2_setvar(effect, chat: chat, local_vars: local_vars, current_indent: current_indent)
+          when "v2DeclareLocalVar"
+            key = effect["var"].to_s.delete_prefix("$")
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent) || "null"
+              end
+            local_vars.set(key, value, indent: current_indent)
           when "v2StopPromptSending"
             chat[:stop_sending] = true
           when "v2Else"
             # Skip else body when the preceding v2IfAdvanced passed.
-            else_indent = Integer(effect["indent"] || 0) rescue 0
+            else_indent = Integer(effect["indent"].to_s, exception: false) || 0
             end_indent = else_indent + 1
             idx += 1
             while idx < effects.length
               ef = effects[idx]
-              break if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"] || 0) rescue 0) == end_indent
+              break if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"].to_s, exception: false) || 0) == end_indent
 
               idx += 1
             end
           when "v2EndIndent"
-            # no-op for the minimal subset
-            nil
+            local_vars.clear_at_indent(Integer(effect["indent"].to_s, exception: false) || 0)
           else
             if type.start_with?("v2")
               # ignore unknown v2 effects until needed by tests
               nil
             else
-              apply_effect(effect, chat: chat, trigger: trigger, triggers: triggers, recursion_count: recursion_count)
+              apply_effect(
+                effect,
+                chat: chat,
+                trigger: trigger,
+                triggers: triggers,
+                recursion_count: recursion_count,
+                local_vars: local_vars,
+                current_indent: current_indent,
+              )
             end
           end
 
@@ -316,19 +384,19 @@ module TavernKit
         end
       end
 
-      def v2_if_pass?(effect, chat:)
+      def v2_if_pass?(effect, chat:, local_vars:, current_indent:)
         source_value =
           if effect["sourceType"].to_s == "value"
             effect["source"].to_s
           else
-            get_var(chat, effect["source"])
+            get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent)
           end
 
         target_value =
           if effect["targetType"].to_s == "value"
             effect["target"].to_s
           else
-            get_var(chat, effect["target"])
+            get_var(chat, effect["target"], local_vars: local_vars, current_indent: current_indent)
           end
 
         condition = effect["condition"].to_s
@@ -425,17 +493,17 @@ module TavernKit
         end
       end
 
-      def apply_v2_setvar(effect, chat:)
+      def apply_v2_setvar(effect, chat:, local_vars:, current_indent:)
         key = effect["var"].to_s
         operator = effect["operator"].to_s
         value =
           if effect["valueType"].to_s == "value"
             effect["value"].to_s
           else
-            get_var(chat, effect["value"])
+            get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent)
           end
 
-        original = safe_float(get_var(chat, key))
+        original = safe_float(get_var(chat, key, local_vars: local_vars, current_indent: current_indent))
         original = 0.0 if original.nan?
 
         delta = safe_float(value)
@@ -458,15 +526,15 @@ module TavernKit
             value.to_s
           end
 
-        set_var(chat, key, result)
+        set_var(chat, key, result, local_vars: local_vars, current_indent: current_indent)
       end
 
-      def apply_setvar(effect, chat:)
+      def apply_setvar(effect, chat:, local_vars:, current_indent:)
         key = effect["var"].to_s
         value = effect["value"].to_s
         operator = effect["operator"].to_s
 
-        original = safe_float(get_var(chat, key))
+        original = safe_float(get_var(chat, key, local_vars: local_vars, current_indent: current_indent))
         original = 0.0 if original.nan?
 
         delta = safe_float(value)
@@ -489,7 +557,7 @@ module TavernKit
             value
           end
 
-        set_var(chat, key, result)
+        set_var(chat, key, result, local_vars: local_vars, current_indent: current_indent)
       end
 
       def apply_systemprompt(effect, chat:)
@@ -579,16 +647,18 @@ module TavernKit
           return
         end
 
+        local_vars = LocalVars.new
         run_all_normalized(
           triggers,
           chat: chat,
           mode: :manual,
           manual_name: name,
           recursion_count: recursion_count + 1,
+          local_vars: local_vars,
         )
       end
 
-      def apply_extract_regex(effect, chat:, trigger:)
+      def apply_extract_regex(effect, chat:, trigger:, local_vars:, current_indent:)
         return unless low_level_access?(trigger)
 
         text = effect["value"].to_s
@@ -608,7 +678,7 @@ module TavernKit
         result = result.gsub("$&", match[0].to_s)
         result = result.gsub("$$", "$")
 
-        set_var(chat, input_var, result)
+        set_var(chat, input_var, result, local_vars: local_vars, current_indent: current_indent)
       rescue RegexpError
         nil
       end
@@ -620,10 +690,16 @@ module TavernKit
         opts
       end
 
-      def get_var(chat, name)
+      def get_var(chat, name, local_vars:, current_indent:)
+        key = name.to_s.delete_prefix("$")
+        if local_vars
+          local = local_vars.get(key, current_indent: current_indent)
+          return local unless local.nil?
+        end
+
         if (store = chat[:variables])
           if store.respond_to?(:get)
-            value = store.get(name.to_s, scope: :local)
+            value = store.get(key, scope: :local)
             return value unless value.nil?
           end
         end
@@ -631,26 +707,26 @@ module TavernKit
         state = chat[:scriptstate]
         return nil unless state.is_a?(Hash)
 
-        key = name.to_s
-        key = "$#{key}" unless key.start_with?("$")
-        state[key]
+        state["$#{key}"]
       end
 
-      def set_var(chat, name, value)
+      def set_var(chat, name, value, local_vars:, current_indent:)
+        key = name.to_s.delete_prefix("$")
+
+        if local_vars && !local_vars.get(key, current_indent: current_indent).nil?
+          local_vars.set(key, value, indent: current_indent)
+          return
+        end
+
         if (store = chat[:variables])
-          if store.respond_to?(:set)
-            store.set(name.to_s, value.to_s, scope: :local)
-          end
+          store.set(key, value.to_s, scope: :local) if store.respond_to?(:set)
         end
 
         state = chat[:scriptstate]
         return unless state.is_a?(Hash) || store.nil?
 
-        key = name.to_s
-        key = "$#{key}" unless key.start_with?("$")
-
         state ||= {}
-        state[key] = value.to_s
+        state["$#{key}"] = value.to_s
         chat[:scriptstate] = state
       end
 
