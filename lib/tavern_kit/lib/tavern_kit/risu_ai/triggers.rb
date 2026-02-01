@@ -516,6 +516,67 @@ module TavernKit
               end
 
             set_var(chat, effect["outputVar"], s1 + s2, local_vars: local_vars, current_indent: current_indent)
+          when "v2SplitString"
+            source =
+              if effect["sourceType"].to_s == "value"
+                effect["source"].to_s
+              else
+                get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            delimiter_type = effect["delimiterType"].to_s
+            delimiter =
+              case delimiter_type
+              when "value"
+                effect["delimiter"].to_s
+              when "var"
+                get_var(chat, effect["delimiter"], local_vars: local_vars, current_indent: current_indent).to_s
+              else # regex
+                effect["delimiter"].to_s
+              end
+
+            parts =
+              if delimiter_type == "regex"
+                begin
+                  if (m = delimiter.match(%r{\A/(.+)/([gimuy]*)\z}))
+                    pattern = m[1].to_s
+                    flags = m[2].to_s
+                    source.split(Regexp.new(pattern, regex_options(flags)))
+                  else
+                    source.split(Regexp.new(delimiter))
+                  end
+                rescue RegexpError
+                  [source]
+                end
+              else
+                source.split(delimiter)
+              end
+
+            set_var(chat, effect["outputVar"], ::JSON.generate(parts), local_vars: local_vars, current_indent: current_indent)
+          when "v2JoinArrayVar"
+            var_value =
+              if effect["varType"].to_s == "value"
+                effect["var"].to_s
+              else
+                get_var(chat, effect["var"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            delimiter =
+              if effect["delimiterType"].to_s == "value"
+                effect["delimiter"].to_s
+              else
+                get_var(chat, effect["delimiter"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            joined =
+              begin
+                arr = ::JSON.parse(var_value)
+                Array(arr).join(delimiter)
+              rescue JSON::ParserError, TypeError
+                ""
+              end
+
+            set_var(chat, effect["outputVar"], joined, local_vars: local_vars, current_indent: current_indent)
           when "v2ConsoleLog"
             source =
               if effect["sourceType"].to_s == "value"

@@ -586,4 +586,43 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "aZc", result.chat[:scriptstate]["$set"]
     assert_equal "ab", result.chat[:scriptstate]["$cat"]
   end
+
+  def test_v2_split_string_and_join_array_var
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2SplitString/v2JoinArrayVar)
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2SplitString", sourceType: "value", source: "a,b", delimiterType: "value", delimiter: ",", outputVar: "arr", indent: 0 },
+        { type: "v2JoinArrayVar", varType: "var", var: "arr", delimiterType: "value", delimiter: "-", outputVar: "joined", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "[\"a\",\"b\"]", result.chat[:scriptstate]["$arr"]
+    assert_equal "a-b", result.chat[:scriptstate]["$joined"]
+
+    trigger2 = {
+      type: "output",
+      effect: [
+        { type: "v2SplitString", sourceType: "value", source: "a  b", delimiterType: "regex", delimiter: "/\\s+/", outputVar: "arr", indent: 0 },
+      ],
+    }
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "[\"a\",\"b\"]", result2.chat[:scriptstate]["$arr"]
+
+    trigger3 = {
+      type: "output",
+      effect: [
+        { type: "v2SplitString", sourceType: "value", source: "x", delimiterType: "regex", delimiter: "(", outputVar: "arr", indent: 0 },
+        { type: "v2JoinArrayVar", varType: "value", var: "invalid json", delimiterType: "value", delimiter: ",", outputVar: "joined", indent: 0 },
+      ],
+    }
+
+    result3 = TavernKit::RisuAI::Triggers.run(trigger3, chat: { scriptstate: {}, message: [] })
+    assert_equal "[\"x\"]", result3.chat[:scriptstate]["$arr"]
+    assert_equal "", result3.chat[:scriptstate]["$joined"]
+  end
 end
