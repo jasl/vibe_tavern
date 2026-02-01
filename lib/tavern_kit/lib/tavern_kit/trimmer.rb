@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "digest/sha1"
 require "json"
 
 module TavernKit
@@ -10,6 +11,8 @@ module TavernKit
   # relies on TokenEstimator.
   class Trimmer
     STRATEGIES = %i[group_order priority].freeze
+    TOKEN_ESTIMATE_CACHE_MAX_SIZE = 2048
+    TOKEN_ESTIMATE_CACHE_MAX_TEXT_BYTES = 8 * 1024
 
     class << self
       def trim(
@@ -119,7 +122,7 @@ module TavernKit
         raise ArgumentError, "message_overhead_tokens must be non-negative" if overhead.negative?
 
         Array(blocks).to_h do |block|
-          content_tokens = token_estimator.estimate(block.content.to_s, model_hint: model_hint)
+          content_tokens = estimate_text_tokens(block.content.to_s, token_estimator: token_estimator, model_hint: model_hint)
           metadata_tokens = include_message_metadata_tokens ? estimate_message_metadata_tokens(block, token_estimator, model_hint) : 0
           [block.id, content_tokens + metadata_tokens + overhead]
         end
@@ -136,7 +139,33 @@ module TavernKit
             meta.to_s
           end
 
-        token_estimator.estimate(serialized, model_hint: model_hint)
+        estimate_text_tokens(serialized, token_estimator: token_estimator, model_hint: model_hint)
+      end
+
+      private
+
+      def estimate_text_tokens(text, token_estimator:, model_hint:)
+        token_estimate_cache.fetch(token_estimate_cache_key(text, token_estimator: token_estimator, model_hint: model_hint)) do
+          token_estimator.estimate(text.to_s, model_hint: model_hint)
+        end
+      end
+
+      def token_estimate_cache
+        @token_estimate_cache ||= TavernKit::LRUCache.new(max_size: TOKEN_ESTIMATE_CACHE_MAX_SIZE)
+      end
+
+      def token_estimate_cache_key(text, token_estimator:, model_hint:)
+        s = text.to_s
+
+        text_key =
+          if s.bytesize > TOKEN_ESTIMATE_CACHE_MAX_TEXT_BYTES
+            # Avoid retaining large prompt strings in memory; use a stable digest instead.
+            [:sha1, ::Digest::SHA1.hexdigest(s), s.bytesize]
+          else
+            [:text, s]
+          end
+
+        [token_estimator.object_id, model_hint&.to_s, text_key]
       end
 
       def apply_evictions(enabled_blocks, tokens_by_id, evicted_ids, strategy:)
