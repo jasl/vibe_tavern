@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../regex_safety"
+
 module TavernKit
   module Text
     module PatternMatcher
@@ -15,7 +17,7 @@ module TavernKit
         text = text.to_s
 
         regex = compile_regex(pattern, case_sensitive: case_sensitive)
-        return regex.match?(text) if regex
+        return TavernKit::RegexSafety.match?(regex, text) if regex
 
         needle = pattern.to_s.strip
         return false if needle.empty?
@@ -44,9 +46,7 @@ module TavernKit
         # JS 's' (dotAll) roughly maps to Ruby's /m (dot matches newline).
         options |= Regexp::MULTILINE if js[:flags].include?("s")
 
-        Regexp.new(js[:source], options)
-      rescue RegexpError
-        nil
+        TavernKit::RegexSafety.compile(js[:source], options: options)
       end
 
       def parse_js_regex(string)

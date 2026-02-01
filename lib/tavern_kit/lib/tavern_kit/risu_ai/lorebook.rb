@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../regex_safety"
+
 module TavernKit
   module RisuAI
     module Lorebook
@@ -79,7 +81,7 @@ module TavernKit
 
             messages.any? do |m|
               text = extract_message_data(m)
-              re.match?(text)
+              TavernKit::RegexSafety.match?(re, text)
             end
           end
         elsif full_word_matching
@@ -120,9 +122,7 @@ module TavernKit
         options |= Regexp::IGNORECASE if flags.include?("i")
         options |= Regexp::MULTILINE if flags.include?("m") || flags.include?("s")
 
-        Regexp.new(pattern, options)
-      rescue RegexpError
-        nil
+        TavernKit::RegexSafety.compile(pattern, options: options)
       end
 
       def strip_decorators(content)
