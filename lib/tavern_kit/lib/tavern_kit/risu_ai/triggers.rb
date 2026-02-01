@@ -816,6 +816,34 @@ module TavernKit
             rescue JSON::ParserError, TypeError, FloatDomainError
               set_var(chat, var_name, "[]", local_vars: local_vars, current_indent: current_indent)
             end
+          when "v2Calculate"
+            expression =
+              if effect["expressionType"].to_s == "value"
+                effect["expression"].to_s
+              else
+                get_var(chat, effect["expression"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            expression = expression.gsub(/\$([a-zA-Z0-9_]+)/) do
+              raw = get_var(chat, Regexp.last_match(1), local_vars: local_vars, current_indent: current_indent)
+              num = parse_js_float_prefix(raw)
+              num.nan? ? "0" : format_js_number(num)
+            end
+
+            result =
+              begin
+                v2_calc_string(expression)
+              rescue StandardError
+                0.0
+              end
+
+            set_var(
+              chat,
+              effect["outputVar"],
+              format_js_number(result),
+              local_vars: local_vars,
+              current_indent: current_indent,
+            )
           when "v2ConsoleLog"
             source =
               if effect["sourceType"].to_s == "value"
@@ -1045,6 +1073,157 @@ module TavernKit
 
         (num % 1).zero? ? num.to_i.to_s : num.to_s
       end
+
+      def parse_js_float_prefix(value)
+        s = value.to_s.lstrip
+        return Float::NAN if s.empty?
+
+        return Float::INFINITY if s.start_with?("Infinity")
+        return -Float::INFINITY if s.start_with?("-Infinity")
+        return Float::NAN if s.start_with?("NaN")
+
+        m = s.match(/\A[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/)
+        return Float::NAN unless m
+
+        safe_float(m[0])
+      end
+      private_class_method :parse_js_float_prefix
+
+      def v2_calc_string(expr)
+        tokens = v2_calc_tokenize(expr)
+        rpn = v2_calc_to_rpn(tokens)
+        v2_calc_eval_rpn(rpn)
+      end
+      private_class_method :v2_calc_string
+
+      def v2_calc_tokenize(expr)
+        s = expr.to_s.gsub(/\s+/, "")
+        tokens = []
+
+        i = 0
+        while i < s.length
+          ch = s[i]
+
+          if ch == "(" || ch == ")"
+            tokens << ch
+            i += 1
+            next
+          end
+
+          if "+-*/%^".include?(ch)
+            if ch == "-" && (tokens.empty? || tokens.last.is_a?(String) && tokens.last != ")")
+              # Unary minus becomes part of the number token.
+              j = i + 1
+              j += 1 while j < s.length && s[j] =~ /[0-9.]/
+              if j < s.length && s[j] =~ /[eE]/
+                k = j + 1
+                k += 1 if k < s.length && s[k] =~ /[+-]/
+                k += 1 while k < s.length && s[k] =~ /\d/
+                j = k
+              end
+
+              tokens << safe_float(s[i...j])
+              i = j
+            else
+              tokens << ch
+              i += 1
+            end
+            next
+          end
+
+          if ch =~ /[0-9.]/
+            j = i
+            j += 1 while j < s.length && s[j] =~ /[0-9.]/
+            if j < s.length && s[j] =~ /[eE]/
+              k = j + 1
+              k += 1 if k < s.length && s[k] =~ /[+-]/
+              k += 1 while k < s.length && s[k] =~ /\d/
+              j = k
+            end
+
+            tokens << safe_float(s[i...j])
+            i = j
+            next
+          end
+
+          raise ArgumentError, "Unexpected token: #{ch}"
+        end
+
+        tokens
+      end
+      private_class_method :v2_calc_tokenize
+
+      def v2_calc_to_rpn(tokens)
+        prec = { "+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "^" => 4 }.freeze
+
+        out = []
+        ops = []
+
+        tokens.each do |t|
+          if t.is_a?(Numeric)
+            out << t
+            next
+          end
+
+          if t == "("
+            ops << t
+            next
+          end
+
+          if t == ")"
+            out << ops.pop while ops.any? && ops.last != "("
+            ops.pop if ops.last == "("
+            next
+          end
+
+          # operator
+          while ops.any? && ops.last != "(" && prec.fetch(ops.last) >= prec.fetch(t)
+            out << ops.pop
+          end
+          ops << t
+        end
+
+        out.concat(ops.reverse.reject { |op| op == "(" })
+        out
+      end
+      private_class_method :v2_calc_to_rpn
+
+      def v2_calc_eval_rpn(rpn)
+        stack = []
+
+        rpn.each do |t|
+          if t.is_a?(Numeric)
+            stack << t
+            next
+          end
+
+          b = stack.pop || Float::NAN
+          a = stack.pop || Float::NAN
+
+          stack <<
+            case t
+            when "+"
+              a + b
+            when "-"
+              a - b
+            when "*"
+              a * b
+            when "/"
+              a / b
+            when "%"
+              b.zero? ? Float::NAN : (a % b)
+            when "^"
+              a**b
+            else
+              Float::NAN
+            end
+        end
+
+        stack.pop || 0.0
+      rescue ZeroDivisionError, FloatDomainError
+        Float::NAN
+      end
+      private_class_method :v2_calc_eval_rpn
 
       def equivalent?(a, b)
         tv = b.to_s

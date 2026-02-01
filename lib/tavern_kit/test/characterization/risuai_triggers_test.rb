@@ -681,4 +681,41 @@ class RisuaiTriggersTest < Minitest::Test
     result3 = TavernKit::RisuAI::Triggers.run(trigger3, chat: { scriptstate: {}, message: [] })
     assert_equal "[]", result3.chat[:scriptstate]["$bad"]
   end
+
+  def test_v2_calculate_substitutes_vars_and_evaluates_expression
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2Calculate + $var parseFloat substitution)
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2SetVar", operator: "=", var: "x", valueType: "value", value: "2", indent: 0 },
+        { type: "v2Calculate", expressionType: "value", expression: "$x+3*2", outputVar: "out", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "8", result.chat[:scriptstate]["$out"]
+
+    trigger2 = {
+      type: "output",
+      effect: [
+        { type: "v2SetVar", operator: "=", var: "x", valueType: "value", value: "10abc", indent: 0 },
+        { type: "v2Calculate", expressionType: "value", expression: "$x+1", outputVar: "out", indent: 0 },
+      ],
+    }
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "11", result2.chat[:scriptstate]["$out"]
+
+    trigger3 = {
+      type: "output",
+      effect: [
+        { type: "v2Calculate", expressionType: "value", expression: "(", outputVar: "out", indent: 0 },
+      ],
+    }
+
+    result3 = TavernKit::RisuAI::Triggers.run(trigger3, chat: { scriptstate: {}, message: [] })
+    assert_equal "0", result3.chat[:scriptstate]["$out"]
+  end
 end
