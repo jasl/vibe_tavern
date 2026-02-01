@@ -539,18 +539,37 @@ module TavernKit
       end
 
       def get_var(chat, name)
+        if (store = chat[:variables])
+          if store.respond_to?(:get)
+            value = store.get(name.to_s, scope: :local)
+            return value unless value.nil?
+          end
+        end
+
+        state = chat[:scriptstate]
+        return nil unless state.is_a?(Hash)
+
         key = name.to_s
         key = "$#{key}" unless key.start_with?("$")
-        chat[:scriptstate] ||= {}
-        chat[:scriptstate][key]
+        state[key]
       end
 
       def set_var(chat, name, value)
+        if (store = chat[:variables])
+          if store.respond_to?(:set)
+            store.set(name.to_s, value.to_s, scope: :local)
+          end
+        end
+
+        state = chat[:scriptstate]
+        return unless state.is_a?(Hash) || store.nil?
+
         key = name.to_s
         key = "$#{key}" unless key.start_with?("$")
 
-        chat[:scriptstate] ||= {}
-        chat[:scriptstate][key] = value.to_s
+        state ||= {}
+        state[key] = value.to_s
+        chat[:scriptstate] = state
       end
 
       def deep_symbolize(value)

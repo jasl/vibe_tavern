@@ -18,8 +18,7 @@ module TavernKit
           runtime = ctx.runtime
           chat_index = runtime ? runtime.chat_index.to_i : -1
 
-          scriptstate = ctx[:risuai_scriptstate]
-          scriptstate = {} unless scriptstate.is_a?(Hash)
+          ctx.variables_store!
 
           history = TavernKit::ChatHistory.wrap(ctx.history).to_a
           messages = history.map { |m| { role: m.role.to_s, data: m.content.to_s } }
@@ -27,7 +26,10 @@ module TavernKit
           chat = {
             chatIndex: chat_index,
             message: messages,
-            scriptstate: scriptstate,
+            # Prefer the Core ChatVariables store as the scriptstate backend so
+            # CBS/lore/triggers all share one source of truth.
+            variables: ctx.variables_store,
+            scriptstate: {},
           }
 
           chat = TavernKit::RisuAI::Triggers.run_all(triggers, chat: chat).chat

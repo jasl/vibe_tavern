@@ -62,6 +62,21 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "Infinity", result3.chat[:scriptstate]["$x"]
   end
 
+  def test_triggers_can_use_core_chat_variables_store_as_scriptstate
+    store = TavernKit::ChatVariables::InMemory.new
+    store.set("flag", "1", scope: :local)
+
+    trigger = {
+      type: "output",
+      conditions: [{ type: "var", var: "flag", value: "", operator: "true" }],
+      effect: [{ type: "setvar", var: "hit", value: "yes", operator: "=" }],
+    }
+
+    _result = TavernKit::RisuAI::Triggers.run(trigger, chat: { message: [], variables: store })
+
+    assert_equal "yes", store.get("hit", scope: :local)
+  end
+
   def test_systemprompt_appends_to_additional_sys_prompt
     trigger = {
       type: "output",
