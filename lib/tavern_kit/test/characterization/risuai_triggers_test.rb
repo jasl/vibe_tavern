@@ -22,6 +22,62 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "yes", result.chat[:scriptstate]["$hit"]
   end
 
+  def test_systemprompt_appends_to_additional_sys_prompt
+    trigger = {
+      type: "output",
+      effect: [{ type: "systemprompt", location: "start", value: "SYS" }],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(
+      trigger,
+      chat: { message: [] }
+    )
+
+    assert_equal "SYS\n\n", result.chat[:additional_sys_prompt][:start]
+  end
+
+  def test_impersonate_appends_to_chat_message
+    trigger = {
+      type: "output",
+      effect: [{ type: "impersonate", role: "user", value: "Hello" }],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(
+      trigger,
+      chat: { message: [] }
+    )
+
+    assert_equal [{ role: "user", data: "Hello" }], result.chat[:message]
+  end
+
+  def test_extract_regex_sets_var_only_with_low_level_access
+    trigger = {
+      type: "output",
+      lowLevelAccess: true,
+      effect: [{
+        type: "extractRegex",
+        value: "abc123",
+        regex: "(\\d+)",
+        flags: "",
+        result: "$1",
+        inputVar: "num",
+      }],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(
+      trigger,
+      chat: { scriptstate: {}, message: [] }
+    )
+    assert_equal "123", result.chat[:scriptstate]["$num"]
+
+    trigger2 = trigger.merge(lowLevelAccess: false)
+    result2 = TavernKit::RisuAI::Triggers.run(
+      trigger2,
+      chat: { scriptstate: {}, message: [] }
+    )
+    assert_nil result2.chat[:scriptstate]["$num"]
+  end
+
   def test_condition_exists_modes
     trigger = {
       type: "output",

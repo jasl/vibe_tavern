@@ -28,7 +28,7 @@ module TavernKit
           run_v2_effects(effects, chat: c)
         else
           effects.each do |effect|
-            apply_effect(effect, chat: c)
+            apply_effect(effect, chat: c, trigger: t)
           end
         end
 
@@ -112,13 +112,25 @@ module TavernKit
         false
       end
 
-      def apply_effect(effect, chat:)
+      def apply_effect(effect, chat:, trigger:)
         case effect["type"].to_s
         when "setvar"
           apply_setvar(effect, chat: chat)
+        when "systemprompt"
+          apply_systemprompt(effect, chat: chat)
+        when "impersonate"
+          apply_impersonate(effect, chat: chat)
+        when "stop"
+          chat[:stop_sending] = true
+        when "extractRegex"
+          apply_extract_regex(effect, chat: chat, trigger: trigger)
         else
           nil
         end
+      end
+
+      def low_level_access?(trigger)
+        trigger.is_a?(Hash) && trigger["lowLevelAccess"] == true
       end
 
       # Minimal v2 interpreter: enough for v2IfAdvanced + v2SetVar and membership ops.
@@ -237,6 +249,85 @@ module TavernKit
           end
 
         set_var(chat, key, result)
+      end
+
+      def apply_systemprompt(effect, chat:)
+        location = effect["location"].to_s
+        value = effect["value"].to_s
+
+        bucket = chat[:additional_sys_prompt]
+        bucket = {} unless bucket.is_a?(Hash)
+        chat[:additional_sys_prompt] = bucket
+
+        key =
+          case location
+          when "start"
+            :start
+          when "historyend"
+            :historyend
+          when "promptend"
+            :promptend
+          else
+            nil
+          end
+
+        return unless key
+
+        bucket[key] = "#{bucket[key]}#{value}\n\n"
+      end
+
+      def apply_impersonate(effect, chat:)
+        role = effect["role"].to_s
+        value = effect["value"].to_s
+
+        normalized_role =
+          case role
+          when "user"
+            "user"
+          when "char"
+            "char"
+          else
+            nil
+          end
+        return unless normalized_role
+
+        messages = chat[:message]
+        messages = [] unless messages.is_a?(Array)
+        chat[:message] = messages
+
+        messages << { role: normalized_role, data: value }
+      end
+
+      def apply_extract_regex(effect, chat:, trigger:)
+        return unless low_level_access?(trigger)
+
+        text = effect["value"].to_s
+        pattern = effect["regex"].to_s
+        flags = effect["flags"].to_s
+        out = effect["result"].to_s
+        input_var = effect["inputVar"].to_s
+
+        re = Regexp.new(pattern, regex_options(flags))
+        match = re.match(text)
+        return unless match
+
+        result = out.gsub(/\$\d+/) do |m|
+          idx = Integer(m.delete_prefix("$"), exception: false)
+          idx && match[idx] ? match[idx].to_s : ""
+        end
+        result = result.gsub("$&", match[0].to_s)
+        result = result.gsub("$$", "$")
+
+        set_var(chat, input_var, result)
+      rescue RegexpError
+        nil
+      end
+
+      def regex_options(flags)
+        opts = 0
+        opts |= Regexp::IGNORECASE if flags.include?("i")
+        opts |= Regexp::MULTILINE if flags.include?("m")
+        opts
       end
 
       def get_var(chat, name)
