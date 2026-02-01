@@ -9,13 +9,11 @@ module TavernKit
   class JsRegexCache
     DEFAULT_MAX_SIZE = 512
     DEFAULT_MAX_LITERAL_BYTES = 2048
-    DEFAULT_TIMEOUT_SECONDS = 0.1
 
-    def initialize(max_size: DEFAULT_MAX_SIZE, literal_only: true, max_literal_bytes: DEFAULT_MAX_LITERAL_BYTES, timeout: DEFAULT_TIMEOUT_SECONDS)
+    def initialize(max_size: DEFAULT_MAX_SIZE, literal_only: true, max_literal_bytes: DEFAULT_MAX_LITERAL_BYTES)
       @cache = TavernKit::LRUCache.new(max_size: max_size)
       @literal_only = literal_only == true
       @max_literal_bytes = Integer(max_literal_bytes)
-      @timeout = timeout.nil? ? nil : Float(timeout)
     end
 
     def fetch(value)
@@ -26,15 +24,7 @@ module TavernKit
       @cache.fetch(v) do
         re = ::JsRegexToRuby.try_convert(v, literal_only: @literal_only)
         return nil unless re.is_a?(Regexp)
-
-        return re if @timeout.nil? || @timeout <= 0
-
-        begin
-          # Ruby 3.2+ supports per-regexp timeouts.
-          Regexp.new(re.source, re.options, timeout: @timeout)
-        rescue ArgumentError
-          re
-        end
+        re
       end
     rescue RegexpError
       nil

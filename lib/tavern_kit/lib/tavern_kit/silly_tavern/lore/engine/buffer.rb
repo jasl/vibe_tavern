@@ -9,6 +9,7 @@ module TavernKit
         # Pure refactor: extracted from `silly_tavern/lore/engine.rb` (Wave 6 large-file split).
         class Buffer
           JS_REGEX_CACHE_MAX = 512
+          JS_REGEX_MAX_INPUT_BYTES = 50_000
 
           def initialize(messages:, default_depth:, scan_context:, scan_injects:, warner: nil, warned: nil)
             @depth_buffer = Array(messages).first(MAX_SCAN_DEPTH).map { |m| m.to_s.strip }
@@ -132,12 +133,17 @@ module TavernKit
                 return false
               end
 
-              begin
-                return regex.match?(h)
-              rescue Regexp::TimeoutError
-                warn_once(warner, warned, [:js_regex_timeout, n], "JS regex match timed out: #{truncate_literal(n)}")
+              if JS_REGEX_MAX_INPUT_BYTES.positive? && h.bytesize > JS_REGEX_MAX_INPUT_BYTES
+                warn_once(
+                  warner,
+                  warned,
+                  [:js_regex_input_too_large, n],
+                  "JS regex skipped: input too large (bytes=#{h.bytesize}): #{truncate_literal(n)}",
+                )
                 return false
               end
+
+              return regex.match?(h)
             end
 
             if case_sensitive

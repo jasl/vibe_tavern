@@ -31,4 +31,3 @@ We intentionally do **not** implement regex timeouts in the rewrite plan.
 Instead, we focus on basic, predictable guardrails (pattern length / input size
 limits and strict-mode error policy) to mitigate common ReDoS risks without
 introducing global or thread-sensitive behavior.
-

@@ -12,6 +12,7 @@ module TavernKit
       class Engine < TavernKit::Lore::Engine::Base
         Inject = Data.define(:operation, :location, :param, :lore)
         JS_REGEX_CACHE_MAX = 512
+        JS_REGEX_MAX_INPUT_BYTES = 50_000
 
         Active = Data.define(
           :entry,           # TavernKit::Lore::Entry (original)
@@ -467,12 +468,18 @@ module TavernKit
               end
 
               m_list.any? do |m|
-                begin
-                  re.match?(m[:data])
-                rescue Regexp::TimeoutError
-                  warn_once(warner, warned, [:js_regex_timeout, js_re], "JS regex match timed out: #{truncate_literal(js_re)}")
-                  false
+                data = m[:data].to_s
+                if JS_REGEX_MAX_INPUT_BYTES.positive? && data.bytesize > JS_REGEX_MAX_INPUT_BYTES
+                  warn_once(
+                    warner,
+                    warned,
+                    [:js_regex_input_too_large, js_re],
+                    "JS regex skipped: input too large (bytes=#{data.bytesize}): #{truncate_literal(js_re)}",
+                  )
+                  next false
                 end
+
+                re.match?(data)
               end
             end
           else
