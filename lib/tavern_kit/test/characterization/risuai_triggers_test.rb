@@ -195,4 +195,22 @@ class RisuaiTriggersTest < Minitest::Test
 
     assert_equal "yes", result.chat[:scriptstate]["$hit"]
   end
+
+  def test_v2_effects_do_not_disable_v1_effects
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2IfAdvanced", condition: "∈", sourceType: "value", source: "a", targetType: "value", target: "[\"a\"]", indent: 0 },
+        { type: "v2EndIndent", endOfLoop: false, indent: 1 },
+        { type: "setvar", var: "hit", value: "yes", operator: "=" },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(
+      trigger,
+      chat: { scriptstate: {}, message: [] }
+    )
+
+    assert_equal "yes", result.chat[:scriptstate]["$hit"]
+  end
 end

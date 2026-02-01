@@ -38,13 +38,7 @@ module TavernKit
 
         return Result.new(chat: c) unless conditions_pass?(conditions, chat: c)
 
-        if effects.any? { |e| e["type"].to_s.start_with?("v2") }
-          run_v2_effects(effects, chat: c)
-        else
-          effects.each do |effect|
-            apply_effect(effect, chat: c, trigger: t, triggers: nil, recursion_count: 0)
-          end
-        end
+        run_effects(effects, chat: c, trigger: t, triggers: nil, recursion_count: 0)
 
         Result.new(chat: c)
       end
@@ -70,13 +64,7 @@ module TavernKit
 
         return unless conditions_pass?(conditions, chat: chat)
 
-        if effects.any? { |e| e["type"].to_s.start_with?("v2") }
-          run_v2_effects(effects, chat: chat)
-        else
-          effects.each do |effect|
-            apply_effect(effect, chat: chat, trigger: trigger, triggers: triggers, recursion_count: recursion_count)
-          end
-        end
+        run_effects(effects, chat: chat, trigger: trigger, triggers: triggers, recursion_count: recursion_count)
       end
       private_class_method :run_one_normalized
 
@@ -184,8 +172,7 @@ module TavernKit
         trigger.is_a?(Hash) && trigger["lowLevelAccess"] == true
       end
 
-      # Minimal v2 interpreter: enough for v2IfAdvanced + v2SetVar and membership ops.
-      def run_v2_effects(effects, chat:)
+      def run_effects(effects, chat:, trigger:, triggers:, recursion_count:)
         idx = 0
 
         while idx < effects.length
@@ -210,12 +197,18 @@ module TavernKit
             end
           when "v2SetVar"
             apply_v2_setvar(effect, chat: chat)
+          when "v2StopPromptSending"
+            chat[:stop_sending] = true
           when "v2EndIndent"
             # no-op for the minimal subset
             nil
           else
-            # ignore unknown v2 effects until needed by tests
-            nil
+            if type.start_with?("v2")
+              # ignore unknown v2 effects until needed by tests
+              nil
+            else
+              apply_effect(effect, chat: chat, trigger: trigger, triggers: triggers, recursion_count: recursion_count)
+            end
           end
 
           idx += 1
