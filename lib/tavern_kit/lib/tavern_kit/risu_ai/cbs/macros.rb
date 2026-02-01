@@ -7,6 +7,7 @@ require_relative "macros/string_macros"
 require_relative "macros/aggregate_macros"
 require_relative "macros/unicode_macros"
 require_relative "macros/crypto_macros"
+require_relative "macros/misc_macros"
 
 module TavernKit
   module RisuAI
@@ -206,6 +207,20 @@ module TavernKit
             resolve_xordecrypt(args)
           when "crypt", "crypto", "caesar", "encrypt", "decrypt"
             resolve_crypt(args)
+          when "calc"
+            resolve_calc(args, environment: environment)
+          when "hiddenkey"
+            resolve_hiddenkey(args)
+          when "reverse"
+            resolve_reverse(name, args)
+          when "comment"
+            resolve_comment(args, environment: environment)
+          when "tex", "latex", "katex"
+            resolve_tex(args)
+          when "ruby", "furigana"
+            resolve_ruby(args)
+          when "codeblock"
+            resolve_codeblock(args)
           else
             nil
           end

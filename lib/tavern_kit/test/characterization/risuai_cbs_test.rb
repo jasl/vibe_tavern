@@ -285,6 +285,23 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "abc", render("{{crypt::bcd::-1}}")
   end
 
+  def test_misc_macros
+    assert_equal "7", render("{{calc::1 + 2 * 3}}")
+
+    assert_equal "xy", render("x{{hidden_key::dragon}}y")
+    assert_equal "eulav_emos::esrever", render("{{reverse::some_value}}")
+
+    assert_equal "xy", render("x{{comment::hi}}y")
+
+    assert_equal "$$E=mc^2$$", render("{{tex::E=mc^2}}")
+    assert_equal "$$E=mc^2$$", render("{{latex::E=mc^2}}")
+
+    assert_equal "<ruby>KANJI<rp> (</rp><rt>kana</rt><rp>) </rp></ruby>", render("{{ruby::KANJI::kana}}")
+
+    assert_equal "<pre><code>puts &quot;hi&quot;</code></pre>", render("{{codeblock::puts \"hi\"}}")
+    assert_equal "<pre-hljs-placeholder lang=\"ruby\">puts &quot;hi&quot;</pre-hljs-placeholder>", render("{{codeblock::ruby::puts \"hi\"}}")
+  end
+
   def test_date_and_time_macros_with_custom_format
     # Upstream reference:
     # resources/Risuai/src/ts/cbs.ts (date/time)
