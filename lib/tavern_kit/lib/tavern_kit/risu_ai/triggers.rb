@@ -290,6 +290,7 @@ module TavernKit
         idx = 0
         mode = trigger["type"].to_s
         current_indent = 0
+        loop_n_times = Hash.new(0)
 
         while idx < effects.length
           effect = effects[idx]
@@ -351,7 +352,64 @@ module TavernKit
               idx += 1
             end
           when "v2EndIndent"
-            local_vars.clear_at_indent(Integer(effect["indent"].to_s, exception: false) || 0)
+            end_indent = Integer(effect["indent"].to_s, exception: false) || 0
+
+            if effect["endOfLoop"] == true
+              loop_indent = end_indent - 1
+              original_idx = idx
+
+              header_idx = nil
+              scan = idx
+              while scan >= 0
+                ef = effects[scan]
+                ef_type = ef["type"].to_s
+                ef_indent = Integer(ef["indent"].to_s, exception: false) || 0
+
+                if (ef_type == "v2Loop" || ef_type == "v2LoopNTimes") && ef_indent == loop_indent
+                  header_idx = scan
+
+                  if ef_type == "v2LoopNTimes"
+                    raw =
+                      if ef["valueType"].to_s == "value"
+                        ef["value"].to_s
+                      else
+                        get_var(chat, ef["value"], local_vars: local_vars, current_indent: end_indent) || "null"
+                      end
+
+                    max_times = safe_float(raw)
+                    max_times = 0.0 if max_times.nan?
+
+                    loop_n_times[header_idx] += 1
+                    if loop_n_times[header_idx] < max_times
+                      idx = header_idx
+                    else
+                      idx = original_idx
+                    end
+                  else
+                    idx = header_idx
+                  end
+
+                  break
+                end
+
+                scan -= 1
+              end
+            end
+
+            local_vars.clear_at_indent(end_indent)
+          when "v2Loop", "v2LoopNTimes"
+            # Looping is handled by v2EndIndent (mirrors upstream).
+            nil
+          when "v2BreakLoop"
+            scan = idx
+            while scan < effects.length
+              ef = effects[scan]
+              if ef["type"].to_s == "v2EndIndent" && ef["endOfLoop"] == true
+                idx = scan
+                break
+              end
+              scan += 1
+            end
           else
             if type.start_with?("v2")
               # ignore unknown v2 effects until needed by tests

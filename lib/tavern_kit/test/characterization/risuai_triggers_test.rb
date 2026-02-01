@@ -313,6 +313,38 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "0", result.chat[:scriptstate]["$x"]
   end
 
+  def test_v2_loop_and_loop_n_times
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2Loop/v2LoopNTimes/v2EndIndent endOfLoop)
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2LoopNTimes", valueType: "value", value: "3", indent: 0 },
+        { type: "v2SetVar", operator: "+=", var: "x", valueType: "value", value: "1", indent: 1 },
+        { type: "v2EndIndent", endOfLoop: true, indent: 1 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "3", result.chat[:scriptstate]["$x"]
+
+    trigger2 = {
+      type: "output",
+      effect: [
+        { type: "v2Loop", indent: 0 },
+        { type: "v2SetVar", operator: "=", var: "hit", valueType: "value", value: "1", indent: 1 },
+        { type: "v2BreakLoop", indent: 1 },
+        { type: "v2EndIndent", endOfLoop: true, indent: 1 },
+        { type: "v2SetVar", operator: "=", var: "after", valueType: "value", value: "OK", indent: 0 },
+      ],
+    }
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "1", result2.chat[:scriptstate]["$hit"]
+    assert_equal "OK", result2.chat[:scriptstate]["$after"]
+  end
+
   def test_v2_effects_do_not_disable_v1_effects
     trigger = {
       type: "output",
