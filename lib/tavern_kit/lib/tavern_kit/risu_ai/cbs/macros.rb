@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "macros/time_macros"
+require_relative "macros/logic_macros"
 
 module TavernKit
   module RisuAI
@@ -54,6 +55,28 @@ module TavernKit
             resolve_metadata(args, environment: environment)
           when "iserror"
             resolve_iserror(args)
+          when "equal"
+            resolve_equal(args)
+          when "notequal"
+            resolve_notequal(args)
+          when "greater"
+            resolve_greater(args)
+          when "less"
+            resolve_less(args)
+          when "greaterequal"
+            resolve_greaterequal(args)
+          when "lessequal"
+            resolve_lessequal(args)
+          when "and"
+            resolve_and(args)
+          when "or"
+            resolve_or(args)
+          when "not"
+            resolve_not(args)
+          when "all"
+            resolve_all(args)
+          when "any"
+            resolve_any(args)
           when "getvar"
             resolve_getvar(args, environment: environment)
           when "setvar"
@@ -732,6 +755,8 @@ module TavernKit
         private_class_method :format_number
 
         def js_number(value)
+          return Float::NAN if value.nil?
+
           s = value.to_s
           return 0.0 if s.strip.empty?
 

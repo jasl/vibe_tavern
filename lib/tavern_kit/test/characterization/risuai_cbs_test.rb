@@ -262,6 +262,44 @@ class RisuaiCbsTest < Minitest::Test
     ENV["TZ"] = old_tz
   end
 
+  def test_logic_and_comparison_macros
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (equal/notequal/greater/less/greaterequal/lessequal/and/or/not/all/any)
+
+    assert_equal "1", render("{{equal::a::a}}")
+    assert_equal "0", render("{{equal::a::b}}")
+    assert_equal "1", render("{{notequal::a::b}}")
+    assert_equal "1", render("{{not_equal::a::b}}")
+
+    assert_equal "1", render("{{greater::2::1}}")
+    assert_equal "0", render("{{greater::1::2}}")
+    assert_equal "0", render("{{greater::a::1}}") # NaN > 1 => false
+
+    assert_equal "1", render("{{less::1::2}}")
+    assert_equal "0", render("{{less::2::1}}")
+
+    assert_equal "1", render("{{greaterequal::2::2}}")
+    assert_equal "1", render("{{greater_equal::2::2}}")
+    assert_equal "1", render("{{lessequal::2::2}}")
+    assert_equal "1", render("{{less_equal::2::2}}")
+
+    assert_equal "1", render("{{and::1::1}}")
+    assert_equal "0", render("{{and::1::0}}")
+    assert_equal "1", render("{{or::0::1}}")
+    assert_equal "0", render("{{or::0::0}}")
+    assert_equal "0", render("{{not::1}}")
+    assert_equal "1", render("{{not::0}}")
+    assert_equal "1", render("{{not::true}}") # only "1" is treated as true
+
+    assert_equal "1", render("{{all::1::1::1}}")
+    assert_equal "0", render("{{all::1::0::1}}")
+    assert_equal "1", render("{{all::[\"1\",\"1\"]}}")
+
+    assert_equal "1", render("{{any::0::1::0}}")
+    assert_equal "0", render("{{any::0::0}}")
+    assert_equal "1", render("{{any::[\"0\",\"1\"]}}")
+  end
+
   def test_nondeterministic_rng_macros
     # Upstream reference:
     # resources/Risuai/src/ts/cbs.ts (random/randint/dice/roll)
