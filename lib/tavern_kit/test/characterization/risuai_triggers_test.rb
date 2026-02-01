@@ -768,4 +768,43 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "OK2", json[1]["content"]
     assert_equal "system", json[0]["role"]
   end
+
+  def test_v2_dict_var_operations
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2MakeDictVar + dict CRUD effects)
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2MakeDictVar", var: "d", indent: 0 },
+        { type: "v2SetDictVar", varType: "var", var: "d", keyType: "value", key: "k", valueType: "value", value: "v", indent: 0 },
+        { type: "v2GetDictVar", varType: "var", var: "d", keyType: "value", key: "k", outputVar: "out", indent: 0 },
+        { type: "v2HasDictKey", varType: "var", var: "d", keyType: "value", key: "k", outputVar: "has", indent: 0 },
+        { type: "v2GetDictSize", varType: "var", var: "d", outputVar: "size", indent: 0 },
+        { type: "v2GetDictKeys", varType: "var", var: "d", outputVar: "keys", indent: 0 },
+        { type: "v2GetDictValues", varType: "var", var: "d", outputVar: "vals", indent: 0 },
+        { type: "v2DeleteDictKey", varType: "var", var: "d", keyType: "value", key: "k", indent: 0 },
+        { type: "v2HasDictKey", varType: "var", var: "d", keyType: "value", key: "k", outputVar: "has2", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "v", result.chat[:scriptstate]["$out"]
+    assert_equal "1", result.chat[:scriptstate]["$has"]
+    assert_equal "1", result.chat[:scriptstate]["$size"]
+    assert_equal "[\"k\"]", result.chat[:scriptstate]["$keys"]
+    assert_equal "[\"v\"]", result.chat[:scriptstate]["$vals"]
+    assert_equal "0", result.chat[:scriptstate]["$has2"]
+
+    trigger2 = {
+      type: "output",
+      effect: [
+        { type: "v2SetVar", operator: "=", var: "d", valueType: "value", value: "invalid json", indent: 0 },
+        { type: "v2SetDictVar", varType: "var", var: "d", keyType: "value", key: "k", valueType: "value", value: "v", indent: 0 },
+      ],
+    }
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "{\"k\":\"v\"}", result2.chat[:scriptstate]["$d"]
+  end
 end

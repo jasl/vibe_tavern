@@ -577,6 +577,159 @@ module TavernKit
               end
 
             set_var(chat, effect["outputVar"], joined, local_vars: local_vars, current_indent: current_indent)
+          when "v2MakeDictVar", "v2ClearDict"
+            var_name = effect["var"].to_s
+            unless var_name.start_with?("{") && var_name.end_with?("}")
+              set_var(chat, var_name, "{}", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2GetDictVar"
+            var_value =
+              if effect["varType"].to_s == "value"
+                effect["var"].to_s
+              else
+                get_var(chat, effect["var"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            key =
+              if effect["keyType"].to_s == "value"
+                effect["key"].to_s
+              else
+                get_var(chat, effect["key"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            begin
+              dict = ::JSON.parse(var_value)
+              out = dict.is_a?(Hash) ? dict[key] : nil
+              set_var(chat, output_var, out.nil? ? "null" : out.to_s, local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, output_var, "null", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2SetDictVar"
+            next_value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            key =
+              if effect["keyType"].to_s == "value"
+                effect["key"].to_s
+              else
+                get_var(chat, effect["key"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            # v2SetDictVar cannot mutate dict literals (mirrors upstream).
+            if effect["varType"].to_s != "value"
+              var_name = effect["var"].to_s
+
+              begin
+                dict = ::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s)
+                dict = {} unless dict.is_a?(Hash)
+                dict[key] = next_value
+                set_var(chat, var_name, ::JSON.generate(dict), local_vars: local_vars, current_indent: current_indent)
+              rescue JSON::ParserError, TypeError
+                dict = { key => next_value }
+                set_var(chat, var_name, ::JSON.generate(dict), local_vars: local_vars, current_indent: current_indent)
+              end
+            end
+          when "v2DeleteDictKey"
+            # v2DeleteDictKey cannot mutate dict literals (mirrors upstream).
+            if effect["varType"].to_s != "value"
+              var_name = effect["var"].to_s
+              key =
+                if effect["keyType"].to_s == "value"
+                  effect["key"].to_s
+                else
+                  get_var(chat, effect["key"], local_vars: local_vars, current_indent: current_indent).to_s
+                end
+
+              begin
+                dict = ::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s)
+                dict = {} unless dict.is_a?(Hash)
+                dict.delete(key)
+                set_var(chat, var_name, ::JSON.generate(dict), local_vars: local_vars, current_indent: current_indent)
+              rescue JSON::ParserError, TypeError
+                set_var(chat, var_name, "{}", local_vars: local_vars, current_indent: current_indent)
+              end
+            end
+          when "v2HasDictKey"
+            var_value =
+              if effect["varType"].to_s == "value"
+                effect["var"].to_s
+              else
+                get_var(chat, effect["var"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            key =
+              if effect["keyType"].to_s == "value"
+                effect["key"].to_s
+              else
+                get_var(chat, effect["key"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            begin
+              dict = ::JSON.parse(var_value)
+              hit = dict.is_a?(Hash) && dict.key?(key) ? "1" : "0"
+              set_var(chat, output_var, hit, local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, output_var, "0", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2GetDictSize"
+            var_value =
+              if effect["varType"].to_s == "value"
+                effect["var"].to_s
+              else
+                get_var(chat, effect["var"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            begin
+              dict = ::JSON.parse(var_value)
+              size = dict.is_a?(Hash) ? dict.size : 0
+              set_var(chat, output_var, size.to_s, local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, output_var, "0", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2GetDictKeys"
+            var_value =
+              if effect["varType"].to_s == "value"
+                effect["var"].to_s
+              else
+                get_var(chat, effect["var"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            begin
+              dict = ::JSON.parse(var_value)
+              keys = dict.is_a?(Hash) ? dict.keys : []
+              set_var(chat, output_var, ::JSON.generate(keys), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, output_var, "[]", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2GetDictValues"
+            var_value =
+              if effect["varType"].to_s == "value"
+                effect["var"].to_s
+              else
+                get_var(chat, effect["var"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            begin
+              dict = ::JSON.parse(var_value)
+              values = dict.is_a?(Hash) ? dict.values : []
+              set_var(chat, output_var, ::JSON.generate(values), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, output_var, "[]", local_vars: local_vars, current_indent: current_indent)
+            end
           when "v2MakeArrayVar"
             var_name = effect["var"].to_s
             unless var_name.start_with?("[") && var_name.end_with?("]")
