@@ -4,6 +4,7 @@ require_relative "macros/time_macros"
 require_relative "macros/logic_macros"
 require_relative "macros/collection_macros"
 require_relative "macros/string_macros"
+require_relative "macros/escape_macros"
 require_relative "macros/aggregate_macros"
 require_relative "macros/unicode_macros"
 require_relative "macros/crypto_macros"
@@ -250,6 +251,22 @@ module TavernKit
             resolve_ruby(args)
           when "codeblock"
             resolve_codeblock(args)
+          when "br", "newline"
+            resolve_br(args)
+          when "cbr", "cnl", "cnewline"
+            resolve_cbr(args)
+          when "displayescapedbracketopen", "debo", "("
+            resolve_displayescapedbracketopen(args)
+          when "displayescapedbracketclose", "debc", ")"
+            resolve_displayescapedbracketclose(args)
+          when "displayescapedanglebracketopen", "deabo", "<"
+            resolve_displayescapedanglebracketopen(args)
+          when "displayescapedanglebracketclose", "deabc", ">"
+            resolve_displayescapedanglebracketclose(args)
+          when "displayescapedcolon", "dec"
+            resolve_displayescapedcolon(args)
+          when "displayescapedsemicolon", ";"
+            resolve_displayescapedsemicolon(args)
           else
             nil
           end

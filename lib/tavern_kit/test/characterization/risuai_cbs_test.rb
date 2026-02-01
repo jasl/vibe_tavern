@@ -19,6 +19,27 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "\u{E9B9}", render("{{decbc}}")
     assert_equal "\n", render("{{br}}")
     assert_equal "\\n", render("{{cbr}}")
+    assert_equal "\n", render("{{newline}}")
+    assert_equal "\\n\\n\\n", render("{{cbr::3}}")
+
+    assert_equal "\u{E9BA}", render("{{displayescapedbracketopen}}")
+    assert_equal "\u{E9BB}", render("{{displayescapedbracketclose}}")
+    assert_equal "\u{E9BC}", render("{{displayescapedanglebracketopen}}")
+    assert_equal "\u{E9BD}", render("{{displayescapedanglebracketclose}}")
+    assert_equal "\u{E9BE}", render("{{displayescapedcolon}}")
+    assert_equal "\u{E9BF}", render("{{displayescapedsemicolon}}")
+
+    assert_equal "\u{E9BA}", render("{{debo}}")
+    assert_equal "\u{E9BB}", render("{{debc}}")
+    assert_equal "\u{E9BC}", render("{{deabo}}")
+    assert_equal "\u{E9BD}", render("{{deabc}}")
+    assert_equal "\u{E9BE}", render("{{dec}}")
+    assert_equal "\u{E9BF}", render("{{;}}")
+
+    assert_equal "\u{E9BA}", render("{{(}}")
+    assert_equal "\u{E9BB}", render("{{)}}")
+    assert_equal "\u{E9BC}", render("{{<}}")
+    assert_equal "\u{E9BD}", render("{{>}}")
 
     assert_equal "abc", render("{{#pure}}  abc  {{/}}")
     assert_equal "abc", render("{{#pure}}abc{{/pure}}")
