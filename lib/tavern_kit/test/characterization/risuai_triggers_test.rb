@@ -868,4 +868,40 @@ class RisuaiTriggersTest < Minitest::Test
     result3 = TavernKit::RisuAI::Triggers.run(trigger3, chat: chat)
     assert_equal "0", result3.chat[:scriptstate]["$count"]
   end
+
+  def test_v2_get_last_user_and_char_message
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2GetLastUserMessage/v2GetLastCharMessage)
+
+    chat = {
+      scriptstate: {},
+      message: [
+        { role: "user", data: "U1" },
+        { role: "char", data: "C1" },
+        { role: "user", data: "U2" },
+      ],
+    }
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2GetLastUserMessage", outputVar: "u", indent: 0 },
+        { type: "v2GetLastCharMessage", outputVar: "c", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: chat)
+    assert_equal "U2", result.chat[:scriptstate]["$u"]
+    assert_equal "C1", result.chat[:scriptstate]["$c"]
+
+    trigger2 = {
+      type: "output",
+      effect: [
+        { type: "v2GetLastCharMessage", outputVar: "c", indent: 0 },
+      ],
+    }
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "null", result2.chat[:scriptstate]["$c"]
+  end
 end

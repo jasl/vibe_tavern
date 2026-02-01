@@ -1131,6 +1131,16 @@ module TavernKit
             last = messages.last
             data = last.is_a?(Hash) ? last[:data].to_s : nil
             set_var(chat, effect["outputVar"], data.nil? ? "null" : data, local_vars: local_vars, current_indent: current_indent)
+          when "v2GetLastUserMessage"
+            messages = Array(chat[:message])
+            last = messages.reverse.find { |m| m.is_a?(Hash) && m[:role].to_s == "user" }
+            data = last.is_a?(Hash) ? last[:data].to_s : nil
+            set_var(chat, effect["outputVar"], data.nil? ? "null" : data, local_vars: local_vars, current_indent: current_indent)
+          when "v2GetLastCharMessage"
+            messages = Array(chat[:message])
+            last = messages.reverse.find { |m| m.is_a?(Hash) && m[:role].to_s == "char" }
+            data = last.is_a?(Hash) ? last[:data].to_s : nil
+            set_var(chat, effect["outputVar"], data.nil? ? "null" : data, local_vars: local_vars, current_indent: current_indent)
           when "v2GetMessageAtIndex"
             raw_index =
               if effect["indexType"].to_s == "value"
