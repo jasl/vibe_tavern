@@ -45,6 +45,8 @@ module TavernKit
 
         def scan(input)
           scan_input = normalize_input(input)
+          warner = scan_input.warner if scan_input.respond_to?(:warner)
+          warned = {}
 
           books = Array(scan_input.books).compact
           entries = books.flat_map { |b| Array(b&.entries) }.select { |e| e.is_a?(TavernKit::Lore::Entry) }
@@ -100,6 +102,8 @@ module TavernKit
                   full_word_matching: active.full_word_match,
                   dont_search_when_recursive: active.dont_search_when_recursive,
                   search_queries: active.search_queries,
+                  warner: warner,
+                  warned: warned,
                 )
               end
 
@@ -400,7 +404,9 @@ module TavernKit
           scan_depth:,
           full_word_matching:,
           dont_search_when_recursive:,
-          search_queries:
+          search_queries:,
+          warner:,
+          warned:
         )
           # Primary keys are required unless the entry is always active (handled elsewhere).
           primary = Array(entry.keys).map(&:to_s)
@@ -428,13 +434,15 @@ module TavernKit
               full_word_matching: full_word_matching,
               all: all_mode == true,
               dont_search_when_recursive: dont_search_when_recursive,
+              warner: warner,
+              warned: warned,
             )
 
             negative == true ? !result : result
           end
         end
 
-        def search_match?(messages:, recursive_prompts:, keys:, search_depth:, regex:, full_word_matching:, all:, dont_search_when_recursive:)
+        def search_match?(messages:, recursive_prompts:, keys:, search_depth:, regex:, full_word_matching:, all:, dont_search_when_recursive:, warner:, warned:)
           depth = search_depth.to_i
           depth = 0 if depth.negative?
 
@@ -453,9 +461,19 @@ module TavernKit
 
             keys.any? do |js_re|
               re = cached_js_regex(js_re)
-              next false unless re
+              unless re
+                warn_once(warner, warned, [:js_regex_invalid, js_re], "Invalid JS regex literal: #{truncate_literal(js_re)}")
+                next false
+              end
 
-              m_list.any? { |m| re.match?(m[:data]) }
+              m_list.any? do |m|
+                begin
+                  re.match?(m[:data])
+                rescue Regexp::TimeoutError
+                  warn_once(warner, warned, [:js_regex_timeout, js_re], "JS regex match timed out: #{truncate_literal(js_re)}")
+                  false
+                end
+              end
             end
           else
             normalized = m_list.map do |m|
@@ -497,6 +515,30 @@ module TavernKit
           s = text.to_s
           s = s.gsub(/\{\{\/\/(.+?)\}\}/, "")
           s.gsub(/\{\{comment:(.+?)\}\}/, "")
+        end
+
+        def warn_once(warner, warned, key, message)
+          return nil unless warner&.respond_to?(:call)
+
+          if warned.is_a?(Hash)
+            return nil if warned[key]
+
+            warned[key] = true
+          end
+
+          warner.call(message.to_s)
+          nil
+        rescue StandardError
+          nil
+        end
+
+        def truncate_literal(value, max_len: 200)
+          s = value.to_s
+          return s if s.length <= max_len
+
+          "#{s[0, max_len]}..."
+        rescue StandardError
+          ""
         end
 
         def cached_js_regex(value)

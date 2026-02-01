@@ -10,7 +10,7 @@ module TavernKit
         class Buffer
           JS_REGEX_CACHE_MAX = 512
 
-          def initialize(messages:, default_depth:, scan_context:, scan_injects:)
+          def initialize(messages:, default_depth:, scan_context:, scan_injects:, warner: nil, warned: nil)
             @depth_buffer = Array(messages).first(MAX_SCAN_DEPTH).map { |m| m.to_s.strip }
             @default_depth = default_depth.to_i
             @skew = 0
@@ -19,6 +19,9 @@ module TavernKit
             @scan_injects = Array(scan_injects).map(&:to_s).map(&:strip).reject(&:empty?)
 
             @recurse_buffer = +""
+
+            @warner = warner&.respond_to?(:call) ? warner : nil
+            @warned = warned.is_a?(Hash) ? warned : {}
           end
 
           def depth
@@ -80,6 +83,8 @@ module TavernKit
                   scan_entry,
                   case_sensitive: case_sensitive,
                   match_whole_words: match_whole_words,
+                  warner: @warner,
+                  warned: @warned,
                 )
               end
             return 0 if primary.empty?
@@ -93,6 +98,8 @@ module TavernKit
                   scan_entry,
                   case_sensitive: case_sensitive,
                   match_whole_words: match_whole_words,
+                  warner: @warner,
+                  warned: @warned,
                 )
               end
 
@@ -113,13 +120,25 @@ module TavernKit
             match_pre_normalized?(haystack, nil, needle, scan_entry, case_sensitive: case_sensitive, match_whole_words: match_whole_words)
           end
 
-          def self.match_pre_normalized?(haystack, haystack_downcase, needle, _scan_entry, case_sensitive:, match_whole_words:)
+          def self.match_pre_normalized?(haystack, haystack_downcase, needle, _scan_entry, case_sensitive:, match_whole_words:, warner: nil, warned: nil)
             h = haystack.to_s
             n = needle.to_s.strip
             return false if n.empty?
 
-            regex = cached_js_regex(n)
-            return regex.match?(h) if regex
+            if n.start_with?("/")
+              regex = cached_js_regex(n)
+              unless regex
+                warn_once(warner, warned, [:js_regex_invalid, n], "Invalid JS regex literal: #{truncate_literal(n)}")
+                return false
+              end
+
+              begin
+                return regex.match?(h)
+              rescue Regexp::TimeoutError
+                warn_once(warner, warned, [:js_regex_timeout, n], "JS regex match timed out: #{truncate_literal(n)}")
+                return false
+              end
+            end
 
             if case_sensitive
               hay = h
@@ -149,6 +168,32 @@ module TavernKit
             @js_regex_cache.fetch(v)
           end
           private_class_method :cached_js_regex
+
+          def self.warn_once(warner, warned, key, message)
+            return nil unless warner&.respond_to?(:call)
+
+            if warned.is_a?(Hash)
+              return nil if warned[key]
+
+              warned[key] = true
+            end
+
+            warner.call(message.to_s)
+            nil
+          rescue StandardError
+            nil
+          end
+          private_class_method :warn_once
+
+          def self.truncate_literal(value, max_len: 200)
+            s = value.to_s
+            return s if s.length <= max_len
+
+            "#{s[0, max_len]}..."
+          rescue StandardError
+            ""
+          end
+          private_class_method :truncate_literal
 
           private
 

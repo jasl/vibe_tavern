@@ -226,6 +226,8 @@ module TavernKit
           turn_count = input.respond_to?(:turn_count) ? input.turn_count.to_i : messages.length
 
           timed_state = input.respond_to?(:timed_state) ? input.timed_state : {}
+          warner = input.respond_to?(:warner) ? input.warner : nil
+          warned = {}
 
           sorted_entries = build_entries(books)
           return empty_result if sorted_entries.empty?
@@ -240,6 +242,8 @@ module TavernKit
             default_depth: default_depth,
             scan_context: scan_context,
             scan_injects: scan_injects,
+            warner: warner,
+            warned: warned,
           )
 
           timed_effects = TimedEffects.new(
@@ -345,11 +349,11 @@ module TavernKit
               scan_text = buffer.get(se.ext, scan_state)
               next if scan_text.empty?
 
-              primary_match = first_primary_match(se.entry.keys, scan_text, se)
+              primary_match = first_primary_match(se.entry.keys, scan_text, se, warner: warner, warned: warned)
               next unless primary_match
 
               if needs_secondary_check?(se.entry)
-                matched = match_secondary(se.entry, scan_text, se)
+                matched = match_secondary(se.entry, scan_text, se, warner: warner, warned: warned)
                 next unless matched
               end
 
@@ -508,7 +512,7 @@ module TavernKit
           entry.with(id: "#{world}.#{uid}")
         end
 
-        def first_primary_match(keys, scan_text, scan_entry)
+        def first_primary_match(keys, scan_text, scan_entry, warner:, warned:)
           scan_text_downcase = case_sensitive(scan_entry) ? nil : scan_text.to_s.downcase
 
           Array(keys).find do |key|
@@ -522,6 +526,8 @@ module TavernKit
               scan_entry,
               case_sensitive: case_sensitive(scan_entry),
               match_whole_words: match_whole_words(scan_entry),
+              warner: warner,
+              warned: warned,
             )
           end
         end
@@ -530,7 +536,7 @@ module TavernKit
           entry.selective == true && Array(entry.secondary_keys).any?
         end
 
-        def match_secondary(entry, scan_text, scan_entry)
+        def match_secondary(entry, scan_text, scan_entry, warner:, warned:)
           secondary = Array(entry.secondary_keys).map { |k| k.to_s.strip }.reject(&:empty?)
           return true if secondary.empty?
 
@@ -549,6 +555,8 @@ module TavernKit
                 scan_entry,
                 case_sensitive: case_sensitive(scan_entry),
                 match_whole_words: match_whole_words(scan_entry),
+                warner: warner,
+                warned: warned,
               )
 
             has_any ||= matched
