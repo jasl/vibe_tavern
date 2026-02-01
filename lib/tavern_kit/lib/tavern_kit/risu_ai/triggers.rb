@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "triggers/local_vars"
 require_relative "triggers/helpers"
 require_relative "triggers/v2_collection_effects"
 require_relative "triggers/v2_string_effects"
@@ -12,49 +13,6 @@ module TavernKit
     # tests (conditions + effect array). v2 effects are added iteratively.
     module Triggers
       Result = Data.define(:chat)
-
-      class LocalVars
-        def initialize
-          @by_indent = {}
-        end
-
-        def get(key, current_indent:)
-          i = current_indent.to_i
-          while i >= 0
-            scope = @by_indent[i]
-            return scope[key] if scope && scope.key?(key)
-
-            i -= 1
-          end
-
-          nil
-        end
-
-        def set(key, value, indent:)
-          final_value = value.nil? ? "null" : value.to_s
-
-          found_indent = nil
-          i = indent.to_i
-          while i >= 0
-            scope = @by_indent[i]
-            if scope && scope.key?(key)
-              found_indent = i
-              break
-            end
-            i -= 1
-          end
-
-          target_indent = found_indent || indent.to_i
-          (@by_indent[target_indent] ||= {})[key] = final_value
-        end
-
-        def clear_at_indent(indent)
-          threshold = indent.to_i
-          @by_indent.keys.each do |i|
-            @by_indent.delete(i) if i >= threshold
-          end
-        end
-      end
 
       # Upstream reference:
       # resources/Risuai/src/ts/process/triggers.ts (safeSubset/displayAllowList/requestAllowList)
