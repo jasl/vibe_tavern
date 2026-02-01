@@ -141,4 +141,26 @@ class RisuaiRegexScriptsTest < Minitest::Test
     # With chat_id, mirror the upstream "remove match from data" behavior.
     assert_equal "ab", TavernKit::RisuAI::RegexScripts.apply("aXbX", inject, mode: "editoutput", chat_id: 0)
   end
+
+  def test_process_script_cache_keys_include_environment_fingerprint
+    cache = TavernKit::RisuAI::RegexScripts.send(:process_script_cache)
+    cache.clear
+
+    scripts = [
+      { in: "X", out: "{{getvar::foo}}", type: "editoutput" },
+    ]
+
+    vars = TavernKit::ChatVariables::InMemory.new
+    env = TavernKit::RisuAI::CBS::Environment.build(variables: vars)
+
+    vars.set("foo", "Alice")
+    assert_equal "Alice", TavernKit::RisuAI::RegexScripts.apply("X", scripts, mode: "editoutput", environment: env)
+    assert_operator cache.size, :>, 0
+
+    vars.set("foo", "Bob")
+    assert_equal "Bob", TavernKit::RisuAI::RegexScripts.apply("X", scripts, mode: "editoutput", environment: env)
+    assert_operator cache.size, :>, 1
+  ensure
+    cache.clear
+  end
 end

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "digest"
+
 module TavernKit
   module RisuAI
     # RisuAI "Regex Scripts" engine.
@@ -9,7 +11,9 @@ module TavernKit
     # repeat_back).
     module RegexScripts
       ParsedScript = Data.define(:script, :order, :actions)
+      ExecutableScript = Data.define(:script, :order, :actions, :pattern)
       COMPILED_REGEX_CACHE_MAX = 1000
+      PROCESS_SCRIPT_CACHE_MAX = 1000
 
       module_function
 
@@ -24,15 +28,26 @@ module TavernKit
         parsed, order_changed = parse_scripts(Array(scripts))
         parsed = parsed.sort_by { |s| -s.order } if order_changed
 
-        parsed.each do |ps|
-          script = ps.script
-          next if script["in"].to_s.empty?
-          next unless script["type"].to_s == mode.to_s
+        executable = build_executable_scripts(parsed, mode: mode, chat_id: chat_id, role: role, environment: base_env, engine: engine)
 
+        cache_key = process_script_cache_key(
+          value,
+          mode: mode,
+          chat_id: chat_id,
+          role: role,
+          history: history,
+          environment: base_env,
+          scripts: executable,
+        )
+        cached = process_script_cache.get(cache_key)
+        return cached unless cached.nil?
+
+        executable.each do |ps|
           value = execute_one(
             value,
-            script: script,
+            script: ps.script,
             actions: ps.actions,
+            pattern: ps.pattern,
             chat_id: chat_id,
             history: history,
             role: role,
@@ -42,6 +57,7 @@ module TavernKit
           )
         end
 
+        process_script_cache.set(cache_key, value)
         value
       end
 
@@ -79,14 +95,78 @@ module TavernKit
         [parsed, order_changed]
       end
 
-      def execute_one(data, script:, actions:, chat_id:, history:, role:, cbs_conditions:, engine:, environment:)
+      def build_executable_scripts(parsed, mode:, chat_id:, role:, environment:, engine:)
+        mode_s = mode.to_s
+
+        parsed.each_with_object([]) do |ps, out|
+          script = ps.script
+          next if script["in"].to_s.empty?
+          next unless script["type"].to_s == mode_s
+
+          pattern = script["in"].to_s
+          pattern = cbs_parse(pattern, engine: engine, environment: environment, chat_id: chat_id, role: role) if ps.actions.include?("cbs")
+
+          out << ExecutableScript.new(script: script, order: ps.order, actions: ps.actions, pattern: pattern)
+        end
+      end
+      private_class_method :build_executable_scripts
+
+      def process_script_cache_key(data, mode:, chat_id:, role:, history:, environment:, scripts:)
+        digest = Digest::SHA256.new
+        digest << "tavernkit.risuai.regex_scripts.v1\0"
+        digest << mode.to_s << "\0"
+        digest << chat_id.to_i.to_s << "\0"
+        digest << role.to_s << "\0"
+
+        env_fp =
+          if environment.respond_to?(:cache_fingerprint)
+            environment.cache_fingerprint
+          else
+            environment.hash
+          end
+        digest << env_fp.to_s << "\0"
+
+        digest << history_anchor_for_cache(history, role) << "\0"
+        digest << data.to_s << "\0"
+
+        Array(scripts).each do |ps|
+          script = ps.script
+          digest << ps.order.to_s << "\0"
+          digest << ps.actions.join(",") << "\0"
+          digest << ps.pattern.to_s << "\0"
+          digest << script["out"].to_s << "\0"
+          digest << script["flag"].to_s << "\0"
+          digest << (TavernKit::Coerce.bool(script["ableFlag"], default: false) ? "1" : "0") << "\0"
+        end
+
+        digest.hexdigest
+      end
+      private_class_method :process_script_cache_key
+
+      def history_anchor_for_cache(history, role)
+        r = role.to_s
+
+        Array(history).reverse_each do |m|
+          h = m.is_a?(Hash) ? TavernKit::Utils.deep_stringify_keys(m) : {}
+          next unless h["role"].to_s == r
+
+          return h["data"].to_s
+        end
+
+        ""
+      end
+      private_class_method :history_anchor_for_cache
+
+      def process_script_cache
+        @process_script_cache ||= TavernKit::LRUCache.new(max_size: PROCESS_SCRIPT_CACHE_MAX)
+      end
+      private_class_method :process_script_cache
+
+      def execute_one(data, script:, actions:, pattern:, chat_id:, history:, role:, cbs_conditions:, engine:, environment:)
         out_script = script["out"].to_s.gsub("$n", "\n")
         out_script = out_script.gsub("{{data}}", "$&")
 
         flags = resolve_flags(script, out_script: out_script, actions: actions)
-
-        pattern = script["in"].to_s
-        pattern = cbs_parse(pattern, engine: engine, environment: environment, chat_id: chat_id, role: role) if actions.include?("cbs")
 
         regex = compile_regex(pattern, flags: flags, actions: actions)
         return data unless regex
