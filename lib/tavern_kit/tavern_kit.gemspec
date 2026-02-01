@@ -39,7 +39,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency "tiktoken_ruby", "~> 0"
   spec.add_dependency "easy_talk", ">= 3.3.0", "~> 3"
   spec.add_dependency "rubyzip", ">= 1.2.2", "< 4.0"
-  spec.add_dependency "concurrent-ruby", "~> 1.3"
 
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html
