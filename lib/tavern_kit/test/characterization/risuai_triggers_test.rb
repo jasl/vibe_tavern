@@ -718,4 +718,54 @@ class RisuaiTriggersTest < Minitest::Test
     result3 = TavernKit::RisuAI::Triggers.run(trigger3, chat: { scriptstate: {}, message: [] })
     assert_equal "0", result3.chat[:scriptstate]["$out"]
   end
+
+  def test_v2_display_and_request_state_effects_use_chat_display_data
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2GetDisplayState/v2SetDisplayState + requestAllowList effects)
+
+    display_trigger = {
+      type: "display",
+      effect: [
+        { type: "v2SetDisplayState", valueType: "value", value: "X", indent: 0 },
+        { type: "v2GetDisplayState", outputVar: "out", indent: 0 },
+      ],
+    }
+
+    display_result = TavernKit::RisuAI::Triggers.run(display_trigger, chat: { scriptstate: {}, message: [], display_data: "null" })
+    assert_equal "X", display_result.chat[:display_data]
+    assert_equal "X", display_result.chat[:scriptstate]["$out"]
+
+    request_state = [
+      { "role" => "user", "content" => "hi" },
+      { "role" => "assistant", "content" => "ok" },
+    ]
+
+    request_trigger = {
+      type: "request",
+      effect: [
+        { type: "v2GetRequestStateLength", outputVar: "len", indent: 0 },
+        { type: "v2GetRequestState", indexType: "value", index: "0", outputVar: "m0", indent: 0 },
+        { type: "v2GetRequestStateRole", indexType: "value", index: "0", outputVar: "r0", indent: 0 },
+        { type: "v2SetRequestState", indexType: "value", index: "1", valueType: "value", value: "OK2", indent: 0 },
+        { type: "v2SetRequestStateRole", indexType: "value", index: "0", valueType: "value", value: "system", indent: 0 },
+        { type: "v2GetRequestState", indexType: "value", index: "1", outputVar: "m1", indent: 0 },
+        { type: "v2GetRequestStateRole", indexType: "value", index: "0", outputVar: "r0b", indent: 0 },
+      ],
+    }
+
+    request_result = TavernKit::RisuAI::Triggers.run(
+      request_trigger,
+      chat: { scriptstate: {}, message: [], display_data: JSON.generate(request_state) }
+    )
+
+    assert_equal "2", request_result.chat[:scriptstate]["$len"]
+    assert_equal "hi", request_result.chat[:scriptstate]["$m0"]
+    assert_equal "user", request_result.chat[:scriptstate]["$r0"]
+    assert_equal "OK2", request_result.chat[:scriptstate]["$m1"]
+    assert_equal "system", request_result.chat[:scriptstate]["$r0b"]
+
+    json = JSON.parse(request_result.chat[:display_data])
+    assert_equal "OK2", json[1]["content"]
+    assert_equal "system", json[0]["role"]
+  end
 end

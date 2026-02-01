@@ -844,6 +844,135 @@ module TavernKit
               local_vars: local_vars,
               current_indent: current_indent,
             )
+          when "v2GetDisplayState"
+            # Upstream: works only in displayMode; TavernKit maps it to trigger type == "display".
+            if mode == "display"
+              value = chat[:display_data]
+              set_var(chat, effect["outputVar"], value.nil? ? "null" : value.to_s, local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2SetDisplayState"
+            if mode == "display"
+              value =
+                if effect["valueType"].to_s == "value"
+                  effect["value"].to_s
+                else
+                  get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+                end
+              chat[:display_data] = value
+            end
+          when "v2GetRequestState"
+            if mode == "request"
+              index =
+                if effect["indexType"].to_s == "value"
+                  safe_float(effect["index"])
+                else
+                  safe_float(get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent))
+                end
+
+              output_var = effect["outputVar"].to_s
+              data = chat[:display_data].to_s
+
+              begin
+                json = ::JSON.parse(data)
+                i = index.nan? || index.infinite? || !(index % 1).zero? || index.negative? ? nil : index.to_i
+                content = i.nil? ? nil : json.dig(i, "content")
+                set_var(chat, output_var, content.nil? ? "null" : content.to_s, local_vars: local_vars, current_indent: current_indent)
+              rescue JSON::ParserError, TypeError
+                set_var(chat, output_var, "null", local_vars: local_vars, current_indent: current_indent)
+              end
+            end
+          when "v2SetRequestState"
+            if mode == "request"
+              index =
+                if effect["indexType"].to_s == "value"
+                  safe_float(effect["index"])
+                else
+                  safe_float(get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent))
+                end
+
+              value =
+                if effect["valueType"].to_s == "value"
+                  effect["value"].to_s
+                else
+                  get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+                end
+
+              data = chat[:display_data].to_s
+              begin
+                json = ::JSON.parse(data)
+                i = index.nan? || index.infinite? || !(index % 1).zero? || index.negative? ? nil : index.to_i
+                if i && json[i].is_a?(Hash)
+                  json[i]["content"] = value
+                  chat[:display_data] = ::JSON.generate(json)
+                end
+              rescue JSON::ParserError, TypeError
+                nil
+              end
+            end
+          when "v2GetRequestStateRole"
+            if mode == "request"
+              index =
+                if effect["indexType"].to_s == "value"
+                  safe_float(effect["index"])
+                else
+                  safe_float(get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent))
+                end
+
+              output_var = effect["outputVar"].to_s
+              data = chat[:display_data].to_s
+
+              begin
+                json = ::JSON.parse(data)
+                i = index.nan? || index.infinite? || !(index % 1).zero? || index.negative? ? nil : index.to_i
+                role = i.nil? ? nil : json.dig(i, "role")
+                set_var(chat, output_var, role.nil? ? "null" : role.to_s, local_vars: local_vars, current_indent: current_indent)
+              rescue JSON::ParserError, TypeError
+                set_var(chat, output_var, "null", local_vars: local_vars, current_indent: current_indent)
+              end
+            end
+          when "v2SetRequestStateRole"
+            if mode == "request"
+              index =
+                if effect["indexType"].to_s == "value"
+                  safe_float(effect["index"])
+                else
+                  safe_float(get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent))
+                end
+
+              value =
+                if effect["valueType"].to_s == "value"
+                  effect["value"].to_s
+                else
+                  get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+                end
+
+              role = value if %w[user assistant system].include?(value)
+              if role
+                data = chat[:display_data].to_s
+                begin
+                  json = ::JSON.parse(data)
+                  i = index.nan? || index.infinite? || !(index % 1).zero? || index.negative? ? nil : index.to_i
+                  if i && json[i].is_a?(Hash)
+                    json[i]["role"] = role
+                    chat[:display_data] = ::JSON.generate(json)
+                  end
+                rescue JSON::ParserError, TypeError
+                  nil
+                end
+              end
+            end
+          when "v2GetRequestStateLength"
+            if mode == "request"
+              output_var = effect["outputVar"].to_s
+              data = chat[:display_data].to_s
+
+              begin
+                json = ::JSON.parse(data)
+                set_var(chat, output_var, Array(json).length.to_s, local_vars: local_vars, current_indent: current_indent)
+              rescue JSON::ParserError, TypeError
+                set_var(chat, output_var, "0", local_vars: local_vars, current_indent: current_indent)
+              end
+            end
           when "v2ConsoleLog"
             source =
               if effect["sourceType"].to_s == "value"
