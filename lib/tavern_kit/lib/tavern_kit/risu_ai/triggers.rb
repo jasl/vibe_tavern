@@ -265,16 +265,16 @@ module TavernKit
       end
 
       def run_effects(effects, chat:, trigger:, triggers:, recursion_count:, local_vars:)
-        idx = 0
+        effect_idx = 0
         mode = trigger["type"].to_s
         current_indent = 0
         loop_n_times = Hash.new(0)
 
-        while idx < effects.length
-          effect = effects[idx]
+        while effect_idx < effects.length
+          effect = effects[effect_idx]
           type = effect["type"].to_s
           unless effect_allowed?(type, mode: mode)
-            idx += 1
+            effect_idx += 1
             next
           end
 
@@ -289,20 +289,20 @@ module TavernKit
             unless pass
               # Skip until the matching end of this indent block.
               end_indent = indent + 1
-              idx += 1
-              while idx < effects.length
-                ef = effects[idx]
+              effect_idx += 1
+              while effect_idx < effects.length
+                ef = effects[effect_idx]
                 if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"].to_s, exception: false) || 0) == end_indent
                   # If there's an else clause, jump to it so the loop increment
                   # lands on the first else-body effect.
-                  next_ef = effects[idx + 1]
+                  next_ef = effects[effect_idx + 1]
                   if next_ef.is_a?(Hash) && next_ef["type"].to_s == "v2Else" && (Integer(next_ef["indent"].to_s, exception: false) || 0) == indent
-                    idx += 1
+                    effect_idx += 1
                   end
                   break
                 end
 
-                idx += 1
+                effect_idx += 1
               end
             end
           when "v2SetVar"
@@ -577,6 +577,245 @@ module TavernKit
               end
 
             set_var(chat, effect["outputVar"], joined, local_vars: local_vars, current_indent: current_indent)
+          when "v2MakeArrayVar"
+            var_name = effect["var"].to_s
+            unless var_name.start_with?("[") && var_name.end_with?("]")
+              set_var(chat, var_name, "[]", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2GetArrayVarLength"
+            var_name = effect["var"].to_s
+            output_var = effect["outputVar"].to_s
+
+            length =
+              begin
+                arr = ::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s)
+                Array(arr).length
+              rescue JSON::ParserError, TypeError
+                0
+              end
+
+            set_var(chat, output_var, length.to_s, local_vars: local_vars, current_indent: current_indent)
+          when "v2GetArrayVar"
+            var_name = effect["var"].to_s
+            raw_index =
+              if effect["indexType"].to_s == "value"
+                effect["index"].to_s
+              else
+                get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            begin
+              arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+              idx = safe_float(raw_index)
+
+              value =
+                if idx.nan? || idx.infinite? || !(idx % 1).zero? || idx.negative?
+                  nil
+                else
+                  arr[idx.to_i]
+                end
+
+              set_var(chat, output_var, value.nil? ? "null" : value.to_s, local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, output_var, "null", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2SetArrayVar"
+            var_name = effect["var"].to_s
+            raw_index =
+              if effect["indexType"].to_s == "value"
+                effect["index"].to_s
+              else
+                get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            idx = safe_float(raw_index)
+            unless idx.nan? || idx.infinite? || !(idx % 1).zero? || idx.negative?
+              begin
+                arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+                arr[idx.to_i] = value
+                set_var(chat, var_name, ::JSON.generate(arr), local_vars: local_vars, current_indent: current_indent)
+              rescue JSON::ParserError, TypeError
+                nil
+              end
+            end
+          when "v2PushArrayVar"
+            var_name = effect["var"].to_s
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            begin
+              arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+              arr << value
+              set_var(chat, var_name, ::JSON.generate(arr), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, var_name, "[]", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2PopArrayVar"
+            var_name = effect["var"].to_s
+            output_var = effect["outputVar"].to_s
+
+            begin
+              arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+              popped = arr.pop
+              set_var(chat, output_var, popped.nil? ? "null" : popped.to_s, local_vars: local_vars, current_indent: current_indent)
+              set_var(chat, var_name, ::JSON.generate(arr), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, var_name, "[]", local_vars: local_vars, current_indent: current_indent)
+              set_var(chat, output_var, "null", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2ShiftArrayVar"
+            var_name = effect["var"].to_s
+            output_var = effect["outputVar"].to_s
+
+            begin
+              arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+              shifted = arr.shift
+              set_var(chat, output_var, shifted.nil? ? "null" : shifted.to_s, local_vars: local_vars, current_indent: current_indent)
+              set_var(chat, var_name, ::JSON.generate(arr), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, var_name, "[]", local_vars: local_vars, current_indent: current_indent)
+              set_var(chat, output_var, "null", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2UnshiftArrayVar"
+            var_name = effect["var"].to_s
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            begin
+              arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+              arr.unshift(value)
+              set_var(chat, var_name, ::JSON.generate(arr), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError
+              set_var(chat, var_name, "[]", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2SpliceArrayVar"
+            var_name = effect["var"].to_s
+            raw_start =
+              if effect["startType"].to_s == "value"
+                effect["start"].to_s
+              else
+                get_var(chat, effect["start"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            item =
+              if effect["itemType"].to_s == "value"
+                effect["item"].to_s
+              else
+                get_var(chat, effect["item"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            begin
+              arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+
+              start = safe_float(raw_start)
+              start_i = start.nan? || start.infinite? ? 0 : start.truncate
+              start_i += arr.length if start_i.negative?
+              start_i = 0 if start_i.negative?
+              start_i = arr.length if start_i > arr.length
+
+              arr.insert(start_i, item)
+              set_var(chat, var_name, ::JSON.generate(arr), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError, FloatDomainError
+              set_var(chat, var_name, "[]", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2SliceArrayVar"
+            var_name = effect["var"].to_s
+            raw_start =
+              if effect["startType"].to_s == "value"
+                effect["start"].to_s
+              else
+                get_var(chat, effect["start"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            raw_end =
+              if effect["endType"].to_s == "value"
+                effect["end"].to_s
+              else
+                get_var(chat, effect["end"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            begin
+              arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+
+              start = safe_float(raw_start)
+              end_v = safe_float(raw_end)
+              s_i = start.nan? || start.infinite? ? 0 : start.truncate
+              e_i = end_v.nan? || end_v.infinite? ? 0 : end_v.truncate
+
+              len = arr.length
+              s_i += len if s_i.negative?
+              e_i += len if e_i.negative?
+              s_i = 0 if s_i.negative?
+              e_i = 0 if e_i.negative?
+              s_i = len if s_i > len
+              e_i = len if e_i > len
+
+              slice = arr[s_i...e_i] || []
+              set_var(chat, output_var, ::JSON.generate(slice), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError, FloatDomainError
+              set_var(chat, output_var, "[]", local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2GetIndexOfValueInArrayVar"
+            var_name = effect["var"].to_s
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            idx =
+              begin
+                arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+                found = arr.index(value)
+                found.nil? ? -1 : found
+              rescue JSON::ParserError, TypeError
+                -1
+              end
+
+            set_var(chat, output_var, idx.to_s, local_vars: local_vars, current_indent: current_indent)
+          when "v2RemoveIndexFromArrayVar"
+            var_name = effect["var"].to_s
+            raw_index =
+              if effect["indexType"].to_s == "value"
+                effect["index"].to_s
+              else
+                get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            begin
+              arr = Array(::JSON.parse(get_var(chat, var_name, local_vars: local_vars, current_indent: current_indent).to_s))
+              index = safe_float(raw_index)
+              i = index.nan? || index.infinite? ? 0 : index.truncate
+              i += arr.length if i.negative?
+              i = 0 if i.negative?
+              i = arr.length if i > arr.length
+              arr.delete_at(i) if i < arr.length
+              set_var(chat, var_name, ::JSON.generate(arr), local_vars: local_vars, current_indent: current_indent)
+            rescue JSON::ParserError, TypeError, FloatDomainError
+              set_var(chat, var_name, "[]", local_vars: local_vars, current_indent: current_indent)
+            end
           when "v2ConsoleLog"
             source =
               if effect["sourceType"].to_s == "value"
@@ -608,22 +847,22 @@ module TavernKit
             # Skip else body when the preceding v2IfAdvanced passed.
             else_indent = Integer(effect["indent"].to_s, exception: false) || 0
             end_indent = else_indent + 1
-            idx += 1
-            while idx < effects.length
-              ef = effects[idx]
+            effect_idx += 1
+            while effect_idx < effects.length
+              ef = effects[effect_idx]
               break if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"].to_s, exception: false) || 0) == end_indent
 
-              idx += 1
+              effect_idx += 1
             end
           when "v2EndIndent"
             end_indent = Integer(effect["indent"].to_s, exception: false) || 0
 
             if effect["endOfLoop"] == true
               loop_indent = end_indent - 1
-              original_idx = idx
+              original_idx = effect_idx
 
               header_idx = nil
-              scan = idx
+              scan = effect_idx
               while scan >= 0
                 ef = effects[scan]
                 ef_type = ef["type"].to_s
@@ -645,12 +884,12 @@ module TavernKit
 
                     loop_n_times[header_idx] += 1
                     if loop_n_times[header_idx] < max_times
-                      idx = header_idx
+                      effect_idx = header_idx
                     else
-                      idx = original_idx
+                      effect_idx = original_idx
                     end
                   else
-                    idx = header_idx
+                    effect_idx = header_idx
                   end
 
                   break
@@ -665,11 +904,11 @@ module TavernKit
             # Looping is handled by v2EndIndent (mirrors upstream).
             nil
           when "v2BreakLoop"
-            scan = idx
+            scan = effect_idx
             while scan < effects.length
               ef = effects[scan]
               if ef["type"].to_s == "v2EndIndent" && ef["endOfLoop"] == true
-                idx = scan
+                effect_idx = scan
                 break
               end
               scan += 1
@@ -691,7 +930,7 @@ module TavernKit
             end
           end
 
-          idx += 1
+          effect_idx += 1
         end
       end
 

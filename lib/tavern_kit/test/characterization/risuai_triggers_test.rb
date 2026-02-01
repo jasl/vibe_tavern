@@ -625,4 +625,60 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "[\"x\"]", result3.chat[:scriptstate]["$arr"]
     assert_equal "", result3.chat[:scriptstate]["$joined"]
   end
+
+  def test_v2_array_var_operations
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2MakeArrayVar + array CRUD effects)
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2MakeArrayVar", var: "arr", indent: 0 },
+        { type: "v2PushArrayVar", var: "arr", valueType: "value", value: "a", indent: 0 },
+        { type: "v2PushArrayVar", var: "arr", valueType: "value", value: "b", indent: 0 },
+        { type: "v2GetArrayVarLength", var: "arr", outputVar: "len", indent: 0 },
+        { type: "v2GetArrayVar", var: "arr", indexType: "value", index: "1", outputVar: "second", indent: 0 },
+        { type: "v2PopArrayVar", var: "arr", outputVar: "popped", indent: 0 },
+        { type: "v2ShiftArrayVar", var: "arr", outputVar: "shifted", indent: 0 },
+        { type: "v2GetArrayVarLength", var: "arr", outputVar: "len2", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "[]", result.chat[:scriptstate]["$arr"]
+    assert_equal "2", result.chat[:scriptstate]["$len"]
+    assert_equal "b", result.chat[:scriptstate]["$second"]
+    assert_equal "b", result.chat[:scriptstate]["$popped"]
+    assert_equal "a", result.chat[:scriptstate]["$shifted"]
+    assert_equal "0", result.chat[:scriptstate]["$len2"]
+
+    trigger2 = {
+      type: "output",
+      effect: [
+        { type: "v2SetVar", operator: "=", var: "arr", valueType: "value", value: "[\"a\",\"c\"]", indent: 0 },
+        { type: "v2SpliceArrayVar", var: "arr", startType: "value", start: "1", itemType: "value", item: "b", indent: 0 },
+        { type: "v2SliceArrayVar", var: "arr", startType: "value", start: "1", endType: "value", end: "3", outputVar: "slice", indent: 0 },
+        { type: "v2GetIndexOfValueInArrayVar", var: "arr", valueType: "value", value: "b", outputVar: "idx", indent: 0 },
+        { type: "v2RemoveIndexFromArrayVar", var: "arr", indexType: "value", index: "1", indent: 0 },
+        { type: "v2SetArrayVar", var: "arr", indexType: "value", index: "1", valueType: "value", value: "Z", indent: 0 },
+        { type: "v2GetArrayVar", var: "arr", indexType: "value", index: "1", outputVar: "val", indent: 0 },
+      ],
+    }
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "[\"b\",\"c\"]", result2.chat[:scriptstate]["$slice"]
+    assert_equal "1", result2.chat[:scriptstate]["$idx"]
+    assert_equal "Z", result2.chat[:scriptstate]["$val"]
+
+    trigger3 = {
+      type: "output",
+      effect: [
+        { type: "v2SetVar", operator: "=", var: "bad", valueType: "value", value: "invalid json", indent: 0 },
+        { type: "v2PushArrayVar", var: "bad", valueType: "value", value: "x", indent: 0 },
+      ],
+    }
+
+    result3 = TavernKit::RisuAI::Triggers.run(trigger3, chat: { scriptstate: {}, message: [] })
+    assert_equal "[]", result3.chat[:scriptstate]["$bad"]
+  end
 end
