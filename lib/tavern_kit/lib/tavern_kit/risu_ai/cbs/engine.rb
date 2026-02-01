@@ -74,7 +74,7 @@ module TavernKit
               next
             end
 
-            out << expand_tag(raw, token: token, environment: environment)
+            out << expand_tag(raw, token: token, environment: environment, out_buffer: out)
             i = close_idx + CLOSE.length
           end
 
@@ -547,6 +547,30 @@ module TavernKit
           end
         end
 
+        def apply_bkspc!(out_buffer)
+          # Upstream reference:
+          # resources/Risuai/src/ts/cbs.ts (bkspc)
+          return unless out_buffer
+
+          root = out_buffer.to_s.rstrip
+          out_buffer.replace(root.sub(/\s*\S+\z/, ""))
+        end
+
+        def apply_erase!(out_buffer)
+          # Upstream reference:
+          # resources/Risuai/src/ts/cbs.ts (erase)
+          return unless out_buffer
+
+          root = out_buffer.to_s.rstrip
+          idx = root.rindex(/[.!?\n]/)
+
+          if idx
+            out_buffer.replace(root[0..idx].rstrip)
+          else
+            out_buffer.replace("")
+          end
+        end
+
         def chat_var(environment, name)
           environment.get_var(name, scope: :local)
         rescue NotImplementedError
@@ -559,7 +583,7 @@ module TavernKit
           nil
         end
 
-        def expand_tag(raw, token:, environment:)
+        def expand_tag(raw, token:, environment:, out_buffer: nil)
           raw_text = raw.to_s
           expanded_raw =
             if raw_text.include?(OPEN)
@@ -581,6 +605,16 @@ module TavernKit
           if tok.start_with?("call::")
             rendered = expand_call(tok, environment: environment)
             return rendered if rendered
+          end
+
+          if tok == "bkspc"
+            apply_bkspc!(out_buffer)
+            return ""
+          end
+
+          if tok == "erase"
+            apply_erase!(out_buffer)
+            return ""
           end
 
           case tok

@@ -193,6 +193,12 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "<div class=\"risu-comment\">hi</div>", render("{{comment::hi}}", displaying: true)
   end
 
+  def test_bkspc_and_erase
+    assert_equal "hello user", render("hello world {{bkspc}} user")
+    assert_equal "Hello world. done", render("Hello world. Next {{erase}} done")
+    assert_equal "end", render("No punctuation {{erase}}end")
+  end
+
   def test_calc_expression
     assert_equal "7", render("{{? 1 + 2 * 3}}")
     assert_equal "1", render("{{? 3 > 2}}")
