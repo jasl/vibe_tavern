@@ -16,9 +16,10 @@ module TavernKit
       def apply(data, scripts, mode:, chat_id: -1, history: nil, role: nil, cbs_conditions: nil, environment: nil)
         # Upstream reference:
         # resources/Risuai/src/ts/process/scripts.ts (processScriptFull)
+        engine = TavernKit::RisuAI::CBS::Engine.new
         value = data.to_s
         base_env = base_environment(environment, chat_id: chat_id, history: history, role: role, cbs_conditions: cbs_conditions)
-        value = cbs_parse(value, environment: base_env, chat_id: chat_id, role: role)
+        value = cbs_parse(value, engine: engine, environment: base_env, chat_id: chat_id, role: role)
 
         parsed, order_changed = parse_scripts(Array(scripts))
         parsed = parsed.sort_by { |s| -s.order } if order_changed
@@ -36,6 +37,7 @@ module TavernKit
             history: history,
             role: role,
             cbs_conditions: cbs_conditions,
+            engine: engine,
             environment: base_env,
           )
         end
@@ -77,14 +79,14 @@ module TavernKit
         [parsed, order_changed]
       end
 
-      def execute_one(data, script:, actions:, chat_id:, history:, role:, cbs_conditions:, environment:)
+      def execute_one(data, script:, actions:, chat_id:, history:, role:, cbs_conditions:, engine:, environment:)
         out_script = script["out"].to_s.gsub("$n", "\n")
         out_script = out_script.gsub("{{data}}", "$&")
 
         flags = resolve_flags(script, out_script: out_script, actions: actions)
 
         pattern = script["in"].to_s
-        pattern = cbs_parse(pattern, environment: environment, chat_id: chat_id, role: role) if actions.include?("cbs")
+        pattern = cbs_parse(pattern, engine: engine, environment: environment, chat_id: chat_id, role: role) if actions.include?("cbs")
 
         regex = compile_regex(pattern, flags: flags, actions: actions)
         return data unless regex
@@ -112,7 +114,7 @@ module TavernKit
 
             # Default special handling: plain replacement, re-parsed via CBS in upstream.
             replaced = replace_data(data, regex, out_script, global: flags.include?("g"))
-            return cbs_parse(replaced, environment: environment, chat_id: chat_id, role: role)
+            return cbs_parse(replaced, engine: engine, environment: environment, chat_id: chat_id, role: role)
           end
 
           if (out_script.start_with?("@@repeat_back") || actions.include?("repeat_back")) && chat_id != -1
@@ -123,7 +125,7 @@ module TavernKit
         end
 
         replaced = replace_data(data, regex, out_script, global: flags.include?("g"))
-        cbs_parse(replaced, environment: environment, chat_id: chat_id, role: role)
+        cbs_parse(replaced, engine: engine, environment: environment, chat_id: chat_id, role: role)
       end
 
       def resolve_flags(script, out_script:, actions:)
@@ -267,7 +269,7 @@ module TavernKit
       end
       private_class_method :base_environment
 
-      def cbs_parse(text, environment:, chat_id:, role:)
+      def cbs_parse(text, engine:, environment:, chat_id:, role:)
         env =
           if environment.respond_to?(:call_frame)
             environment.call_frame(
@@ -280,7 +282,7 @@ module TavernKit
             environment
           end
 
-        TavernKit::RisuAI::CBS::Engine.new.expand(text.to_s, environment: env)
+        engine.expand(text.to_s, environment: env)
       end
       private_class_method :cbs_parse
     end
