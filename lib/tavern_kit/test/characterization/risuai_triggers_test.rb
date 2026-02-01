@@ -904,4 +904,97 @@ class RisuaiTriggersTest < Minitest::Test
     result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
     assert_equal "null", result2.chat[:scriptstate]["$c"]
   end
+
+  def test_v2_replace_string
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2ReplaceString)
+
+    trigger = {
+      type: "output",
+      effect: [
+        {
+          type: "v2ReplaceString",
+          sourceType: "value",
+          source: "a-b-b",
+          regexType: "value",
+          regex: "b",
+          resultType: "value",
+          result: "$0",
+          replacementType: "value",
+          replacement: "X",
+          flagsType: "value",
+          flags: "",
+          outputVar: "out1",
+          indent: 0,
+        },
+        {
+          type: "v2ReplaceString",
+          sourceType: "value",
+          source: "a-b-b",
+          regexType: "value",
+          regex: "b",
+          resultType: "value",
+          result: "$0",
+          replacementType: "value",
+          replacement: "X",
+          flagsType: "value",
+          flags: "g",
+          outputVar: "out2",
+          indent: 0,
+        },
+        {
+          type: "v2ReplaceString",
+          sourceType: "value",
+          source: "abc",
+          regexType: "value",
+          regex: "a(b)c",
+          resultType: "value",
+          result: "$1",
+          replacementType: "value",
+          replacement: "X",
+          flagsType: "value",
+          flags: "",
+          outputVar: "out3",
+          indent: 0,
+        },
+        {
+          type: "v2ReplaceString",
+          sourceType: "value",
+          source: "abc",
+          regexType: "value",
+          regex: "a(b)c",
+          resultType: "value",
+          result: "[$1:$0:$&:$$]",
+          replacementType: "value",
+          replacement: "X",
+          flagsType: "value",
+          flags: "",
+          outputVar: "out4",
+          indent: 0,
+        },
+        {
+          type: "v2ReplaceString",
+          sourceType: "value",
+          source: "abc",
+          regexType: "value",
+          regex: "[",
+          resultType: "value",
+          result: "$0",
+          replacementType: "value",
+          replacement: "X",
+          flagsType: "value",
+          flags: "",
+          outputVar: "out5",
+          indent: 0,
+        },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "a-X-b", result.chat[:scriptstate]["$out1"]
+    assert_equal "a-X-X", result.chat[:scriptstate]["$out2"]
+    assert_equal "aXc", result.chat[:scriptstate]["$out3"]
+    assert_equal "[b:abc:abc:$]", result.chat[:scriptstate]["$out4"]
+    assert_equal "abc", result.chat[:scriptstate]["$out5"]
+  end
 end

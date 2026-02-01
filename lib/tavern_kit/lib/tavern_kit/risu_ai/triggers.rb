@@ -997,6 +997,54 @@ module TavernKit
               local_vars: local_vars,
               current_indent: current_indent,
             )
+          when "v2ReplaceString"
+            source =
+              if effect["sourceType"].to_s == "value"
+                effect["source"].to_s
+              else
+                get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            regex_pattern =
+              if effect["regexType"].to_s == "value"
+                effect["regex"].to_s
+              else
+                get_var(chat, effect["regex"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            result_format =
+              if effect["resultType"].to_s == "value"
+                effect["result"].to_s
+              else
+                get_var(chat, effect["result"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            replacement =
+              if effect["replacementType"].to_s == "value"
+                effect["replacement"].to_s
+              else
+                get_var(chat, effect["replacement"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            flags =
+              if effect["flagsType"].to_s == "value"
+                effect["flags"].to_s
+              else
+                get_var(chat, effect["flags"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            result =
+              begin
+                re = Regexp.new(regex_pattern, regex_options(flags))
+                fn = ->(m) { v2_replace_string_replacement(m, result_format, replacement) }
+                flags.include?("g") ? source.gsub(re) { fn.call(Regexp.last_match) } : source.sub(re) { fn.call(Regexp.last_match) }
+              rescue StandardError
+                source
+              end
+
+            set_var(chat, output_var, result, local_vars: local_vars, current_indent: current_indent)
           when "v2GetDisplayState"
             # Upstream: works only in displayMode; TavernKit maps it to trigger type == "display".
             if mode == "display"
@@ -1878,6 +1926,31 @@ module TavernKit
         opts |= Regexp::IGNORECASE if flags.include?("i")
         opts |= Regexp::MULTILINE if flags.include?("m")
         opts
+      end
+
+      def v2_replace_string_replacement(match, result_format, replacement)
+        match_str = match[0].to_s
+        groups = match.captures
+
+        target_group_match = result_format.match(/\A\$(\d+)\z/)
+        if target_group_match
+          target_index = Integer(target_group_match[1], exception: false)
+          if target_index == 0
+            return replacement
+          elsif target_index
+            target_group = groups[target_index - 1]
+            if target_group && !target_group.empty?
+              return match_str.sub(target_group, replacement)
+            end
+          end
+        end
+
+        result_format.gsub(/\$\d+/) do |placeholder|
+          idx = Integer(placeholder.delete_prefix("$"), exception: false)
+          idx == 0 ? match_str : (idx ? (groups[idx - 1] || "") : "")
+        end
+          .gsub("$&", match_str)
+          .gsub("$$", "$")
       end
 
       def get_var(chat, name, local_vars:, current_indent:)
