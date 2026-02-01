@@ -24,6 +24,16 @@ module TavernKit
             resolve_chatindex(environment)
           when "messageindex"
             resolve_messageindex(environment)
+          when "personality", "charpersona"
+            resolve_personality(environment)
+          when "description", "chardesc"
+            resolve_description(environment)
+          when "scenario"
+            resolve_scenario(environment)
+          when "exampledialogue", "examplemessage"
+            resolve_exampledialogue(environment)
+          when "persona", "userpersona"
+            resolve_persona(environment)
           when "model"
             resolve_model(environment)
           when "role"
@@ -160,6 +170,41 @@ module TavernKit
           (environment.respond_to?(:message_index) ? (environment.message_index || 0) : 0).to_i.to_s
         end
         private_class_method :resolve_messageindex
+
+        def resolve_personality(environment)
+          char = environment.respond_to?(:character) ? environment.character : nil
+          text = char&.respond_to?(:data) ? char.data&.personality.to_s : ""
+          render_nested(text, environment: environment)
+        end
+        private_class_method :resolve_personality
+
+        def resolve_description(environment)
+          char = environment.respond_to?(:character) ? environment.character : nil
+          text = char&.respond_to?(:data) ? char.data&.description.to_s : ""
+          render_nested(text, environment: environment)
+        end
+        private_class_method :resolve_description
+
+        def resolve_scenario(environment)
+          char = environment.respond_to?(:character) ? environment.character : nil
+          text = char&.respond_to?(:data) ? char.data&.scenario.to_s : ""
+          render_nested(text, environment: environment)
+        end
+        private_class_method :resolve_scenario
+
+        def resolve_exampledialogue(environment)
+          char = environment.respond_to?(:character) ? environment.character : nil
+          text = char&.respond_to?(:data) ? char.data&.mes_example.to_s : ""
+          render_nested(text, environment: environment)
+        end
+        private_class_method :resolve_exampledialogue
+
+        def resolve_persona(environment)
+          user = environment.respond_to?(:user) ? environment.user : nil
+          text = user&.respond_to?(:persona_text) ? user.persona_text.to_s : environment.user_name.to_s
+          render_nested(text, environment: environment)
+        end
+        private_class_method :resolve_persona
 
         def resolve_model(environment)
           environment.respond_to?(:model_hint) ? environment.model_hint.to_s : ""
@@ -551,6 +596,11 @@ module TavernKit
           "NaN"
         end
         private_class_method :resolve_remaind
+
+        def render_nested(text, environment:)
+          TavernKit::RisuAI::CBS::Engine.new.expand(text.to_s, environment: environment)
+        end
+        private_class_method :render_nested
 
         def parse_js_number(value)
           s = value.to_s.strip

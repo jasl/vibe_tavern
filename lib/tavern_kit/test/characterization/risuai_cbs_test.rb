@@ -71,6 +71,30 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "", render("{{#when::toggle::x}}yes{{/}}", toggles: { x: "0" })
   end
 
+  def test_character_field_macros_expand_inner_cbs
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (personality/description/scenario/exampledialogue/persona)
+
+    char = TavernKit::Character.create(
+      name: "Seraphina",
+      personality: "P={{user}}",
+      description: "D={{char}}",
+      scenario: "S={{user}}&{{char}}",
+      mes_example: "E={{user}}",
+    )
+    user = TavernKit::User.new(name: "Alice", persona: "I am {{user}}")
+
+    assert_equal "P=Alice", render("{{personality}}", character: char, user: user)
+    assert_equal "P=Alice", render("{{charpersona}}", character: char, user: user)
+    assert_equal "D=Seraphina", render("{{description}}", character: char, user: user)
+    assert_equal "D=Seraphina", render("{{chardesc}}", character: char, user: user)
+    assert_equal "S=Alice&Seraphina", render("{{scenario}}", character: char, user: user)
+    assert_equal "E=Alice", render("{{exampledialogue}}", character: char, user: user)
+    assert_equal "E=Alice", render("{{examplemessage}}", character: char, user: user)
+    assert_equal "I am Alice", render("{{persona}}", character: char, user: user)
+    assert_equal "I am Alice", render("{{userpersona}}", character: char, user: user)
+  end
+
   def test_calc_expression_with_variables
     store = TavernKit::ChatVariables::InMemory.new
     store.set("x", 2, scope: :local)
