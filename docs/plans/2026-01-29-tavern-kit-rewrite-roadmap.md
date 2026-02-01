@@ -769,7 +769,7 @@ Wave 5 from drifting while implementing RisuAI.
 
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
-| `RisuAI::RegexScripts` | RisuAI | 6 execution types (modify input/output/request/display, edit translation, disabled), flag system (<order N>, <cbs>, <inject>, <move_top/bottom>, <repeat_back>, <no_end_nl>), @@ directives (emo, inject, move_top/bottom, repeat_back), script ordering. Note: LRU cache is deferred to Wave 6 (Core LRU helper). | 250-300 |
+| `RisuAI::RegexScripts` | RisuAI | 6 execution types (modify input/output/request/display, edit translation, disabled), flag system (<order N>, <cbs>, <inject>, <move_top/bottom>, <repeat_back>, <no_end_nl>), @@ directives (emo, inject, move_top/bottom, repeat_back), script ordering. Note: compiled regex is cached via the Core LRU helper (Wave 6). | 250-300 |
 | `RisuAI::Triggers` | RisuAI | v1 + v2 trigger runner with lowLevelAccess gating and recursion limits. Wave 5 focuses on prompt-building safe effects (control flow + vars + string/array/dict + chat ops + tokenize + replace). UI/DB effects (alerts/LLM/imggen/lorebook persistence) are app-owned and may be added later via adapters (Wave 6+). | 500-700 |
 
 #### 5f. RisuAI Pipeline
