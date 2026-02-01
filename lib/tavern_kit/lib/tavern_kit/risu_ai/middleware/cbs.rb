@@ -29,6 +29,7 @@ module TavernKit
             model_hint: ctx[:model_hint],
             toggles: runtime&.toggles,
             metadata: runtime&.metadata,
+            cbs_conditions: runtime&.cbs_conditions,
             modules: runtime&.modules,
             run_var: run_var,
             rm_var: rm_var,

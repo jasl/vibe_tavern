@@ -93,6 +93,14 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "", render("{{#when::toggle::x}}yes{{/}}", toggles: { x: "0" })
   end
 
+  def test_cbs_conditions_affect_role_and_first_message_macros
+    assert_equal "user", render("{{role}}", cbs_conditions: { chatRole: "user" })
+    assert_equal "char", render("{{role}}", cbs_conditions: { firstmsg: true })
+
+    assert_equal "1", render("{{isfirstmsg}}", cbs_conditions: { firstmsg: true })
+    assert_equal "0", render("{{isfirstmsg}}", cbs_conditions: { firstmsg: false })
+  end
+
   def test_character_field_macros_expand_inner_cbs
     # Upstream reference:
     # resources/Risuai/src/ts/cbs.ts (personality/description/scenario/exampledialogue/persona)

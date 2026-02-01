@@ -16,6 +16,7 @@ module TavernKit
                     :rng_word,
                     :modules,
                     :metadata,
+                    :cbs_conditions,
                     :displaying,
                     :run_var,
                     :rm_var
@@ -37,6 +38,7 @@ module TavernKit
           rng_word: nil,
           modules: nil,
           metadata: nil,
+          cbs_conditions: nil,
           displaying: nil,
           variables: nil,
           toggles: nil,
@@ -56,6 +58,7 @@ module TavernKit
           @rng_word = rng_word.to_s
           @modules = Array(modules).map(&:to_s)
           @metadata = normalize_metadata(metadata)
+          @cbs_conditions = normalize_metadata(cbs_conditions)
 
           @displaying = displaying == true
 
@@ -91,6 +94,7 @@ module TavernKit
             @rng_word,
             @modules,
             @metadata,
+            @cbs_conditions,
             @toggles,
             @displaying,
             @run_var,
@@ -118,6 +122,7 @@ module TavernKit
             rng_word: @rng_word,
             modules: @modules,
             metadata: @metadata,
+            cbs_conditions: @cbs_conditions,
             displaying: @displaying,
             variables: @variables,
             toggles: @toggles,

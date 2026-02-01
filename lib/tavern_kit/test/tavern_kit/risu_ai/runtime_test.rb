@@ -14,6 +14,7 @@ class TavernKit::RisuAI::RuntimeTest < Minitest::Test
         "rngWord" => "seed",
         "runVar" => "0",
         "rmVar" => "1",
+        "cbsConditions" => { "chatRole" => "user", "firstmsg" => true },
         "toggles" => { "x" => "1" },
         "metadata" => { "ModelName" => "gpt-4o", "model_short_name" => "4o" },
         "modules" => %w[a b],
@@ -28,6 +29,11 @@ class TavernKit::RisuAI::RuntimeTest < Minitest::Test
     assert_equal "seed", h[:rng_word]
     assert_equal false, h[:run_var]
     assert_equal true, h[:rm_var]
+
+    # cbsConditions keys are normalized to the macro key form.
+    assert_equal "user", h[:cbs_conditions]["chatrole"]
+    assert_equal true, h[:cbs_conditions]["firstmsg"]
+
     assert_equal({ "x" => "1" }, h[:toggles])
 
     # Metadata keys are normalized to the macro key form.

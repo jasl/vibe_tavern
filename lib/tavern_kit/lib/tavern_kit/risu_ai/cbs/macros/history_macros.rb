@@ -21,6 +21,15 @@ module TavernKit
         end
         private_class_method :resolve_firstmsgindex
 
+        def resolve_isfirstmsg(environment)
+          conds = environment.respond_to?(:cbs_conditions) ? environment.cbs_conditions : nil
+          first = conds.is_a?(Hash) ? conds["firstmsg"] : nil
+          TavernKit::Coerce.bool(first, default: false) ? "1" : "0"
+        rescue StandardError
+          "0"
+        end
+        private_class_method :resolve_isfirstmsg
+
         def resolve_blank(_args)
           ""
         end

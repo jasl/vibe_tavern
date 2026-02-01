@@ -710,6 +710,9 @@ Wave 5 from drifting while implementing RisuAI.
   - `rng_word` (String) -- deterministic RNG seed word. Upstream uses
     `chaId + chat.id`; TavernKit cannot infer those IDs, so applications should
     pass a stable string when exact parity matters.
+  - `cbs_conditions` (Hash) -- optional CBS “matcherArg” flags that affect a
+    small subset of macros (e.g. `role`, `isfirstmsg`). Keys are normalized once
+    at runtime build (snake_case symbols in input; stored as normalized strings).
   - `toggles` (Hash) -- toggle name → string value (RisuAI truthiness rules apply).
   - `metadata` (Hash) -- free-form (RisuAI exposes 15+ metadata macros).
   - `modules` (Array) -- enabled modules list (for module_* macros).
@@ -724,6 +727,7 @@ Wave 5 from drifting while implementing RisuAI.
   - `chat_index`: `-1`
   - `message_index`: derived from history size when available; otherwise `0`
   - `rng_word`: `character.name` when available; otherwise `"0"`
+  - `cbs_conditions`: `{}`
   - `toggles`: `{}`; `metadata`: `{}`; `modules`: `[]`; `assets`: `{}`/`[]`
 - In strict/debug mode, missing runtime keys may raise to make integration bugs
   obvious during tests.
@@ -748,7 +752,7 @@ Wave 5 from drifting while implementing RisuAI.
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
 | `RisuAI::CBS::Engine` | RisuAI | Implements `Macro::Engine::Base` via `#expand(text, environment:)` but uses CBS-specific semantics. CBS parser: 10 block types (#when/#if/#each/#func/#escape/#puredisplay/#pure/#code/#if_pure/:else), 13+ #when operators (is/isnot, >/>=/</<= , and/or/not, var/toggle, vis/tis), stack-based evaluation, 10 processing modes, 20-depth call stack limit, #func/call function system, §-delimited arrays, deterministic RNG (message-index seed) | 800-1,000 |
-| `RisuAI::CBS::Macros` | RisuAI | 130+ built-in macros with aliases (character/user 8, chat history 8, time/date 10, system 14, variables 8, math 14, strings 11, arrays 10, dicts 4, logic 11, unicode 7, media 13, crypto 3, modules 3, escapes 10, aggregates 4, misc 15+), math expression engine (calc, {{? expr}}), metadata introspection (15+ keys) | 600-800 |
+| `RisuAI::CBS::Macros` | RisuAI | **Prompt-building scope.** Implement the macros required for message/prompt assembly (character/user/history/vars/math/strings/collections/unicode/crypto/misc) and app-state macros sourced from `runtime.metadata` (e.g. `mainprompt`, `jb`, `maxcontext`, `jbtoggled`). UI/DB-dependent macros (assets/media buttons, DB fetches, downloads, etc.) are deferred and should be provided by the application layer / adapters if needed. | 600-800 |
 | `RisuAI::CBS::Environment` | RisuAI | Implements `Macro::Environment::Base` for CBS evaluation. Manages variable scopes (`:local/:global` + RisuAI-only `:temp/:function_arg`) without changing Core behavior. Integrates with Core `ChatVariables` for persisted scopes and uses in-memory storage for ephemeral scopes. | 120-180 |
 
 #### 5c. RisuAI Lorebook

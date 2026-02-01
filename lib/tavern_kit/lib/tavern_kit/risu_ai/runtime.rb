@@ -28,6 +28,7 @@ module TavernKit
         out[:run_var] = coerce_bool(h, :run_var, default: true, strict: strict)
         out[:rm_var] = coerce_bool(h, :rm_var, default: false, strict: strict)
 
+        out[:cbs_conditions] = normalize_metadata(coerce_hash(h, :cbs_conditions, default: {}, strict: strict))
         out[:toggles] = normalize_string_keys(coerce_hash(h, :toggles, default: {}, strict: strict))
         out[:metadata] = normalize_metadata(coerce_hash(h, :metadata, default: {}, strict: strict))
         out[:modules] = coerce_array(h, :modules, default: [], strict: strict)
@@ -44,6 +45,7 @@ module TavernKit
         validate_type!(h[:rng_word], String, key: :rng_word)
         validate_type!(h[:run_var], TrueClass, FalseClass, key: :run_var)
         validate_type!(h[:rm_var], TrueClass, FalseClass, key: :rm_var)
+        validate_type!(h[:cbs_conditions], Hash, key: :cbs_conditions)
         validate_type!(h[:toggles], Hash, key: :toggles)
         validate_type!(h[:metadata], Hash, key: :metadata)
         validate_type!(h[:modules], Array, key: :modules)
@@ -55,6 +57,7 @@ module TavernKit
       def rng_word = @data[:rng_word]
       def run_var = @data[:run_var]
       def rm_var = @data[:rm_var]
+      def cbs_conditions = @data[:cbs_conditions]
       def toggles = @data[:toggles]
       def metadata = @data[:metadata]
       def modules = @data[:modules]

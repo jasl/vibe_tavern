@@ -94,12 +94,40 @@ module TavernKit
         private_class_method :resolve_model
 
         def resolve_role(environment)
-          role =
-            if environment.respond_to?(:role)
-              environment.role
-            else
-              nil
+          # Upstream reference:
+          # resources/Risuai/src/ts/cbs.ts (role)
+
+          conds = environment.respond_to?(:cbs_conditions) ? environment.cbs_conditions : nil
+          if conds.is_a?(Hash)
+            chat_role = conds["chatrole"]
+            return chat_role.to_s unless chat_role.nil? || chat_role.to_s.empty?
+
+            return "char" if TavernKit::Coerce.bool(conds["firstmsg"], default: false)
+          end
+
+          chat_index = environment.respond_to?(:chat_index) ? environment.chat_index.to_i : -1
+          if chat_index != -1
+            raw_history = environment.respond_to?(:history) ? environment.history : nil
+            list =
+              if raw_history.is_a?(Array)
+                raw_history
+              elsif raw_history.respond_to?(:to_a)
+                raw_history.to_a
+              else
+                []
+              end
+
+            msg = list[chat_index]
+            if msg.is_a?(Hash)
+              h = TavernKit::Runtime::Base.normalize(msg)
+              role = h[:role]
+              return role.to_s if role
+            elsif msg && msg.respond_to?(:role)
+              return msg.role.to_s
             end
+          end
+
+          role = environment.respond_to?(:role) ? environment.role : nil
           role.nil? ? "null" : role.to_s
         end
         private_class_method :resolve_role
