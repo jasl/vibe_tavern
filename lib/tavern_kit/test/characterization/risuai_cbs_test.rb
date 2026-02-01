@@ -240,6 +240,28 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "assistant", render("{{role}}", role: :assistant)
   end
 
+  def test_date_and_time_macros_with_custom_format
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (date/time)
+    # resources/Risuai/src/ts/parser.svelte.ts (dateTimeFormat token replacement)
+
+    old_tz = ENV["TZ"]
+    ENV["TZ"] = "UTC"
+
+    ts_ms = 1_640_995_200_000 # 2022-01-01 00:00:00 UTC
+
+    assert_equal "2022-01-01", render("{{date::YYYY-MM-DD::#{ts_ms}}}")
+    assert_equal "2022-01-01", render("{{datetimeformat::YYYY-MM-DD::#{ts_ms}}}")
+    assert_equal "Jan January", render("{{date::MMM MMMM::#{ts_ms}}}")
+    assert_equal "1", render("{{date::DDDD::#{ts_ms}}}") # day-of-year
+
+    assert_equal "00:00:00", render("{{time::HH:mm:ss::#{ts_ms}}}")
+    assert_equal "12", render("{{time::hh::#{ts_ms}}}") # 12-hour clock at midnight
+    assert_equal "AM", render("{{time::A::#{ts_ms}}}")
+  ensure
+    ENV["TZ"] = old_tz
+  end
+
   def test_nondeterministic_rng_macros
     # Upstream reference:
     # resources/Risuai/src/ts/cbs.ts (random/randint/dice/roll)
