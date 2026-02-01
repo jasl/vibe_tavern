@@ -282,7 +282,7 @@ module TavernKit
           current_indent = indent_value && indent_value >= 0 ? indent_value : 0
 
           case type
-          when "v2IfAdvanced"
+          when "v2If", "v2IfAdvanced"
             indent = Integer(effect["indent"].to_s, exception: false) || 0
             pass = v2_if_pass?(effect, chat: chat, local_vars: local_vars, current_indent: current_indent)
 
@@ -307,6 +307,129 @@ module TavernKit
             end
           when "v2SetVar"
             apply_v2_setvar(effect, chat: chat, local_vars: local_vars, current_indent: current_indent)
+          when "v2Random"
+            min =
+              if effect["minType"].to_s == "value"
+                safe_float(effect["min"])
+              else
+                safe_float(get_var(chat, effect["min"], local_vars: local_vars, current_indent: current_indent))
+              end
+
+            max =
+              if effect["maxType"].to_s == "value"
+                safe_float(effect["max"])
+              else
+                safe_float(get_var(chat, effect["max"], local_vars: local_vars, current_indent: current_indent))
+              end
+
+            output_var = effect["outputVar"].to_s
+
+            if min.nan? || max.nan?
+              set_var(chat, output_var, "NaN", local_vars: local_vars, current_indent: current_indent)
+            else
+              value = (Random.rand * (max - min + 1) + min)
+              floored =
+                if value.infinite?
+                  value
+                else
+                  value.floor
+                end
+
+              set_var(chat, output_var, format_js_number(floored), local_vars: local_vars, current_indent: current_indent)
+            end
+          when "v2RegexTest"
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            pattern =
+              if effect["regexType"].to_s == "value"
+                effect["regex"].to_s
+              else
+                get_var(chat, effect["regex"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            flags =
+              if effect["flagsType"].to_s == "value"
+                effect["flags"].to_s
+              else
+                get_var(chat, effect["flags"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+            hit =
+              begin
+                re = Regexp.new(pattern, regex_options(flags))
+                re.match?(value) ? "1" : "0"
+              rescue RegexpError
+                "0"
+              end
+
+            set_var(chat, effect["outputVar"], hit, local_vars: local_vars, current_indent: current_indent)
+          when "v2ExtractRegex"
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            pattern =
+              if effect["regexType"].to_s == "value"
+                effect["regex"].to_s
+              else
+                get_var(chat, effect["regex"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            flags =
+              if effect["flagsType"].to_s == "value"
+                effect["flags"].to_s
+              else
+                get_var(chat, effect["flags"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            format =
+              if effect["resultType"].to_s == "value"
+                effect["result"].to_s
+              else
+                get_var(chat, effect["result"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            re = Regexp.new(pattern, regex_options(flags))
+            match = re.match(value)
+
+            result =
+              if match
+                format.gsub(/\$\d+/) do |m|
+                  group_idx = Integer(m.delete_prefix("$"), exception: false)
+                  group_idx && match[group_idx] ? match[group_idx].to_s : ""
+                end
+                  .gsub("$&", match[0].to_s)
+                  .gsub("$$", "$")
+              else
+                format.gsub(/\$\d+/, "")
+                  .gsub("$&", "")
+                  .gsub("$$", "$")
+              end
+
+            set_var(chat, effect["outputVar"], result, local_vars: local_vars, current_indent: current_indent)
+          when "v2ConsoleLog"
+            source =
+              if effect["sourceType"].to_s == "value"
+                effect["source"].to_s
+              else
+                get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            buf = chat[:console_log]
+            buf = [] unless buf.is_a?(Array)
+            buf << source
+            chat[:console_log] = buf
+          when "v2StopTrigger"
+            break
+          when "v2Comment"
+            nil
           when "v2DeclareLocalVar"
             key = effect["var"].to_s.delete_prefix("$")
             value =
@@ -498,7 +621,12 @@ module TavernKit
       end
 
       def safe_float(value)
-        Float(value)
+        s = value.to_s.strip
+        return Float::NAN if s == "NaN"
+        return Float::INFINITY if s == "Infinity"
+        return -Float::INFINITY if s == "-Infinity"
+
+        Float(s)
       rescue ArgumentError, TypeError
         Float::NAN
       end
