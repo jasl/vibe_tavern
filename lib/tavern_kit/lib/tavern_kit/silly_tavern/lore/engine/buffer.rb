@@ -180,8 +180,6 @@ module TavernKit
 
             warner.call(message.to_s)
             nil
-          rescue StandardError
-            nil
           end
           private_class_method :warn_once
 

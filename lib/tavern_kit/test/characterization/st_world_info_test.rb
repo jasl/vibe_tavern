@@ -48,4 +48,29 @@ class StWorldInfoTest < Minitest::Test
 
     assert_equal :eligible, state
   end
+
+  def test_js_regex_invalid_is_no_match_and_warns_once
+    warned = {}
+    warnings = []
+    warner = ->(msg) { warnings << msg }
+
+    buffer = TavernKit::SillyTavern::Lore::Engine::Buffer
+
+    hit = buffer.match_pre_normalized?("dragon", nil, "/(", nil, case_sensitive: false, match_whole_words: true, warner: warner, warned: warned)
+    assert_equal false, hit
+    assert_equal 1, warnings.size
+
+    hit_again = buffer.match_pre_normalized?("dragon", nil, "/(", nil, case_sensitive: false, match_whole_words: true, warner: warner, warned: warned)
+    assert_equal false, hit_again
+    assert_equal 1, warnings.size
+  end
+
+  def test_js_regex_invalid_raises_in_strict_mode_via_ctx_warn
+    ctx = TavernKit::Prompt::Context.new(strict: true)
+    buffer = TavernKit::SillyTavern::Lore::Engine::Buffer
+
+    assert_raises(TavernKit::StrictModeError) do
+      buffer.match_pre_normalized?("dragon", nil, "/(", nil, case_sensitive: false, match_whole_words: true, warner: ctx.method(:warn), warned: {})
+    end
+  end
 end

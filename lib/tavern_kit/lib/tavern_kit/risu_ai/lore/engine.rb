@@ -528,8 +528,6 @@ module TavernKit
 
           warner.call(message.to_s)
           nil
-        rescue StandardError
-          nil
         end
 
         def truncate_literal(value, max_len: 200)

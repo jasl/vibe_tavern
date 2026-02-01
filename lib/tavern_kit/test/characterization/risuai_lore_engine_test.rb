@@ -179,4 +179,29 @@ class RisuaiLoreEngineTest < Minitest::Test
 
     assert_equal ["HIT"], result.activated_entries.map(&:content)
   end
+
+  def test_invalid_js_regex_warns_and_does_not_activate
+    warnings = []
+    warner = ->(msg) { warnings << msg }
+
+    book = TavernKit::Lore::Book.new(
+      entries: [
+        TavernKit::Lore::Entry.new(
+          keys: ["/("],
+          content: "HIT",
+          use_regex: true,
+          insertion_order: 100,
+        ),
+      ]
+    )
+
+    engine = TavernKit::RisuAI::Lore::Engine.new(token_estimator: TokenEstimator.new)
+    input = TavernKit::RisuAI::Lore::ScanInput.new(messages: ["("], books: [book], budget: nil, scan_depth: 10, warner: warner)
+
+    result = engine.scan(input)
+
+    assert_equal [], result.activated_entries.map(&:content)
+    assert_equal 1, warnings.size
+    assert_match(/Invalid JS regex literal/, warnings[0])
+  end
 end
