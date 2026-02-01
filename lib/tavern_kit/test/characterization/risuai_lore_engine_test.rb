@@ -37,7 +37,7 @@ class RisuaiLoreEngineTest < Minitest::Test
   end
 
   def test_keep_activate_after_match_sticks_via_chat_var
-    vars = TavernKit::ChatVariables::InMemory.new
+    vars = TavernKit::Store::InMemory.new
 
     book = TavernKit::Lore::Book.new(
       entries: [
@@ -60,7 +60,7 @@ class RisuaiLoreEngineTest < Minitest::Test
   end
 
   def test_dont_activate_after_match_is_one_shot
-    vars = TavernKit::ChatVariables::InMemory.new
+    vars = TavernKit::Store::InMemory.new
 
     book = TavernKit::Lore::Book.new(
       entries: [

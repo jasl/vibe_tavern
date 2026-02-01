@@ -34,7 +34,7 @@ module TavernKit
               greeting_index: ctx.greeting_index,
               chat_index: chat_id,
               message_index: message_index,
-              variables: ctx.variables_store,
+              variables: ctx.store,
               dialect: ctx.dialect,
               model_hint: ctx[:model_hint],
               toggles: runtime&.toggles,

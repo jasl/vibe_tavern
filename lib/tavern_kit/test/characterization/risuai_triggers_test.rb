@@ -62,8 +62,8 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "Infinity", result3.chat[:scriptstate]["$x"]
   end
 
-  def test_triggers_can_use_core_chat_variables_store_as_scriptstate
-    store = TavernKit::ChatVariables::InMemory.new
+  def test_triggers_can_use_core_store_as_scriptstate
+    store = TavernKit::Store::InMemory.new
     store.set("flag", "1", scope: :local)
 
     trigger = {

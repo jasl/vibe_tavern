@@ -83,7 +83,7 @@ module TavernKit
       # This object must not be replaced during pipeline execution.
       attr_reader :runtime
 
-      delegate :type, :id, :chat_vars, to: :runtime, allow_nil: true
+      delegate :type, :id, to: :runtime, allow_nil: true
 
       # ============================================
       # Intermediate state (set by middlewares)
@@ -104,11 +104,11 @@ module TavernKit
       # @return [Array<Block>] compiled blocks
       attr_accessor :blocks
 
-      # @return [Object, nil] variables store (ChatVariables::Base)
+      # @return [Object, nil] variables store (Store::Base)
       #
       # This is application-owned session state; treat it as stable during
       # pipeline execution (do not replace in middleware).
-      attr_reader :variables_store
+      attr_reader :store
 
       # @return [Array<String>] scan messages for World Info
       attr_accessor :scan_messages
@@ -229,32 +229,43 @@ module TavernKit
         @runtime = value
       end
 
-      def variables_store=(value)
-        if !@variables_store.nil? && @variables_store != value && @current_stage
-          raise ArgumentError, "variables_store cannot be replaced once set"
+      def store=(value)
+        if !@store.nil? && @store != value && @current_stage
+          raise ArgumentError, "store cannot be replaced once set"
         end
 
-        @variables_store = value
+        @store = value
+      end
+
+      # Back-compat alias (Wave 6 refactor): prefer `store`.
+      def variables_store = @store
+
+      # Back-compat alias (Wave 6 refactor): prefer `store=`.
+      def variables_store=(value)
+        self.store = value
       end
 
       # Ensure the context has a variables store.
       #
-      # ChatVariables are application-owned, session-level state (not per-build),
-      # but the pipeline reads/writes them via the Context.
-      def variables_store!
-        @variables_store ||= TavernKit::ChatVariables::InMemory.new
+      # The store is application-owned, session-level state (not per-build),
+      # but the pipeline reads/writes it via the Context.
+      def store!
+        @store ||= TavernKit::Store::InMemory.new
       end
+
+      # Back-compat alias (Wave 6 refactor): prefer `store!`.
+      def variables_store! = store!
 
       # Convenience setter for chat variables (application injection).
       def set_chat_var(name, value, scope: :local)
-        variables_store!.set(name, value, scope: scope)
+        store!.set(name, value, scope: scope)
         self
       end
 
       # Convenience multi-set for chat variables (application injection).
       def set_chat_vars(hash, scope: :local)
         hash = hash.is_a?(Hash) ? hash : {}
-        store = variables_store!
+        store = store!
         hash.each { |k, v| store.set(k, v, scope: scope) }
         self
       end

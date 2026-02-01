@@ -2,9 +2,9 @@
 
 require "test_helper"
 
-class TavernKit::ChatVariablesTest < Minitest::Test
+class TavernKit::StoreTest < Minitest::Test
   def test_set_get_has_delete
-    vars = TavernKit::ChatVariables::InMemory.new
+    vars = TavernKit::Store::InMemory.new
 
     refute vars.has?("foo")
     assert_nil vars.get("foo")
@@ -18,7 +18,7 @@ class TavernKit::ChatVariablesTest < Minitest::Test
   end
 
   def test_scopes_are_independent
-    vars = TavernKit::ChatVariables::InMemory.new
+    vars = TavernKit::Store::InMemory.new
 
     vars.set("x", "local")
     vars.set("x", "global", scope: :global)
@@ -28,7 +28,7 @@ class TavernKit::ChatVariablesTest < Minitest::Test
   end
 
   def test_add_numeric_and_string
-    vars = TavernKit::ChatVariables::InMemory.new
+    vars = TavernKit::Store::InMemory.new
 
     vars.set("n", 1)
     vars.add("n", 2)
@@ -40,7 +40,7 @@ class TavernKit::ChatVariablesTest < Minitest::Test
   end
 
   def test_cache_version_increments_on_writes
-    vars = TavernKit::ChatVariables::InMemory.new
+    vars = TavernKit::Store::InMemory.new
 
     v0 = vars.cache_version
     vars.set("a", "1")

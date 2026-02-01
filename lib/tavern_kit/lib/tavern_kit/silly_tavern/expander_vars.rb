@@ -17,10 +17,12 @@ module TavernKit
         user = ctx.respond_to?(:user) ? ctx.user : nil
 
         vars_store =
-          if ctx.respond_to?(:variables_store) && ctx.variables_store
+          if ctx.respond_to?(:store) && ctx.store
+            ctx.store
+          elsif ctx.respond_to?(:variables_store) && ctx.variables_store
             ctx.variables_store
           else
-            TavernKit::ChatVariables::InMemory.new
+            TavernKit::Store::InMemory.new
           end
 
         macro_vars = ctx.respond_to?(:macro_vars) ? ctx.macro_vars : nil

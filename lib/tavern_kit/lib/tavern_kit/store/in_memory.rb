@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require_relative "../chat_variables"
+require_relative "../store"
 
 module TavernKit
-  module ChatVariables
-    # In-memory ChatVariables implementation.
+  module Store
+    # In-memory Store implementation.
     class InMemory < Base
       def initialize
         @scopes = Hash.new { |h, k| h[k] = {} }

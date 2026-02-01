@@ -160,14 +160,17 @@ module TavernKit
         self
       end
 
-      # Set the chat variables store (session-level state).
+      # Set the variables Store (session-level state).
       #
       # This store is application-owned and should usually persist across
       # multiple prompt builds within the same chat.
-      def chat_variables(store)
-        @context.variables_store = store
+      def store(value)
+        @context.store = value
         self
       end
+
+      # Back-compat: older name for `store`.
+      def chat_variables(value) = store(value)
 
       # Convenience setter for chat variables (application injection).
       def set_chat_var(name, value, scope: :local)

@@ -1,11 +1,17 @@
 # frozen_string_literal: true
 
 module TavernKit
-  module ChatVariables
+  # Generic, scoped key/value storage contract for prompt-building state.
+  #
+  # This replaces the older "ChatVariables" naming: ST `var`/`globalvar` and
+  # RisuAI's persisted variables are all stores with explicit scopes.
+  module Store
     # Minimal variable storage contract for macro engines.
     #
     # Core guarantees :local and :global scopes. Platform layers may extend
-    # scopes (e.g., RisuAI :temp / :function_arg).
+    # scopes (e.g., RisuAI :temp / :function_arg), but those extra scopes are
+    # typically implemented in the macro environment (ephemeral) rather than
+    # the persisted store.
     class Base
       CORE_SCOPES = %i[local global].freeze
 

@@ -17,7 +17,7 @@ module TavernKit
         def initialize(
           character: nil,
           user: nil,
-          variables: TavernKit::ChatVariables::InMemory.new,
+          variables: TavernKit::Store::InMemory.new,
           locals: nil,
           globals: nil,
           outlets: {},
@@ -37,7 +37,7 @@ module TavernKit
         )
           @character = character
           @user = user
-          @variables = variables || TavernKit::ChatVariables::InMemory.new
+          @variables = variables || TavernKit::Store::InMemory.new
           @outlets = outlets.is_a?(Hash) ? outlets : {}
           @original = original.nil? ? nil : original.to_s
           @character_name = character_name.nil? ? nil : character_name.to_s
