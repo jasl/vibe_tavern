@@ -47,7 +47,7 @@ module VibeTavern
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks rails_ext tavern_kit])
+    config.autoload_lib(ignore: %w[assets tasks rails_ext tavern_kit easy_talk])
 
     config.i18n.available_locales = %i[en zh-CN]
     config.i18n.load_path += Dir[Rails.root.join("config", "locales", "**", "*.{rb,yml}")]
