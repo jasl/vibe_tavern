@@ -899,7 +899,7 @@ reviews after the major feature work is complete.
 
 For every Wave 6 change (including "pure refactor" splits), run:
 
-- `cd lib/tavern_kit && bundle exec rake test:wave5`
+- `cd lib/tavern_kit && bundle exec rake test`
 - `bin/rubocop`
 - `ruby bin/lint-eof`
 
