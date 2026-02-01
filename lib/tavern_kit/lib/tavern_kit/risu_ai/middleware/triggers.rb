@@ -25,6 +25,8 @@ module TavernKit
 
           chat = {
             chatIndex: chat_index,
+            fmIndex: ctx.greeting_index.nil? ? -1 : ctx.greeting_index.to_i,
+            character: ctx.character,
             message: messages,
             # Prefer the Core ChatVariables store as the scriptstate backend so
             # CBS/lore/triggers all share one source of truth.

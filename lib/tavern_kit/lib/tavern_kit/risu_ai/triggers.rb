@@ -1189,6 +1189,24 @@ module TavernKit
             last = messages.reverse.find { |m| m.is_a?(Hash) && m[:role].to_s == "char" }
             data = last.is_a?(Hash) ? last[:data].to_s : nil
             set_var(chat, effect["outputVar"], data.nil? ? "null" : data, local_vars: local_vars, current_indent: current_indent)
+          when "v2GetFirstMessage"
+            fm_index = Integer(chat[:fmIndex].to_s, exception: false) || -1
+
+            character = chat[:character]
+            data = character&.respond_to?(:data) ? character.data : nil
+
+            first = data&.respond_to?(:first_mes) ? data.first_mes.to_s : ""
+            alternates = data&.respond_to?(:alternate_greetings) ? Array(data.alternate_greetings) : []
+
+            out =
+              if fm_index == -1
+                first
+              else
+                msg = alternates[fm_index]
+                msg.nil? ? "null" : msg.to_s
+              end
+
+            set_var(chat, effect["outputVar"], out, local_vars: local_vars, current_indent: current_indent)
           when "v2GetMessageAtIndex"
             raw_index =
               if effect["indexType"].to_s == "value"

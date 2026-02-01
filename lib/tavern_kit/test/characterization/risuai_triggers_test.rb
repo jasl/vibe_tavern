@@ -1028,4 +1028,27 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal ["hello", "gpt-4o"], estimator.seen
     assert_equal "42", result.chat[:scriptstate]["$t"]
   end
+
+  def test_v2_get_first_message_uses_character_greetings
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2GetFirstMessage)
+
+    character = TavernKit::Character.create(name: "Char", first_mes: "FIRST", alternate_greetings: ["ALT0", "ALT1"])
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2GetFirstMessage", outputVar: "g", indent: 0 },
+      ],
+    }
+
+    result1 = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [], fmIndex: -1, character: character })
+    assert_equal "FIRST", result1.chat[:scriptstate]["$g"]
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [], fmIndex: 1, character: character })
+    assert_equal "ALT1", result2.chat[:scriptstate]["$g"]
+
+    result3 = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [], fmIndex: 99, character: character })
+    assert_equal "null", result3.chat[:scriptstate]["$g"]
+  end
 end
