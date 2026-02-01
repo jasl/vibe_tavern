@@ -78,6 +78,46 @@ class RisuaiTriggersTest < Minitest::Test
     assert_nil result2.chat[:scriptstate]["$num"]
   end
 
+  def test_cutchat_slices_message_list
+    trigger = {
+      type: "output",
+      effect: [{ type: "cutchat", start: "1", end: "3" }],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(
+      trigger,
+      chat: {
+        message: [
+          { role: "user", data: "m0" },
+          { role: "user", data: "m1" },
+          { role: "user", data: "m2" },
+          { role: "user", data: "m3" },
+        ],
+      }
+    )
+
+    assert_equal ["m1", "m2"], result.chat[:message].map { |m| m[:data] }
+  end
+
+  def test_modifychat_updates_message_at_index
+    trigger = {
+      type: "output",
+      effect: [{ type: "modifychat", index: "1", value: "X" }],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(
+      trigger,
+      chat: {
+        message: [
+          { role: "user", data: "m0" },
+          { role: "user", data: "m1" },
+        ],
+      }
+    )
+
+    assert_equal "X", result.chat[:message][1][:data]
+  end
+
   def test_condition_exists_modes
     trigger = {
       type: "output",

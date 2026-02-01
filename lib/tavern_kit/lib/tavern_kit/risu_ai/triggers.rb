@@ -122,6 +122,10 @@ module TavernKit
           apply_impersonate(effect, chat: chat)
         when "stop"
           chat[:stop_sending] = true
+        when "cutchat"
+          apply_cutchat(effect, chat: chat)
+        when "modifychat"
+          apply_modifychat(effect, chat: chat)
         when "extractRegex"
           apply_extract_regex(effect, chat: chat, trigger: trigger)
         else
@@ -296,6 +300,36 @@ module TavernKit
         chat[:message] = messages
 
         messages << { role: normalized_role, data: value }
+      end
+
+      def apply_cutchat(effect, chat:)
+        start_idx = Integer(effect["start"].to_s, exception: false) || 0
+        end_idx = Integer(effect["end"].to_s, exception: false)
+
+        messages = chat[:message]
+        messages = [] unless messages.is_a?(Array)
+
+        if end_idx.nil?
+          chat[:message] = messages[start_idx..] || []
+        else
+          chat[:message] = messages[start_idx...end_idx] || []
+        end
+      end
+
+      def apply_modifychat(effect, chat:)
+        idx = Integer(effect["index"].to_s, exception: false)
+        return unless idx
+
+        value = effect["value"].to_s
+
+        messages = chat[:message]
+        return unless messages.is_a?(Array)
+
+        msg = messages[idx]
+        return unless msg.is_a?(Hash)
+
+        msg[:data] = value
+        messages[idx] = msg
       end
 
       def apply_extract_regex(effect, chat:, trigger:)
