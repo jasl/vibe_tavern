@@ -11,6 +11,7 @@ module TavernKit
       # - resources/Risuai/src/ts/process/lorebook.svelte.ts (loadLoreBookV3Prompt)
       class Engine < TavernKit::Lore::Engine::Base
         Inject = Data.define(:operation, :location, :param, :lore)
+        JS_REGEX_CACHE_MAX = 512
 
         Active = Data.define(
           :entry,           # TavernKit::Lore::Entry (original)
@@ -451,7 +452,7 @@ module TavernKit
             return false unless keys.all? { |k| k.start_with?("/") }
 
             keys.any? do |js_re|
-              re = JsRegexToRuby.try_convert(js_re, literal_only: true)
+              re = cached_js_regex(js_re)
               next false unless re
 
               m_list.any? { |m| re.match?(m[:data]) }
@@ -496,6 +497,14 @@ module TavernKit
           s = text.to_s
           s = s.gsub(/\{\{\/\/(.+?)\}\}/, "")
           s.gsub(/\{\{comment:(.+?)\}\}/, "")
+        end
+
+        def cached_js_regex(value)
+          v = value.to_s
+          return nil unless v.start_with?("/")
+
+          @js_regex_cache ||= TavernKit::LRUCache.new(max_size: JS_REGEX_CACHE_MAX)
+          @js_regex_cache.fetch(v) { JsRegexToRuby.try_convert(v, literal_only: true) }
         end
 
         def normalize_message(message)
