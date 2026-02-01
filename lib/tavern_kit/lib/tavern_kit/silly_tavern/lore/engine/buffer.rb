@@ -10,6 +10,8 @@ module TavernKit
         class Buffer
           JS_REGEX_CACHE_MAX = 512
           JS_REGEX_MAX_INPUT_BYTES = 50_000
+          WORD_REGEX_CACHE_MAX = 1024
+          WORD_REGEX_MAX_NEEDLE_BYTES = 128
 
           def initialize(messages:, default_depth:, scan_context:, scan_injects:, warner: nil, warned: nil)
             @depth_buffer = Array(messages).first(MAX_SCAN_DEPTH).map { |m| m.to_s.strip }
@@ -155,11 +157,12 @@ module TavernKit
             end
 
             if match_whole_words
-              parts = nee.split(/\s+/)
-              if parts.length > 1
+              # For multi-word keys, ST does substring matching even in whole-word mode.
+              if nee.match?(/\s/)
                 hay.include?(nee)
               else
-                /(?:^|\W)#{Regexp.escape(nee)}(?:$|\W)/.match?(hay)
+                regex = cached_word_regex(nee)
+                (regex || /(?:^|\W)#{Regexp.escape(nee)}(?:$|\W)/).match?(hay)
               end
             else
               hay.include?(nee)
@@ -174,6 +177,17 @@ module TavernKit
             @js_regex_cache.fetch(v)
           end
           private_class_method :cached_js_regex
+
+          def self.cached_word_regex(needle)
+            n = needle.to_s
+            return nil if WORD_REGEX_MAX_NEEDLE_BYTES.positive? && n.bytesize > WORD_REGEX_MAX_NEEDLE_BYTES
+
+            @word_regex_cache ||= TavernKit::LRUCache.new(max_size: WORD_REGEX_CACHE_MAX)
+            @word_regex_cache.fetch(n) { /(?:^|\W)#{Regexp.escape(n)}(?:$|\W)/ }
+          rescue RegexpError
+            nil
+          end
+          private_class_method :cached_word_regex
 
           def self.warn_once(warner, warned, key, message)
             return nil unless warner&.respond_to?(:call)
