@@ -47,7 +47,7 @@ module TavernKit
           include_message_metadata_tokens: include_message_metadata_tokens,
         )
 
-        initial_tokens = tokens_by_id.values.sum
+        initial_tokens = tokens_by_id.each_value.sum
         return no_op_result(strategy, budget_tokens, initial_tokens, enabled_blocks) if initial_tokens <= budget_tokens
 
         evicted_ids =
@@ -145,23 +145,24 @@ module TavernKit
         records = []
 
         enabled_blocks.each do |block|
-          next unless evicted_ids.key?(block.id)
+          reason = evicted_ids[block.id]
+          unless reason
+            kept << block
+            next
+          end
 
-          evicted_block = block.disable
-          evicted << evicted_block
+          evicted << block.disable
 
           records << TavernKit::EvictionRecord.new(
             block_id: block.id,
             slot: block.slot,
             token_count: tokens_by_id.fetch(block.id),
-            reason: evicted_ids.fetch(block.id),
+            reason: reason,
             budget_group: normalize_budget_group(block.token_budget_group),
             priority: (strategy == :priority ? block.priority : nil),
             source: block.metadata[:source],
           )
         end
-
-        kept = enabled_blocks.reject { |b| evicted_ids.key?(b.id) }
 
         [kept, evicted, records]
       end
@@ -172,7 +173,7 @@ module TavernKit
         units = build_units(blocks, tokens_by_id, protected)
         units.sort_by! { |u| [u.priority, u.first_index] }
 
-        current = tokens_by_id.values.sum
+        current = tokens_by_id.each_value.sum
         evicted_ids = {}
 
         units.each do |unit|
@@ -192,7 +193,7 @@ module TavernKit
 
       def evict_group_order(blocks, tokens_by_id, budget_tokens)
         protected = protected_ids(blocks, preserve_latest_user: true)
-        current = tokens_by_id.values.sum
+        current = tokens_by_id.each_value.sum
         evicted_ids = {}
 
         mapped_groups = blocks.to_h { |b| [b.id, normalize_budget_group(b.token_budget_group)] }
@@ -230,8 +231,13 @@ module TavernKit
 
         if preserve_latest_user
           # ST parity: preserve the latest user message in history.
-          history_user = blocks.select { |b| b.enabled? && normalize_budget_group(b.token_budget_group) == :history && b.role == :user }
-          protected[history_user.last.id] = true if history_user.any?
+          last_history_user = nil
+          blocks.each do |b|
+            next unless b.enabled? && normalize_budget_group(b.token_budget_group) == :history && b.role == :user
+
+            last_history_user = b
+          end
+          protected[last_history_user.id] = true if last_history_user
         end
 
         protected
