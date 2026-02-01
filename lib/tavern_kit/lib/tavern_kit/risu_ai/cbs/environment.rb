@@ -14,6 +14,7 @@ module TavernKit
                     :model_hint,
                     :role,
                     :rng_word,
+                    :modules,
                     :metadata,
                     :run_var,
                     :rm_var
@@ -33,6 +34,7 @@ module TavernKit
           model_hint: nil,
           role: nil,
           rng_word: nil,
+          modules: nil,
           metadata: nil,
           variables: nil,
           toggles: nil,
@@ -50,6 +52,7 @@ module TavernKit
           @model_hint = model_hint.to_s
           @role = role
           @rng_word = rng_word.to_s
+          @modules = Array(modules).map(&:to_s)
           @metadata = normalize_metadata(metadata)
 
           @variables = variables
@@ -81,6 +84,7 @@ module TavernKit
             model_hint: @model_hint,
             role: @role,
             rng_word: @rng_word,
+            modules: @modules,
             metadata: @metadata,
             variables: @variables,
             toggles: @toggles,

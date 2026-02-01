@@ -10,6 +10,7 @@ require_relative "macros/crypto_macros"
 require_relative "macros/misc_macros"
 require_relative "macros/history_macros"
 require_relative "macros/basic_macros"
+require_relative "macros/app_state_macros"
 
 module TavernKit
   module RisuAI
@@ -55,6 +56,12 @@ module TavernKit
             resolve_exampledialogue(environment)
           when "persona", "userpersona"
             resolve_persona(environment)
+          when "mainprompt", "systemprompt"
+            resolve_mainprompt(environment)
+          when "jb", "jailbreak"
+            resolve_jb(environment)
+          when "globalnote", "systemnote", "ujb"
+            resolve_globalnote(environment)
           when "date", "datetimeformat"
             resolve_date(args)
           when "time"
@@ -75,6 +82,12 @@ module TavernKit
             resolve_lastmessageid(environment)
           when "metadata"
             resolve_metadata(args, environment: environment)
+          when "jbtoggled"
+            resolve_jbtoggled(environment)
+          when "maxcontext"
+            resolve_maxcontext(environment)
+          when "moduleenabled"
+            resolve_moduleenabled(args, environment: environment)
           when "iserror"
             resolve_iserror(args)
           when "equal"

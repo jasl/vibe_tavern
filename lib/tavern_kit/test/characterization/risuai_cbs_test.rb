@@ -336,6 +336,29 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "null", render("{{triggerid}}", metadata: {})
   end
 
+  def test_app_state_macros_are_metadata_backed
+    user = TavernKit::User.new(name: "Alice", persona: "")
+
+    assert_equal "SYS=Alice", render("{{mainprompt}}", user: user, metadata: { "mainprompt" => "SYS={{user}}" })
+    assert_equal "SYS=Alice", render("{{systemprompt}}", user: user, metadata: { "systemprompt" => "SYS={{user}}" })
+
+    assert_equal "JB", render("{{jb}}", metadata: { "jb" => "JB" })
+    assert_equal "JB", render("{{jailbreak}}", metadata: { "jailbreak" => "JB" })
+
+    assert_equal "NOTE", render("{{globalnote}}", metadata: { "globalnote" => "NOTE" })
+    assert_equal "NOTE", render("{{systemnote}}", metadata: { "systemnote" => "NOTE" })
+    assert_equal "NOTE", render("{{ujb}}", metadata: { "ujb" => "NOTE" })
+
+    assert_equal "1", render("{{jbtoggled}}", metadata: { "jbtoggled" => true })
+    assert_equal "0", render("{{jbtoggled}}", metadata: { "jbtoggled" => false })
+    assert_equal "0", render("{{jbtoggled}}", metadata: {})
+
+    assert_equal "8192", render("{{maxcontext}}", metadata: { "maxcontext" => 8192 })
+
+    assert_equal "1", render("{{moduleenabled::core}}", modules: ["core"])
+    assert_equal "0", render("{{moduleenabled::core}}", modules: [])
+  end
+
   def test_date_and_time_macros_with_custom_format
     # Upstream reference:
     # resources/Risuai/src/ts/cbs.ts (date/time)
