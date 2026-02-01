@@ -12,39 +12,56 @@ module TavernKit
       raise ArgumentError, "max_size must be positive" if @max_size <= 0
 
       @store = {}
+      @mutex = Mutex.new
     end
 
     attr_reader :max_size
 
-    def size = @store.size
+    def size = @mutex.synchronize { @store.size }
 
-    def key?(key) = @store.key?(key)
+    def key?(key) = @mutex.synchronize { @store.key?(key) }
 
     def clear
-      @store.clear
+      @mutex.synchronize { @store.clear }
     end
 
     def get(key)
-      return nil unless @store.key?(key)
+      @mutex.synchronize do
+        return nil unless @store.key?(key)
 
-      value = @store.delete(key)
-      @store[key] = value
-      value
+        value = @store.delete(key)
+        @store[key] = value
+        value
+      end
     end
 
     def set(key, value)
-      @store.delete(key)
-      @store[key] = value
+      @mutex.synchronize do
+        @store.delete(key)
+        @store[key] = value
 
-      @store.shift while @store.size > @max_size
-      value
+        @store.shift while @store.size > @max_size
+        value
+      end
     end
 
     def fetch(key)
-      return get(key) if @store.key?(key)
+      existing = nil
+      hit = false
+
+      @mutex.synchronize do
+        if @store.key?(key)
+          existing = @store.delete(key)
+          @store[key] = existing
+          hit = true
+        end
+      end
+
+      return existing if hit
       raise KeyError, "key not found: #{key.inspect}" unless block_given?
 
-      set(key, yield)
+      computed = yield
+      set(key, computed)
     end
   end
 end
