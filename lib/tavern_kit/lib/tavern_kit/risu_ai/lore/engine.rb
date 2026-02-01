@@ -503,8 +503,8 @@ module TavernKit
           v = value.to_s
           return nil unless v.start_with?("/")
 
-          @js_regex_cache ||= TavernKit::LRUCache.new(max_size: JS_REGEX_CACHE_MAX)
-          @js_regex_cache.fetch(v) { JsRegexToRuby.try_convert(v, literal_only: true) }
+          @js_regex_cache ||= TavernKit::JsRegexCache.new(max_size: JS_REGEX_CACHE_MAX)
+          @js_regex_cache.fetch(v)
         end
 
         def normalize_message(message)

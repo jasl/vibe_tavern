@@ -780,16 +780,8 @@ module TavernKit
             v = value.to_s
             return nil unless v.start_with?("/")
 
-            @js_regex_cache ||= {}
-            cached = @js_regex_cache[v]
-            return cached if cached
-
-            regex = JsRegexToRuby.try_convert(v, literal_only: true)
-            return nil unless regex
-
-            @js_regex_cache[v] = regex
-            @js_regex_cache.shift while @js_regex_cache.size > JS_REGEX_CACHE_MAX
-            regex
+            @js_regex_cache ||= TavernKit::JsRegexCache.new(max_size: JS_REGEX_CACHE_MAX)
+            @js_regex_cache.fetch(v)
           end
           private_class_method :cached_js_regex
 

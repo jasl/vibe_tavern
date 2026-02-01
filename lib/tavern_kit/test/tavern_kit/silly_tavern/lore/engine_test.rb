@@ -220,7 +220,7 @@ class TavernKit::SillyTavern::Lore::EngineTest < Minitest::Test
 
   def test_js_regex_conversion_is_cached_for_regex_keys
     buffer = TavernKit::SillyTavern::Lore::Engine::Buffer
-    buffer.instance_variable_set(:@js_regex_cache, {})
+    buffer.instance_variable_set(:@js_regex_cache, TavernKit::JsRegexCache.new(max_size: buffer::JS_REGEX_CACHE_MAX))
 
     calls = 0
     verbose, $VERBOSE = $VERBOSE, nil

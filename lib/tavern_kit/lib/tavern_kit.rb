@@ -9,6 +9,7 @@ require_relative "tavern_kit/coerce"
 require_relative "tavern_kit/errors"
 require_relative "tavern_kit/utils"
 require_relative "tavern_kit/lru_cache"
+require_relative "tavern_kit/js_regex_cache"
 require_relative "tavern_kit/runtime"
 
 require_relative "tavern_kit/participant"
