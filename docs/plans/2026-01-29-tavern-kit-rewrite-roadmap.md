@@ -895,6 +895,19 @@ decorator-driven lorebook, regex scripts, and triggers all operational.
 **Close-out wave.** Ship-ready polish: docs, test hardening, and consistency
 reviews after the major feature work is complete.
 
+#### Wave 6 execution gates (avoid drift)
+
+For every Wave 6 change (including "pure refactor" splits), run:
+
+- `cd lib/tavern_kit && bundle exec rake test:wave5`
+- `bin/rubocop`
+- `ruby bin/lint-eof`
+
+Before declaring Wave 6 done, also run:
+
+- `cd lib/tavern_kit && bundle exec rake`
+- `bin/ci`
+
 #### 6a. Documentation (Write Last, Carefully)
 
 | Task | Layer | Description |
@@ -921,7 +934,7 @@ reviews after the major feature work is complete.
 | Performance pass | Core | Token estimation hot paths (incl. Trimmer token-estimate memoization via bounded cache), avoid expensive debug work unless instrumenter is enabled |
 | Trace + fingerprint review | Core | Ensure trace contains enough to reproduce “why this prompt” decisions; confirm fingerprint stability for caching |
 | Large-file split pass | ST + RisuAI | Split `SillyTavern::Lore::Engine`, `SillyTavern::Macro::V2Engine`, `RisuAI::CBS::Engine`, and `RisuAI::Triggers` into internal helpers to meet the 800 LOC guideline, without behavior changes |
-| Regex safety hardening | ST | Review JS-regex handling for ReDoS risk; consider timeouts/length limits for untrusted patterns, plus strict-mode error policy (keep tolerant mode behavior by default) |
+| Regex safety hardening | Core/ST/RisuAI | Review regex handling for ReDoS risk across the stack (JS-regex conversion caches, `Text::PatternMatcher`, RisuAI triggers/regex scripts, etc.); add timeouts/length limits for untrusted patterns, plus strict-mode error policy (tolerant default should warn and continue) |
 | Extract LRU cache helper | Core | Add a small bounded LRU cache helper (no ActiveSupport dependency) and reuse it for regex compilation caches (ST regex scripts) and other hot-path bounded caches (e.g., JS-regex conversion in lore scanning) |
 | Micro-perf audit backlog | Core/ST | Consider bounded caching for regex conversions, token count memoization, lore scan pre-normalization (downcase/strip once per message), and precomputed sort keys where hot paths justify it |
 | RisuAI triggers adapters (optional) | RisuAI | If needed by downstream apps, add adapter/hooks for UI/DB effects (alerts/LLM/imggen/lorebook persistence) so TavernKit can stay prompt-building focused while still supporting parity |
