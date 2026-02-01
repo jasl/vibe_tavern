@@ -186,4 +186,13 @@ class RisuaiRegexScriptsTest < Minitest::Test
     result_with = TavernKit::RisuAI::RegexScripts.apply("X", scripts_with_flag, mode: "editoutput")
     assert_equal "<tag>", result_with, "Expected no newline suffix when no_end_nl flag is present"
   end
+
+  def test_guardrails_skip_processing_when_input_is_too_large
+    scripts = [
+      { in: "a", out: "X", type: "editoutput" },
+    ]
+
+    too_big = "a" * (TavernKit::RegexSafety::DEFAULT_MAX_INPUT_BYTES + 1)
+    assert_equal too_big, TavernKit::RisuAI::RegexScripts.apply(too_big, scripts, mode: "editoutput")
+  end
 end

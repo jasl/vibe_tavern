@@ -170,9 +170,10 @@ module TavernKit
 
         regex = compile_regex(pattern, flags: flags, actions: actions)
         return data unless regex
+        data_too_large = TavernKit::RegexSafety.input_too_large?(data)
 
         if out_script.start_with?("@@") || actions.any?
-          if regex.match?(data)
+          if !data_too_large && regex.match?(data)
             # UI-only directive in upstream: does not modify the message text.
             if out_script.start_with?("@@emo ")
               return data
@@ -203,6 +204,7 @@ module TavernKit
 
           return data
         end
+        return data if data_too_large
 
         replaced = replace_data(data, regex, out_script, global: flags.include?("g"))
         cbs_parse(replaced, engine: engine, environment: environment, chat_id: chat_id, role: role)
@@ -237,10 +239,9 @@ module TavernKit
         options |= Regexp::IGNORECASE if flags.include?("i")
         options |= Regexp::MULTILINE if flags.include?("m") || flags.include?("s")
 
-        compiled_regex_cache.fetch([pattern.to_s, options]) do
-          Regexp.new(pattern.to_s, options)
-        rescue RegexpError
-          nil
+        pattern = pattern.to_s
+        compiled_regex_cache.fetch([pattern, options]) do
+          TavernKit::RegexSafety.compile(pattern, options: options)
         end
       end
       private_class_method :compile_regex
@@ -259,6 +260,8 @@ module TavernKit
       end
 
       def apply_move(data, regex, out_script:, flags:, actions:)
+        return data if TavernKit::RegexSafety.input_too_large?(data)
+
         global = flags.include?("g")
         matches = []
 
@@ -297,7 +300,7 @@ module TavernKit
         return data unless last
 
         last_data = TavernKit::Utils.deep_stringify_keys(last)["data"].to_s
-        match = last_data.match(regex)
+        match = TavernKit::RegexSafety.match(regex, last_data)
         return data unless match
 
         token = match[0].to_s
