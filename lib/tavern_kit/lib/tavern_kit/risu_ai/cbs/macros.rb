@@ -2,6 +2,7 @@
 
 require_relative "macros/time_macros"
 require_relative "macros/logic_macros"
+require_relative "macros/collection_macros"
 
 module TavernKit
   module RisuAI
@@ -127,6 +128,30 @@ module TavernKit
             resolve_rollp(args, environment: environment)
           when "arrayelement"
             resolve_arrayelement(args)
+          when "dictelement", "objectelement"
+            resolve_dictelement(args)
+          when "objectassert", "dictassert"
+            resolve_objectassert(args)
+          when "element", "ele"
+            resolve_element(args)
+          when "arrayshift"
+            resolve_arrayshift(args)
+          when "arraypop"
+            resolve_arraypop(args)
+          when "arraypush"
+            resolve_arraypush(args)
+          when "arraysplice"
+            resolve_arraysplice(args)
+          when "arrayassert"
+            resolve_arrayassert(args)
+          when "makearray", "array", "a"
+            resolve_makearray(args)
+          when "makedict", "dict", "d", "makeobject", "object", "o"
+            resolve_makedict(args)
+          when "range"
+            resolve_range(args)
+          when "filter"
+            resolve_filter(args)
           when "trim"
             resolve_trim(args)
           when "length"

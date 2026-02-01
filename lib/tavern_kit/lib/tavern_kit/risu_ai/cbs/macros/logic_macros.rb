@@ -67,9 +67,9 @@ module TavernKit
           s = value.to_s
 
           arr = ::JSON.parse(s)
-          arr.is_a?(Array) ? arr : []
+          arr.is_a?(Array) ? arr : s.split("§")
         rescue ::JSON::ParserError
-          []
+          s.split("§")
         end
         private_class_method :parse_json_array
       end

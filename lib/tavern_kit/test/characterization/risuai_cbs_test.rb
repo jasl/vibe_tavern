@@ -300,6 +300,41 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "1", render("{{any::[\"0\",\"1\"]}}")
   end
 
+  def test_array_and_dict_macros
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (dictelement/objectassert/element/arrayshift/arraypop/arraypush/arraysplice/arrayassert/makearray/makedict/range/filter)
+
+    assert_equal "John", render("{{dictelement::{\"name\":\"John\"}::name}}")
+    assert_equal "John", render("{{objectelement::{\"name\":\"John\"}::name}}")
+
+    assert_equal "{\"a\":1,\"b\":\"2\"}", render("{{objectassert::{\"a\":1}::b::2}}")
+    assert_equal "{\"a\":1,\"b\":\"2\"}", render("{{object_assert::{\"a\":1}::b::2}}")
+
+    nested = ::JSON.generate({ "user" => ::JSON.generate({ "name" => "John" }) })
+    assert_equal "John", render("{{element::#{nested}::user::name}}")
+    assert_equal "null", render("{{element::{\"n\":0}::n}}") # JS falsy quirk
+
+    assert_equal "[\"b\",\"c\"]", render("{{arrayshift::[\"a\",\"b\",\"c\"]}}")
+    assert_equal "[\"a\",\"b\"]", render("{{arraypop::[\"a\",\"b\",\"c\"]}}")
+    assert_equal "[\"a\",\"b\",\"c\"]", render("{{arraypush::[\"a\",\"b\"]::c}}")
+    assert_equal "[\"a\",\"x\",\"c\"]", render("{{arraysplice::[\"a\",\"b\",\"c\"]::1::1::x}}")
+    assert_equal "[\"a\",null,null,null,null,\"b\"]", render("{{arrayassert::[\"a\"]::5::b}}")
+
+    assert_equal "[\"a\",\"b\",\"c\"]", render("{{makearray::a::b::c}}")
+    assert_equal "[\"a\",\"b\",\"c\"]", render("{{array::a::b::c}}")
+    assert_equal "[\"a\",\"b\",\"c\"]", render("{{a::a::b::c}}")
+
+    assert_equal "{\"name\":\"John\",\"age\":\"25\"}", render("{{makedict::name=John::age=25}}")
+    assert_equal "{\"name\":\"John\",\"age\":\"25\"}", render("{{dict::name=John::age=25}}")
+
+    assert_equal "[\"0\",\"1\",\"2\",\"3\",\"4\"]", render("{{range::[5]}}")
+    assert_equal "[\"2\",\"4\",\"6\"]", render("{{range::[2,8,2]}}")
+
+    assert_equal "[\"a\",\"\"]", render("{{filter::[\"a\",\"\",\"a\"]::unique}}")
+    assert_equal "[\"a\",\"a\"]", render("{{filter::[\"a\",\"\",\"a\"]::nonempty}}")
+    assert_equal "[\"a\"]", render("{{filter::[\"a\",\"\",\"a\"]::all}}")
+  end
+
   def test_nondeterministic_rng_macros
     # Upstream reference:
     # resources/Risuai/src/ts/cbs.ts (random/randint/dice/roll)
