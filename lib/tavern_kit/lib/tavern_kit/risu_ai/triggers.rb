@@ -9,6 +9,71 @@ module TavernKit
     module Triggers
       Result = Data.define(:chat)
 
+      # Upstream reference:
+      # resources/Risuai/src/ts/process/triggers.ts (safeSubset/displayAllowList/requestAllowList)
+      SAFE_SUBSET = %w[
+        v2Header
+        v2If
+        v2IfAdvanced
+        v2Else
+        v2EndIndent
+        v2SetVar
+        v2Loop
+        v2BreakLoop
+        v2RunTrigger
+        v2ConsoleLog
+        v2StopTrigger
+        v2CutChat
+        v2ModifyChat
+        v2SystemPrompt
+        v2Impersonate
+        v2Command
+        v2SendAIprompt
+        v2ImgGen
+        v2CheckSimilarity
+        v2RunLLM
+        v2ShowAlert
+        v2ExtractRegex
+        v2GetLastMessage
+        v2GetMessageAtIndex
+        v2GetMessageCount
+        v2ModifyLorebook
+        v2GetLorebook
+        v2GetLorebookCount
+        v2GetLorebookEntry
+        v2SetLorebookActivation
+        v2GetLorebookIndexViaName
+        v2LoopNTimes
+        v2Random
+        v2GetCharAt
+        v2GetCharCount
+        v2ToLowerCase
+        v2ToUpperCase
+        v2SetCharAt
+        v2SplitString
+        v2JoinArrayVar
+        v2ConcatString
+        v2MakeArrayVar
+        v2GetArrayVarLength
+        v2GetArrayVar
+        v2SetArrayVar
+        v2PushArrayVar
+        v2PopArrayVar
+        v2ShiftArrayVar
+        v2UnshiftArrayVar
+        v2SpliceArrayVar
+        v2GetFirstMessage
+        v2SliceArrayVar
+        v2GetIndexOfValueInArrayVar
+        v2RemoveIndexFromArrayVar
+        v2Calculate
+        v2Comment
+        v2DeclareLocalVar
+      ].freeze
+
+      DISPLAY_ALLOWLIST = (SAFE_SUBSET + %w[v2GetDisplayState v2SetDisplayState]).freeze
+      REQUEST_ALLOWLIST = (SAFE_SUBSET + %w[v2GetRequestState v2SetRequestState v2GetRequestStateRole v2SetRequestStateRole v2GetRequestStateLength]).freeze
+
       module_function
 
       # Run a trigger list (the upstream "runTrigger" entrypoint).
@@ -29,9 +94,10 @@ module TavernKit
         t = TavernKit::Utils.deep_stringify_keys(trigger.is_a?(Hash) ? trigger : {})
         c = deep_symbolize(chat.is_a?(Hash) ? chat : {})
 
-        type = t.fetch("type", "").to_s
-        # Characterization tests call run() directly, so we don't filter by mode here.
-        _ = type
+        # Note: `run` executes a single trigger unconditionally; it does not
+        # filter by mode. However, request/display modes still apply effect
+        # allowlists (mirroring upstream) to prevent unsafe side effects.
+        _ = t.fetch("type", "").to_s
 
         conditions = Array(t["conditions"]).select { |v| v.is_a?(Hash) }
         effects = Array(t["effect"]).select { |v| v.is_a?(Hash) }
@@ -174,10 +240,15 @@ module TavernKit
 
       def run_effects(effects, chat:, trigger:, triggers:, recursion_count:)
         idx = 0
+        mode = trigger["type"].to_s
 
         while idx < effects.length
           effect = effects[idx]
           type = effect["type"].to_s
+          unless effect_allowed?(type, mode: mode)
+            idx += 1
+            next
+          end
 
           case type
           when "v2IfAdvanced"
@@ -231,6 +302,17 @@ module TavernKit
           end
 
           idx += 1
+        end
+      end
+
+      def effect_allowed?(effect_type, mode:)
+        case mode.to_s
+        when "display"
+          DISPLAY_ALLOWLIST.include?(effect_type)
+        when "request"
+          REQUEST_ALLOWLIST.include?(effect_type)
+        else
+          true
         end
       end
 

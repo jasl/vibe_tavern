@@ -310,6 +310,29 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "IF", result2.chat[:scriptstate]["$hit"]
   end
 
+  def test_display_and_request_modes_apply_effect_allowlists
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (displayAllowList/requestAllowList)
+
+    trigger = {
+      type: "display",
+      conditions: [],
+      effect: [
+        # v1 effects are skipped in display mode
+        { type: "setvar", operator: "=", var: "hit", value: "V1" },
+        # v2 safeSubset effects are allowed
+        { type: "v2SetVar", operator: "=", var: "hit", valueType: "value", value: "V2", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "V2", result.chat[:scriptstate]["$hit"]
+
+    trigger2 = trigger.merge(type: "request")
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "V2", result2.chat[:scriptstate]["$hit"]
+  end
+
   def test_v2_if_approx_and_equivalent
     trigger = {
       type: "output",
