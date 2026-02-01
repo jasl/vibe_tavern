@@ -74,4 +74,51 @@ class RisuaiRegexScriptsTest < Minitest::Test
 
     assert_equal "XaY[b]$", result
   end
+
+  def test_replacement_output_is_reparsed_via_cbs
+    scripts = [
+      { in: "X", out: "{{user}}", type: "editoutput" },
+    ]
+
+    user = TavernKit::User.new(name: "Alice")
+    env = TavernKit::RisuAI::CBS::Environment.build(user: user)
+
+    result = TavernKit::RisuAI::RegexScripts.apply(
+      "X",
+      scripts,
+      mode: "editoutput",
+      environment: env,
+    )
+
+    assert_equal "Alice", result
+  end
+
+  def test_cbs_flag_parses_pattern_before_compiling_regex
+    scripts = [
+      { in: "{{user}}", out: "HIT", type: "editoutput", flag: "<cbs>", ableFlag: true },
+    ]
+
+    user = TavernKit::User.new(name: "Alice")
+    env = TavernKit::RisuAI::CBS::Environment.build(user: user)
+
+    assert_equal(
+      "Alice",
+      TavernKit::RisuAI::RegexScripts.apply(
+        "Alice",
+        scripts.map { |s| s.merge(flag: "", ableFlag: true) },
+        mode: "editoutput",
+        environment: env,
+      ),
+    )
+
+    assert_equal(
+      "HIT",
+      TavernKit::RisuAI::RegexScripts.apply(
+        "Alice",
+        scripts,
+        mode: "editoutput",
+        environment: env,
+      ),
+    )
+  end
 end

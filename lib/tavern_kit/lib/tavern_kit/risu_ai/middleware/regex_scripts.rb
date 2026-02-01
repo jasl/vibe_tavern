@@ -18,12 +18,33 @@ module TavernKit
 
           runtime = ctx.runtime
           chat_id = runtime ? runtime.chat_index.to_i : -1
+          rng_word = runtime ? runtime.rng_word.to_s : ""
 
           history = TavernKit::ChatHistory.wrap(ctx.history).to_a
           history_hashes = history.map { |m| { role: m.role.to_s, data: m.content.to_s } }
+          message_index = runtime ? runtime.message_index.to_i : history_hashes.length
 
           ctx.blocks = Array(ctx.blocks).map do |block|
             next block unless block.is_a?(TavernKit::Prompt::Block)
+
+            env = TavernKit::RisuAI::CBS::Environment.build(
+              character: ctx.character,
+              user: ctx.user,
+              history: history_hashes,
+              greeting_index: ctx.greeting_index,
+              chat_index: chat_id,
+              message_index: message_index,
+              variables: ctx.variables_store,
+              dialect: ctx.dialect,
+              model_hint: ctx[:model_hint],
+              toggles: runtime&.toggles,
+              metadata: runtime&.metadata,
+              modules: runtime&.modules,
+              run_var: false,
+              rm_var: false,
+              rng_word: rng_word,
+              role: block.role.to_s,
+            )
 
             out = TavernKit::RisuAI::RegexScripts.apply(
               block.content.to_s,
@@ -32,6 +53,7 @@ module TavernKit
               chat_id: chat_id,
               history: history_hashes,
               role: block.role.to_s,
+              environment: env,
             )
 
             block.with(content: out)
