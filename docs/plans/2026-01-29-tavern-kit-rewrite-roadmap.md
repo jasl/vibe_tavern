@@ -254,7 +254,7 @@ Delivered modules:
 - **Core (Wave 4):** Trimmer + Dialects (8 formats) + MaxTokensMiddleware guardrails
 - **SillyTavern (Wave 4):** 9-stage middleware chain + HookRegistry + InjectionRegistry + GroupContext + ST build()/to_messages convenience
 
-Test status (gem): 484 runs, 0 failures, 15 skips (all remaining skips are RisuAI parity).
+Test status (gem): 593 runs, 0 failures, 0 errors, 0 skips.
 
 ## Gap Summary
 
@@ -556,7 +556,7 @@ Note: PromptEntry conditions + pattern matching moved to Wave 2 supplement.
   variable shorthand (16 operators), flags, typed arg validation, legacy markers
 - ✅ Unlocked ST World Info characterization tests
 - ✅ Unlocked ST Macros characterization tests
-- Pending: RisuAI Lorebook characterization tests (Wave 5)
+- ✅ Unlocked RisuAI Lorebook characterization tests (Wave 5)
 
 **Deliverable:** `SillyTavern::Lore::Engine` activates world info independently
 with full entry field support (40+ fields). `SillyTavern::Macro::V2Engine`
@@ -769,8 +769,8 @@ Wave 5 from drifting while implementing RisuAI.
 
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
-| `RisuAI::RegexScripts` | RisuAI | 6 execution types (modify input/output/request/display, edit translation, disabled), flag system (<order N>, <cbs>, <inject>, <move_top/bottom>, <repeat_back>, <no_end_nl>), @@ directives (emo, inject, move_top/bottom, repeat_back), script ordering, LRU cache (1000 entries) | 250-300 |
-| `RisuAI::Triggers` | RisuAI | v1: 16 effect types with lowLevelAccess gating, 3 condition types (var, exists, chatindex), 6 trigger types (start/manual/output/input/display/request). v2: 60+ effects with indent-based control flow (v2If/v2Else/v2Loop), local var scoping, lorebook CRUD (9 ops), string/array/dict operations, request state inspection, UI state management, recursion limit (10) | 500-700 |
+| `RisuAI::RegexScripts` | RisuAI | 6 execution types (modify input/output/request/display, edit translation, disabled), flag system (<order N>, <cbs>, <inject>, <move_top/bottom>, <repeat_back>, <no_end_nl>), @@ directives (emo, inject, move_top/bottom, repeat_back), script ordering. Note: LRU cache is deferred to Wave 6 (Core LRU helper). | 250-300 |
+| `RisuAI::Triggers` | RisuAI | v1 + v2 trigger runner with lowLevelAccess gating and recursion limits. Wave 5 focuses on prompt-building safe effects (control flow + vars + string/array/dict + chat ops + tokenize + replace). UI/DB effects (alerts/LLM/imggen/lorebook persistence) are app-owned and may be added later via adapters (Wave 6+). | 500-700 |
 
 #### 5f. RisuAI Pipeline
 
@@ -825,7 +825,7 @@ available.
   30+ decorators, injection graph (4 operations), timed activation gates
 - Template cards: 6 item types, position injection, innerFormat, ST import
 - Regex scripts: 6 execution types, flag parsing, @@ directives, ordering
-- Triggers: v1 effects, v2 control flow, v2 lorebook CRUD, condition types,
+- Triggers: v1 effects, v2 control flow, v2 safe effects (vars/string/array/dict/chat ops/tokenize/replace),
   lowLevelAccess gating, recursion limits
 - Memory: interface compliance tests (mock adapter), block injection, budget participation
 - End-to-end: character + RisuAI template + lore + CBS macros -> plan -> messages
@@ -836,14 +836,15 @@ This is the Wave 5 “stop the line” gate. Run it only after 5b-5g are landed.
 
 | Task | Layer | Description |
 |------|-------|-------------|
-| Unlock remaining pending characterization tests | RisuAI | RisuAI (15) |
+| ✅ Unlock characterization tests | RisuAI | RisuAI (15) |
 | Recreate ST compatibility test suite | ST | 8 areas worth of coverage (behavior-derived, not copied) |
 | Spec conformance tests | Core | CCv2 + CCv3 spec conformance and TavernKit-defined intentional divergences |
 | Integration verification | All | Ensure downstream Rails app can work with both ST and RisuAI pipelines |
 
 **Concrete worklist (Wave 5h):**
 
-- **RisuAI pending tests (15)** (already in place; unskip as modules land):
+- ✅ **RisuAI characterization tests**: all green (0 skips).
+  (Originally tracked as 15 pending tests; now fully landed.)
   - `lib/tavern_kit/test/characterization/risuai_cbs_test.rb` (5)
   - `lib/tavern_kit/test/characterization/risuai_lorebook_test.rb` (4)
   - `lib/tavern_kit/test/characterization/risuai_regex_scripts_test.rb` (3)
