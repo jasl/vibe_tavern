@@ -926,6 +926,20 @@ reviews after the major feature work is complete.
 |------|-------|-------------|
 | CLI parity (optional) | ST/Core | Add `exe/tavern_kit` with the minimal “developer tools” commands used for debugging/validation (validate/extract/convert/embed cards, prompt preview, lore test). Keep fixtures hand-authored (no ST/RisuAI fixture copying). |
 
+#### 6e. UI Directives + Examples (Optional)
+
+TavernKit does not ship a UI, but downstream apps may want to implement a
+RisuAI-like “interactive chat” experience (buttons, code blocks, file cards,
+etc.). The goal of this section is to support those apps **without**
+introducing UI/HTML into model-bound prompt building.
+
+| Task | Layer | Description |
+|------|-------|-------------|
+| Display-bound parsing | RisuAI | Add a `RisuAI::UI.parse(text, runtime:, context:)` helper that runs CBS in “visualize/display” semantics, but returns `{ text:, directives: [...] }` instead of HTML. |
+| Model-bound sanitization | Core/RisuAI | Add a helper/middleware to ensure UI/HTML never enters model-bound prompt output; optionally preserve UI macro placeholders for post-processing. |
+| Runtime sync contract | Core | Document and enforce that all app-owned state (global prompts/toggles/DB-derived values) is injected via `runtime.metadata` / runtime stores. Add conformance tests to prevent “hidden DB access” regressions. |
+| Examples / PoC | All | Add hand-authored examples (not fixture copies) showing an interactive guide + VN-like branching using `directives` + runtime synchronization. |
+
 **Deliverable:** Documentation is complete and aligned with the implemented
 behavior; test suite is stable with minimal skips; APIs are consistent and
 the system is ready for Rails app rewrite integration.
