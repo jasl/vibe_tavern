@@ -35,6 +35,7 @@ module TavernKit
             messages: ctx.scan_messages,
             books: books,
             budget: budget_tokens,
+            warner: ctx.method(:warn),
             scan_context: ctx.scan_context,
             scan_injects: ctx.scan_injects,
             trigger: ctx.generation_type,

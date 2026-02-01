@@ -14,6 +14,7 @@ module TavernKit
           messages:,
           books:,
           budget:,
+          warner: nil,
           scan_depth: 50,
           recursive_scanning: true,
           full_word_matching: false,
@@ -22,7 +23,7 @@ module TavernKit
           variables: nil,
           rng: nil
         )
-          super(messages: messages, books: books, budget: budget)
+          super(messages: messages, books: books, budget: budget, warner: warner)
 
           @scan_depth = Integer(scan_depth)
           @recursive_scanning = recursive_scanning == true

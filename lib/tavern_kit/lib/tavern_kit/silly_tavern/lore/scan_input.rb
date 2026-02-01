@@ -79,6 +79,7 @@ module TavernKit
           messages:,
           books:,
           budget:,
+          warner: nil,
           scan_context: {},
           scan_injects: [],
           trigger: :normal,
@@ -91,7 +92,7 @@ module TavernKit
           turn_count: 0,
           **_platform_attrs
         )
-          super(messages: messages, books: books, budget: budget)
+          super(messages: messages, books: books, budget: budget, warner: warner)
 
           @scan_context = normalize_scan_context(scan_context)
           @scan_injects = Array(scan_injects).map(&:to_s).freeze

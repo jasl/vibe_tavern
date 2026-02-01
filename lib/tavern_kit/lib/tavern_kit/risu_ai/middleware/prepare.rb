@@ -31,6 +31,7 @@ module TavernKit
             messages: scan_messages,
             books: lore_books,
             budget: ctx[:risuai_lore_token_budget],
+            warner: ctx.method(:warn),
             scan_depth: (ctx[:risuai_lore_scan_depth] || 50),
             recursive_scanning: ctx.key?(:risuai_recursive_scanning) ? (ctx[:risuai_recursive_scanning] == true) : true,
             full_word_matching: ctx[:risuai_full_word_matching] == true,
