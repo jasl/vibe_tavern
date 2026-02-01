@@ -62,7 +62,7 @@ module TavernKit
           greeting_index = scan_input.greeting_index
 
           variables = scan_input.variables
-          variables = TavernKit::Store::InMemory.new if variables.nil?
+          variables = TavernKit::VariablesStore::InMemory.new if variables.nil?
 
           budget_tokens = scan_input.budget
           budget_tokens = nil if budget_tokens.nil?

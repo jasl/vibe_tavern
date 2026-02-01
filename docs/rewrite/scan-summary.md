@@ -58,7 +58,7 @@ Location: `resources/rails/activemodel/lib/active_model/schematized_json.rb`
 - **Macros**: 50+ SillyTavern-compatible macros via V1 (regex) and V2 (parser) engines
 - **Lore/World Info**: Keyword matching, token budgeting, recursive scanning, timed effects
 - **Output Dialects**: OpenAI, Anthropic, Google, Text (+ others)
-- **Registries**: MacroRegistry, InjectionRegistry, HookRegistry, Store
+- **Registries**: MacroRegistry, InjectionRegistry, HookRegistry, VariablesStore
 
 ### Playground Integration Pattern
 - **Adapters**: CharacterAdapter, ParticipantAdapter, PresetResolver, LoreBooksResolver, MessageHistory

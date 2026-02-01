@@ -88,13 +88,13 @@ TavernKit (Core)
 │   ├── Macro::Environment::Base (character_name, user_name, get_var/set_var)
 │   ├── Macro::Registry::Base (#register(name, handler, **metadata))
 │   ├── Preset::Base, HookRegistry::Base, InjectionRegistry::Base
-│   └── Store::Base (scope: :local/:global; extensible by platforms)
+│   └── VariablesStore::Base (scope: :local/:global; extensible by platforms)
 ├── Platform-agnostic implementations:
 │   ├── Dialects (OpenAI, Anthropic, Google, Cohere, AI21, Mistral, XAI, Text)
 │   ├── TokenEstimator (pluggable adapters; tiktoken_ruby default, model_hint:)
 │   ├── Trimmer (pluggable strategy: :group_order or :priority)
 │   ├── ChatHistory::Base + ChatHistory::InMemory
-│   └── Store::InMemory
+│   └── VariablesStore::InMemory
 ├── Utilities (Coerce, Utils, Constants, Errors, Png::Parser/Writer)
 └── Ingest (file adapters: JSON/PNG/APNG/BYAF/CHARX; tmp extraction bundle)
 
@@ -123,7 +123,7 @@ TavernKit::RisuAI (Wave 5)
 - Interface protocols that ST and RisuAI implement (Lore::Engine::Base, etc.)
 - Platform-agnostic infra: Dialects (LLM API formats have nothing to do with
   ST or RisuAI), TokenEstimator (token counting is universal), Trimmer (budget
-  enforcement is generic), ChatHistory/Store (storage abstractions)
+  enforcement is generic), ChatHistory/VariablesStore (storage abstractions)
 
 **SillyTavern** provides:
 - ST-specific configuration formats (Preset with 40+ ST keys, Instruct sequences,
@@ -163,7 +163,7 @@ TavernKit::RisuAI (Wave 5)
 - ST's WI position enum (before/after/EMTop/EMBottom/ANTop/ANBottom/atDepth)
   belongs in `SillyTavern::Lore::Engine`, not `Lore::Engine::Base`.
 - CBS syntax (`{{#if}}`, `{{#when}}`) belongs in `RisuAI::CBS::Engine`.
-- Dialects, TokenEstimator, Trimmer, ChatHistory, Store stay in Core
+- Dialects, TokenEstimator, Trimmer, ChatHistory, VariablesStore stay in Core
   because they are LLM/storage concerns, not platform concerns.
 
 ### Core Interface Design (ST/RisuAI Dual-Platform Review)
@@ -180,7 +180,7 @@ Core interfaces must define **behavioral contracts**, not unified configuration.
 |-----------|--------|----------|
 | `Macro::Engine::Base` | `#expand(text, environment:)` with Environment protocol | P0 (Wave 2) |
 | `Lore::Engine::Base` | `#scan(input)` with ScanInput parameter object | P0 (Wave 2) |
-| `Store::Base` | Add `scope:` parameter (Core: local/global; RisuAI: +temp/function_arg) | P1 (Wave 2) |
+| `VariablesStore::Base` | Add `scope:` parameter (Core: local/global; RisuAI: +temp/function_arg) | P1 (Wave 2) |
 | `Prompt::Block` | Relax ROLES/INSERTION_POINTS/BUDGET_GROUPS; add `removable:` flag | P1 (Wave 1) |
 | `Prompt::Message` | Reserve optional multimodal/metadata fields; allow passthrough in dialects | P1 (Wave 1) |
 | `Trimmer` | Add `strategy:` parameter (:group_order vs :priority) | P2 (Wave 4) |
@@ -248,7 +248,7 @@ end
 
 Delivered modules:
 - **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (basic), Coerce/Utils/Constants/Errors
-- **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/Store, TokenEstimator, Ingest, TrimReport, Prompt::Trace/Instrumenter, PromptEntry enhancements (conditions + pattern matching)
+- **Core (Wave 2):** interface protocols (Preset/Lore/Macro/Hook/Injection), Lore data (Book/Entry/ScanInput/Result), ChatHistory/VariablesStore, TokenEstimator, Ingest, TrimReport, Prompt::Trace/Instrumenter, PromptEntry enhancements (conditions + pattern matching)
 - **SillyTavern (Wave 2):** Preset + Instruct + ContextTemplate (config/data only; middleware chain lands in Wave 4)
 - **SillyTavern (Wave 3):** Lore engine (World Info) + Macro engines (V1+V2) + ExamplesParser + ExpanderVars
 - **Core (Wave 4):** Trimmer + Dialects (8 formats) + MaxTokensMiddleware guardrails
@@ -261,7 +261,7 @@ Test status (gem): 593 runs, 0 failures, 0 errors, 0 skips.
 | Area | Layer | Est. LOC | Status |
 |------|-------|----------|--------|
 | Preset (60+ fields) + Instruct (24 attrs) + ContextTemplate (Handlebars) | **ST** | ~1,250 | ✅ (Wave 2) |
-| ChatHistory + Store | **Core** | ~400 | ✅ (Wave 2) |
+| ChatHistory + VariablesStore | **Core** | ~400 | ✅ (Wave 2) |
 | TokenEstimator | **Core** | ~150 | ✅ (Wave 2) |
 | Trimmer | **Core** | ~197 | ✅ (Wave 4) |
 | Dialects (8 formats) | **Core** | ~970 | ✅ (Wave 4) |
@@ -464,7 +464,7 @@ These must be preserved in the SillyTavern layer:
 | Module | Layer | Description | Est. LOC |
 |--------|-------|-------------|----------|
 | `ChatHistory::Base` + `InMemory` | Core | Abstract protocol + default impl | 150-200 |
-| `Store::Base` + `InMemory` | Core | Type-safe variable Store + default impl; `scope:` parameter (Core: `:local`/`:global`; RisuAI extends with `:temp`/`:function_arg`) | 150-200 |
+| `VariablesStore::Base` + `InMemory` | Core | Type-safe variables store + default impl; `scope:` parameter (Core: `:local`/`:global`; RisuAI extends with `:temp`/`:function_arg`) | 150-200 |
 | `TokenEstimator` | Core | Token counting (tiktoken_ruby), optional `model_hint:`, **pluggable adapter interface** | 100-150 |
 | `Ingest` | Core | File-based ingestion returning `Ingest::Bundle` (character + main image + lazy assets + warnings). Core parsing stays Hash-only. | 80-120 |
 | `TrimReport` + `TrimResult` | Core | Shared budgeting result value objects (Lore budget trimming + Trimmer); include eviction reasons + provenance for debugging | 60-100 |
@@ -753,7 +753,7 @@ Wave 5 from drifting while implementing RisuAI.
 |--------|-------|-------------|----------|
 | `RisuAI::CBS::Engine` | RisuAI | Implements `Macro::Engine::Base` via `#expand(text, environment:)` but uses CBS-specific semantics. CBS parser: 10 block types (#when/#if/#each/#func/#escape/#puredisplay/#pure/#code/#if_pure/:else), 13+ #when operators (is/isnot, >/>=/</<= , and/or/not, var/toggle, vis/tis), stack-based evaluation, 10 processing modes, 20-depth call stack limit, #func/call function system, §-delimited arrays, deterministic RNG (message-index seed) | 800-1,000 |
 | `RisuAI::CBS::Macros` | RisuAI | **Prompt-building scope.** Implement the macros required for message/prompt assembly (character/user/history/vars/math/strings/collections/unicode/crypto/misc) and app-state macros sourced from `runtime.metadata` (e.g. `mainprompt`, `jb`, `maxcontext`, `jbtoggled`). UI/DB-dependent macros (assets/media buttons, DB fetches, downloads, etc.) are deferred and should be provided by the application layer / adapters if needed. | 600-800 |
-| `RisuAI::CBS::Environment` | RisuAI | Implements `Macro::Environment::Base` for CBS evaluation. Manages variable scopes (`:local/:global` + RisuAI-only `:temp/:function_arg`) without changing Core behavior. Integrates with Core `Store` for persisted scopes and uses in-memory storage for ephemeral scopes. | 120-180 |
+| `RisuAI::CBS::Environment` | RisuAI | Implements `Macro::Environment::Base` for CBS evaluation. Manages variable scopes (`:local/:global` + RisuAI-only `:temp/:function_arg`) without changing Core behavior. Integrates with Core `VariablesStore` for persisted scopes and uses in-memory storage for ephemeral scopes. | 120-180 |
 
 #### 5c. RisuAI Lorebook
 
@@ -930,7 +930,7 @@ Before declaring Wave 6 done, also run:
 | Task | Layer | Description |
 |------|-------|-------------|
 | API consistency pass | All | Naming, option shapes, error semantics (warn vs raise), and deprecations |
-| Store unification decision | Core | **DONE:** renamed Core `ChatVariables` to `Store` and standardized on `ctx.store` (DSL: `store(...)`, `chat_variables(...)` alias). Remaining decision: whether `runtime.metadata`/toggles should become read-only Stores or stay plain Hashes |
+| VariablesStore naming decision | Core | **DONE:** renamed Core `ChatVariables` to `VariablesStore` and standardized on `ctx.variables_store` (DSL: `variables_store(...)`). Remaining decision: whether `runtime.metadata`/toggles should become read-only Stores or stay plain Hashes |
 | Performance pass | Core | Token estimation hot paths (incl. Trimmer token-estimate memoization via bounded cache), avoid expensive debug work unless instrumenter is enabled |
 | Trace + fingerprint review | Core | Ensure trace contains enough to reproduce “why this prompt” decisions; confirm fingerprint stability for caching |
 | Large-file split pass | ST + RisuAI | Split `SillyTavern::Lore::Engine`, `SillyTavern::Macro::V2Engine`, `RisuAI::CBS::Engine`, and `RisuAI::Triggers` into internal helpers to meet the 800 LOC guideline, without behavior changes |
@@ -1122,9 +1122,9 @@ lib/tavern_kit/
       chat_history.rb                # ChatHistory::Base
       chat_history/
         in_memory.rb                 # ChatHistory::InMemory
-      store.rb                       # Store::Base
-      store/
-        in_memory.rb                 # Store::InMemory
+      variables_store.rb             # VariablesStore::Base
+      variables_store/
+        in_memory.rb                 # VariablesStore::InMemory
       token_estimator.rb             # TokenEstimator
       trim_report.rb                 # TrimReport + TrimResult
       trimmer.rb                     # Trimmer                     [Wave 4]

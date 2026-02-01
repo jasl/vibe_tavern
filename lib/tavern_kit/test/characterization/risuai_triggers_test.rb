@@ -63,7 +63,7 @@ class RisuaiTriggersTest < Minitest::Test
   end
 
   def test_triggers_can_use_core_store_as_scriptstate
-    store = TavernKit::Store::InMemory.new
+    store = TavernKit::VariablesStore::InMemory.new
     store.set("flag", "1", scope: :local)
 
     trigger = {

@@ -104,11 +104,11 @@ module TavernKit
       # @return [Array<Block>] compiled blocks
       attr_accessor :blocks
 
-      # @return [Object, nil] store (Store::Base)
+      # @return [Object, nil] variables store (VariablesStore::Base)
       #
       # This is application-owned session state; treat it as stable during
       # pipeline execution (do not replace in middleware).
-      attr_reader :store
+      attr_reader :variables_store
 
       # @return [Array<String>] scan messages for World Info
       attr_accessor :scan_messages
@@ -229,33 +229,33 @@ module TavernKit
         @runtime = value
       end
 
-      def store=(value)
-        if !@store.nil? && @store != value && @current_stage
-          raise ArgumentError, "store cannot be replaced once set"
+      def variables_store=(value)
+        if !@variables_store.nil? && @variables_store != value && @current_stage
+          raise ArgumentError, "variables_store cannot be replaced once set"
         end
 
-        @store = value
+        @variables_store = value
       end
 
-      # Ensure the context has a store.
+      # Ensure the context has a variables store.
       #
       # The store is application-owned, session-level state (not per-build),
       # but the pipeline reads/writes it via the Context.
-      def store!
-        @store ||= TavernKit::Store::InMemory.new
+      def variables_store!
+        @variables_store ||= TavernKit::VariablesStore::InMemory.new
       end
 
       # Convenience setter for chat variables (application injection).
       def set_chat_var(name, value, scope: :local)
-        store!.set(name, value, scope: scope)
+        variables_store!.set(name, value, scope: scope)
         self
       end
 
       # Convenience multi-set for chat variables (application injection).
       def set_chat_vars(hash, scope: :local)
         hash = hash.is_a?(Hash) ? hash : {}
-        store = store!
-        hash.each { |k, v| store.set(k, v, scope: scope) }
+        vars = variables_store!
+        hash.each { |k, v| vars.set(k, v, scope: scope) }
         self
       end
 

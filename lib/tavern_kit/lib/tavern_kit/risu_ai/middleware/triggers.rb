@@ -18,7 +18,7 @@ module TavernKit
           runtime = ctx.runtime
           chat_index = runtime ? runtime.chat_index.to_i : -1
 
-          ctx.store!
+          ctx.variables_store!
 
           history = TavernKit::ChatHistory.wrap(ctx.history).to_a
           messages = history.map { |m| { role: m.role.to_s, data: m.content.to_s } }
@@ -30,7 +30,7 @@ module TavernKit
             message: messages,
             # Prefer the Core Store as the scriptstate backend so CBS/lore/triggers
             # all share one source of truth.
-            variables: ctx.store,
+            variables: ctx.variables_store,
             token_estimator: ctx.token_estimator,
             model_hint: ctx[:model_hint],
             scriptstate: {},

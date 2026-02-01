@@ -157,13 +157,13 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
 
     dsl.set_chat_var("x", "1")
-    assert_kind_of TavernKit::Store::InMemory, dsl.context.store
-    assert_equal "1", dsl.context.store.get("x", scope: :local)
+    assert_kind_of TavernKit::VariablesStore::InMemory, dsl.context.variables_store
+    assert_equal "1", dsl.context.variables_store.get("x", scope: :local)
 
-    store = TavernKit::Store::InMemory.new
-    dsl.store(store)
+    store = TavernKit::VariablesStore::InMemory.new
+    dsl.variables_store(store)
     dsl.set_chat_vars({ y: 2 }, scope: :global)
-    assert_same store, dsl.context.store
+    assert_same store, dsl.context.variables_store
     assert_equal 2, store.get("y", scope: :global)
   end
 

@@ -16,7 +16,7 @@ module TavernKit
           normalize_risuai_runtime!(ctx)
 
           ctx.token_estimator ||= TavernKit::TokenEstimator.default
-          ctx.store!
+          ctx.variables_store!
 
           template = extract_prompt_template(ctx.preset)
           ctx.warn("RisuAI preset is missing promptTemplate; using empty template") if template.nil?
@@ -37,7 +37,7 @@ module TavernKit
             full_word_matching: ctx[:risuai_full_word_matching] == true,
             greeting_index: ctx.greeting_index,
             chat_length: (ctx[:risuai_chat_length] || (TavernKit::ChatHistory.wrap(ctx.history).size + 1)),
-            variables: ctx.store,
+            variables: ctx.variables_store,
           )
 
           ctx.lore_result = lore_engine.scan(lore_input)
@@ -56,7 +56,7 @@ module TavernKit
           # Runtime input is provided by the application as `ctx[:runtime]`.
           raw = ctx.key?(:runtime) ? ctx[:runtime] : nil
 
-          ctx.store!
+          ctx.variables_store!
           ctx.runtime = TavernKit::RisuAI::Runtime.build(raw, context: ctx, strict: ctx.strict?)
         end
 

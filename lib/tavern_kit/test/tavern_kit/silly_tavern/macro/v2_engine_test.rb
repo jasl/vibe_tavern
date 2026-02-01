@@ -277,7 +277,7 @@ class TavernKit::SillyTavern::Macro::V2EngineTest < Minitest::Test
     defaults = {
       character: char,
       user: user,
-      variables: TavernKit::Store::InMemory.new,
+      variables: TavernKit::VariablesStore::InMemory.new,
       outlets: {},
       original: nil,
       clock: -> { Time.utc(2020, 1, 1, 0, 0, 0) },

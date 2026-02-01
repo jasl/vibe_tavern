@@ -150,7 +150,7 @@ class RisuaiRegexScriptsTest < Minitest::Test
       { in: "X", out: "{{getvar::foo}}", type: "editoutput" },
     ]
 
-    vars = TavernKit::Store::InMemory.new
+    vars = TavernKit::VariablesStore::InMemory.new
     env = TavernKit::RisuAI::CBS::Environment.build(variables: vars)
 
     vars.set("foo", "Alice")

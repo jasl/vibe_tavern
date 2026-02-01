@@ -126,7 +126,7 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_calc_expression_with_variables
-    store = TavernKit::Store::InMemory.new
+    store = TavernKit::VariablesStore::InMemory.new
     store.set("x", 2, scope: :local)
     store.set("y", 3, scope: :global)
 
@@ -134,7 +134,7 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_variable_macros_and_return
-    store = TavernKit::Store::InMemory.new
+    store = TavernKit::VariablesStore::InMemory.new
 
     # Upstream: setvar/addvar/setdefaultvar only run when runVar=true.
     assert_equal "{{setvar::flag::1}}", render("{{setvar::flag::1}}", variables: store)
@@ -162,7 +162,7 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "1|", render(input)
 
     # rmVar: removes setter macros without mutating variables (used for stripping).
-    store2 = TavernKit::Store::InMemory.new
+    store2 = TavernKit::VariablesStore::InMemory.new
     assert_equal "", render("{{setvar::flag::1}}", variables: store2, run_var: true, rm_var: true)
     assert_nil store2.get("flag", scope: :local)
   end
@@ -172,7 +172,7 @@ class RisuaiCbsTest < Minitest::Test
     # resources/Risuai/src/ts/parser/chatVar.svelte.ts (getChatVar/getGlobalChatVar)
     # resources/Risuai/src/ts/cbs.ts (setdefaultvar/addvar)
 
-    store = TavernKit::Store::InMemory.new
+    store = TavernKit::VariablesStore::InMemory.new
 
     assert_equal "null", render("{{getvar::missing}}", variables: store)
     assert_equal "null", render("{{getglobalvar::missing}}", variables: store)

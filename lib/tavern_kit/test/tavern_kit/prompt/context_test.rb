@@ -95,14 +95,14 @@ class TavernKit::Prompt::ContextTest < Minitest::Test
 
   def test_chat_variables_helpers
     ctx = TavernKit::Prompt::Context.new
-    assert_nil ctx.store
+    assert_nil ctx.variables_store
 
     ctx.set_chat_var("x", "1")
-    assert_kind_of TavernKit::Store::InMemory, ctx.store
-    assert_equal "1", ctx.store.get("x", scope: :local)
+    assert_kind_of TavernKit::VariablesStore::InMemory, ctx.variables_store
+    assert_equal "1", ctx.variables_store.get("x", scope: :local)
 
     ctx.set_chat_vars({ y: 2, z: "ok" }, scope: :global)
-    assert_equal 2, ctx.store.get("y", scope: :global)
-    assert_equal "ok", ctx.store.get("z", scope: :global)
+    assert_equal 2, ctx.variables_store.get("y", scope: :global)
+    assert_equal "ok", ctx.variables_store.get("z", scope: :global)
   end
 end

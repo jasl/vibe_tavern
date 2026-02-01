@@ -36,7 +36,7 @@ its own configuration parsing.
 |-----------|------|-----------------|
 | Macro/CBS Engine | **High** | `#expand(text, vars)` too narrow; needs `environment:` parameter object |
 | Lore Engine | **Medium-High** | `#scan(text, books:, budget:)` too narrow; needs `ScanInput` parameter object |
-| Store | **Medium** | Missing `temp`/`function_arg` scopes for RisuAI |
+| VariablesStore | **Medium** | Missing `temp`/`function_arg` scopes for RisuAI |
 | Prompt::Block | **Low** | Implemented in Core: flexible role/points/groups + `removable` flag |
 | Prompt::Message | **Low** | Implemented in Core: `attachments`/`metadata` passthrough fields |
 | Trimmer | **Low** | Needs pluggable strategy (`:group_order` vs `:priority`) |
@@ -288,14 +288,14 @@ Minimal shared schema + `extensions` Hash for platform-specific fields:
 
 ---
 
-### 4. Store::Base
+### 4. VariablesStore::Base
 
 Adds `scope:` parameter. Core guarantees `:local` and `:global`; RisuAI extends
 with `:temp` and `:function_arg`.
 
 ```ruby
 module TavernKit
-  class Store::Base
+  class VariablesStore::Base
     CORE_SCOPES = %i[local global].freeze
 
     def get(name, scope: :local) = raise NotImplementedError
@@ -978,7 +978,7 @@ end
 | P0 | `Macro::Engine::Base` + `Environment::Base` | Wave 2 |
 | P0 | `Lore::Engine::Base` + `ScanInput` | Wave 2 |
 | P1 | `ChatHistory::Base` + message contract | Wave 2 |
-| P1 | `Store::Base` scope parameter | Wave 2 |
+| P1 | `VariablesStore::Base` scope parameter | Wave 2 |
 | P1 | `Block` validation relaxation | Done (2026-01-29) |
 | P1 | `Prompt::Message` multimodal/metadata scaffolding | Done (2026-01-29) |
 | P1 | `Prompt::Trace` + instrumentation hooks | Wave 2 |

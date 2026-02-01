@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require_relative "../store"
+require_relative "../variables_store"
 
 module TavernKit
-  module Store
-    # In-memory Store implementation.
+  module VariablesStore
+    # In-memory VariablesStore implementation.
     class InMemory < Base
       def initialize
         @scopes = Hash.new { |h, k| h[k] = {} }

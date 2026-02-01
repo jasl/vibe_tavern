@@ -126,7 +126,7 @@ TavernKit core objects are **hash-first**. File formats are handled by
 | Core (`{{char}}`, `{{user}}`, `{{original}}`, …) | ✅ | ✅ | |
 | Chat/history macros | ✅ | ✅ | `{{lastMessage}}`, `{{lastUserMessage}}`, … |
 | Time/date macros | ✅ | ✅ | `{{date}}`, `{{time}}`, `{{datetimeformat}}`, … |
-| Variables (`var` + `globalvar`) | ✅ | ✅ | Stored in `ctx.store` |
+| Variables (`var` + `globalvar`) | ✅ | ✅ | Stored in `ctx.variables_store` |
 | Instruct macros (`{{instruct...}}`) | ✅ | ✅ | Based on `ctx.preset.instruct` |
 | State/env macros | ✅ | ✅ | Requires app-supplied state for strict parity |
 
