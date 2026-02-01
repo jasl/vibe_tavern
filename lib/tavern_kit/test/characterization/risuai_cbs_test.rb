@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "base64"
 
 class RisuaiCbsTest < Minitest::Test
   def render(text, **context)
@@ -238,6 +239,50 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "42", render("{{message_index}}", message_index: 42)
     assert_equal "gpt-4o", render("{{model}}", model_hint: "gpt-4o")
     assert_equal "assistant", render("{{role}}", role: :assistant)
+  end
+
+  def test_aggregate_unicode_and_crypto_macros
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (min/max/sum/average/fixnum/unicode/hex/xor/crypt)
+
+    assert_equal "2", render("{{min::5::2::8}}")
+    assert_equal "0", render("{{min::a::5}}")
+    assert_equal "2", render("{{min::[\"5\",\"2\",\"8\"]}}")
+    assert_equal "Infinity", render("{{min}}")
+
+    assert_equal "8", render("{{max::5::2::8}}")
+    assert_equal "5", render("{{max::a::5}}")
+    assert_equal "-Infinity", render("{{max}}")
+
+    assert_equal "6", render("{{sum::1::2::3}}")
+    assert_equal "2", render("{{sum::a::2}}")
+    assert_equal "0", render("{{sum}}")
+
+    assert_equal "4", render("{{average::2::4::6}}")
+    assert_equal "NaN", render("{{average}}")
+
+    assert_equal "3.14", render("{{fixnum::3.14159::2}}")
+    assert_equal "3", render("{{fixnum::3.1}}")
+    assert_equal "NaN", render("{{fixnum::abc::2}}")
+
+    assert_equal "65", render("{{unicodeencode::A}}")
+    assert_equal "NaN", render("{{unicodeencode::A::1}}")
+    assert_equal "A", render("{{unicodedecode::65}}")
+    assert_equal "A", render("{{u::41}}")
+    assert_equal "A", render("{{ue::41}}")
+
+    assert_equal "255", render("{{fromhex::FF}}")
+    assert_equal "NaN", render("{{fromhex::ZZ}}")
+    assert_equal "ff", render("{{tohex::255}}")
+    assert_equal "3", render("{{tohex::3.14}}")
+
+    expected_xor = Base64.strict_encode64("hello".bytes.map { |b| b ^ 0xFF }.pack("C*"))
+    assert_equal expected_xor, render("{{xor::hello}}")
+    assert_equal "hello", render("{{xordecrypt::#{expected_xor}}}")
+    assert_equal "hello", render("{{xordecrypt::{{xor::hello}}}}")
+
+    assert_equal "bcd", render("{{crypt::abc::1}}")
+    assert_equal "abc", render("{{crypt::bcd::-1}}")
   end
 
   def test_date_and_time_macros_with_custom_format

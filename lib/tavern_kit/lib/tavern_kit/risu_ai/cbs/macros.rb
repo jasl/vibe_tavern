@@ -4,6 +4,9 @@ require_relative "macros/time_macros"
 require_relative "macros/logic_macros"
 require_relative "macros/collection_macros"
 require_relative "macros/string_macros"
+require_relative "macros/aggregate_macros"
+require_relative "macros/unicode_macros"
+require_relative "macros/crypto_macros"
 
 module TavernKit
   module RisuAI
@@ -175,6 +178,34 @@ module TavernKit
             resolve_abs(args)
           when "remaind"
             resolve_remaind(args)
+          when "min"
+            resolve_min(args)
+          when "max"
+            resolve_max(args)
+          when "sum"
+            resolve_sum(args)
+          when "average"
+            resolve_average(args)
+          when "fixnum", "fixnumber"
+            resolve_fixnum(args)
+          when "unicodeencode"
+            resolve_unicodeencode(args)
+          when "unicodedecode"
+            resolve_unicodedecode(args)
+          when "u"
+            resolve_u(args)
+          when "ue"
+            resolve_ue(args)
+          when "fromhex"
+            resolve_fromhex(args)
+          when "tohex"
+            resolve_tohex(args)
+          when "xor", "xorencrypt", "xorencode", "xore"
+            resolve_xor(args)
+          when "xordecrypt", "xordecode", "xord"
+            resolve_xordecrypt(args)
+          when "crypt", "crypto", "caesar", "encrypt", "decrypt"
+            resolve_crypt(args)
           else
             nil
           end
