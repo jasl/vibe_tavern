@@ -13,10 +13,10 @@ class RisuaiCbsTest < Minitest::Test
   end
 
   def test_basic_escapes
-    assert_equal "{{", render("{{bo}}")
-    assert_equal "}}", render("{{bc}}")
-    assert_equal "{", render("{{decbo}}")
-    assert_equal "}", render("{{decbc}}")
+    assert_equal "\u{E9B8}\u{E9B8}", render("{{bo}}")
+    assert_equal "\u{E9B9}\u{E9B9}", render("{{bc}}")
+    assert_equal "\u{E9B8}", render("{{decbo}}")
+    assert_equal "\u{E9B9}", render("{{decbc}}")
     assert_equal "\n", render("{{br}}")
     assert_equal "\\n", render("{{cbr}}")
 

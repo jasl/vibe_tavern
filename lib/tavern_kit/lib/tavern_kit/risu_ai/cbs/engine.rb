@@ -584,10 +584,12 @@ module TavernKit
           end
 
           case tok
-          when "bo" then "{{"
-          when "bc" then "}}"
-          when "decbo" then "{"
-          when "decbc" then "}"
+          # Upstream uses private-use glyphs to display braces without re-triggering CBS parsing.
+          # resources/Risuai/src/ts/cbs.ts (decbo/decbc/bo/bc)
+          when "bo" then "\u{E9B8}\u{E9B8}"
+          when "bc" then "\u{E9B9}\u{E9B9}"
+          when "decbo" then "\u{E9B8}"
+          when "decbc" then "\u{E9B9}"
           when "br" then "\n"
           when "cbr" then "\\n"
           else
