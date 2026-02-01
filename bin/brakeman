@@ -2,6 +2,8 @@
 require "rubygems"
 require "bundler/setup"
 
+# Ignore reference code under resources/ (not part of the Rails app).
+ARGV.unshift("--skip-files", "resources/")
 ARGV.unshift("--ensure-latest")
 
 load Gem.bin_path("brakeman", "brakeman")
