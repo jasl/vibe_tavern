@@ -413,9 +413,10 @@ module TavernKit
           end
 
           queries.all? do |query|
-            keys = Array(query[:keys] || query["keys"]).map(&:to_s)
-            negative = query.key?(:negative) ? query[:negative] : query["negative"]
-            all_mode = query.key?(:all) ? query[:all] : query["all"]
+            q = normalize_hash_keys(query)
+            keys = Array(q[:keys]).map(&:to_s)
+            negative = q[:negative]
+            all_mode = q[:all]
 
             result = search_match?(
               messages: messages,
@@ -499,7 +500,8 @@ module TavernKit
 
         def normalize_message(message)
           if message.is_a?(Hash)
-            data = message[:data] || message["data"] || message[:content] || message["content"] || message[:text] || message["text"]
+            h = normalize_hash_keys(message)
+            data = h[:data] || h[:content] || h[:text]
             { data: data.to_s }
           else
             { data: message.to_s }
@@ -507,9 +509,25 @@ module TavernKit
         end
 
         def normalize_recursive_prompt(hash)
-          h = hash.is_a?(Hash) ? hash : {}
-          data = h[:data] || h["data"] || h[:prompt] || h["prompt"]
+          h = normalize_hash_keys(hash)
+          data = h[:data] || h[:prompt]
           { data: data.to_s }
+        end
+
+        def normalize_hash_keys(raw)
+          h = raw.is_a?(Hash) ? raw : {}
+          return {} if h.empty?
+
+          snake_symbol = true
+          h.each_key do |key|
+            unless key.is_a?(Symbol) && key.to_s.match?(/\A[a-z0-9_]+\z/)
+              snake_symbol = false
+              break
+            end
+          end
+          return h if snake_symbol
+
+          TavernKit::Runtime::Base.normalize(h)
         end
 
         def apply_lore_injections!(actives, injection_lores)

@@ -72,6 +72,22 @@ class RisuaiTemplateCardsTest < Minitest::Test
     assert_equal ["----\nDEFAULT"], blocks.map(&:content)
   end
 
+  def test_groups_accept_string_and_camelcase_keys
+    template = [
+      { type: "description" },
+      { type: "postEverything" },
+    ]
+
+    groups = {
+      "description" => [{ "role" => "system", "data" => "DESC" }],
+      "postEverything" => [{ "role" => "system", "content" => "POST" }],
+    }
+
+    blocks = TavernKit::RisuAI::TemplateCards.assemble(template: template, groups: groups, lore_entries: [])
+
+    assert_equal ["DESC", "POST"], blocks.map(&:content)
+  end
+
   def test_st_chat_convert
     st = {
       "prompts" => [

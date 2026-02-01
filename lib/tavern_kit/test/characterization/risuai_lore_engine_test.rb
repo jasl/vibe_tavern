@@ -160,4 +160,23 @@ class RisuaiLoreEngineTest < Minitest::Test
     assert_equal 1, result.activated_entries.size
     assert_equal "BASE INJECTED", result.activated_entries.first.content
   end
+
+  def test_message_hash_content_key_is_searched
+    book = TavernKit::Lore::Book.new(
+      entries: [
+        TavernKit::Lore::Entry.new(
+          keys: ["dragon"],
+          content: "HIT",
+          insertion_order: 100,
+        ),
+      ]
+    )
+
+    engine = TavernKit::RisuAI::Lore::Engine.new(token_estimator: TokenEstimator.new)
+    input = TavernKit::RisuAI::Lore::ScanInput.new(messages: [{ "content" => "dragon" }], books: [book], budget: nil, scan_depth: 10)
+
+    result = engine.scan(input)
+
+    assert_equal ["HIT"], result.activated_entries.map(&:content)
+  end
 end

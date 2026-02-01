@@ -141,23 +141,23 @@ module TavernKit
         list = Array(template)
 
         has_post_everything = list.any? do |raw|
-          h = raw.is_a?(Hash) ? raw : {}
-          (h[:type] || h["type"]).to_s == "postEverything"
+          h = normalize_hash_keys(raw)
+          h[:type].to_s == "postEverything"
         end
 
         has_post_everything ? list : (list + [{ "type" => "postEverything" }])
       end
 
       def normalize_groups(groups)
-        h = groups.is_a?(Hash) ? groups : {}
+        h = normalize_hash_keys(groups)
         {
-          persona: normalize_message_list(h[:persona] || h["persona"]),
-          description: normalize_message_list(h[:description] || h["description"]),
-          lorebook: normalize_message_list(h[:lorebook] || h["lorebook"]),
-          memory: normalize_message_list(h[:memory] || h["memory"]),
-          authornote: normalize_message_list(h[:authornote] || h["authornote"]),
-          post_everything: normalize_message_list(h[:post_everything] || h["post_everything"] || h[:postEverything] || h["postEverything"]),
-          chats: normalize_message_list(h[:chats] || h["chats"] || h[:chat] || h["chat"]),
+          persona: normalize_message_list(h[:persona]),
+          description: normalize_message_list(h[:description]),
+          lorebook: normalize_message_list(h[:lorebook]),
+          memory: normalize_message_list(h[:memory]),
+          authornote: normalize_message_list(h[:authornote] || h[:author_note]),
+          post_everything: normalize_message_list(h[:post_everything]),
+          chats: normalize_message_list(h[:chats] || h[:chat]),
         }
       end
 
@@ -169,9 +169,10 @@ module TavernKit
           when TavernKit::Prompt::Message
             m
           when Hash
-            role = (m[:role] || m["role"]).to_s
+            h = normalize_hash_keys(m)
+            role = h[:role].to_s
             role = "assistant" if role == "bot" || role == "char"
-            content = m[:content] || m["content"] || m[:data] || m["data"] || ""
+            content = h[:content] || h[:data] || ""
             TavernKit::Prompt::Message.new(role: role.to_sym, content: content.to_s)
           else
             nil
@@ -456,6 +457,23 @@ module TavernKit
           token_budget_group: token_budget_group,
           metadata: metadata,
         )
+      end
+
+      def normalize_hash_keys(raw)
+        h = raw.is_a?(Hash) ? raw : {}
+        return {} if h.empty?
+
+        # Fast path: already snake_case symbols.
+        snake_symbol = true
+        h.each_key do |key|
+          unless key.is_a?(Symbol) && key.to_s.match?(/\A[a-z0-9_]+\z/)
+            snake_symbol = false
+            break
+          end
+        end
+        return h if snake_symbol
+
+        TavernKit::Runtime::Base.normalize(h)
       end
     end
   end
