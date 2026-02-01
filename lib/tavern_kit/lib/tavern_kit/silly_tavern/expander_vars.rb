@@ -19,8 +19,6 @@ module TavernKit
         vars_store =
           if ctx.respond_to?(:store) && ctx.store
             ctx.store
-          elsif ctx.respond_to?(:variables_store) && ctx.variables_store
-            ctx.variables_store
           else
             TavernKit::Store::InMemory.new
           end

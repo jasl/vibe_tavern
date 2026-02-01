@@ -104,7 +104,7 @@ module TavernKit
       # @return [Array<Block>] compiled blocks
       attr_accessor :blocks
 
-      # @return [Object, nil] variables store (Store::Base)
+      # @return [Object, nil] store (Store::Base)
       #
       # This is application-owned session state; treat it as stable during
       # pipeline execution (do not replace in middleware).
@@ -237,24 +237,13 @@ module TavernKit
         @store = value
       end
 
-      # Back-compat alias (Wave 6 refactor): prefer `store`.
-      def variables_store = @store
-
-      # Back-compat alias (Wave 6 refactor): prefer `store=`.
-      def variables_store=(value)
-        self.store = value
-      end
-
-      # Ensure the context has a variables store.
+      # Ensure the context has a store.
       #
       # The store is application-owned, session-level state (not per-build),
       # but the pipeline reads/writes it via the Context.
       def store!
         @store ||= TavernKit::Store::InMemory.new
       end
-
-      # Back-compat alias (Wave 6 refactor): prefer `store!`.
-      def variables_store! = store!
 
       # Convenience setter for chat variables (application injection).
       def set_chat_var(name, value, scope: :local)
