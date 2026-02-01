@@ -118,6 +118,51 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "X", result.chat[:message][1][:data]
   end
 
+  def test_run_all_supports_runtrigger_by_comment_with_recursion_limit
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (runtrigger recursionCount < 10)
+
+    triggers = [
+      {
+        type: "output",
+        comment: "A",
+        conditions: [],
+        effect: [{ type: "runtrigger", value: "B" }],
+      },
+      {
+        type: "manual",
+        comment: "B",
+        conditions: [],
+        effect: [{ type: "setvar", operator: "=", var: "hit", value: "yes" }],
+      },
+    ]
+
+    result = TavernKit::RisuAI::Triggers.run_all(
+      triggers,
+      chat: { scriptstate: {}, message: [] }
+    )
+
+    assert_equal "yes", result.chat[:scriptstate]["$hit"]
+
+    # Recursion is blocked at 10 for non-lowLevelAccess triggers.
+    triggers2 = [
+      {
+        type: "output",
+        comment: "A",
+        conditions: [],
+        effect: [{ type: "runtrigger", value: "A" }],
+      },
+    ]
+
+    result2 = TavernKit::RisuAI::Triggers.run_all(
+      triggers2,
+      chat: { scriptstate: {}, message: [] }
+    )
+
+    # It should return without infinite recursion and without setting anything.
+    assert_equal({}, result2.chat[:scriptstate])
+  end
+
   def test_condition_exists_modes
     trigger = {
       type: "output",

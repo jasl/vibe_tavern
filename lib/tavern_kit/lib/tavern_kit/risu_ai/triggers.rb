@@ -11,6 +11,20 @@ module TavernKit
 
       module_function
 
+      # Run a trigger list (the upstream "runTrigger" entrypoint).
+      #
+      # @param triggers [Array<Hash>] trigger scripts
+      # @param chat [Hash] chat state (messages + scriptstate)
+      # @param mode [String, Symbol, nil] optional type filter (e.g. "output")
+      # @param manual_name [String, nil] runs only triggers whose comment matches (manual mode)
+      # @param recursion_count [Integer] recursion guard for runtrigger
+      def run_all(triggers, chat:, mode: nil, manual_name: nil, recursion_count: 0)
+        t_list = normalize_triggers(triggers)
+        c = deep_symbolize(chat.is_a?(Hash) ? chat : {})
+        run_all_normalized(t_list, chat: c, mode: mode, manual_name: manual_name, recursion_count: recursion_count)
+        Result.new(chat: c)
+      end
+
       def run(trigger, chat:)
         t = TavernKit::Utils.deep_stringify_keys(trigger.is_a?(Hash) ? trigger : {})
         c = deep_symbolize(chat.is_a?(Hash) ? chat : {})
@@ -28,12 +42,43 @@ module TavernKit
           run_v2_effects(effects, chat: c)
         else
           effects.each do |effect|
-            apply_effect(effect, chat: c, trigger: t)
+            apply_effect(effect, chat: c, trigger: t, triggers: nil, recursion_count: 0)
           end
         end
 
         Result.new(chat: c)
       end
+
+      def run_all_normalized(triggers, chat:, mode:, manual_name:, recursion_count:)
+        triggers.each do |t|
+          next unless t.is_a?(Hash)
+
+          if manual_name
+            next unless t["comment"].to_s == manual_name.to_s
+          elsif mode
+            next unless t["type"].to_s == mode.to_s
+          end
+
+          run_one_normalized(t, triggers: triggers, chat: chat, recursion_count: recursion_count)
+        end
+      end
+      private_class_method :run_all_normalized
+
+      def run_one_normalized(trigger, triggers:, chat:, recursion_count:)
+        conditions = Array(trigger["conditions"]).select { |v| v.is_a?(Hash) }
+        effects = Array(trigger["effect"]).select { |v| v.is_a?(Hash) }
+
+        return unless conditions_pass?(conditions, chat: chat)
+
+        if effects.any? { |e| e["type"].to_s.start_with?("v2") }
+          run_v2_effects(effects, chat: chat)
+        else
+          effects.each do |effect|
+            apply_effect(effect, chat: chat, trigger: trigger, triggers: triggers, recursion_count: recursion_count)
+          end
+        end
+      end
+      private_class_method :run_one_normalized
 
       def conditions_pass?(conditions, chat:)
         conditions.all? do |condition|
@@ -112,7 +157,7 @@ module TavernKit
         false
       end
 
-      def apply_effect(effect, chat:, trigger:)
+      def apply_effect(effect, chat:, trigger:, triggers:, recursion_count:)
         case effect["type"].to_s
         when "setvar"
           apply_setvar(effect, chat: chat)
@@ -122,6 +167,8 @@ module TavernKit
           apply_impersonate(effect, chat: chat)
         when "stop"
           chat[:stop_sending] = true
+        when "runtrigger"
+          apply_runtrigger(effect, chat: chat, trigger: trigger, triggers: triggers, recursion_count: recursion_count)
         when "cutchat"
           apply_cutchat(effect, chat: chat)
         when "modifychat"
@@ -332,6 +379,25 @@ module TavernKit
         messages[idx] = msg
       end
 
+      def apply_runtrigger(effect, chat:, trigger:, triggers:, recursion_count:)
+        return unless triggers.is_a?(Array)
+
+        name = effect["value"].to_s
+        return if name.empty?
+
+        if recursion_count >= 10 && !low_level_access?(trigger)
+          return
+        end
+
+        run_all_normalized(
+          triggers,
+          chat: chat,
+          mode: :manual,
+          manual_name: name,
+          recursion_count: recursion_count + 1,
+        )
+      end
+
       def apply_extract_regex(effect, chat:, trigger:)
         return unless low_level_access?(trigger)
 
@@ -395,6 +461,15 @@ module TavernKit
           value
         end
       end
+
+      def normalize_triggers(triggers)
+        Array(triggers).filter_map do |raw|
+          next nil unless raw.is_a?(Hash)
+
+          TavernKit::Utils.deep_stringify_keys(raw)
+        end
+      end
+      private_class_method :normalize_triggers
     end
   end
 end

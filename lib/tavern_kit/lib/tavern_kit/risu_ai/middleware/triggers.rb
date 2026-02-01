@@ -30,9 +30,7 @@ module TavernKit
             scriptstate: scriptstate,
           }
 
-          Array(triggers).each do |t|
-            chat = TavernKit::RisuAI::Triggers.run(t, chat: chat).chat
-          end
+          chat = TavernKit::RisuAI::Triggers.run_all(triggers, chat: chat).chat
 
           ctx[:risuai_scriptstate] = chat[:scriptstate] if chat.is_a?(Hash)
           ctx[:risuai_chat_state] = chat
