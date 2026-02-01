@@ -190,7 +190,15 @@ module TavernKit
               idx += 1
               while idx < effects.length
                 ef = effects[idx]
-                break if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"] || 0) rescue 0) == end_indent
+                if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"] || 0) rescue 0) == end_indent
+                  # If there's an else clause, jump to it so the loop increment
+                  # lands on the first else-body effect.
+                  next_ef = effects[idx + 1]
+                  if next_ef.is_a?(Hash) && next_ef["type"].to_s == "v2Else" && (Integer(next_ef["indent"] || 0) rescue 0) == indent
+                    idx += 1
+                  end
+                  break
+                end
 
                 idx += 1
               end
@@ -199,6 +207,17 @@ module TavernKit
             apply_v2_setvar(effect, chat: chat)
           when "v2StopPromptSending"
             chat[:stop_sending] = true
+          when "v2Else"
+            # Skip else body when the preceding v2IfAdvanced passed.
+            else_indent = Integer(effect["indent"] || 0) rescue 0
+            end_indent = else_indent + 1
+            idx += 1
+            while idx < effects.length
+              ef = effects[idx]
+              break if ef["type"].to_s == "v2EndIndent" && (Integer(ef["indent"] || 0) rescue 0) == end_indent
+
+              idx += 1
+            end
           when "v2EndIndent"
             # no-op for the minimal subset
             nil
@@ -233,6 +252,10 @@ module TavernKit
         condition = effect["condition"].to_s
 
         case condition
+        when "="
+          numeric_equal?(source_value, target_value)
+        when "!="
+          !numeric_equal?(source_value, target_value)
         when "∈"
           ::JSON.parse(target_value.to_s).include?(source_value.to_s)
         when "∋"
@@ -241,11 +264,70 @@ module TavernKit
           !::JSON.parse(target_value.to_s).include?(source_value.to_s)
         when "∌"
           !::JSON.parse(source_value.to_s).include?(target_value.to_s)
+        when ">"
+          numeric_compare?(source_value, target_value, :>)
+        when "<"
+          numeric_compare?(source_value, target_value, :<)
+        when ">="
+          numeric_compare?(source_value, target_value, :>=)
+        when "<="
+          numeric_compare?(source_value, target_value, :<=)
+        when "≒"
+          approx_equal?(source_value, target_value)
+        when "≡"
+          equivalent?(source_value, target_value)
         else
           false
         end
       rescue JSON::ParserError
         false
+      end
+
+      def numeric_equal?(a, b)
+        na = safe_float(a)
+        nb = safe_float(b)
+        return a.to_s == b.to_s if na.nan? || nb.nan?
+
+        na == nb
+      end
+
+      def approx_equal?(a, b)
+        na = safe_float(a)
+        nb = safe_float(b)
+
+        if na.nan? || nb.nan?
+          normalize = ->(v) { v.to_s.downcase.delete(" ") }
+          return normalize.call(a) == normalize.call(b)
+        end
+
+        (na - nb).abs < 0.0001
+      end
+
+      def numeric_compare?(a, b, op)
+        na = safe_float(a)
+        nb = safe_float(b)
+        return false if na.nan? || nb.nan?
+
+        na.public_send(op, nb)
+      end
+
+      def safe_float(value)
+        Float(value)
+      rescue ArgumentError, TypeError
+        Float::NAN
+      end
+
+      def equivalent?(a, b)
+        tv = b.to_s
+        sv = a.to_s
+
+        if tv == "true"
+          sv == "true" || sv == "1"
+        elsif tv == "false"
+          !(sv == "true" || sv == "1")
+        else
+          sv == tv
+        end
       end
 
       def apply_v2_setvar(effect, chat:)

@@ -213,4 +213,53 @@ class RisuaiTriggersTest < Minitest::Test
 
     assert_equal "yes", result.chat[:scriptstate]["$hit"]
   end
+
+  def test_v2_if_else
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2IfAdvanced", condition: "=", sourceType: "value", source: "0", targetType: "value", target: "1", indent: 0 },
+        { type: "v2SetVar", operator: "=", var: "hit", valueType: "value", value: "IF", indent: 1 },
+        { type: "v2EndIndent", endOfLoop: false, indent: 1 },
+        { type: "v2Else", indent: 0 },
+        { type: "v2SetVar", operator: "=", var: "hit", valueType: "value", value: "ELSE", indent: 1 },
+        { type: "v2EndIndent", endOfLoop: false, indent: 1 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "ELSE", result.chat[:scriptstate]["$hit"]
+
+    trigger2 = trigger.dup
+    trigger2[:effect] = trigger[:effect].dup
+    trigger2[:effect][0] = trigger2[:effect][0].merge(source: "1", target: "1")
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "IF", result2.chat[:scriptstate]["$hit"]
+  end
+
+  def test_v2_if_approx_and_equivalent
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2IfAdvanced", condition: "≒", sourceType: "value", source: "1", targetType: "value", target: "1.00005", indent: 0 },
+        { type: "v2SetVar", operator: "=", var: "hit", valueType: "value", value: "YES", indent: 1 },
+        { type: "v2EndIndent", endOfLoop: false, indent: 1 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "YES", result.chat[:scriptstate]["$hit"]
+
+    trigger2 = {
+      type: "output",
+      effect: [
+        { type: "v2IfAdvanced", condition: "≡", sourceType: "value", source: "1", targetType: "value", target: "true", indent: 0 },
+        { type: "v2SetVar", operator: "=", var: "hit", valueType: "value", value: "YES", indent: 1 },
+        { type: "v2EndIndent", endOfLoop: false, indent: 1 },
+      ],
+    }
+
+    result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
+    assert_equal "YES", result2.chat[:scriptstate]["$hit"]
+  end
 end
