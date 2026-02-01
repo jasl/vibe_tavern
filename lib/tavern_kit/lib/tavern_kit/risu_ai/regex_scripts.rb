@@ -9,6 +9,7 @@ module TavernKit
     # repeat_back).
     module RegexScripts
       ParsedScript = Data.define(:script, :order, :actions)
+      COMPILED_REGEX_CACHE_MAX = 1000
 
       module_function
 
@@ -154,10 +155,18 @@ module TavernKit
         options |= Regexp::IGNORECASE if flags.include?("i")
         options |= Regexp::MULTILINE if flags.include?("m") || flags.include?("s")
 
-        Regexp.new(pattern, options)
-      rescue RegexpError
-        nil
+        compiled_regex_cache.fetch([pattern.to_s, options]) do
+          Regexp.new(pattern.to_s, options)
+        rescue RegexpError
+          nil
+        end
       end
+      private_class_method :compile_regex
+
+      def compiled_regex_cache
+        @compiled_regex_cache ||= TavernKit::LRUCache.new(max_size: COMPILED_REGEX_CACHE_MAX)
+      end
+      private_class_method :compiled_regex_cache
 
       def replace_data(data, regex, out_script, global:)
         if global
