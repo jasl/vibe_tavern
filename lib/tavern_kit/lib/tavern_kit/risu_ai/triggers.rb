@@ -317,6 +317,19 @@ module TavernKit
         Float::NAN
       end
 
+      # Format a Float like JS `Number(...).toString()`:
+      # - integer numbers render without ".0"
+      # - NaN/Infinity render as their identifier strings
+      def format_js_number(value)
+        num = value.is_a?(Numeric) ? value.to_f : safe_float(value)
+        return "NaN" if num.nan?
+
+        inf = num.infinite?
+        return inf.positive? ? "Infinity" : "-Infinity" if inf
+
+        (num % 1).zero? ? num.to_i.to_s : num.to_s
+      end
+
       def equivalent?(a, b)
         tv = b.to_s
         sv = a.to_s
@@ -340,12 +353,30 @@ module TavernKit
             get_var(chat, effect["value"])
           end
 
-        case operator
-        when "="
-          set_var(chat, key, value)
-        else
-          set_var(chat, key, value)
-        end
+        original = safe_float(get_var(chat, key))
+        original = 0.0 if original.nan?
+
+        delta = safe_float(value)
+
+        result =
+          case operator
+          when "="
+            value.to_s
+          when "+="
+            format_js_number(original + delta)
+          when "-="
+            format_js_number(original - delta)
+          when "*="
+            format_js_number(original * delta)
+          when "/="
+            format_js_number(original / delta)
+          when "%="
+            format_js_number(original % delta)
+          else
+            value.to_s
+          end
+
+        set_var(chat, key, result)
       end
 
       def apply_setvar(effect, chat:)
@@ -353,23 +384,25 @@ module TavernKit
         value = effect["value"].to_s
         operator = effect["operator"].to_s
 
-        original = get_var(chat, key).to_f
-        original = 0 if original.nan?
+        original = safe_float(get_var(chat, key))
+        original = 0.0 if original.nan?
+
+        delta = safe_float(value)
 
         result =
           case operator
           when "="
             value
           when "+="
-            (original + value.to_f).to_s
+            format_js_number(original + delta)
           when "-="
-            (original - value.to_f).to_s
+            format_js_number(original - delta)
           when "*="
-            (original * value.to_f).to_s
+            format_js_number(original * delta)
           when "/="
-            (original / value.to_f).to_s
+            format_js_number(original / delta)
           when "%="
-            (original % value.to_f).to_s
+            format_js_number(original % delta)
           else
             value
           end

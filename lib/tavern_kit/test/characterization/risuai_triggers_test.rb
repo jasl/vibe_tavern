@@ -22,6 +22,46 @@ class RisuaiTriggersTest < Minitest::Test
     assert_equal "yes", result.chat[:scriptstate]["$hit"]
   end
 
+  def test_setvar_arithmetic_uses_js_number_semantics
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (setvar)
+
+    trigger = {
+      type: "output",
+      conditions: [],
+      effect: [
+        { type: "setvar", operator: "=", var: "x", value: "10" },
+        { type: "setvar", operator: "+=", var: "x", value: "2" },
+        { type: "setvar", operator: "-=", var: "x", value: "1" },
+        { type: "setvar", operator: "*=", var: "x", value: "2" },
+        { type: "setvar", operator: "/=", var: "x", value: "2" },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "11", result.chat[:scriptstate]["$x"]
+
+    nan_trigger = {
+      type: "output",
+      effect: [
+        { type: "setvar", operator: "=", var: "x", value: "10" },
+        { type: "setvar", operator: "+=", var: "x", value: "abc" },
+      ],
+    }
+    result2 = TavernKit::RisuAI::Triggers.run(nan_trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "NaN", result2.chat[:scriptstate]["$x"]
+
+    inf_trigger = {
+      type: "output",
+      effect: [
+        { type: "setvar", operator: "=", var: "x", value: "10" },
+        { type: "setvar", operator: "/=", var: "x", value: "0" },
+      ],
+    }
+    result3 = TavernKit::RisuAI::Triggers.run(inf_trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "Infinity", result3.chat[:scriptstate]["$x"]
+  end
+
   def test_systemprompt_appends_to_additional_sys_prompt
     trigger = {
       type: "output",
@@ -194,6 +234,24 @@ class RisuaiTriggersTest < Minitest::Test
     )
 
     assert_equal "yes", result.chat[:scriptstate]["$hit"]
+  end
+
+  def test_v2_setvar_supports_arithmetic_operators
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2SetVar)
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2SetVar", operator: "=", var: "x", valueType: "value", value: "10", indent: 0 },
+        { type: "v2SetVar", operator: "=", var: "y", valueType: "value", value: "2", indent: 0 },
+        { type: "v2SetVar", operator: "+=", var: "x", valueType: "var", value: "y", indent: 0 },
+        { type: "v2SetVar", operator: "%=", var: "x", valueType: "value", value: "3", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "0", result.chat[:scriptstate]["$x"]
   end
 
   def test_v2_effects_do_not_disable_v1_effects
