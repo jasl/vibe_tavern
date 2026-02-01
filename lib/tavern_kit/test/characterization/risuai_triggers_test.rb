@@ -559,4 +559,31 @@ class RisuaiTriggersTest < Minitest::Test
     result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
     assert_equal "yes", result.chat[:scriptstate]["$hit"]
   end
+
+  def test_v2_string_primitives
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/triggers.ts (v2GetCharAt/v2GetCharCount/v2ToLowerCase/v2ToUpperCase/v2SetCharAt/v2ConcatString)
+
+    trigger = {
+      type: "output",
+      effect: [
+        { type: "v2GetCharAt", sourceType: "value", source: "abc", indexType: "value", index: "1", outputVar: "ch", indent: 0 },
+        { type: "v2GetCharAt", sourceType: "value", source: "abc", indexType: "value", index: "-1", outputVar: "ch2", indent: 0 },
+        { type: "v2GetCharCount", sourceType: "value", source: "abc", outputVar: "len", indent: 0 },
+        { type: "v2ToLowerCase", sourceType: "value", source: "AbC", outputVar: "lower", indent: 0 },
+        { type: "v2ToUpperCase", sourceType: "value", source: "AbC", outputVar: "upper", indent: 0 },
+        { type: "v2SetCharAt", sourceType: "value", source: "abc", indexType: "value", index: "1", valueType: "value", value: "Z", outputVar: "set", indent: 0 },
+        { type: "v2ConcatString", source1Type: "value", source1: "a", source2Type: "value", source2: "b", outputVar: "cat", indent: 0 },
+      ],
+    }
+
+    result = TavernKit::RisuAI::Triggers.run(trigger, chat: { scriptstate: {}, message: [] })
+    assert_equal "b", result.chat[:scriptstate]["$ch"]
+    assert_equal "null", result.chat[:scriptstate]["$ch2"]
+    assert_equal "3", result.chat[:scriptstate]["$len"]
+    assert_equal "abc", result.chat[:scriptstate]["$lower"]
+    assert_equal "ABC", result.chat[:scriptstate]["$upper"]
+    assert_equal "aZc", result.chat[:scriptstate]["$set"]
+    assert_equal "ab", result.chat[:scriptstate]["$cat"]
+  end
 end

@@ -414,6 +414,108 @@ module TavernKit
               end
 
             set_var(chat, effect["outputVar"], result, local_vars: local_vars, current_indent: current_indent)
+          when "v2GetCharAt"
+            source =
+              if effect["sourceType"].to_s == "value"
+                effect["source"].to_s
+              else
+                get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            raw_index =
+              if effect["indexType"].to_s == "value"
+                effect["index"].to_s
+              else
+                get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            index = safe_float(raw_index)
+            out =
+              if index.nan? || index.infinite? || !(index % 1).zero? || index.negative?
+                "null"
+              else
+                ch = source[index.to_i]
+                ch.nil? ? "null" : ch.to_s
+              end
+
+            set_var(chat, effect["outputVar"], out, local_vars: local_vars, current_indent: current_indent)
+          when "v2GetCharCount"
+            source =
+              if effect["sourceType"].to_s == "value"
+                effect["source"].to_s
+              else
+                get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            set_var(chat, effect["outputVar"], source.length.to_s, local_vars: local_vars, current_indent: current_indent)
+          when "v2ToLowerCase"
+            source =
+              if effect["sourceType"].to_s == "value"
+                effect["source"].to_s
+              else
+                get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            set_var(chat, effect["outputVar"], source.downcase, local_vars: local_vars, current_indent: current_indent)
+          when "v2ToUpperCase"
+            source =
+              if effect["sourceType"].to_s == "value"
+                effect["source"].to_s
+              else
+                get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            set_var(chat, effect["outputVar"], source.upcase, local_vars: local_vars, current_indent: current_indent)
+          when "v2SetCharAt"
+            source =
+              if effect["sourceType"].to_s == "value"
+                effect["source"].to_s
+              else
+                get_var(chat, effect["source"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            raw_index =
+              if effect["indexType"].to_s == "value"
+                effect["index"].to_s
+              else
+                get_var(chat, effect["index"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            value =
+              if effect["valueType"].to_s == "value"
+                effect["value"].to_s
+              else
+                get_var(chat, effect["value"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            index = safe_float(raw_index)
+
+            out =
+              if index.nan? || index.infinite? || !(index % 1).zero? || index.negative?
+                source
+              else
+                chars = source.chars
+                chars[index.to_i] = value
+                chars.join
+              end
+
+            set_var(chat, effect["outputVar"], out, local_vars: local_vars, current_indent: current_indent)
+          when "v2ConcatString"
+            s1 =
+              if effect["source1Type"].to_s == "value"
+                effect["source1"].to_s
+              else
+                get_var(chat, effect["source1"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            s2 =
+              if effect["source2Type"].to_s == "value"
+                effect["source2"].to_s
+              else
+                get_var(chat, effect["source2"], local_vars: local_vars, current_indent: current_indent).to_s
+              end
+
+            set_var(chat, effect["outputVar"], s1 + s2, local_vars: local_vars, current_indent: current_indent)
           when "v2ConsoleLog"
             source =
               if effect["sourceType"].to_s == "value"
