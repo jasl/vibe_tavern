@@ -8,6 +8,7 @@ require_relative "macros/aggregate_macros"
 require_relative "macros/unicode_macros"
 require_relative "macros/crypto_macros"
 require_relative "macros/misc_macros"
+require_relative "macros/history_macros"
 
 module TavernKit
   module RisuAI
@@ -27,12 +28,22 @@ module TavernKit
             resolve_char(environment)
           when "user"
             resolve_user(environment)
+          when "triggerid"
+            resolve_trigger_id(environment)
+          when "previouscharchat", "lastcharmessage"
+            resolve_previouscharchat(environment)
+          when "previoususerchat", "lastusermessage"
+            resolve_previoususerchat(environment)
           when "prefillsupported", "prefill"
             resolve_prefill_supported(environment)
           when "chatindex"
             resolve_chatindex(environment)
+          when "firstmsgindex", "firstmessageindex"
+            resolve_firstmsgindex(environment)
           when "messageindex"
             resolve_messageindex(environment)
+          when "blank", "none"
+            resolve_blank(args)
           when "personality", "charpersona"
             resolve_personality(environment)
           when "description", "chardesc"
@@ -57,6 +68,10 @@ module TavernKit
             resolve_model(environment)
           when "role"
             resolve_role(environment)
+          when "lastmessage"
+            resolve_lastmessage(environment)
+          when "lastmessageid", "lastmessageindex"
+            resolve_lastmessageid(environment)
           when "metadata"
             resolve_metadata(args, environment: environment)
           when "iserror"

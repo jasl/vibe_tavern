@@ -20,6 +20,8 @@ module TavernKit
           env_kwargs = {
             character: ctx.character,
             user: ctx.user,
+            history: (ctx[:risuai_groups].is_a?(Hash) ? ctx[:risuai_groups][:chats] : nil),
+            greeting_index: ctx.greeting_index,
             chat_index: chat_index,
             message_index: message_index,
             variables: ctx.variables_store,

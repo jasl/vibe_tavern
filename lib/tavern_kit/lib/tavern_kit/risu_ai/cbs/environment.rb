@@ -4,7 +4,19 @@ module TavernKit
   module RisuAI
     module CBS
       class Environment < TavernKit::Macro::Environment::Base
-        attr_reader :character, :user, :chat_index, :message_index, :dialect, :model_hint, :role, :rng_word, :metadata, :run_var, :rm_var
+        attr_reader :character,
+                    :user,
+                    :history,
+                    :greeting_index,
+                    :chat_index,
+                    :message_index,
+                    :dialect,
+                    :model_hint,
+                    :role,
+                    :rng_word,
+                    :metadata,
+                    :run_var,
+                    :rm_var
 
         def self.build(**kwargs)
           new(**kwargs)
@@ -13,6 +25,8 @@ module TavernKit
         def initialize(
           character: nil,
           user: nil,
+          history: nil,
+          greeting_index: nil,
           chat_index: nil,
           message_index: nil,
           dialect: nil,
@@ -28,13 +42,15 @@ module TavernKit
         )
           @character = character
           @user = user
+          @history = history
+          @greeting_index = greeting_index.nil? ? nil : greeting_index.to_i
           @chat_index = chat_index
           @message_index = message_index
           @dialect = dialect&.to_sym
           @model_hint = model_hint.to_s
           @role = role
           @rng_word = rng_word.to_s
-          @metadata = metadata.is_a?(Hash) ? metadata : {}
+          @metadata = normalize_metadata(metadata)
 
           @variables = variables
           @toggles = normalize_toggles(toggles)
@@ -57,6 +73,8 @@ module TavernKit
           self.class.build(
             character: @character,
             user: @user,
+            history: @history,
+            greeting_index: @greeting_index,
             chat_index: @chat_index,
             message_index: @message_index,
             dialect: @dialect,
@@ -164,6 +182,16 @@ module TavernKit
 
           toggles.each_with_object({}) do |(k, v), out|
             out[k.to_s] = v
+          end
+        end
+
+        def normalize_metadata(metadata)
+          return {} unless metadata.is_a?(Hash)
+
+          metadata.each_with_object({}) do |(k, v), out|
+            # Match CBS macro normalization: lowercased and stripped of separators.
+            key = k.to_s.downcase.gsub(/[\s_-]+/, "")
+            out[key] = v
           end
         end
       end

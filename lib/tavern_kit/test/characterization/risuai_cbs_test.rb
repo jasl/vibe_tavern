@@ -302,6 +302,40 @@ class RisuaiCbsTest < Minitest::Test
     assert_equal "<pre-hljs-placeholder lang=\"ruby\">puts &quot;hi&quot;</pre-hljs-placeholder>", render("{{codeblock::ruby::puts \"hi\"}}")
   end
 
+  def test_history_macros
+    # Upstream reference:
+    # resources/Risuai/src/ts/cbs.ts (trigger_id/previous*chat/lastmessage/firstmsgindex/blank)
+
+    char = TavernKit::Character.create(name: "Seraphina", first_mes: "HELLO", alternate_greetings: ["ALT0", "ALT1"])
+
+    history = [
+      { role: "user", content: "u0" },
+      { role: "assistant", content: "a0" },
+      { role: "user", content: "u1" },
+    ]
+
+    assert_equal "u1", render("{{lastmessage}}", character: char, history: history)
+    assert_equal "2", render("{{lastmessageid}}", character: char, history: history)
+
+    assert_equal "a0", render("{{previouscharchat}}", character: char, history: history, chat_index: -1, greeting_index: -1)
+    assert_equal "", render("{{previoususerchat}}", character: char, history: history, chat_index: -1, greeting_index: -1)
+
+    assert_equal "u0", render("{{previoususerchat}}", character: char, history: history, chat_index: 2, greeting_index: -1)
+    assert_equal "a0", render("{{previouscharchat}}", character: char, history: history, chat_index: 2, greeting_index: -1)
+
+    assert_equal "HELLO", render("{{previoususerchat}}", character: char, history: [{ role: "assistant", content: "a0" }], chat_index: 1, greeting_index: -1)
+    assert_equal "ALT1", render("{{previouscharchat}}", character: char, history: [], chat_index: -1, greeting_index: 1)
+
+    assert_equal "-1", render("{{firstmsgindex}}", greeting_index: -1)
+    assert_equal "2", render("{{firstmessageindex}}", greeting_index: 2)
+
+    assert_equal "xy", render("x{{blank}}y")
+    assert_equal "xy", render("x{{none}}y")
+
+    assert_equal "abc", render("{{trigger_id}}", metadata: { "triggerid" => "abc" })
+    assert_equal "null", render("{{triggerid}}", metadata: {})
+  end
+
   def test_date_and_time_macros_with_custom_format
     # Upstream reference:
     # resources/Risuai/src/ts/cbs.ts (date/time)
