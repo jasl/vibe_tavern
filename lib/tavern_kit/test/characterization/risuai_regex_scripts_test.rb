@@ -163,4 +163,27 @@ class RisuaiRegexScriptsTest < Minitest::Test
   ensure
     cache.clear
   end
+
+  def test_no_end_nl_flag_prevents_auto_newline_suffix
+    # Upstream reference:
+    # resources/Risuai/src/ts/process/scripts.ts (line 163-165)
+    # When output ends with '>' and no_end_nl is NOT present, a newline is appended.
+    # When no_end_nl IS present, no newline is appended.
+
+    # Without the flag: output ending with '>' gets auto-newline appended
+    scripts_without_flag = [
+      { in: "X", out: "<tag>", type: "editoutput", flag: "", ableFlag: true },
+    ]
+
+    result_without = TavernKit::RisuAI::RegexScripts.apply("X", scripts_without_flag, mode: "editoutput")
+    assert_equal "<tag>\n", result_without, "Expected newline suffix when no_end_nl flag is absent"
+
+    # With the flag: output ending with '>' does NOT get auto-newline
+    scripts_with_flag = [
+      { in: "X", out: "<tag>", type: "editoutput", flag: "<no_end_nl>", ableFlag: true },
+    ]
+
+    result_with = TavernKit::RisuAI::RegexScripts.apply("X", scripts_with_flag, mode: "editoutput")
+    assert_equal "<tag>", result_with, "Expected no newline suffix when no_end_nl flag is present"
+  end
 end
