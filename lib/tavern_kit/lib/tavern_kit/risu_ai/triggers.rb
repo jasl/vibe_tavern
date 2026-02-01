@@ -55,39 +55,18 @@ module TavernKit
       # Upstream reference:
       # resources/Risuai/src/ts/process/triggers.ts (safeSubset/displayAllowList/requestAllowList)
       SAFE_SUBSET = %w[
-        v2Header
+        v2SetVar
         v2If
         v2IfAdvanced
         v2Else
         v2EndIndent
-        v2SetVar
-        v2Loop
+        v2LoopNTimes
         v2BreakLoop
-        v2RunTrigger
         v2ConsoleLog
         v2StopTrigger
-        v2CutChat
-        v2ModifyChat
-        v2SystemPrompt
-        v2Impersonate
-        v2Command
-        v2SendAIprompt
-        v2ImgGen
-        v2CheckSimilarity
-        v2RunLLM
-        v2ShowAlert
-        v2ExtractRegex
-        v2GetLastMessage
-        v2GetMessageAtIndex
-        v2GetMessageCount
-        v2ModifyLorebook
-        v2GetLorebook
-        v2GetLorebookCount
-        v2GetLorebookEntry
-        v2SetLorebookActivation
-        v2GetLorebookIndexViaName
-        v2LoopNTimes
         v2Random
+        v2ExtractRegex
+        v2RegexTest
         v2GetCharAt
         v2GetCharCount
         v2ToLowerCase
@@ -105,7 +84,6 @@ module TavernKit
         v2ShiftArrayVar
         v2UnshiftArrayVar
         v2SpliceArrayVar
-        v2GetFirstMessage
         v2SliceArrayVar
         v2GetIndexOfValueInArrayVar
         v2RemoveIndexFromArrayVar

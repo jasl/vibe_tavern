@@ -407,6 +407,11 @@ class RisuaiTriggersTest < Minitest::Test
     trigger2 = trigger.merge(type: "request")
     result2 = TavernKit::RisuAI::Triggers.run(trigger2, chat: { scriptstate: {}, message: [] })
     assert_equal "V2", result2.chat[:scriptstate]["$hit"]
+
+    assert TavernKit::RisuAI::Triggers.effect_allowed?("v2Random", mode: "display")
+    assert TavernKit::RisuAI::Triggers.effect_allowed?("v2RegexTest", mode: "request")
+    refute TavernKit::RisuAI::Triggers.effect_allowed?("v2Loop", mode: "display")
+    refute TavernKit::RisuAI::Triggers.effect_allowed?("v2RunTrigger", mode: "request")
   end
 
   def test_v2_if_approx_and_equivalent
