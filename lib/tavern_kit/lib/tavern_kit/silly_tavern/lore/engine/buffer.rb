@@ -153,7 +153,7 @@ module TavernKit
               if parts.length > 1
                 hay.include?(nee)
               else
-                /(?:^|\\W)#{Regexp.escape(nee)}(?:$|\\W)/.match?(hay)
+                /(?:^|\W)#{Regexp.escape(nee)}(?:$|\W)/.match?(hay)
               end
             else
               hay.include?(nee)
