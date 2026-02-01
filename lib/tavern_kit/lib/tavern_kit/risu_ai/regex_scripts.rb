@@ -74,6 +74,7 @@ module TavernKit
 
       def execute_one(data, script:, actions:, chat_id:, history:, role:, cbs_conditions:)
         out_script = script["out"].to_s.gsub("$n", "\n")
+        out_script = out_script.gsub("{{data}}", "$&")
 
         flags = resolve_flags(script, out_script: out_script, actions: actions)
         regex = compile_regex(script["in"].to_s, flags: flags, actions: actions)
@@ -135,7 +136,11 @@ module TavernKit
       end
 
       def replace_data(data, regex, out_script, global:)
-        global ? data.gsub(regex, out_script) : data.sub(regex, out_script)
+        if global
+          data.gsub(regex) { expand_js_replacement(out_script, Regexp.last_match) }
+        else
+          data.sub(regex) { expand_js_replacement(out_script, Regexp.last_match) }
+        end
       end
 
       def apply_move(data, regex, out_script:, flags:, actions:)
@@ -155,7 +160,7 @@ module TavernKit
           next unless m
 
           out = out_script.sub(/\A@@move_top\s+/, "").sub(/\A@@move_bottom\s+/, "")
-          out = out.gsub("$&", m[0].to_s)
+          out = expand_js_replacement(out, m)
 
           if out_script.start_with?("@@move_top") || actions.include?("move_top")
             data = "#{out}\n#{data}"
@@ -195,6 +200,23 @@ module TavernKit
           "#{token}\n#{data}"
         else
           data
+        end
+      end
+
+      def expand_js_replacement(template, match)
+        t = template.to_s
+        m = match
+
+        t.gsub(/\$(\$|&|\d{1,2})/) do |token|
+          case token
+          when "$$"
+            "$"
+          when "$&"
+            m[0].to_s
+          else
+            idx = token.delete_prefix("$").to_i
+            m[idx].to_s
+          end
         end
       end
     end

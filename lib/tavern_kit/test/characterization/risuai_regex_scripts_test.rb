@@ -58,4 +58,20 @@ class RisuaiRegexScriptsTest < Minitest::Test
 
     assert_equal "current flag:beta", result
   end
+
+  def test_replacement_supports_data_placeholder_and_capture_groups
+    scripts = [
+      { in: "(a)", out: "X{{data}}Y", type: "editoutput" },
+      { in: "(b)", out: "[$1]", type: "editoutput" },
+      { in: "c", out: "$$", type: "editoutput" },
+    ]
+
+    result = TavernKit::RisuAI::RegexScripts.apply(
+      "abc",
+      scripts,
+      mode: "editoutput"
+    )
+
+    assert_equal "XaY[b]$", result
+  end
 end
