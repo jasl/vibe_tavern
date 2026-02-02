@@ -145,7 +145,7 @@ entry.extensions["sillyTavern/sticky"]             # ✓ correct
 ### What to Avoid
 
 ```ruby
-# ✗ WRONG: Defensive dual-key access
+# ✗ WRONG: Defensive multi-key access in-line
 value = hash["key"] || hash[:key]
 
 # ✗ WRONG: Blanket symbolization of external payloads
@@ -159,19 +159,23 @@ def to_json
 end
 ```
 
-### HashAccessor Deprecation Plan
+### Hash Normalization Pattern (Current)
 
-The current `Utils::HashAccessor` tries both String and Symbol keys. This will
-be deprecated in favor of:
+TavernKit intentionally accepts **external** Hash inputs that may be:
+- String-keyed (typical `JSON.parse`)
+- Symbol-keyed (Ruby ergonomics)
+- camelCase or snake_case (platform JSON vs Ruby style)
 
-1. Normalize external payloads to **String keys** at import boundaries (JSON shape)
-2. Parse into value objects (no internal code should depend on raw hash key types)
-3. Remove dual-key fallback behavior
+To keep the implementation consistent (and avoid repeating `h[:x] || h["x"] || h[:xY]...` patterns),
+we normalize **once at the boundary** and then only use one canonical shape internally.
 
-Migration path:
-- Wave 2: Add `normalize_keys: true` option to parsers (deep-stringify Hash inputs)
-- Wave 3: Default to normalized String keys; deprecate HashAccessor dual-key usage
-- Wave 4: Remove HashAccessor dual-key; keep explicit accessors/value objects only
+Preferred options:
+- **JSON-like payloads (cards/presets/books):** `Utils.deep_stringify_keys(raw)` and then parse owned fields explicitly.
+  - Keep `extensions` as a String-keyed Hash (passthrough contract).
+- **Mixed-key feature flags / config hashes:** `Utils::HashAccessor.wrap(hash)` to read alternative spellings
+  without sprinkling manual fallbacks.
+- **Runtime/app-state contract:** `Runtime::Base.normalize(raw)` to canonicalize keys into
+  snake_case Symbols (because runtime keys are TavernKit-owned).
 
 ---
 
