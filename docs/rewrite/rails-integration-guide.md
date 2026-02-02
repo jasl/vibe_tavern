@@ -115,6 +115,9 @@ plan =
   TavernKit::VibeTavern.build do
     history chat_history
 
+    character character_obj
+    user user_obj
+
     runtime TavernKit::Runtime::Base.build(
       { chat_index: chat_index, message_index: message_index },
       type: :app,
@@ -130,6 +133,11 @@ plan =
     # Prefer this over expanding user input at build time.
     meta :system_template, system_template_text
 
+    # Optional: VibeTavern-only post-history template (Liquid-rendered).
+    # If omitted, VibeTavern inserts `character.data.post_history_instructions`
+    # after history (plain text) when present.
+    meta :post_history_template, post_history_template_text
+
     message user_input
   end
 
@@ -138,9 +146,12 @@ fingerprint = plan.fingerprint(dialect: :openai)
 ```
 
 Notes:
-- `TavernKit::VibeTavern` is intentionally minimal at first (history + user input).
-  You can still pass richer inputs (character/user/preset/lore) now, and add
-  middlewares later to consume them.
+- `TavernKit::VibeTavern` is intentionally minimal, but it does insert a
+  deterministic default system block when `character`/`user` are provided, and
+  it inserts `post_history_instructions` after history when present on the card.
+- To disable those default insertions explicitly:
+  - `meta :system_template, nil` disables the system block
+  - `meta :post_history_template, nil` disables post-history insertion
 - Preserve `variables_store` per chat; do not share it between concurrent chats.
 - See `docs/rewrite/vibe-tavern-pipeline.md` for the precise supported contract and behaviors.
 - For the planned Liquid-based macros system (variables + side-effect tags), see `docs/rewrite/liquid-macros.md`.

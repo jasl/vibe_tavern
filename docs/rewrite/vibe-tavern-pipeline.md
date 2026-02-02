@@ -17,7 +17,7 @@ Goals:
 
 Non-goals (for now):
 - ST/RisuAI parity behavior (use `TavernKit::SillyTavern` / `TavernKit::RisuAI`)
-- macro expansion / lore activation / injection / trimming
+- lore activation / injection / trimming
 - UI behaviors, persistence, or provider networking
 
 ## Entry Points
@@ -46,16 +46,18 @@ fingerprint = plan.fingerprint(dialect: :openai)
 Currently used by this pipeline:
 - `history(...)` (required for prior messages; chronological)
 - `message(...)` (the current user input; blank after `.strip` is ignored)
+- `character(...)` (optional; used for the default `system` block and post-history instructions)
+- `user(...)` (optional; used for the default `system` block)
 - `runtime(...)` (optional; see Runtime Contract)
 - `variables_store(...)` (optional; will be defaulted if not provided)
 - `token_estimator(...)` (optional; defaults to `TavernKit::TokenEstimator.default`)
 - `strict(...)` (optional; affects warning handling across TavernKit)
 - `instrumenter(...)` (optional; enables lightweight instrumentation events)
 - `meta(:system_template, "...")` (optional; Liquid-rendered; prepends a `system` block)
+- `meta(:post_history_template, "...")` (optional; Liquid-rendered; inserts a post-history `system` block)
 
 Accepted by the DSL but currently **ignored** by this pipeline (no behavior yet):
 - `dialect(...)`
-- `character(...)`, `user(...)`
 - `preset(...)`
 - `lore_books(...)`, `lore_engine(...)`
 - `expander(...)`
@@ -70,19 +72,23 @@ The pipeline produces a `TavernKit::Prompt::Plan` with:
 
 The plan can then be rendered by `plan.to_messages(dialect: ...)`.
 
-## Block Semantics (System Template + History + User Message)
+## Block Semantics (System + History + Post-history + User Message)
 
 Implementation: `lib/tavern_kit/vibe_tavern/middleware/plan_assembly.rb`
 
-System template (optional):
-- If `ctx[:system_template].to_s.strip` is not empty:
-  - Liquid is rendered using `LiquidMacros.render_for(ctx, ...)`
-  - one block is prepended:
-    - `role`: `:system`
-    - `content`: rendered output
-    - `slot`: `:system`
-    - `token_budget_group`: `:system`
-    - `metadata`: `{ source: :system_template }`
+System block (optional):
+- If `meta(:system_template, ...)` is present:
+  - blank (`nil` / `""` / whitespace-only) disables the system block entirely
+  - non-blank is Liquid-rendered using `LiquidMacros.render_for(ctx, ...)` and
+    inserted as the first block (`source: :system_template`)
+- Else, if `character` or `user` is present:
+  - a deterministic "default system" block is built from:
+    - `character.data.system_prompt` (if present)
+    - `character.display_name` (nickname if present) as `You are {char}.`
+    - `character.data.description`, `character.data.personality`
+    - `character.data.scenario` (prefixed as `Scenario:`)
+    - `user.persona_text` (prefixed as `User persona:`)
+  - inserted as the first block (`source: :default_system`)
 
 History:
 - Each history message becomes a `TavernKit::Prompt::Block` with:
@@ -95,6 +101,19 @@ History:
   - `token_budget_group`: `:history`
   - `metadata`: `{ source: :history }`
 
+Post-history instructions (optional):
+- If `meta(:post_history_template, ...)` is present:
+  - blank (`nil` / `""` / whitespace-only) disables post-history insertion
+  - non-blank is Liquid-rendered and inserted **after history** as a `system` block:
+    - `slot`: `:post_history_instructions`
+    - `token_budget_group`: `:system`
+    - `metadata`: `{ source: :post_history_template }`
+- Else, if `character.data.post_history_instructions` is present:
+  - inserted **after history** as a plain-text `system` block:
+    - `slot`: `:post_history_instructions`
+    - `token_budget_group`: `:system`
+    - `metadata`: `{ source: :post_history_instructions }`
+
 User input:
 - If `ctx.user_message.to_s.strip` is not empty, it becomes one block:
   - `role`: `:user`
@@ -104,17 +123,16 @@ User input:
   - `metadata`: `{ source: :user_message }`
 
 Notes:
-- This pipeline does **not** insert system messages, character cards, lore, or
-  any special injections yet, except for the optional `system_template`.
+- This pipeline is still intentionally small: it does not do ST/RisuAI parity
+  behavior, lore/injection/trimming, or any provider networking.
 - Message metadata passthrough matters for OpenAI-style tool call flows:
   when a history message includes `metadata[:tool_calls]` / `:tool_call_id`,
   dialect rendering can include those fields.
 
-System template:
-- If `ctx[:system_template]` is present and non-blank, it is rendered via
-  `TavernKit::VibeTavern::LiquidMacros.render_for(ctx, ...)` and inserted as the
-  first block (`role: :system`, `slot: :system`).
-  This is the first integration point for Liquid macros in VibeTavern.
+Liquid rendering:
+- Only `system_template` and `post_history_template` are Liquid-rendered today.
+  Raw character card text fields (like `post_history_instructions`) are treated
+  as plain text by default for safety and predictability.
 
 ## Runtime Contract
 

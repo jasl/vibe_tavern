@@ -30,6 +30,34 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     assert_equal "Continue.", msgs[2][:content]
   end
 
+  test "builds a default system block from character/user when no system_template override is provided" do
+    character =
+      TavernKit::Character.create(
+        name: "Seraphina",
+        nickname: "Sera",
+        system_prompt: "SYS",
+        description: "Desc",
+        personality: "Pers",
+        scenario: "Scene",
+      )
+    user = TavernKit::User.new(name: "J", persona: "I like cats")
+
+    plan =
+      TavernKit::VibeTavern.build do
+        character character
+        user user
+        message "Hello."
+      end
+
+    msgs = plan.to_messages(dialect: :openai)
+
+    assert_equal "system", msgs[0][:role]
+    assert_equal "SYS\n\nYou are Sera.\n\nDesc\n\nPers\n\nScenario:\nScene\n\nUser persona:\nI like cats", msgs[0][:content]
+
+    assert_equal "user", msgs[1][:role]
+    assert_equal "Hello.", msgs[1][:content]
+  end
+
   test "optionally prepends a system block from system_template (Liquid-rendered)" do
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)
@@ -53,6 +81,100 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     assert_equal "You are Sera. Mood=happy Pick=a.", msgs[0][:content]
     assert_equal "user", msgs[1][:role]
     assert_equal "Hello.", msgs[1][:content]
+  end
+
+  test "allows explicitly disabling the system block via system_template override" do
+    character = TavernKit::Character.create(name: "Seraphina")
+
+    plan =
+      TavernKit::VibeTavern.build do
+        character character
+        meta :system_template, nil
+        message "Hello."
+      end
+
+    msgs = plan.to_messages(dialect: :openai)
+
+    assert_equal "user", msgs[0][:role]
+    assert_equal "Hello.", msgs[0][:content]
+  end
+
+  test "inserts post_history_instructions after history by default" do
+    character = TavernKit::Character.create(name: "Seraphina", post_history_instructions: "PHI")
+
+    history = [
+      TavernKit::Prompt::Message.new(role: :assistant, content: "Earlier..."),
+      TavernKit::Prompt::Message.new(role: :user, content: "Ok."),
+    ]
+
+    plan =
+      TavernKit::VibeTavern.build do
+        character character
+        meta :system_template, nil
+
+        history history
+        message "Continue."
+      end
+
+    msgs = plan.to_messages(dialect: :openai)
+
+    assert_equal "assistant", msgs[0][:role]
+    assert_equal "Earlier...", msgs[0][:content]
+
+    assert_equal "user", msgs[1][:role]
+    assert_equal "Ok.", msgs[1][:content]
+
+    assert_equal "system", msgs[2][:role]
+    assert_equal "PHI", msgs[2][:content]
+
+    assert_equal "user", msgs[3][:role]
+    assert_equal "Continue.", msgs[3][:content]
+  end
+
+  test "supports post_history_template override (Liquid-rendered) and can suppress default post_history_instructions" do
+    store = TavernKit::VariablesStore::InMemory.new
+    store.set("mood", "happy", scope: :local)
+
+    character = TavernKit::Character.create(name: "Seraphina", post_history_instructions: "PHI")
+
+    history = [
+      TavernKit::Prompt::Message.new(role: :assistant, content: "Earlier..."),
+    ]
+
+    plan =
+      TavernKit::VibeTavern.build do
+        variables_store store
+        character character
+        meta :system_template, nil
+        meta :post_history_template, %(Mood={{ var.mood }})
+
+        history history
+        message "Continue."
+      end
+
+    msgs = plan.to_messages(dialect: :openai)
+
+    assert_equal "assistant", msgs[0][:role]
+    assert_equal "Earlier...", msgs[0][:content]
+
+    assert_equal "system", msgs[1][:role]
+    assert_equal "Mood=happy", msgs[1][:content]
+
+    assert_equal "user", msgs[2][:role]
+    assert_equal "Continue.", msgs[2][:content]
+
+    plan2 =
+      TavernKit::VibeTavern.build do
+        character character
+        meta :system_template, nil
+        meta :post_history_template, nil
+
+        history history
+        message "Continue."
+      end
+
+    msgs2 = plan2.to_messages(dialect: :openai)
+    assert_equal %w[assistant user], msgs2.map { |m| m[:role] }
   end
 
   test "normalizes runtime input once and ensures variables_store exists" do

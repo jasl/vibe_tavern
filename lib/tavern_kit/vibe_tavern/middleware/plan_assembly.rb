@@ -32,27 +32,8 @@ module TavernKit
         def build_blocks(ctx)
           blocks = []
 
-          system_template = ctx[:system_template].to_s
-          if !system_template.strip.empty?
-            rendered =
-              TavernKit::VibeTavern::LiquidMacros.render_for(
-                ctx,
-                system_template,
-                strict: ctx.strict?,
-                on_error: :passthrough,
-              )
-
-            rendered = rendered.to_s
-            unless rendered.strip.empty?
-              blocks << TavernKit::Prompt::Block.new(
-                role: :system,
-                content: rendered,
-                slot: :system,
-                token_budget_group: :system,
-                metadata: { source: :system_template },
-              )
-            end
-          end
+          system_block = build_system_block(ctx)
+          blocks << system_block if system_block
 
           history = TavernKit::ChatHistory.wrap(ctx.history)
           history.each do |message|
@@ -68,6 +49,9 @@ module TavernKit
             )
           end
 
+          post_history_block = build_post_history_block(ctx)
+          blocks << post_history_block if post_history_block
+
           user_text = ctx.user_message.to_s
           unless user_text.strip.empty?
             blocks << TavernKit::Prompt::Block.new(
@@ -80,6 +64,109 @@ module TavernKit
           end
 
           blocks
+        end
+
+        def build_system_block(ctx)
+          # Explicit override (including nil/blank) wins.
+          if ctx.key?(:system_template)
+            return nil if ctx[:system_template].to_s.strip.empty?
+
+            return build_template_block(ctx, ctx[:system_template], source: :system_template, slot: :system)
+          end
+
+          build_default_system_block(ctx)
+        end
+
+        def build_post_history_block(ctx)
+          if ctx.key?(:post_history_template)
+            return nil if ctx[:post_history_template].to_s.strip.empty?
+
+            return build_template_block(
+              ctx,
+              ctx[:post_history_template],
+              source: :post_history_template,
+              slot: :post_history_instructions,
+            )
+          end
+
+          text = ctx.character&.data&.post_history_instructions.to_s
+          text = TavernKit::Utils.presence(text)
+          return nil unless text
+
+          TavernKit::Prompt::Block.new(
+            role: :system,
+            content: text,
+            slot: :post_history_instructions,
+            token_budget_group: :system,
+            metadata: { source: :post_history_instructions },
+          )
+        end
+
+        def build_template_block(ctx, template, source:, slot:)
+          rendered =
+            TavernKit::VibeTavern::LiquidMacros.render_for(
+              ctx,
+              template.to_s,
+              strict: ctx.strict?,
+              on_error: :passthrough,
+            )
+
+          text = TavernKit::Utils.presence(rendered)
+          return nil unless text
+
+          TavernKit::Prompt::Block.new(
+            role: :system,
+            content: text,
+            slot: slot,
+            token_budget_group: :system,
+            metadata: { source: source },
+          )
+        end
+
+        def build_default_system_block(ctx)
+          char = ctx.character
+          user = ctx.user
+
+          return nil unless char || user
+
+          parts = []
+          parts << presence(char&.data&.system_prompt)
+
+          char_name =
+            if char&.respond_to?(:display_name)
+              char.display_name.to_s
+            elsif char&.respond_to?(:name)
+              char.name.to_s
+            else
+              ""
+            end
+          char_name = TavernKit::Utils.presence(char_name)
+          parts << "You are #{char_name}." if char_name
+
+          parts << presence(char&.data&.description)
+          parts << presence(char&.data&.personality)
+
+          scenario = presence(char&.data&.scenario)
+          parts << "Scenario:\n#{scenario}" if scenario
+
+          persona = presence(user&.persona_text)
+          parts << "User persona:\n#{persona}" if persona
+
+          text = parts.compact.join("\n\n")
+          text = TavernKit::Utils.presence(text)
+          return nil unless text
+
+          TavernKit::Prompt::Block.new(
+            role: :system,
+            content: text,
+            slot: :system,
+            token_budget_group: :system,
+            metadata: { source: :default_system },
+          )
+        end
+
+        def presence(value)
+          TavernKit::Utils.presence(value)
         end
       end
     end
