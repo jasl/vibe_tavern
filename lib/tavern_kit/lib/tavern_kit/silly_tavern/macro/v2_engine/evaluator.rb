@@ -504,7 +504,7 @@ module TavernKit
 
             raw_type =
               if arg_def.is_a?(Hash)
-                arg_def[:type] || arg_def["type"] || :string
+                arg_def[:type] || :string
               else
                 :string
               end
@@ -514,14 +514,14 @@ module TavernKit
 
             arg_name =
               if arg_def.is_a?(Hash)
-                arg_def[:name] || arg_def["name"] || "Argument #{idx + 1}"
+                arg_def[:name] || "Argument #{idx + 1}"
               else
                 "Argument #{idx + 1}"
               end
 
             optional =
               if arg_def.is_a?(Hash)
-                arg_def[:optional] || arg_def["optional"]
+                arg_def[:optional]
               else
                 false
               end
