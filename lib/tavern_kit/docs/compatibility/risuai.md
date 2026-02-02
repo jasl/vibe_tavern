@@ -122,7 +122,7 @@ Implementation: `TavernKit::RisuAI::Lore::Engine`.
 |---------|--------|-----------|-------|
 | Decorator parsing → entry extensions | ✅ | ✅ | `@position/@depth/@role/@inject/...` etc |
 | Keyword matching | ✅ | ✅ | |
-| Regex matching | ✅ | ✅ | JS regex supported (best-effort conversion) |
+| Regex matching | ✅ | ⚠️ | JS regex supported (best-effort conversion) |
 | Full-word matching | ✅ | ✅ | |
 | Multi-pass activation loop | ✅ | ✅ | recursion + state decorators |
 | Token budget | ✅ | ✅ | priority-based selection |

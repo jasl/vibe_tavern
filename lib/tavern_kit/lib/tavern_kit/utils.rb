@@ -72,6 +72,7 @@ module TavernKit
     # Flexible hash accessor for parsing mixed-key hashes (string/symbol, camelCase/snake_case).
     class HashAccessor
       TRUE_STRINGS = %w[1 true yes y on].freeze
+      FALSE_STRINGS = %w[0 false no n off].freeze
 
       def self.wrap(hash)
         new(hash)
@@ -97,7 +98,8 @@ module TavernKit
       end
 
       def fetch(*keys, default: nil)
-        self[*keys] || default
+        val = self[*keys]
+        val.nil? ? default : val
       end
 
       def dig(*path)
@@ -172,7 +174,11 @@ module TavernKit
         return default if val.nil?
         return val if val == true || val == false
 
-        TRUE_STRINGS.include?(val.to_s.strip.downcase) || default
+        v = val.to_s.strip.downcase
+        return true if TRUE_STRINGS.include?(v)
+        return false if FALSE_STRINGS.include?(v)
+
+        default
       end
     end
   end

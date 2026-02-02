@@ -52,4 +52,31 @@ class SillyTavernBuildTest < Minitest::Test
     assert messages.any?, "expected non-empty messages"
     assert messages.any? { |m| m[:role] == "user" && m[:content] == "Hello!" }
   end
+
+  def test_instruct_and_context_template_macros_expand_from_preset
+    character = TavernKit::Character.create(name: "Nyx")
+    user = TavernKit::User.new(name: "Alice")
+
+    preset =
+      TavernKit::SillyTavern::Preset.new(
+        main_prompt: "A {{chatStart}} {{instructInput}} B",
+        use_sysprompt: true,
+        instruct: TavernKit::SillyTavern::Instruct.new(enabled: true, input_sequence: "IN"),
+        context_template: TavernKit::SillyTavern::ContextTemplate.new(chat_start: "<CHAT>"),
+      )
+
+    plan =
+      TavernKit::SillyTavern.build do
+        character character
+        user user
+        preset preset
+        history []
+        message "Hello!"
+        dialect :openai
+      end
+
+    main = plan.enabled_blocks.find { |b| b.slot == :main_prompt }
+    assert main, "expected a main_prompt block"
+    assert_equal "A <CHAT> IN B", main.content
+  end
 end

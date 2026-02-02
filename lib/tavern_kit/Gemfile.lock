@@ -1,4 +1,13 @@
 PATH
+  remote: ../easy_talk
+  specs:
+    easy_talk (3.3.0)
+      activemodel (>= 7.0, < 9.0)
+      activesupport (>= 7.0, < 9.0)
+      js_regex (~> 3.0)
+      sorbet-runtime (~> 0.5)
+
+PATH
   remote: .
   specs:
     tavern_kit (0.1.0)
@@ -34,11 +43,6 @@ GEM
     date (3.5.1)
     docile (1.4.1)
     drb (2.2.3)
-    easy_talk (3.3.0)
-      activemodel (>= 7.0, < 9.0)
-      activesupport (>= 7.0, < 9.0)
-      js_regex (~> 3.0)
-      sorbet-runtime (~> 0.5)
     erb (6.0.1)
     i18n (1.14.8)
       concurrent-ruby (~> 1.0)
@@ -151,9 +155,10 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  easy_talk!
   irb
   minitest (~> 6)
-  rake (~> 13.0)
+  rake (~> 13)
   rubocop (~> 1.21)
   rubocop-rails-omakase
   simplecov
@@ -171,7 +176,7 @@ CHECKSUMS
   date (3.5.1) sha256=750d06384d7b9c15d562c76291407d89e368dda4d4fff957eb94962d325a0dc0
   docile (1.4.1) sha256=96159be799bfa73cdb721b840e9802126e4e03dfc26863db73647204c727f21e
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
-  easy_talk (3.3.0) sha256=1db579c7d3db59a0aa3756393ee57b374a3d06aa080f492ea3ef56678611ccd8
+  easy_talk (3.3.0)
   erb (6.0.1) sha256=28ecdd99c5472aebd5674d6061e3c6b0a45c049578b071e5a52c2a7f13c197e5
   i18n (1.14.8) sha256=285778639134865c5e0f6269e0b818256017e8cde89993fdfcbfb64d088824a5
   io-console (0.8.2) sha256=d6e3ae7a7cc7574f4b8893b4fca2162e57a825b223a177b7afa236c5ef9814cc

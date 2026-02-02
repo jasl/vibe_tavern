@@ -62,6 +62,11 @@ class TavernKit::UtilsTest < Minitest::Test
     assert_equal "default", h.fetch(:missing, default: "default")
   end
 
+  def test_hash_accessor_fetch_preserves_false
+    h = TavernKit::Utils::HashAccessor.wrap({ "enabled" => false })
+    assert_equal false, h.fetch(:enabled, default: true)
+  end
+
   def test_hash_accessor_dig
     h = TavernKit::Utils::HashAccessor.wrap({ "extensions" => { "world" => "Narnia" } })
     assert_equal "Narnia", h.dig(:extensions, :world)
@@ -95,6 +100,20 @@ class TavernKit::UtilsTest < Minitest::Test
     assert h.bool(:enabled)
     refute h.bool(:disabled)
     refute h.bool(:missing)
+  end
+
+  def test_hash_accessor_bool_parses_false_strings_with_default_true
+    h = TavernKit::Utils::HashAccessor.wrap(
+      {
+        "enabled" => "false",
+        "disabled" => "0",
+        "other" => "no",
+      },
+    )
+
+    refute h.bool(:enabled, default: true)
+    refute h.bool(:disabled, default: true)
+    refute h.bool(:other, default: true)
   end
 
   def test_hash_accessor_int

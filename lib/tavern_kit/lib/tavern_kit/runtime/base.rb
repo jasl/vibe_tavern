@@ -23,7 +23,10 @@ module TavernKit
         h = raw.is_a?(Hash) ? raw : {}
 
         h.each_with_object({}) do |(key, value), out|
-          out[TavernKit::Utils.underscore(key).to_sym] = value
+          underscored = TavernKit::Utils.underscore(key)
+          next if underscored.strip.empty?
+
+          out[underscored.to_sym] = value
         end
       end
       private_class_method :normalize_hash_keys

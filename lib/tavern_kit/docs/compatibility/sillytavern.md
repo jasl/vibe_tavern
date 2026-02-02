@@ -116,7 +116,7 @@ TavernKit core objects are **hash-first**. File formats are handled by
 | Nested macros in args | ✅ | ✅ | Depth-first, left-to-right |
 | Unknown macros preserved | ✅ | ✅ | Preserved for later expansion |
 | `{{if}}...{{else}}...{{/if}}` | ✅ | ✅ | Block support + flags |
-| Deterministic `{{pick}}` (offset-based) | ✅ | ✅ | ⚠️ see delta doc for edge cases |
+| Deterministic `{{pick}}` (offset-based) | ✅ | ⚠️ | Deterministic, but seeding differs; see delta doc |
 | Pre/post-processing pipeline | ✅ | ✅ | Includes `<USER>` etc normalization |
 
 ### 3.3 Macro packs
@@ -143,7 +143,7 @@ See:
 |---------|----|-----------|-------|
 | Keyword matching + selective logic | ✅ | ✅ | |
 | Secondary keys | ✅ | ✅ | |
-| Regex keys (JS) | ✅ | ✅ | Uses JS→Ruby conversion; some JS features may be unsupported |
+| Regex keys (JS) | ✅ | ⚠️ | Uses JS→Ruby conversion; some JS features may be unsupported |
 | whole-word + case-sensitive options | ✅ | ✅ | |
 | Constant entries | ✅ | ✅ | |
 | Positions (8 types) | ✅ | ✅ | incl. `at_depth` + `outlet` |

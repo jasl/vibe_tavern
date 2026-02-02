@@ -186,6 +186,10 @@ ST v1.15.0: Uses `chatIdHash + rawContentHash + globalOffset + rerollSeed`.
 
 **Impact:** TavernKit's `{{pick}}` seeding should match this 4-component seed.
 
+**Current TavernKit (2026-02-02):** Deterministic `{{pick}}` is implemented, but
+the seed does **not** yet match ST exactly (no reroll seed; Ruby `Random` +
+`Zlib.crc32` vs JS `seedrandom`). This is tracked as a known delta.
+
 ### 1.10 Updated: `{{banned}}` Side Effects
 
 Old docs: "No side effects (removed only)".
@@ -515,28 +519,28 @@ These were listed as "NOT implemented" but ST v1.15.0 HAS them:
 
 | Feature | Old Status | ST v1.15.0 | TavernKit Action |
 |---------|-----------|-----------|-----------------|
-| `{{#if}}` / `{{#unless}}` conditionals | NOT implemented | **`{{if}}` / `{{else}}` implemented** (no `#` prefix; `#` is preserveWhitespace flag) | Must implement |
-| `{{space}}` / `{{space::N}}` | NOT implemented | **Implemented** | Must implement |
-| `{{newline::N}}` | NOT implemented (experimental) | **Implemented** (count arg) | Must implement |
-| Handlebars conditionals | NOT implemented | Replaced by `{{if}}` block syntax | Must implement |
+| `{{#if}}` / `{{#unless}}` conditionals | NOT implemented | **`{{if}}` / `{{else}}` implemented** (no `#` prefix; `#` is preserveWhitespace flag) | Implemented (V2Engine) |
+| `{{space}}` / `{{space::N}}` | NOT implemented | **Implemented** | Implemented (core macros pack) |
+| `{{newline::N}}` | NOT implemented (experimental) | **Implemented** (count arg) | Implemented (core macros pack) |
+| Handlebars conditionals | NOT implemented | Replaced by `{{if}}` block syntax | Implemented (scoped `{{if}}`) |
 
 ### 5.3 New Divergences to Document
 
 | Feature | ST v1.15.0 | TavernKit Action |
 |---------|-----------|-----------------|
-| Variable shorthand (`{{.var}}`, `{{$var}}`, 16 operators) | Implemented | Must implement in V2 |
-| `{{hasExtension}}` macro | Checks ST extension system | Map to TavernKit extension check or return `"false"` |
-| `{{hasvar}}` / `{{deletevar}}` / `{{hasglobalvar}}` / `{{deleteglobalvar}}` | Implemented | Must implement |
-| `{{groupNotMuted}}` | Group members excluding muted | Must implement |
-| Entry field: 6 `match*` flags | Per-entry opt-in for non-chat scan data | Must implement in Lore::Entry |
-| Entry field: `characterFilter*` | Character/tag filter with exclude | Must implement |
-| Entry field: `triggers` | Generation type filter | Must implement |
-| Entry field: `useProbability` | Enable/disable probability check | Must implement |
-| Macro flags (`!`, `?`, `~`, `>`) | Parsed but unimplemented | Parse and ignore |
-| Pre/post-processor pipeline | Extensible processing around evaluation | Implement pipeline hooks |
-| Typed macro arguments | Runtime type validation | Implement validation |
+| Variable shorthand (`{{.var}}`, `{{$var}}`, 16 operators) | Implemented | Implemented (V2Engine) |
+| `{{hasExtension}}` macro | Checks ST extension system | Implemented (platform attrs-driven) |
+| `{{hasvar}}` / `{{deletevar}}` / `{{hasglobalvar}}` / `{{deleteglobalvar}}` | Implemented | Implemented (variables macros pack) |
+| `{{groupNotMuted}}` | Group members excluding muted | Implemented (env macros pack) |
+| Entry field: 6 `match*` flags | Per-entry opt-in for non-chat scan data | Implemented (Lore::EntryExtensions) |
+| Entry field: `characterFilter*` | Character/tag filter with exclude | Implemented (Lore::EntryExtensions) |
+| Entry field: `triggers` | Generation type filter | Implemented (Lore::EntryExtensions) |
+| Entry field: `useProbability` | Enable/disable probability check | Implemented (Lore::EntryExtensions) |
+| Macro flags (`!`, `?`, `~`, `>`) | Parsed but unimplemented | Implemented (parse + ignore) |
+| Pre/post-processor pipeline | Extensible processing around evaluation | Implemented |
+| Typed macro arguments | Runtime type validation | Implemented |
 | Multimodal Message content | Images, video, audio | Deferred (future) |
-| System prompt as separate entity | `sysprompt.content` separate from instruct | Model separately |
+| System prompt as separate entity | `sysprompt.content` separate from instruct | Implemented (macros; content is app-supplied) |
 | MacroBrowser documentation UI | Dynamic searchable UI | Not applicable (gem has no UI) |
 
 ---
