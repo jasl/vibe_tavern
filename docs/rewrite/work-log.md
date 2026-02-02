@@ -33,6 +33,10 @@ Guidelines:
     - post-history `system` block (`post_history_instructions` or `post_history_template`)
     - explicit disable semantics via `meta :system_template, nil` / `meta :post_history_template, nil`
     - tests/docs: `6c376cd`
+  - Harden Liquid rendering for app-owned macros:
+    - add conservative Liquid resource limits + max template size guardrail
+    - document runtime.toggles key normalization contract and lock with tests
+    - commits: `8b5d2dd`
 
 ## 2026-02-02
 
