@@ -17,7 +17,6 @@ References:
 ## Gates (green)
 
 - Gem: `cd lib/tavern_kit && bundle exec rake` (tests + gem rubocop)
-- Gem regression gate: `cd lib/tavern_kit && bundle exec rake test:gate`
 - App CI: `bin/ci`
 - Style: `bin/rubocop`
 - EOF lint: `ruby bin/lint-eof`

@@ -46,7 +46,6 @@ namespace :test do
   task conformance: :conformance
   task integration: :integration
   task risuai: :risuai
-  task gate: %i[guardrails conformance integration risuai]
 end
 
 require "rubocop/rake_task"
