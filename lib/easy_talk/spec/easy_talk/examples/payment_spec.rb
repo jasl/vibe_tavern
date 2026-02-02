@@ -3,6 +3,12 @@
 require 'spec_helper'
 
 RSpec.describe 'Payment object example' do
+  around do |example|
+    next example.run unless Time.respond_to?(:use_zone)
+
+    Time.use_zone("UTC") { example.run }
+  end
+
   let(:credit_card) do
     Class.new do
       include EasyTalk::Model

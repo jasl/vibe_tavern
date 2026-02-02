@@ -14,7 +14,7 @@ module EasyTalk
     #   expect(User).not_to validate_schema_for(name: "", email: "invalid")
     #
     # @example Check that ActiveModel and JSON Schema validations agree
-    #   expect(User).to have_matching_validations_for(name: "John", email: "john@example.com")
+    #   expect(User).to matching_validations_for(name: "John", email: "john@example.com")
     #
     class SchemaValidationMatcher
       def initialize(data)
@@ -300,9 +300,9 @@ module EasyTalk
       # Validates that ActiveModel and JSON Schema validations produce the same result
       #
       # @example
-      #   expect(User).to matching_validations_for?(name: "John", age: 30)
+      #   expect(User).to matching_validations_for(name: "John", age: 30)
       #
-      def matching_validations_for?(data)
+      def matching_validations_for(data)
         MatchingValidationsMatcher.new(data)
       end
 

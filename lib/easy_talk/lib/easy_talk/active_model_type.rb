@@ -45,10 +45,34 @@ module EasyTalk
     end
 
     def changed_in_place?(raw_old_value, new_value)
-      cast_value(raw_old_value) != new_value
+      normalize_for_comparison(cast_value(raw_old_value)) != normalize_for_comparison(new_value)
     end
 
     private
+
+    # ActiveRecord calls `changed_in_place?` with the raw DB value and the current
+    # (type-cast) value to detect in-place mutations of mutable attributes.
+    #
+    # EasyTalk schema/model instances only implement `==` against Hashes (and
+    # otherwise fall back to object identity). If we compare instances directly,
+    # two distinct instances with identical data will always be treated as
+    # different, causing "always dirty" attributes.
+    #
+    # To avoid that, compare a deep, JSON-ready representation instead.
+    def normalize_for_comparison(value)
+      value = serialize(value) if easy_talk_model_class?(value.class)
+
+      case value
+      when Hash
+        value.each_with_object({}) do |(k, v), out|
+          out[k.to_s] = normalize_for_comparison(v)
+        end
+      when Array
+        value.map { |item| normalize_for_comparison(item) }
+      else
+        value
+      end
+    end
 
     def cast_value(value)
       case value
