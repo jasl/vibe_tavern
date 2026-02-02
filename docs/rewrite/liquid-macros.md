@@ -193,4 +193,3 @@ Compatibility matrices:
 Rails rewrite pipeline docs:
 - `docs/rewrite/vibe-tavern-pipeline.md`
 - `docs/rewrite/rails-integration-guide.md`
-
