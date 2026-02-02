@@ -908,6 +908,22 @@ Before declaring Wave 6 done, also run:
 - `cd lib/tavern_kit && bundle exec rake`
 - `bin/ci`
 
+#### Wave 6 status (as of 2026-02-02)
+
+**Done:**
+- Docs index: `docs/rewrite/README.md`
+- Rails integration guide: `docs/rewrite/rails-integration-guide.md`
+- Pipeline debugging/observability guide: `docs/rewrite/pipeline-observability.md`
+- Compatibility matrices: `docs/rewrite/st-compatibility-matrix.md` + `docs/rewrite/risuai-compatibility-matrix.md`
+- Core safety/perf helpers: `TavernKit::RegexSafety`, `TavernKit::LRUCache`, `TavernKit::JsRegexCache`
+- Large-file splits landed for high-risk modules (kept behavior): ST macro engines, RisuAI template cards, RisuAI triggers
+- ZIP safety regression tests expanded: `lib/tavern_kit/test/tavern_kit/archive/zip_reader_test.rb`
+
+**Remaining:**
+- Finalize `lib/tavern_kit/README.md` (keep last; needs careful wording)
+- Any additional regression fixtures / property tests discovered during the final audit
+- Remaining design decision: whether `runtime.metadata`/toggles should become Stores (currently plain Hashes by design)
+
 #### 6a. Documentation (Write Last, Carefully)
 
 | Task | Layer | Description |
