@@ -11,7 +11,7 @@ module TavernKit
         :alias_visible,
       ) do
         def unnamed_arg_defs
-          raw = metadata[:unnamed_args] || metadata["unnamed_args"] || metadata[:unnamedArgs] || metadata["unnamedArgs"]
+          raw = metadata[:unnamed_args]
           case raw
           when nil
             []
@@ -25,26 +25,26 @@ module TavernKit
         end
 
         def list_spec
-          raw = metadata[:list] || metadata["list"]
+          raw = metadata[:list]
           return nil if raw.nil? || raw == false
 
           if raw == true
             { min: 0, max: nil }
           elsif raw.is_a?(Hash)
-            min = raw[:min] || raw["min"] || 0
-            max = raw[:max] || raw["max"]
+            min = raw.fetch(:min, 0)
+            max = raw[:max]
             { min: min.to_i, max: max.nil? ? nil : max.to_i }
           else
             { min: 0, max: nil }
           end
         end
 
-        def strict_args? = (metadata.key?(:strict_args) ? metadata[:strict_args] : metadata["strict_args"]) != false
-        def delay_arg_resolution? = (metadata[:delay_arg_resolution] || metadata["delay_arg_resolution"]) == true
+        def strict_args? = metadata.fetch(:strict_args, true) != false
+        def delay_arg_resolution? = metadata[:delay_arg_resolution] == true
 
         def min_args
           unnamed_arg_defs.count do |defn|
-            opt = defn.is_a?(Hash) ? (defn[:optional] || defn["optional"]) : nil
+            opt = defn.is_a?(Hash) ? defn[:optional] : nil
             opt != true
           end
         end
@@ -100,11 +100,17 @@ module TavernKit
           raise ArgumentError, "Macro handler is required" if fn.nil?
 
           key = normalize_name(name)
-          meta = metadata.dup
+          meta = normalize_metadata_keys(metadata)
+
           meta[:unnamed_args] = unnamed_args if unnamed_args
           meta[:list] = list unless list.nil?
           meta[:strict_args] = strict_args
           meta[:delay_arg_resolution] = delay_arg_resolution
+
+          # Normalize nested structures too so the rest of the macro engine only
+          # deals with symbol keys.
+          meta[:unnamed_args] = normalize_unnamed_args(meta[:unnamed_args]) if meta.key?(:unnamed_args)
+          meta[:list] = normalize_list_spec(meta[:list]) if meta.key?(:list)
 
           defn = Definition.new(
             name: key,
@@ -151,6 +157,28 @@ module TavernKit
           raise ArgumentError, "Macro name must not be empty" if s.empty?
 
           s.downcase
+        end
+
+        def normalize_metadata_keys(hash)
+          return {} unless hash.is_a?(Hash)
+
+          hash.each_with_object({}) do |(k, v), out|
+            out[TavernKit::Utils.underscore(k).to_sym] = v
+          end
+        end
+
+        def normalize_unnamed_args(value)
+          return value if value.is_a?(Integer)
+
+          Array(value).map do |v|
+            v.is_a?(Hash) ? normalize_metadata_keys(v) : v
+          end
+        end
+
+        def normalize_list_spec(value)
+          return value if value == true || value == false
+
+          value.is_a?(Hash) ? normalize_metadata_keys(value) : value
         end
       end
 

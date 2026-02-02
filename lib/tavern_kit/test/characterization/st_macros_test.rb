@@ -99,4 +99,27 @@ class StMacrosTest < Minitest::Test
       engine.expand("{{lenient::abc}}", environment: strict_env)
     end
   end
+
+  def test_registry_normalizes_metadata_keys
+    registry = TavernKit::SillyTavern::Macro::Registry.new
+
+    # Accept legacy/camelCase metadata keys, but normalize internally so the
+    # macro engine only deals with snake_case symbol keys.
+    registry.register(
+      "num",
+      unnamedArgs: [{ "name" => "n", "type" => :integer, "optional" => true }],
+      list: { "min" => 1, "max" => 2 },
+    ) { "OK" }
+
+    defn = registry.get("num")
+
+    assert_equal [{ name: "n", type: :integer, optional: true }], defn.unnamed_arg_defs
+    assert_equal({ min: 1, max: 2 }, defn.list_spec)
+    assert_equal 0, defn.min_args
+    assert_equal 1, defn.max_args
+    assert defn.arity_valid?(1)
+
+    engine = TavernKit::SillyTavern::Macro::V2Engine.new(registry: registry)
+    assert_equal "OK", engine.expand("{{num::1}}", environment: TavernKit::SillyTavern::Macro::Environment.new)
+  end
 end
