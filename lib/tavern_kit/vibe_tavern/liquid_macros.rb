@@ -59,6 +59,7 @@ module TavernKit
         end
 
         store = variables_store
+        regs = registers.is_a?(Hash) ? registers : {}
 
         liquid_assigns = (assigns || {}).dup
         if store
@@ -70,7 +71,7 @@ module TavernKit
 
         out = template.render(
           liquid_assigns,
-          registers: registers.merge(variables_store: store),
+          registers: regs.merge(variables_store: store),
           strict_variables: strict,
           strict_filters: strict,
         ).to_s
