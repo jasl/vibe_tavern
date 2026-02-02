@@ -37,6 +37,7 @@ Guidelines:
     - add conservative Liquid resource limits + max template size guardrail
     - document runtime.toggles key normalization contract and lock with tests
     - commits: `8b5d2dd`
+  - Make Liquid strict mode truly fail-fast (undefined variables/filters now raise) + tests: `9931cad`
 
 ## 2026-02-02
 
