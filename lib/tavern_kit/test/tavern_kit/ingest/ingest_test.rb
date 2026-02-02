@@ -121,6 +121,57 @@ class TavernKit::IngestTest < Minitest::Test
     end
   end
 
+  def test_ingest_byaf_asset_read_respects_max_bytes
+    zip_bytes = byaf_bytes(
+      character_images: [],
+      scenarios: [
+        { title: "S1", background_path: "backgrounds/bg.png", background_content: "BGDATA" },
+      ],
+    )
+
+    Tempfile.create(["bundle", ".byaf"]) do |f|
+      f.binmode
+      f.write(zip_bytes)
+      f.flush
+
+      TavernKit::Ingest.open(f.path) do |bundle|
+        bg = bundle.assets.find { |a| a.kind == :background_image }
+        assert bg, "expected a background_image asset"
+
+        err = assert_raises(TavernKit::Archive::ZipError) { bg.read(max_bytes: 2) }
+        assert_match(/too large/i, err.message)
+      end
+    end
+  end
+
+  def test_ingest_charx_asset_read_respects_max_bytes
+    card_hash = TavernKit::CharacterCard.export_v3(TavernKit::Character.create(name: "ZipChar"))
+    card_hash["data"]["assets"] = [
+      { "type" => "background", "uri" => "embeded://assets/bg.png", "name" => "scene", "ext" => "png" },
+    ]
+
+    zip_bytes = charx_bytes(
+      card_hash: card_hash,
+      assets: { "assets/bg.png" => "BGDATA" },
+    )
+
+    Tempfile.create(["bundle", ".charx"]) do |f|
+      f.binmode
+      f.write(zip_bytes)
+      f.flush
+
+      TavernKit::Ingest.open(f.path) do |bundle|
+        assert_equal "ZipChar", bundle.character.name
+
+        bg = bundle.assets.find { |a| a.source_path == "assets/bg.png" }
+        assert bg, "expected bg asset"
+
+        err = assert_raises(TavernKit::Archive::ZipError) { bg.read(max_bytes: 2) }
+        assert_match(/too large/i, err.message)
+      end
+    end
+  end
+
   private
 
   def byaf_bytes(character_images:, scenarios:)
