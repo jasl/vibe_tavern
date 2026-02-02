@@ -195,10 +195,11 @@ module TavernKit
 
               env = inv.environment
               attrs = env.respond_to?(:platform_attrs) ? env.platform_attrs : {}
-              main_api = TavernKit::Utils::HashAccessor.wrap(attrs).fetch(:main_api, :mainApi, default: "").to_s
+              ha = TavernKit::Utils::HashAccessor.wrap(attrs)
+              main_api = ha.fetch(:main_api, :mainApi, default: "").to_s
               next "" unless main_api == "textgenerationwebui"
 
-              list = attrs["banned_words"] || attrs["bannedWords"] || attrs[:banned_words] || attrs[:bannedWords]
+              list = ha.fetch(:banned_words, default: nil)
               list << word if list.is_a?(Array)
 
               ""
