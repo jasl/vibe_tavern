@@ -15,6 +15,16 @@ class VibeTavernLiquidMacrosTest < ActiveSupport::TestCase
     end
   end
 
+  test "strict mode raises on undefined variables and filters" do
+    assert_raises(::Liquid::Error) do
+      TavernKit::VibeTavern::LiquidMacros.render("{{ missing }}", strict: true)
+    end
+
+    assert_raises(::Liquid::Error) do
+      TavernKit::VibeTavern::LiquidMacros.render(%({{ "a" | missing_filter }}), strict: true)
+    end
+  end
+
   test "reads variables through var/global drops" do
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)

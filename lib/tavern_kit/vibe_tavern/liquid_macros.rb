@@ -52,9 +52,9 @@ module TavernKit
       # @param on_error [Symbol] :raise or :passthrough (return original text)
       def render(text, assigns: {}, variables_store: nil, strict: false, on_error: :passthrough, registers: {})
         source = text.to_s
+        raise_on_error = strict || on_error == :raise
         if source.bytesize > MAX_TEMPLATE_BYTES
-          raise ::Liquid::Error, "Liquid template is too large (#{source.bytesize} bytes > #{MAX_TEMPLATE_BYTES} bytes)" if strict ||
-            on_error == :raise
+          raise ::Liquid::Error, "Liquid template is too large (#{source.bytesize} bytes > #{MAX_TEMPLATE_BYTES} bytes)" if raise_on_error
           return source
         end
 
@@ -72,9 +72,10 @@ module TavernKit
         out = template.render(
           liquid_assigns,
           registers: regs.merge(variables_store: store),
-          strict_variables: strict,
-          strict_filters: strict,
+          strict_variables: raise_on_error,
+          strict_filters: raise_on_error,
         ).to_s
+        raise template.errors.first if raise_on_error && template.errors.any?
 
         # ST-style escaping: `\{\{` / `\}\}` (or `\{` / `\}` generally) should be
         # preserved through parsing and unescaped after rendering.
@@ -89,7 +90,7 @@ module TavernKit
 
         out
       rescue ::Liquid::Error
-        raise if strict || on_error == :raise
+        raise if raise_on_error
         source
       end
 
