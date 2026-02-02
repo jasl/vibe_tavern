@@ -40,12 +40,14 @@ module TavernKit
             @timed_state.each do |entry_id, state|
               next unless state.is_a?(Hash)
 
-              effect = state[type] || state[type.to_s]
+              state_h = TavernKit::Utils::HashAccessor.wrap(state)
+              effect = state_h[type]
               next unless effect.is_a?(Hash)
 
-              start_turn = (effect[:start_turn] || effect["start_turn"] || effect[:start] || effect["start"]).to_i
-              end_turn = (effect[:end_turn] || effect["end_turn"] || effect[:end] || effect["end"]).to_i
-              protected_flag = !!(effect[:protected] || effect["protected"])
+              effect_h = TavernKit::Utils::HashAccessor.wrap(effect)
+              start_turn = effect_h.int(:start_turn, :start, default: 0)
+              end_turn = effect_h.int(:end_turn, :end, default: 0)
+              protected_flag = !!effect_h[:protected]
 
               # Drop if chat has not advanced since setting and not protected.
               if @turn_count <= start_turn && !protected_flag

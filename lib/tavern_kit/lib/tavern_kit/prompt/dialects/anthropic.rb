@@ -66,12 +66,15 @@ module TavernKit
       end
 
       def tool_use_block(call)
-        # Accept either symbol or string keys, and preserve unknown keys best-effort.
-        h = call.is_a?(Hash) ? call : {}
-        id = h[:id] || h["id"]
-        fn = h[:function] || h["function"] || {}
-        name = fn[:name] || fn["name"]
-        args = fn[:arguments] || fn["arguments"]
+        # Tool call payloads can be app-provided, so accept mixed-key hashes but
+        # normalize access via HashAccessor to avoid ad-hoc key fallback logic.
+        h = TavernKit::Utils::HashAccessor.wrap(call)
+        id = h[:id]
+
+        fn = h.fetch(:function, default: {})
+        fn_h = TavernKit::Utils::HashAccessor.wrap(fn)
+        name = fn_h[:name]
+        args = fn_h[:arguments]
 
         {
           type: "tool_use",

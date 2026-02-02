@@ -88,12 +88,13 @@ module TavernKit
         return value if value.is_a?(TavernKit::Prompt::Message)
 
         if value.is_a?(Hash)
-          role = value[:role] || value["role"]
-          content = value[:content] || value["content"]
-          name = value[:name] || value["name"]
-          send_date = value[:send_date] || value["send_date"]
-          attachments = value[:attachments] || value["attachments"]
-          metadata = value[:metadata] || value["metadata"]
+          h = TavernKit::Utils::HashAccessor.wrap(value)
+          role = h[:role]
+          content = h[:content]
+          name = h[:name]
+          send_date = h[:send_date]
+          attachments = h[:attachments]
+          metadata = h[:metadata]
 
           raise ArgumentError, "message.role is required" if role.nil?
           raise ArgumentError, "message.content is required" if content.nil?

@@ -172,8 +172,9 @@ module TavernKit
           effect = timed_effect(entry_uid, :delay)
           return false unless effect
 
-          start_turn = (effect[:start_turn] || effect["start_turn"] || 0).to_i
-          duration = (effect[:duration] || effect["duration"] || 0).to_i
+          h = TavernKit::Utils::HashAccessor.wrap(effect)
+          start_turn = h.int(:start_turn, default: 0)
+          duration = h.int(:duration, default: 0)
           turn_count < start_turn + duration
         end
 
@@ -205,12 +206,14 @@ module TavernKit
           state = timed_state[entry_uid.to_s]
           return nil unless state.is_a?(Hash)
 
-          effect = state[type] || state[type.to_s]
+          h = TavernKit::Utils::HashAccessor.wrap(state)
+          effect = h[type]
           effect.is_a?(Hash) ? effect : nil
         end
 
         def effect_end_turn(effect)
-          (effect[:end_turn] || effect["end_turn"] || effect[:end] || effect["end"] || 0).to_i
+          h = TavernKit::Utils::HashAccessor.wrap(effect)
+          h.int(:end_turn, :end, default: 0)
         end
       end
     end
