@@ -12,6 +12,7 @@ parity notes, contracts, and integration guidance.
 - Pipeline debugging/observability: `docs/rewrite/pipeline-observability.md`
 - Rails integration guidance: `docs/rewrite/rails-integration-guide.md`
 - Wave 6 audit notes (consistency/security/perf): `docs/rewrite/wave6-audit.md`
+- Wave 1-6 completion audit (roadmap vs code/tests): `docs/rewrite/wave1-6-audit.md`
 - Out-of-scope backlog (CLI, UI directives, etc): `docs/rewrite/backlogs.md`
 
 ## Deltas / Alignment Notes

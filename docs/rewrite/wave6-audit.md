@@ -35,6 +35,10 @@ and what remains as explicit decisions/backlogs.
     compression ratio limit, and encrypted-entry rejection.
   - Ingested assets support lazy reads and allow downstream apps to enforce
     `max_bytes` per read.
+- **PNG/APNG text chunks**:
+  - `TavernKit::Png::Parser` enforces size limits for untrusted metadata chunks
+    (`tEXt`/`zTXt`/`iTXt`) and caps inflate output to mitigate zip-bomb-style
+    payloads embedded in images.
 - **Regex safety**:
   - No regex timeouts (to avoid global/thread side effects).
   - Basic guardrails via `TavernKit::RegexSafety`:
