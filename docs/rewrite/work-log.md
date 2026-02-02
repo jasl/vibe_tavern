@@ -25,6 +25,7 @@ Guidelines:
     - Rationale: keep prompt building deterministic and avoid implicit side effects unless explicitly enabled.
   - Pin Liquid assigns contract (`Assigns.build(ctx)`) + tests: `aa2f92f`
   - Add Liquid P0 filters (deterministic RNG + time helpers) + docs/tests: `9b9ba98`
+  - Fix Liquid runtime seed wiring; add `render_for(ctx, ...)` helper + tests: `f028797`
 
 ## 2026-02-02
 
