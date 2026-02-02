@@ -99,23 +99,25 @@ Whitespace control (Liquid feature):
 
 ## 2) Template Environment (Assigns / Objects)
 
-We expose a **small, prompt-building-safe** environment to Liquid. The exact
-set of assigns will evolve, but the intent is:
+We expose a **small, prompt-building-safe** environment to Liquid.
 
-Core text fields (Strings):
-- `char`, `user`
+Current assigns contract (implemented by `TavernKit::VibeTavern::LiquidMacros::Assigns.build(ctx)`):
+
+Core text fields:
+- `char` (character display name; uses nickname when present)
+- `user` (user display name)
 - `description`, `personality`, `scenario`
-- `persona`
+- `persona` (user persona text)
 - `system_prompt`, `post_history_instructions`
-- `mes_examples` (raw; optionally also provide a formatted variant)
+- `mes_examples`
 
 Runtime snapshot (read-only):
-- `runtime` (object/Drop; built from `TavernKit::Runtime::Base`)
-- common convenience fields may also be exposed at top-level:
-  - `chat_index`, `message_index`, `model`, `role`
+- `runtime` (Hash with **string keys**)
+- `chat_index`, `message_index`, `model`, `role` (top-level conveniences; sourced from runtime)
 
-History (read-only):
-- `history` (Array of message objects; shape depends on the app adapter)
+Notes:
+- History is intentionally not exposed yet. When/if we expose it, it will be
+  read-only and its shape will be pinned by tests.
 
 VariablesStore (session-level state):
 - `var` (local scope store; read-only in `{{ }}`)

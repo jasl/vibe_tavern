@@ -23,6 +23,7 @@ Guidelines:
   - Add optional app-layer user input preprocessing toggle (default OFF): `29424df`
     - Standard toggle: `runtime[:toggles][:expand_user_input_macros]`
     - Rationale: keep prompt building deterministic and avoid implicit side effects unless explicitly enabled.
+  - Pin Liquid assigns contract (`Assigns.build(ctx)`) + tests: (next commit)
 
 ## 2026-02-02
 
@@ -47,4 +48,3 @@ Guidelines:
   - Harden PNG parsing limits for untrusted text chunks: `2fd3490`
   - Add `RegexSafety` input-size guardrails and apply to regex-heavy subsystems: `aeb5d01`, `1cea647`, `d42450e`, `43ff6bb`
   - Rename/migrate chat variable storage to `VariablesStore` (and remove old aliases): `891cc74`, `66d45ae`
-
