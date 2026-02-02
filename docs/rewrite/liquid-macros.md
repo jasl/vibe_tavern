@@ -185,7 +185,53 @@ Notes:
 
 ---
 
-## 5) Strict vs Tolerant Mode
+## 5) Filters (P0)
+
+Deterministic RNG (prompt-building safe):
+
+- `hash7` — stable 7-digit hash derived from input:
+
+```liquid
+{{ "hello" | hash7 }}
+```
+
+- `pick` — deterministic pick based on runtime seeds:
+
+```liquid
+{{ "a,b,c" | pick }}
+{{ "a,b,c" | split: "," | pick }}
+```
+
+Seeds used by default:
+- `runtime.message_index` (as the deterministic counter; defaults to `0`)
+- `runtime.rng_word` (as the deterministic seed word; falls back to `char`, then `"0"`)
+
+Dice:
+
+- `rollp` — deterministic dice roll (RisuAI-like):
+
+```liquid
+{{ "2d6" | rollp }}
+```
+
+Time/date helpers (UTC):
+
+These filters accept epoch milliseconds (preferred) or seconds as input.
+For deterministic builds, inject `runtime.now_ms` from the app.
+
+```liquid
+{{ runtime.now_ms | unixtime }}  {# -> "1700000000" #}
+{{ runtime.now_ms | isodate }}   {# -> "2023-11-14" #}
+{{ runtime.now_ms | isotime }}   {# -> "22:13:20" #}
+{{ runtime.now_ms | datetimeformat: "YYYY-MM-DD HH:mm:ss" }}
+```
+
+`datetimeformat` supports a Moment-ish subset:
+`YYYY YY MMMM MMM MM DDDD DD dddd ddd HH hh mm ss X x A`
+
+---
+
+## 6) Strict vs Tolerant Mode
 
 TavernKit has a pipeline-level `strict` mode used primarily for tests and debugging.
 
@@ -201,7 +247,7 @@ Current implementation (`TavernKit::VibeTavern::LiquidMacros.render`):
 
 ---
 
-## 6) User Input Processing (Optional)
+## 7) User Input Processing (Optional)
 
 By default, we do **not** run Liquid macros on end-user messages.
 
@@ -223,7 +269,7 @@ Notes:
   **after** the LLM response, gated behind its own feature flag, and only from
   assistant-role output (never from user messages).
 
-## 7) References
+## 8) References
 
 Liquid source copy:
 - `resources/liquid` (vendored for reference/porting)

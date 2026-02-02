@@ -14,6 +14,9 @@ module TavernKit
 
       def environment
         @environment ||= ::Liquid::Environment.build do |env|
+          env.register_filter(TavernKit::VibeTavern::LiquidMacros::Filters::DeterministicRng)
+          env.register_filter(TavernKit::VibeTavern::LiquidMacros::Filters::Time)
+
           env.register_tag("setvar", TavernKit::VibeTavern::LiquidMacros::Tags::SetVar)
           env.register_tag("setdefaultvar", TavernKit::VibeTavern::LiquidMacros::Tags::SetDefaultVar)
           env.register_tag("addvar", TavernKit::VibeTavern::LiquidMacros::Tags::AddVar)
