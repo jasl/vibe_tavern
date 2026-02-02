@@ -9,7 +9,7 @@ module TavernKit
 
       module_function
 
-      # Minimal matcher for RisuAI lorebook entries (Wave 5c kickoff).
+      # Matcher for RisuAI lorebook entries.
       #
       # This mirrors the upstream matching approach:
       # - scan last N messages (scan_depth)
@@ -20,7 +20,7 @@ module TavernKit
       #
       # NOTE: This intentionally accepts Hash lore entries to match RisuAI's
       # internal JSON-y shape; higher-level conversion to Core Lore::Entry will
-      # be handled by the Wave 5c engine.
+      # be handled by the RisuAI lore engine.
       def match(messages, lores, full_word_matching: false, scan_depth: 50, recursive_scanning: false)
         scan_depth = scan_depth.to_i
         scan_depth = 0 if scan_depth.negative?

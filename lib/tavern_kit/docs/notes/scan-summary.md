@@ -1,10 +1,10 @@
 > [!IMPORTANT]
 > Historical / discovery document (2026-01-29). This file is kept for context but may be outdated.
 > Current source of truth:
-> - `docs/rewrite/README.md`
-> - `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
-> - `docs/rewrite/st-compatibility-matrix.md`
-> - `docs/rewrite/risuai-compatibility-matrix.md`
+> - `lib/tavern_kit/docs/README.md`
+> - `lib/tavern_kit/docs/compatibility/sillytavern.md`
+> - `lib/tavern_kit/docs/compatibility/risuai.md`
+> - Rails integration docs: `docs/rewrite/rails-integration-guide.md`
 
 # Scan Summary (2026-01-29)
 
@@ -16,7 +16,7 @@
 - **Result service**: `app/services/result.rb` with success/failure pattern
 - **EasyTalk fork**: `lib/easy_talk/` with `ActiveModelType` adapter already implemented (`to_type`)
 - **TavernKit stub**: `lib/tavern_kit/` with just version.rb and main entry point
-- **Comprehensive documentation**: `CLAUDE.md`, `docs/rewrite/`, `.sisyphus/` plans
+- **Comprehensive documentation**: `CLAUDE.md`, `lib/tavern_kit/docs/`, `.sisyphus/` drafts
 - **Test infrastructure**: Minitest, SimpleCov, parallel workers, fixtures dirs created
 - **Frontend CSS**: Tailwind config with SillyTavern message styling (`.mes-*`), CJK typography, DaisyUI theme
 - **Docker setup**: PostgreSQL with pgvector via compose.dev.yaml
@@ -37,9 +37,9 @@
 | Decision | Choice | Source |
 |----------|--------|--------|
 | JSON serialization | Option C: Fork EasyTalk + ActiveModel::Type | `.sisyphus/drafts/` |
-| Parity priority | SillyTavern primary, RisuAI secondary/backlog | `docs/rewrite/overview.md` |
-| StoreModel adoption | Rejected | `docs/rewrite/store_model-evaluation.md` |
-| Rails 8.2 `has_json` usage | Useful for flat settings only; cannot replace EasyTalk for nested | `docs/rewrite/overview.md` |
+| Parity priority | SillyTavern primary, RisuAI secondary/backlog | `lib/tavern_kit/docs/notes/overview.md` |
+| StoreModel adoption | Rejected | `lib/tavern_kit/docs/notes/store-model-evaluation.md` |
+| Rails 8.2 `has_json` usage | Useful for flat settings only; cannot replace EasyTalk for nested | `lib/tavern_kit/docs/notes/overview.md` |
 | EasyTalk fork policy | Allowed; log changes in `FORK_CHANGES.md` | Confirmed in overview |
 | API breakage tolerance | Acceptable for better design | Confirmed |
 | Data migration | Greenfield; no production data | Confirmed |

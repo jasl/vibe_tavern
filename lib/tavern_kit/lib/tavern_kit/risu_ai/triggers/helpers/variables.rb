@@ -5,7 +5,7 @@ module TavernKit
     module Triggers
       module_function
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def get_var(chat, name, local_vars:, current_indent:)
         key = name.to_s.delete_prefix("$")
         if local_vars
@@ -26,7 +26,7 @@ module TavernKit
         state["$#{key}"]
       end
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def set_var(chat, name, value, local_vars:, current_indent:)
         key = name.to_s.delete_prefix("$")
 
@@ -47,7 +47,7 @@ module TavernKit
         chat[:scriptstate] = state
       end
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def deep_symbolize(value)
         case value
         when Array
@@ -65,7 +65,7 @@ module TavernKit
         end
       end
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def normalize_triggers(triggers)
         Array(triggers).filter_map do |raw|
           next nil unless raw.is_a?(Hash)

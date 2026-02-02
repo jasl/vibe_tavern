@@ -6,7 +6,7 @@ module TavernKit
     # expansion.
     #
     # This isolates "how do we map context state into macro expansion inputs"
-    # into a single place so Wave 4+ middleware can stay consistent.
+    # into a single place so middleware can stay consistent.
     module ExpanderVars
       module_function
 

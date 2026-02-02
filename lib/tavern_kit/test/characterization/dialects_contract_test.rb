@@ -2,9 +2,9 @@
 
 require "test_helper"
 
-class Wave4DialectsContractTest < Minitest::Test
+class DialectsContractTest < Minitest::Test
   # Contract reference:
-  # - docs/rewrite/wave4-contracts.md (dialects tool/function passthrough rules)
+  # - lib/tavern_kit/docs/contracts/prompt-orchestration.md (dialects tool/function passthrough rules)
   FIXTURES_DIR = File.expand_path("../fixtures/dialects", __dir__)
 
   def test_openai_tool_calls_passthrough

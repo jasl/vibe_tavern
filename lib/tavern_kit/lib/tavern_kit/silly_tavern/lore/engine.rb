@@ -6,7 +6,7 @@ require_relative "engine/buffer"
 module TavernKit
   module SillyTavern
     module Lore
-      # SillyTavern World Info scanning engine (Wave 3).
+      # SillyTavern World Info scanning engine.
       #
       # Implements the core scanning loop: keyword matching, recursion, delayed recursion,
       # timed effects, min activations, inclusion groups, and token budgeting.
@@ -27,7 +27,7 @@ module TavernKit
 
         ScanEntry = Struct.new(:entry, :decorators, :ext, :order, keyword_init: true)
 
-        # Class methods extracted to `silly_tavern/lore/engine/class_methods.rb` (Wave 6 large-file split).
+        # Class methods extracted to `silly_tavern/lore/engine/class_methods.rb`.
 
         def initialize(
           token_estimator: TavernKit::TokenEstimator.default,

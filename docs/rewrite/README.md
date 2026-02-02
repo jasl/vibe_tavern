@@ -1,31 +1,10 @@
-# Rewrite Docs Index
+# Rails Rewrite Docs
 
-This folder contains working documents produced during the TavernKit rewrite:
-parity notes, contracts, and integration guidance.
+This folder contains docs for integrating the embedded `tavern_kit` gem into the
+Rails app rewrite.
 
-## Start Here (Current Source of Truth)
-
-- Roadmap / wave definitions: `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
-- ST compatibility: `docs/rewrite/st-compatibility-matrix.md`
-- RisuAI compatibility: `docs/rewrite/risuai-compatibility-matrix.md`
-- Core interface protocols: `docs/rewrite/core-interface-design.md`
-- Pipeline debugging/observability: `docs/rewrite/pipeline-observability.md`
-- Rails integration guidance: `docs/rewrite/rails-integration-guide.md`
+Start here:
+- Rails integration guide: `docs/rewrite/rails-integration-guide.md`
 - Rails rewrite checklist (models/services/tests; no UI): `docs/rewrite/rails-rewrite-checklist.md`
-- Wave 6 audit notes (consistency/security/perf): `docs/rewrite/wave6-audit.md`
-- Wave 1-6 completion audit (roadmap vs code/tests): `docs/rewrite/wave1-6-audit.md`
-- Out-of-scope backlog (CLI, UI directives, etc): `docs/rewrite/backlogs.md`
 
-## Deltas / Alignment Notes
-
-- SillyTavern deltas (known differences): `docs/rewrite/st-alignment-delta-v1.15.0.md`
-- RisuAI deltas (known differences): `docs/rewrite/risuai-alignment-delta.md`
-- Cross-platform parity checklist/notes: `docs/rewrite/st-risuai-parity.md`
-
-## Historical / Discovery (Read as Background)
-
-These were written early during discovery and may not reflect current
-implementation details:
-
-- `docs/rewrite/overview.md`
-- `docs/rewrite/scan-summary.md`
+For the TavernKit gem documentation, see: `lib/tavern_kit/docs/README.md`.

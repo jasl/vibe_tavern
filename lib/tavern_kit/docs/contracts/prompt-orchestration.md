@@ -1,10 +1,10 @@
-# Wave 4 Contracts (Orchestration & Output Layer)
+# Prompt Orchestration Contracts (Orchestration & Output Layer)
 
 Date: 2026-01-30
 
-This document "pins down" Wave 4 behavior so implementation stays aligned with:
+This document "pins down" orchestration/output behavior so implementation stays aligned with:
 
-- `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md` (work checklist)
+- Reference sources pinned in `lib/tavern_kit/docs/reference-sources.md`
 - SillyTavern staging behavior (reference only; no test/fixture copying)
 - Our pipeline philosophy: tolerant at external input boundaries, fail-fast for programmer errors
 
@@ -40,8 +40,8 @@ Core message object is `TavernKit::Prompt::Message`:
 
 ### Standard metadata keys (Core-level convention)
 
-To keep Core agnostic but still support tool calling across providers, Wave 4
-standardizes a *small* set of keys. Dialects must read these keys and map them
+To keep Core agnostic but still support tool calling across providers, we
+standardize a *small* set of keys. Dialects must read these keys and map them
 to the provider format.
 
 - `metadata[:tool_calls]`: Array<Hash>
@@ -127,7 +127,7 @@ In TavernKit these live on `TavernKit::SillyTavern::Preset` and are imported by
 
 ### Bundled eviction (examples-as-dialogues)
 
-Wave 4 introduces a Core-level convention for "evict as a unit":
+Core introduces a convention for "evict as a unit":
 
 - `block.metadata[:eviction_bundle]` (String)
   - blocks sharing the same bundle id must be enabled/disabled together
@@ -177,14 +177,14 @@ SillyTavern uses two different prompt assembly modes:
 - **Text dialect** (`:text`): prompt is assembled as a single string; story
   string IS used as the primary "context template".
 
-In Wave 4, the ST pipeline must branch based on `ctx.dialect`:
+The ST pipeline must branch based on `ctx.dialect`:
 
 - `ctx.dialect == :text` => apply ContextTemplate story string rules
 - otherwise => chat-style assembly (PromptManager-style)
 
 ### Template syntax
 
-Wave 4 only relies on a restricted Handlebars-like subset:
+This contract only relies on a restricted Handlebars-like subset:
 
 - `{{field}}` substitution for known fields
 - `{{#if field}}...{{/if}}` conditional blocks
@@ -375,7 +375,7 @@ Group chat behavior spans **two** concerns:
 
 Applications may want to own scheduling (UI queue, retries, concurrency), but
 TavernKit needs the *same decision* to build the correct prompt. To avoid
-drift when switching between “app decides” and “TavernKit decides”, Wave 4
+drift when switching between “app decides” and “TavernKit decides”, TavernKit
 standardizes a decision handshake.
 
 ### Config + Decision (single source of truth)
@@ -512,7 +512,7 @@ Determinism:
 When `generation_mode` is `:append` or `:append_disabled`, SillyTavern merges
 multiple character cards into one "group card" used for prompt construction.
 
-Wave 4 pins the ST join behavior from `getGroupCharacterCardsLazy()`:
+This contract pins the ST join behavior from `getGroupCharacterCardsLazy()`:
 
 - Only applies for `generation_mode` in `[:append, :append_disabled]`.
 - Member selection:
@@ -536,8 +536,8 @@ Wave 4 pins the ST join behavior from `getGroupCharacterCardsLazy()`:
     - else collect member `mes_examples`, and ensure each non-empty value starts
       with `"<START>\n"` (prepend if missing) before applying join templates.
 
-`baseChatReplace()` substitutions exist in ST, but Wave 4 only requires the
-structural join behavior above; macro expansion still happens later in Stage 7.
+`baseChatReplace()` substitutions exist in ST, but this contract only requires
+the structural join behavior above; macro expansion still happens later in Stage 7.
 
 ## Middleware Data Flow Contract
 
@@ -621,7 +621,7 @@ SillyTavern's Author's Note extension (`public/scripts/authors-note.js`)
 computes a per-turn "should inject" boolean based on the number of **user**
 messages and the configured `note_interval`.
 
-Wave 4 contract:
+Contract:
 
 - Inputs:
   - `preset.authors_note` (String)
@@ -647,7 +647,7 @@ the ST insertion cadence.
 
 #### Persona description positions parity (ST `persona_description_positions`)
 
-SillyTavern supports 5 persona description positions. Wave 4 pins the exact
+SillyTavern supports 5 persona description positions. This contract pins the exact
 interaction with Author's Note to avoid "almost correct" implementations.
 
 Inputs (conceptual; app supplies them in some form):
@@ -766,9 +766,9 @@ Behavior:
   - Instrument: initial_tokens, final_tokens, budget_tokens, eviction_count
 ```
 
-## Middleware Output Expectations (Wave 4)
+## Middleware Output Expectations
 
-Wave 4 middleware must output blocks that are ready for trimming and dialect conversion:
+Middleware must output blocks that are ready for trimming and dialect conversion:
 
 - `Prompt::Block#token_budget_group` is set (`:system`, `:examples`, `:lore`, `:history`, ...)
 - `Prompt::Block#removable` is set correctly (protect hard-required content)

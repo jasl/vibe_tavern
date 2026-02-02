@@ -39,8 +39,8 @@ cd lib/tavern_kit && bundle exec rake test
 
 ## Rewrite docs
 
-- Roadmap (waves): `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
-- Rewrite doc index: `docs/rewrite/README.md`
+- Rails rewrite docs: `docs/rewrite/README.md`
+- TavernKit gem docs: `lib/tavern_kit/docs/README.md`
 - TavernKit gem README: `lib/tavern_kit/README.md`
 
 ## License

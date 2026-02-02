@@ -267,7 +267,7 @@ module TavernKit
       # 4) custom stops + ephemeral stops
       #
       # @param context [Prompt::Context]
-      # @param macro_expander [#call, nil] optional macro expander (Wave 3+)
+      # @param macro_expander [#call, nil] optional macro expander
       # @return [Array<String>]
       def stopping_strings(context, macro_expander: nil)
         ctx = context

@@ -3,11 +3,11 @@
 module TavernKit
   module RisuAI
     module Middleware
-      # Wave 5f Stage 3: Triggers (tolerant).
+      # Stage: triggers (tolerant).
       #
       # This middleware is intentionally minimal: it executes triggers against an
       # in-memory "chat" hash and stores the resulting scriptstate back into ctx
-      # metadata. Full UI/state parity is implemented incrementally in Wave 5.
+      # metadata for later macro expansion. UI/state parity remains app-owned.
       class Triggers < TavernKit::Prompt::Middleware::Base
         private
 

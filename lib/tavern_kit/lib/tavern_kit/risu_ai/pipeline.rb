@@ -10,7 +10,7 @@ require_relative "middleware/plan_assembly"
 
 module TavernKit
   module RisuAI
-    # Default RisuAI middleware chain (Wave 5f).
+    # Default RisuAI middleware chain.
     Pipeline = TavernKit::Prompt::Pipeline.new do
       use TavernKit::RisuAI::Middleware::Prepare, name: :prepare
       use TavernKit::RisuAI::Middleware::Memory, name: :memory

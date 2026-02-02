@@ -5,7 +5,7 @@ module TavernKit
     module CBS
       # Internal RPN evaluator used by `{{calc::...}}`.
       #
-      # Pure refactor: extracted from `risu_ai/cbs/engine.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/cbs/engine.rb`.
       class Engine < TavernKit::Macro::Engine::Base
         private
 

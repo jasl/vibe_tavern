@@ -8,7 +8,7 @@ module TavernKit
     # - Text-completion pipeline: `doChatInject()` (public/script.js)
     # - Chat-completion pipeline: `populationInjectionPrompts()` (public/scripts/openai.js)
     #
-    # This helper is used by the Wave 4 Injection middleware, but is kept as a
+    # This helper is used by the Injection middleware, but is kept as a
     # standalone unit so its contract can be tested directly.
     module InChatInjector
       module_function

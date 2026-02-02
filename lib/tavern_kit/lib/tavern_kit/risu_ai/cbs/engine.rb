@@ -3,10 +3,10 @@
 module TavernKit
   module RisuAI
     module CBS
-      # Minimal CBS engine (Wave 5b).
+      # Minimal CBS engine.
       #
       # This starts with the escape/pure family and basic #if/#when semantics.
-      # Later Wave 5 steps will expand this into the full CBS feature set.
+      # Additional CBS features are implemented here as upstream parity requires.
       class Engine < TavernKit::Macro::Engine::Base
         OPEN = "{{"
         CLOSE = "}}"

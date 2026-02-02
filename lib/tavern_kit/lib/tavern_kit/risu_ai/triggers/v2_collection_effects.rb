@@ -4,7 +4,7 @@ module TavernKit
   module RisuAI
     # V2 effect implementations for dict/array variable operations (JSON-backed).
     #
-    # Pure refactor: extracted from `risu_ai/triggers.rb` (Wave 6 large-file split).
+    # Pure refactor: extracted from `risu_ai/triggers.rb`.
     module Triggers
       module_function
 

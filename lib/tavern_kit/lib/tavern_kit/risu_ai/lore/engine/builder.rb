@@ -6,7 +6,7 @@ module TavernKit
       class Engine < TavernKit::Lore::Engine::Base
         private
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def internal_keep_key(entry)
           suffix = entry.id.to_s
           if suffix.empty?
@@ -15,7 +15,7 @@ module TavernKit
           "__internal_ka_#{suffix}"
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def internal_dont_key(entry)
           suffix = entry.id.to_s
           if suffix.empty?
@@ -24,7 +24,7 @@ module TavernKit
           "__internal_da_#{suffix}"
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def build_active(entry, chat_length:, greeting_index:, global_scan_depth:, global_full_word:, variables:)
           h = entry.to_h
           ext = TavernKit::Utils::HashAccessor.wrap(h.fetch("extensions", {}))
@@ -216,7 +216,7 @@ module TavernKit
           )
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def safe_int(value)
           Integer(value)
         rescue ArgumentError, TypeError

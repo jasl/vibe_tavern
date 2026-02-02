@@ -10,7 +10,7 @@ require_relative "triggers/runner"
 
 module TavernKit
   module RisuAI
-    # RisuAI trigger engine (Wave 5f).
+    # RisuAI trigger engine.
     #
     # This starts with the v1-style trigger schema used by characterization
     # tests (conditions + effect array). v2 effects are added iteratively.

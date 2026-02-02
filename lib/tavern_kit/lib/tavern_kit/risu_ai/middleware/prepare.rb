@@ -3,7 +3,7 @@
 module TavernKit
   module RisuAI
     module Middleware
-      # Wave 5f Stage 1: Prompt Preparation.
+      # Stage: prompt preparation.
       #
       # Responsibilities:
       # - Build scan messages for lorebook activation

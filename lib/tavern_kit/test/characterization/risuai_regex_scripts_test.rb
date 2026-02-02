@@ -5,7 +5,7 @@ require "test_helper"
 class RisuaiRegexScriptsTest < Minitest::Test
   # Upstream references:
   # - resources/Risuai/src/ts/regexScripts.ts @ b8076cae
-  # - docs/rewrite/risuai-alignment-delta.md (tracked deltas)
+  # - lib/tavern_kit/docs/compatibility/risuai-deltas.md (tracked deltas)
 
   def test_ordering_and_flags
     scripts = [

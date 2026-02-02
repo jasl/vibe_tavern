@@ -1,4 +1,4 @@
-# Wave 6 Audit Notes (2026-02-02)
+# Security + Performance Audit Notes (2026-02-02)
 
 This note captures the final "global consistency / security / performance"
 audit outcomes before moving on to post-rewrite backlogs.
@@ -56,5 +56,4 @@ and what remains as explicit decisions/backlogs.
 
 - `runtime.metadata` / `runtime.toggles` remain plain Hashes for now (a future
   unification into Stores is deferred).
-- UI directives / CLI tooling are tracked in `docs/rewrite/backlogs.md`
-  (explicitly out of the rewrite plan).
+- UI directives / CLI tooling are tracked in `lib/tavern_kit/docs/backlogs.md`.

@@ -16,7 +16,7 @@ require_relative "macros/app_state_macros"
 module TavernKit
   module RisuAI
     module CBS
-      # Prompt-building subset of the CBS macro registry (Wave 5b).
+      # Prompt-building subset of the CBS macro registry.
       #
       # Upstream reference:
       # resources/Risuai/src/ts/cbs.ts (registerFunction)

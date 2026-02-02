@@ -3,7 +3,7 @@
 module TavernKit
   module RisuAI
     module Memory
-      # Interface-only adapter for memory integration (Wave 5g).
+      # Interface-only adapter for memory integration.
       #
       # Concrete adapters live in the application layer (vector DB / summaries /
       # compression algorithms).

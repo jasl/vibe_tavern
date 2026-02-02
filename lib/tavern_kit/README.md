@@ -30,11 +30,12 @@ Out of scope (application-owned):
 This rewrite tracks real-world behavior via characterization tests and
 compatibility docs:
 
-- Roadmap / wave plan: `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
-- ST compatibility matrix: `docs/rewrite/st-compatibility-matrix.md`
-- RisuAI compatibility matrix: `docs/rewrite/risuai-compatibility-matrix.md`
-- Core interfaces: `docs/rewrite/core-interface-design.md`
-- Debugging/observability: `docs/rewrite/pipeline-observability.md`
+- Docs index: `lib/tavern_kit/docs/README.md`
+- Reference source pins: `lib/tavern_kit/docs/reference-sources.md`
+- ST compatibility matrix: `lib/tavern_kit/docs/compatibility/sillytavern.md`
+- RisuAI compatibility matrix: `lib/tavern_kit/docs/compatibility/risuai.md`
+- Core interfaces: `lib/tavern_kit/docs/core-interface-design.md`
+- Debugging/observability: `lib/tavern_kit/docs/pipeline-observability.md`
 - Rails integration notes: `docs/rewrite/rails-integration-guide.md`
 
 ## Installation (this repo)
@@ -155,7 +156,7 @@ pipeline:
 - `ctx.variables_store`: application-owned, session-level store (ST `var` +
   `globalvar`, plus RisuAI extensions). Persist it across turns within a chat.
 
-See `docs/rewrite/core-interface-design.md` for the full contract and
+See `lib/tavern_kit/docs/core-interface-design.md` for the full contract and
 `docs/rewrite/rails-integration-guide.md` for recommended persistence patterns.
 
 ## Debugging / Strict mode
@@ -164,7 +165,7 @@ See `docs/rewrite/core-interface-design.md` for the full contract and
 - `instrumenter TavernKit::Prompt::Instrumenter::TraceCollector.new` enables
   detailed stage traces and is meant for development only.
 
-See `docs/rewrite/pipeline-observability.md`.
+See `lib/tavern_kit/docs/pipeline-observability.md`.
 
 ## Development (embedded gem)
 

@@ -269,17 +269,18 @@
 
 ## Next Actions
 
-Detailed implementation plans have been refined into the following documents:
+Further details live in:
 
-- **Roadmap (wave plan + Core interface design):**
-  `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
-- **ST alignment delta (30 action items):**
-  `docs/rewrite/st-alignment-delta-v1.15.0.md`
-- **RisuAI alignment delta (39 action items):**
-  `docs/rewrite/risuai-alignment-delta.md`
+- `lib/tavern_kit/docs/core-interface-design.md`
+- `lib/tavern_kit/docs/contracts/prompt-orchestration.md`
+- `lib/tavern_kit/docs/compatibility/sillytavern.md`
+- `lib/tavern_kit/docs/compatibility/risuai.md`
+- `lib/tavern_kit/docs/compatibility/sillytavern-deltas.md`
+- `lib/tavern_kit/docs/compatibility/risuai-deltas.md`
+- Deferred/non-goals: `lib/tavern_kit/docs/backlogs.md`
 
-High-level summary of remaining work:
-- Wave 2: Core interfaces (revised for dual-platform support) + ST config
-- Wave 3: Lore engine + Macro engine (ST implementations)
-- Wave 4: Middleware chain + Dialects + full `SillyTavern.build()` end-to-end
-- Wave 5: RisuAI layer + parity verification
+High-level scope map:
+
+- Core: prompt pipeline framework, contracts, dialect conversion, trimming, ingest.
+- SillyTavern: ST preset/instruct/context template, World Info engine, macro engines, middleware chain.
+- RisuAI: CBS engine/macros, lorebook engine/decorators, template cards, regex scripts, triggers.

@@ -3,7 +3,7 @@
 module TavernKit
   module SillyTavern
     module Middleware
-      # Wave 4: ST injection stage (extension prompts + Author's Note + persona).
+      # ST injection stage (extension prompts + Author's Note + persona).
       class Injection < TavernKit::Prompt::Middleware::Base
         private
 

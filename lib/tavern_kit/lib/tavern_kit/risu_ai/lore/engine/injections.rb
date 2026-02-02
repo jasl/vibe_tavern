@@ -6,7 +6,7 @@ module TavernKit
       class Engine < TavernKit::Lore::Engine::Base
         private
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def apply_lore_injections!(actives, injection_lores)
           list = Array(actives)
 
@@ -34,7 +34,7 @@ module TavernKit
           end
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def to_result_entry(active)
           base = active.entry
 

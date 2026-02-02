@@ -3,7 +3,7 @@
 module TavernKit
   module RisuAI
     module Middleware
-      # Wave 5f Stage 1/2 boundary: assemble prompt blocks from template + groups.
+      # Assemble prompt blocks from template + groups.
       class TemplateAssembly < TavernKit::Prompt::Middleware::Base
         private
 

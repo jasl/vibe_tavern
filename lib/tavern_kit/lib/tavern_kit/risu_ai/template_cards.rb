@@ -2,7 +2,7 @@
 
 module TavernKit
   module RisuAI
-    # Prompt template assembly for RisuAI (Wave 5d).
+    # Prompt template assembly for RisuAI.
     #
     # Characterization source:
     # - resources/Risuai/src/ts/process/index.svelte.ts (promptTemplate + positionParser)

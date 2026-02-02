@@ -3,7 +3,7 @@
 module TavernKit
   module RisuAI
     module Middleware
-      # Wave 5f Stage 2: Memory Integration (contract-only).
+      # Memory integration (contract-only).
       #
       # This calls an application-provided adapter and inserts the returned
       # blocks into the `:memory` slot for TemplateCards.

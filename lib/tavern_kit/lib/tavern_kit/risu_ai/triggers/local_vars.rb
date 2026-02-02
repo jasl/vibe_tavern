@@ -5,7 +5,7 @@ module TavernKit
     module Triggers
       # Per-trigger local variable storage keyed by "indent" scope.
       #
-      # Pure refactor: extracted from `risu_ai/triggers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers.rb`.
       class LocalVars
         def initialize
           @by_indent = {}

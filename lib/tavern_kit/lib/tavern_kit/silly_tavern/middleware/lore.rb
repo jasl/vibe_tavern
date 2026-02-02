@@ -3,9 +3,9 @@
 module TavernKit
   module SillyTavern
     module Middleware
-      # Wave 4: ST World Info orchestration.
+      # ST World Info orchestration.
       #
-      # Stage contract is pinned in docs/rewrite/wave4-contracts.md.
+      # Stage contract is pinned in `lib/tavern_kit/docs/contracts/prompt-orchestration.md`.
       class Lore < TavernKit::Prompt::Middleware::Base
         private
 

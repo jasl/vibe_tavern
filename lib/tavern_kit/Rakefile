@@ -13,7 +13,7 @@ end
 Minitest::TestTask.create(:guardrails) do |t|
   t.framework = %(require_relative "./test/test_helper")
   t.test_globs = [
-    "test/characterization/wave4_*_contract_test.rb",
+    "test/characterization/*_contract_test.rb",
     "test/characterization/st_*_test.rb",
   ]
 end
@@ -46,7 +46,7 @@ namespace :test do
   task conformance: :conformance
   task integration: :integration
   task risuai: :risuai
-  task wave5: %i[guardrails conformance integration risuai]
+  task gate: %i[guardrails conformance integration risuai]
 end
 
 require "rubocop/rake_task"

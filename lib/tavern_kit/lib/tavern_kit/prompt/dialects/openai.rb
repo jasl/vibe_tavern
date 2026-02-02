@@ -9,7 +9,7 @@ module TavernKit
     # Output is an Array<Hash> in the OpenAI message shape:
     #   { role: "system"|"user"|"assistant"|"tool", content: "...", ... }
     #
-    # Tool calling passthrough (Wave 4 contract):
+    # Tool calling passthrough (contract):
     # - assistant messages may include `tool_calls` (from Message.metadata[:tool_calls])
     # - tool result messages may include `tool_call_id` (from Message.metadata[:tool_call_id])
     # - optional `signature` passthrough

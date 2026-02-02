@@ -7,7 +7,7 @@ module TavernKit
     # RisuAI "Regex Scripts" engine.
     #
     # This is a partial implementation intended to match the upstream behavior
-    # that Wave 5 characterization tests cover (ordering + move_top/bottom +
+    # that characterization tests cover (ordering + move_top/bottom +
     # repeat_back).
     module RegexScripts
       ParsedScript = Data.define(:script, :order, :actions)

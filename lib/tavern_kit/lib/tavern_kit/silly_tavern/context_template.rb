@@ -8,7 +8,7 @@ module TavernKit
     # character context (system/description/personality/scenario/persona/etc).
     #
     # Note: this renderer only handles Handlebars blocks and known placeholders.
-    # Unknown `{{macro}}` tokens are preserved for the Macro engine (Wave 3+).
+    # Unknown `{{macro}}` tokens are preserved for the Macro engine.
     ContextTemplate = Data.define(
       :preset,
       :story_string,

@@ -2,11 +2,11 @@
 
 require "test_helper"
 
-class Wave4PersonaAuthorsNoteContractTest < Minitest::Test
+class PersonaAuthorsNoteContractTest < Minitest::Test
   # Upstream references:
   # - resources/SillyTavern/public/scripts/openai.js @ bba43f332
   #   - preparePromptsForChatCompletion() (Author's Note + persona positioning)
-  # - docs/rewrite/wave4-contracts.md (TavernKit contract notes)
+  # - lib/tavern_kit/docs/contracts/prompt-orchestration.md (TavernKit contract notes)
   FIXTURES_DIR = File.expand_path("../fixtures/silly_tavern/authors_note", __dir__)
 
   def test_persona_top_bottom_an_only_applies_when_authors_note_is_scheduled

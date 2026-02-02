@@ -5,7 +5,7 @@ module TavernKit
     # Internal helper methods for the trigger engine.
     #
     # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` to keep file sizes
-    # manageable (Wave 6 large-file split).
+    # manageable.
     module Triggers
       module_function
 

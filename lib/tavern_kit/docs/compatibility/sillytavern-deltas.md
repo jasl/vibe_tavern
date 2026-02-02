@@ -362,7 +362,7 @@ ST injects known extension prompts into `main`'s collection:
 - `personaDescription` (if position is IN_PROMPT)
 
 **Impact:** TavernKit's middleware chain should have injection points for
-extensions. This maps to the InjectionRegistry pattern already in the roadmap.
+extensions. This maps cleanly to the InjectionRegistry pattern.
 
 ### 3.6 Message Class Multimodal Support
 
@@ -374,8 +374,8 @@ ST's `Message` class supports:
 Old docs: did not mention multimodal support.
 
 **Impact:** TavernKit's `Prompt::Message` should support multimodal content
-(at minimum images). Lower priority for Wave 2-4, but worth noting for
-future API design.
+(at minimum images). Lower priority than the core text-only prompt path, but
+worth noting for future API design.
 
 ### 3.7 Default Message Templates
 
@@ -535,126 +535,9 @@ These were listed as "NOT implemented" but ST v1.15.0 HAS them:
 | Macro flags (`!`, `?`, `~`, `>`) | Parsed but unimplemented | Parse and ignore |
 | Pre/post-processor pipeline | Extensible processing around evaluation | Implement pipeline hooks |
 | Typed macro arguments | Runtime type validation | Implement validation |
-| Multimodal Message content | Images, video, audio | Defer to future wave |
+| Multimodal Message content | Images, video, audio | Deferred (future) |
 | System prompt as separate entity | `sysprompt.content` separate from instruct | Model separately |
 | MacroBrowser documentation UI | Dynamic searchable UI | Not applicable (gem has no UI) |
-
----
-
-## 6. Roadmap Impact
-
-### 6.1 Wave 2 Updates
-
-No changes needed. Wave 2 focuses on Core interfaces + ChatHistory +
-TokenEstimator + ST Preset/Instruct/ContextTemplate. The macro deltas
-are Wave 3.
-
-### 6.2 Wave 3 Updates (Content Expansion Layer)
-
-**Macro module scope increase:**
-
-| Item | Was | Now |
-|------|-----|-----|
-| V2Engine | Parser-based nesting | Full Chevrotain-equivalent pipeline with scoped blocks |
-| Scoped macros | Not planned | `{{macro}}...{{/macro}}` pairing, auto-trim/dedent |
-| `{{if}}`/`{{else}}` | Not planned (listed as "NOT implemented") | Must implement with lazy branch resolution |
-| Variable shorthand | Not planned | 16 operators, dedicated lexer/parser branch |
-| Macro flags | Not planned | 6 flags (2 implemented, 4 parsed+ignored) |
-| Typed args | Not planned | `MacroValueType` validation |
-| New macros | ~55 | ~81 (including aliases) |
-| Pre/post-processors | Not planned | Priority-ordered pipeline hooks |
-
-**Estimated LOC increase for Macro module:** +400-600 LOC (was 2,000, now ~2,400-2,600)
-
-**Lore module scope increase:**
-
-| Item | Was | Now |
-|------|-----|-----|
-| Entry fields | Basic set | +6 `match*` fields, `characterFilter*`, `triggers`, `useProbability` |
-| Scan buffer | Chat messages only | Chat + opt-in non-chat data (persona, char desc, etc.) |
-| Generation triggers | Not planned | Filter entries by generation type |
-| Character filtering | Not planned | Name/tag filter with exclude |
-
-**Estimated LOC increase for Lore module:** +150-200 LOC
-
-### 6.3 Wave 4 Updates
-
-**Instruct macro pack:**
-- 19 macros (was ~15 in old docs)
-- New aliases and fallback logic
-- System prompt as separate entity
-
-**No significant LOC increase.** Already accounted for in Wave 4 scope.
-
-### 6.4 Metrics Update
-
-| Metric | Old Roadmap Target | Updated Target |
-|--------|-------------------|----------------|
-| Total macros (ST) | ~55 | ~81 |
-| V2 Engine complexity | Medium | High (scoped blocks, variable shorthand, flags, typed args) |
-| Lore entry fields | ~30 | ~40+ |
-| Instruct macros | ~15 | 19 |
-| Total gem LOC (Wave 5) | 10,000-12,000 | 11,000-13,000 |
-
----
-
-## 7. Summary of Action Items
-
-### Must Implement (Wave 3)
-
-1. **Scoped block macros** -- `{{macro}}...{{/macro}}` pairing with auto-trim/dedent
-2. **`{{if}}`/`{{else}}` conditional** -- lazy branch resolution, negation, auto-resolve, variable shorthand conditions
-3. **Variable shorthand** -- `{{.var}}`, `{{$var}}`, 16 operators with lazy value resolution
-4. **Macro flags** -- parse 6 flags, implement `/` and `#`, ignore others
-5. **New macros** -- `{{space}}`, `{{hasvar}}`, `{{deletevar}}`, `{{hasglobalvar}}`, `{{deleteglobalvar}}`, `{{groupNotMuted}}`, `{{notChar}}`, `{{hasExtension}}`
-6. **Lore entry fields** -- 6 `match*` flags, `characterFilter*`, `triggers`, `useProbability`
-7. **Lore scan buffer** -- non-chat data opt-in matching
-8. **Lore generation triggers** -- filter by generation type
-9. **Lore character filtering** -- name/tag filter with exclude
-
-### Should Implement (Wave 3-4)
-
-10. **Typed argument validation** -- `MacroValueType` enforcement
-11. **Pre/post-processor pipeline** -- extensible hooks around macro evaluation
-12. **Updated `{{pick}}` seeding** -- 4-component seed matching ST v1.15.0
-13. **System prompt separation** -- model as independent from instruct mode
-14. **All 19 instruct macros** -- with correct aliases and fallback logic
-
-### Should Implement (Wave 2, Config)
-
-15. **Context template system** -- story_string Handlebars template, chat_start,
-    example_separator, story_string_position/depth/role
-16. **Persona description positions** -- 5 positions (IN_PROMPT, TOP_AN, BOTTOM_AN,
-    AT_DEPTH, NONE), depth/role for AT_DEPTH injection
-17. **Author's Note** -- interval-based insertion, depth, position, role,
-    character-specific author's note with replace/before/after
-18. **Stopping strings assembly** -- 4 sources: names, instruct sequences,
-    context start/separator, custom strings
-19. **Continue/Impersonate mode** -- nudge prompts, prefill, postfix types,
-    Claude-specific assistant_impersonation
-
-### Should Implement (Wave 4, Orchestration)
-
-20. **Extension prompt injection** -- extension_prompt_types/roles enums,
-    setExtensionPrompt API, position/depth/role/scan/filter
-21. **`/inject` equivalent** -- InjectionRegistry with ephemeral flag, filter
-    closures, position mapping (before/after/chat/none)
-22. **Group chat behaviors** -- 4 activation strategies, 3 generation modes,
-    card merging (join prefix/suffix), group nudge
-
-### Can Defer (Wave 5+)
-
-23. **CFG (Classifier-Free Guidance)** -- 3-tier hierarchy (chat > character >
-    global), guidance_scale, negative/positive prompts, combine flags
-24. **Reasoning/Thinking system** -- auto-parse `<think>` blocks, templates,
-    encrypted signatures, hidden reasoning models
-25. **Message bias** -- logit_bias presets, token-level biasing, bias caching
-26. **Multimodal message content** -- images/video/audio in Prompt::Message
-27. **MacroBrowser UI** -- not applicable to gem
-28. **Unimplemented flags** (`!`, `?`, `~`, `>`) -- parse and ignore
-29. **Novel AI / Agnai lorebook import** -- low priority
-30. **Tokenizer system** -- 20 tokenizer types, BEST_MATCH auto-detection
-    (TavernKit uses tiktoken_ruby; ST tokenizer IDs are informational only)
 
 ---
 
@@ -684,8 +567,8 @@ Placeholders (all conditionally injected):
 Implementation note:
 - Some context presets include **ST macro tokens** inside `story_string` (for
   example `{{trim}}` in `default/content/presets/context/*.json`).
-  TavernKit Wave 2 should render Handlebars blocks + known placeholders only,
-  and leave unknown `{{...}}` macros intact for Wave 3 Macro expansion.
+  TavernKit should render Handlebars blocks + known placeholders only, and
+  leave unknown `{{...}}` macros intact for macro expansion.
 
 ### 8.2 Context Template Fields
 
@@ -703,10 +586,10 @@ Implementation note:
 - `IN_PROMPT (0)` -- After system prompt
 - `IN_CHAT (1)` -- At message depth within chat history
 
-**Impact:** TavernKit's `SillyTavern::ContextTemplate` (Wave 2) must implement
+**Impact:** TavernKit's `SillyTavern::ContextTemplate` must implement
 Handlebars-based story string compilation with all placeholders, plus
 chat_start/example_separator with stop-string integration. Macro tokens inside
-the template (e.g. `{{trim}}`) are expanded later by the Macro engine (Wave 3).
+the template (e.g. `{{trim}}`) are expanded later by the Macro engine.
 
 ---
 
@@ -833,7 +716,7 @@ All sources deduplicated before sending to API.
 
 **Impact:** TavernKit's `SillyTavern::Preset` should expose a
 `#stopping_strings(context)` method that assembles all 4 sources.
-The Instruct sequences source requires the Instruct module (Wave 2).
+The Instruct sequences source requires the Instruct module.
 
 ---
 
@@ -890,7 +773,7 @@ extension_prompts[key] = {
 2. Chat injection: for each depth level, retrieves IN_CHAT prompts grouped
    by role, injects at message boundaries
 
-**Impact:** TavernKit's `SillyTavern::InjectionRegistry` (Wave 4) maps
+**Impact:** TavernKit's `SillyTavern::InjectionRegistry` maps
 directly to this framework. The `Middleware::Injection` stage consumes
 registered extension prompts and injects them at the correct positions.
 
@@ -950,7 +833,7 @@ Field: `oai_settings.group_nudge_prompt`
 Positioned as system message (identifier: `'groupNudge'`).
 Not added for impersonate-type requests.
 
-**Impact:** TavernKit's `SillyTavern::GroupContext` (Wave 4) must implement
+**Impact:** TavernKit's `SillyTavern::GroupContext` must implement
 activation strategies, generation modes, and card merging. The
 `Middleware::PinnedGroups` stage handles group-specific prompt slots.
 
@@ -1007,7 +890,7 @@ Impersonate mode:
 Only applied when `chat_completion_source === 'claude'` and not in
 continue+prefill mode.
 
-**Impact:** TavernKit's `SillyTavern::Middleware::PlanAssembly` (Wave 4) needs
+**Impact:** TavernKit's `SillyTavern::Middleware::PlanAssembly` needs
 continue/impersonate mode awareness. The `Preset` must carry nudge prompts,
 postfix config, and prefill settings.
 
@@ -1063,8 +946,9 @@ allow callers to specify a tokenizer hint for more accurate estimation.
 
 ## 16. Additional Subsystems (Deferred) -- New Section
 
-These subsystems were identified but are explicitly deferred to Wave 5+ or
-are not applicable to the TavernKit gem:
+These subsystems were identified but are explicitly deferred (out of scope for
+the prompt-assembly gem; see `lib/tavern_kit/docs/backlogs.md`) or are not
+applicable:
 
 ### 16.1 CFG (Classifier-Free Guidance)
 
@@ -1193,7 +1077,7 @@ Fields marked **(conn)** are connection settings, not part of prompt logic.
 | `show_thoughts` | true | Show reasoning |
 | `reasoning_effort` | `"auto"` | o1/o3 effort level |
 
-**Impact:** TavernKit's `SillyTavern::Preset` (Wave 2) should model all
+**Impact:** TavernKit's `SillyTavern::Preset` should model all
 prompt-affecting fields (sections 17.1-17.5). Streaming, tool calling, and
 provider-specific model selection (17.6, connection settings) are not relevant
 to the prompt assembly gem.

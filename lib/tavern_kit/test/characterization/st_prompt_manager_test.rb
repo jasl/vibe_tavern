@@ -6,7 +6,7 @@ class StPromptManagerTest < Minitest::Test
   # Upstream references:
   # - resources/SillyTavern/public/scripts/PromptManager.js @ bba43f332
   #   - default prompt identifiers + ordering used for chat-completions prompt assembly
-  # - docs/rewrite/st-alignment-delta-v1.15.0.md (tracked deltas)
+  # - lib/tavern_kit/docs/compatibility/sillytavern-deltas.md (tracked deltas)
   def test_default_prompt_order
     preset = TavernKit::SillyTavern::Preset.new(prefer_char_prompt: false)
     char = TavernKit::Character.create(

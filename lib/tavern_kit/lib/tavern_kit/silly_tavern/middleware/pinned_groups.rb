@@ -3,7 +3,7 @@
 module TavernKit
   module SillyTavern
     module Middleware
-      # Wave 4: resolves ST pinned prompt groups into block arrays.
+      # Resolve ST pinned prompt groups into block arrays.
       class PinnedGroups < TavernKit::Prompt::Middleware::Base
         private
 

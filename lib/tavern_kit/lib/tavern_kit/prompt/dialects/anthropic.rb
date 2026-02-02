@@ -9,7 +9,7 @@ module TavernKit
     # Output is a Hash:
     #   { system: "....", messages: [{ role: "user"|"assistant", content: [...] }, ...] }
     #
-    # Tool calling passthrough (Wave 4 contract):
+    # Tool calling passthrough (contract):
     # - assistant messages with metadata[:tool_calls] -> tool_use blocks
     # - tool messages with metadata[:tool_call_id] -> tool_result blocks
     class Anthropic < Base

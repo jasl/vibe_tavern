@@ -198,7 +198,7 @@ Tests:
 ## Milestone 7: Regression Gate Suite (Keep it From Drifting)
 
 Deliverable:
-- Rails has a “stop the line” gate similar to the gem’s Wave 4/5 guardrails.
+- Rails has a “stop the line” gate similar to the gem’s contract/conformance guardrails.
 
 Add a small, stable Rails integration suite:
 - ST:
@@ -212,4 +212,3 @@ Add a small, stable Rails integration suite:
 Tests:
 - Put under `test/integration/prompt_building/**/*_test.rb`
 - Run on CI via `bin/ci` (already in place)
-

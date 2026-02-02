@@ -3,7 +3,7 @@
 module TavernKit
   module SillyTavern
     module Middleware
-      # Wave 4: build the final Prompt::Plan.
+      # Build the final Prompt::Plan.
       class PlanAssembly < TavernKit::Prompt::Middleware::Base
         private
 

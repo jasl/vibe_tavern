@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-class Wave4InChatInjectionContractTest < Minitest::Test
+class InChatInjectionContractTest < Minitest::Test
   # Upstream references:
   # - resources/SillyTavern/public/script.js @ bba43f332
   #   - doChatInject() (reverse-depth insertion + role ordering)

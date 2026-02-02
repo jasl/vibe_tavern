@@ -13,7 +13,7 @@ require_relative "risu_ai/pipeline"
 require_relative "risu_ai/build"
 
 module TavernKit
-  # RisuAI platform layer (Wave 5+).
+  # RisuAI platform layer.
   #
   # This namespace intentionally stays independent from SillyTavern to avoid
   # “almost-the-same” helpers that drift over time.

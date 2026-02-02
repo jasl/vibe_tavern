@@ -3,7 +3,7 @@
 module TavernKit
   module SillyTavern
     module Middleware
-      # Wave 4: expands {{macro}} syntax in block content via ST Macro engine.
+      # Expand {{macro}} syntax in block content via ST Macro engine.
       class MacroExpansion < TavernKit::Prompt::Middleware::Base
         private
 

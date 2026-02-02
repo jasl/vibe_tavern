@@ -576,7 +576,7 @@ values as read-only by convention, and tighten boundaries as Dialects and
 platform layers land.
 
 Current ST-flavored accessors should migrate to `metadata` hash access in
-Wave 4 refactor:
+continued platform-agnostic cleanup:
 
 **Current (ST-specific):**
 - `pinned_groups`, `outlets`, `prompt_entries`, `scan_context`,
@@ -975,23 +975,15 @@ end
 
 ---
 
-## Implementation Priority
+## Related Docs
 
-| Priority | Change | When |
-|----------|--------|------|
-| P0 | `Macro::Engine::Base` + `Environment::Base` | Wave 2 |
-| P0 | `Lore::Engine::Base` + `ScanInput` | Wave 2 |
-| P1 | `ChatHistory::Base` + message contract | Wave 2 |
-| P1 | `VariablesStore::Base` scope parameter | Wave 2 |
-| P1 | `Block` validation relaxation | Done (2026-01-29) |
-| P1 | `Prompt::Message` multimodal/metadata scaffolding | Done (2026-01-29) |
-| P1 | `Prompt::Trace` + instrumentation hooks | Wave 2 |
-| P2 | `Trimmer` strategy parameter | Wave 4 |
-| P2 | `Registry::Base` metadata parameter | Wave 2 |
-| P2 | `Dialects` conversion (`dialect: :openai` etc) | Wave 4 |
-| P3 | `Context` ST accessor migration | Wave 4 |
-
----
+- Contracts: `lib/tavern_kit/docs/contracts/prompt-orchestration.md`
+- Compatibility matrices:
+  - SillyTavern: `lib/tavern_kit/docs/compatibility/sillytavern.md`
+  - RisuAI: `lib/tavern_kit/docs/compatibility/risuai.md`
+- Audit notes:
+  - Rewrite audit: `lib/tavern_kit/docs/rewrite-audit.md`
+  - Security/perf audit: `lib/tavern_kit/docs/security-performance-audit.md`
 
 ## API Style Guidelines
 
@@ -1114,6 +1106,5 @@ entry.activate!     # mutates state (if mutable)
 
 ## Reference
 
-- Roadmap: `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
-- ST alignment delta: `docs/rewrite/st-alignment-delta-v1.15.0.md`
-- RisuAI alignment delta: `docs/rewrite/risuai-alignment-delta.md`
+- ST alignment delta: `lib/tavern_kit/docs/compatibility/sillytavern-deltas.md`
+- RisuAI alignment delta: `lib/tavern_kit/docs/compatibility/risuai-deltas.md`

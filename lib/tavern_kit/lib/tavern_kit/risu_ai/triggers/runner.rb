@@ -6,7 +6,7 @@ module TavernKit
       # Trigger effect runner (v1 + v2 schema).
       #
       # Pure refactor: extracted from `risu_ai/triggers.rb` to keep file sizes
-      # manageable (Wave 6 large-file split).
+      # manageable.
 
       module_function
 

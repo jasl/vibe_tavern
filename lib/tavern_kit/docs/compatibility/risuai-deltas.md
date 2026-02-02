@@ -2,13 +2,13 @@
 
 Date: 2026-01-29
 Source: `resources/Risuai/src/` (full source tree scan)
-Cross-reference: `docs/rewrite/st-risuai-parity.md` (prior parity checklist)
+Cross-reference: `lib/tavern_kit/docs/notes/st-risuai-parity.md` (prior parity checklist)
 
 ## Purpose
 
 This document records findings from a deep scan of the RisuAI source code,
 identifying every subsystem, data structure, and behavioral detail that the
-`TavernKit::RisuAI` layer (Wave 5) must implement.
+`TavernKit::RisuAI` layer must implement for parity.
 
 The existing `st-risuai-parity.md` already covers the high-level parity
 checklist. This delta focuses on **precise implementation requirements** --
@@ -1082,93 +1082,7 @@ documented:
 
 ---
 
-## 15. Action Items for Wave 5
-
-### Priority 1: Core CBS Engine (`RisuAI::CBS::Engine`)
-
-1. Implement `{{...}}` macro expansion with `::` arg separator
-2. Implement 10 block types (`#when`, `#if`, `#each`, `#func`, `#escape`,
-   `#puredisplay`, `#pure`, `#code`, `#if_pure`, `:else`)
-3. Implement 13+ `#when` operators (is/isnot, comparisons, and/or/not,
-   var/toggle, vis/tis)
-4. Implement `#func`/`call` function system (20-depth limit)
-5. Implement `#each` with JSON/§-delimited arrays and `{{slot::name}}`
-6. Implement 4-scope variable system (chat, global, temp, function args)
-7. Register 130+ built-in macros with aliases
-8. Implement math expression engine (`{{calc}}`, `{{? expr}}`)
-9. Implement deterministic RNG (message-index seed for `rollp`/`pick`)
-10. Implement 10 processing modes with whitespace rules
-
-### Priority 2: Lorebook (`RisuAI::Lore::Engine` + `DecoratorParser`)
-
-11. Implement 30+ decorators with `CCardLib.decorator.parse()` API
-12. Implement keyword matching algorithm (full-word, partial, regex modes)
-13. Implement iterative activation loop with recursive scanning
-14. Implement token budget with priority sorting
-15. Implement injection system (4 operations: append, prepend, replace, inject_at)
-16. Implement `@keep_activate_after_match` / `@dont_activate_after_match`
-    via chat variables
-17. Implement `@ignore_on_max_context` (priority -1000)
-
-### Priority 3: Prompt Assembly (`RisuAI::TemplateCards`)
-
-18. Implement 6 prompt item types (Plain, Typed, Chat, AuthorNote, ChatML, Cache)
-19. Implement `{{position::name}}` template injection
-20. Implement `innerFormat` wrapping with `{{slot}}`
-21. Implement ST preset import conversion (`stChatConvert`)
-
-### Priority 4: Regex Scripts (`RisuAI::RegexScripts`)
-
-22. Implement 6 execution types
-23. Implement flag system (`<order>`, `<cbs>`, `<inject>`, `<move_*>`,
-    `<repeat_back>`, `<no_end_nl>`)
-24. Implement `@@` directives (emo, inject, move_top/bottom, repeat_back)
-25. Implement script ordering and LRU caching
-
-### Priority 5: Triggers (`RisuAI::Triggers`)
-
-26. Implement 3 condition types (var, exists, chatindex)
-27. Implement 16 V1 effects with `lowLevelAccess` gating
-28. Implement 60+ V2 effects with indent-based control flow
-29. Implement V2 local variable scoping
-30. Implement lorebook CRUD from triggers (9 operations)
-31. Implement recursion limit (10, unless lowLevelAccess)
-
-### Priority 6: Pipeline (`RisuAI::Pipeline`)
-
-32. Implement 4-stage processing pipeline
-33. Implement message processing flow (input -> CBS -> regex -> triggers -> display)
-34. Implement memory system integration point (HypaMemory/SupaMemory)
-
-### Deferred
-
-35. Plugin V3 API (sandboxed iframes -- likely not needed in Ruby gem)
-36. Lua/Python scripting engine (wasmoon/pyodide -- Ruby alternative TBD)
-37. Memory compression algorithms (HypaMemory V1/V2/V3, SupaMemory)
-38. Image generation integration
-39. Hidden metadata / AI watermarking
-
----
-
-## 16. LOC Estimates for Wave 5
-
-| Module | Layer | Est. LOC |
-|--------|-------|----------|
-| `RisuAI::CBS::Engine` | RisuAI | 800-1,000 |
-| `RisuAI::CBS::Macros` (130+ builtins) | RisuAI | 600-800 |
-| `RisuAI::Lore::Engine` | RisuAI | 400-500 |
-| `RisuAI::Lore::DecoratorParser` | RisuAI | 250-300 |
-| `RisuAI::TemplateCards` | RisuAI | 200-250 |
-| `RisuAI::RegexScripts` | RisuAI | 250-300 |
-| `RisuAI::Triggers` (v1+v2) | RisuAI | 500-700 |
-| `RisuAI::Pipeline` | RisuAI | 150-200 |
-| `RisuAI::RisuAI.build()` | RisuAI | 40-60 |
-| **Total** | | **3,190-4,110** |
-
----
-
 ## Reference
 
-- Parity checklist: `docs/rewrite/st-risuai-parity.md`
-- ST alignment delta: `docs/rewrite/st-alignment-delta-v1.15.0.md`
-- Roadmap: `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
+- Parity checklist: `lib/tavern_kit/docs/notes/st-risuai-parity.md`
+- ST alignment delta: `lib/tavern_kit/docs/compatibility/sillytavern-deltas.md`

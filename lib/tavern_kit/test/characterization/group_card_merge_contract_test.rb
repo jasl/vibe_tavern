@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-class Wave4GroupCardMergeContractTest < Minitest::Test
+class GroupCardMergeContractTest < Minitest::Test
   # Upstream reference:
   # - resources/SillyTavern/public/scripts/group-chats.js @ bba43f332
   #   - getGroupCharacterCardsLazy() (APPEND / APPEND_DISABLED merging)

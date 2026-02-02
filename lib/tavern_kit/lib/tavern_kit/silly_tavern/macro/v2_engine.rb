@@ -7,7 +7,7 @@ require_relative "packs/silly_tavern"
 module TavernKit
   module SillyTavern
     module Macro
-      # Parser-based SillyTavern macro engine (Wave 3).
+      # Parser-based SillyTavern macro engine.
       #
       # This is a Ruby re-implementation of ST's v2 macro pipeline:
       # - priority-ordered pre/post processors (see Preprocessors)
@@ -64,7 +64,7 @@ module TavernKit
         # - `silly_tavern/macro/v2_engine/helpers.rb`
         # - `silly_tavern/macro/v2_engine/parser.rb`
 
-        # Helper methods extracted to `silly_tavern/macro/v2_engine/helpers.rb` (Wave 6 large-file split).
+        # Helper methods extracted to `silly_tavern/macro/v2_engine/helpers.rb`.
       end
     end
   end

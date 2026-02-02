@@ -2,9 +2,9 @@
 
 require "test_helper"
 
-class Wave4TrimmerContractTest < Minitest::Test
+class TrimmerContractTest < Minitest::Test
   # Contract reference:
-  # - docs/rewrite/wave4-contracts.md (trimmer strategy + eviction semantics)
+  # - lib/tavern_kit/docs/contracts/prompt-orchestration.md (trimmer strategy + eviction semantics)
   class CharEstimator
     def estimate(text, model_hint: nil)
       text.to_s.length

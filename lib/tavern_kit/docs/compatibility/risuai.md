@@ -15,7 +15,7 @@ Status legend:
 - 🚫 Intentional divergence (we intentionally do something different)
 
 Scope notes (important):
-- Wave 5 scope for RisuAI is **prompt building** (CBS/Lore/Templates/RegexScripts/Triggers),
+- Scope for RisuAI is **prompt building** (CBS/Lore/Templates/RegexScripts/Triggers),
   with app-state coming from `ctx.runtime` (metadata, toggles, etc).
 - UI rendering, storage/DB persistence, and network I/O are **application-owned**.
 
@@ -64,7 +64,7 @@ Defaults in tolerant mode (TavernKit-only):
 - `cbs_conditions: {}`
 
 See:
-- `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md` (Wave 5 runtime contract)
+- Runtime contract: `lib/tavern_kit/docs/core-interface-design.md` (Runtime section)
 
 ---
 
@@ -197,7 +197,7 @@ Implementation: `TavernKit::RisuAI::Pipeline`.
 | CCv2/CCv3 JSON (hash) | ✅ | ✅ | core model layer is hash-first |
 | PNG wrappers | ✅ | ✅ | via `TavernKit::Ingest` |
 | CHARX / BYAF | ✅ | ✅ | via `TavernKit::Ingest` (zip safety limits apply) |
-| `.risum` modules | ✅ | ⏸️ | Deferred (Wave 6+) |
+| `.risum` modules | ✅ | ⏸️ | Deferred (see `lib/tavern_kit/docs/backlogs.md`) |
 
 ---
 
@@ -225,6 +225,5 @@ TavernKit does **not** ship a concrete memory algorithm (vector DB, summarizer).
 
 ## References
 
-- Roadmap: `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
-- RisuAI deltas/spec notes: `docs/rewrite/risuai-alignment-delta.md`
-- Core interface design: `docs/rewrite/core-interface-design.md`
+- RisuAI deltas/spec notes: `lib/tavern_kit/docs/compatibility/risuai-deltas.md`
+- Core interface design: `lib/tavern_kit/docs/core-interface-design.md`

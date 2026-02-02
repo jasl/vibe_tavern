@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-class Wave4GroupActivationContractTest < Minitest::Test
+class GroupActivationContractTest < Minitest::Test
   # Upstream reference:
   # - resources/SillyTavern/public/scripts/group-chats.js @ bba43f332
   #   - generateGroupWrapper() activation strategy branch

@@ -3,7 +3,7 @@
 module TavernKit
   module SillyTavern
     module Middleware
-      # Wave 4: compile pinned groups + prompt entries into a single block list.
+      # Compile pinned groups + prompt entries into a single block list.
       class Compilation < TavernKit::Prompt::Middleware::Base
         private
 

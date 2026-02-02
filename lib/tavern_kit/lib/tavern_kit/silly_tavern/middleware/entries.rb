@@ -3,7 +3,7 @@
 module TavernKit
   module SillyTavern
     module Middleware
-      # Wave 4: prompt entry filtering + ST normalization rules.
+      # Prompt entry filtering + ST normalization rules.
       class Entries < TavernKit::Prompt::Middleware::Base
         private
 

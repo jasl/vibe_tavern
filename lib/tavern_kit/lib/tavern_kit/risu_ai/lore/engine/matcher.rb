@@ -6,7 +6,7 @@ module TavernKit
       class Engine < TavernKit::Lore::Engine::Base
         private
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def matches_entry?(
           entry:,
           messages:,
@@ -52,7 +52,7 @@ module TavernKit
           end
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def search_match?(messages:, recursive_prompts:, keys:, search_depth:, regex:, full_word_matching:, all:, dont_search_when_recursive:, warner:, warned:)
           depth = search_depth.to_i
           depth = 0 if depth.negative?
@@ -128,14 +128,14 @@ module TavernKit
           end
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def strip_macro_comments(text)
           s = text.to_s
           s = s.gsub(/\{\{\/\/(.+?)\}\}/, "")
           s.gsub(/\{\{comment:(.+?)\}\}/, "")
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def warn_once(warner, warned, key, message)
           return nil unless warner&.respond_to?(:call)
 
@@ -149,7 +149,7 @@ module TavernKit
           nil
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def truncate_literal(value, max_len: 200)
           s = value.to_s
           return s if s.length <= max_len
@@ -159,7 +159,7 @@ module TavernKit
           ""
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def cached_js_regex(value)
           v = value.to_s
           return nil unless v.start_with?("/")
@@ -168,7 +168,7 @@ module TavernKit
           @js_regex_cache.fetch(v)
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def normalize_message(message)
           if message.is_a?(Hash)
             h = normalize_hash_keys(message)
@@ -179,14 +179,14 @@ module TavernKit
           end
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def normalize_recursive_prompt(hash)
           h = normalize_hash_keys(hash)
           data = h[:data] || h[:prompt]
           { data: data.to_s }
         end
 
-        # Pure refactor: extracted from `risu_ai/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `risu_ai/lore/engine.rb`.
         def normalize_hash_keys(raw)
           h = raw.is_a?(Hash) ? raw : {}
           return {} if h.empty?

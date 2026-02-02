@@ -5,7 +5,7 @@ module TavernKit
     module Lore
       # Internal class methods for `Engine`.
       #
-      # Pure refactor: extracted from `silly_tavern/lore/engine.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `silly_tavern/lore/engine.rb`.
       class Engine < TavernKit::Lore::Engine::Base
         def self.sort_entries(global:, character:, chat:, persona:, strategy:)
           sort_fn = lambda do |list|

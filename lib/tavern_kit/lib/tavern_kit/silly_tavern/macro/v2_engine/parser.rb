@@ -5,7 +5,7 @@ module TavernKit
     module Macro
       # Internal parser methods for `V2Engine`.
       #
-      # Pure refactor: extracted from `silly_tavern/macro/v2_engine.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `silly_tavern/macro/v2_engine.rb`.
       class V2Engine < TavernKit::Macro::Engine::Base
         private
 

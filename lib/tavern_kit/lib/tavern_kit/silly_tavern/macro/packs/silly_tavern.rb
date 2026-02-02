@@ -12,7 +12,7 @@ module TavernKit
   module SillyTavern
     module Macro
       module Packs
-        # Built-in macro pack aiming for SillyTavern parity (Wave 3).
+        # Built-in macro pack aiming for SillyTavern parity.
         #
         # This file intentionally starts small and grows with tests. Avoid adding
         # macros without a corresponding spec/characterization test.

@@ -6,7 +6,7 @@ module TavernKit
       class Engine < TavernKit::Lore::Engine::Base
         # Scan buffer builder + matching helpers (ST-like).
         #
-        # Pure refactor: extracted from `silly_tavern/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `silly_tavern/lore/engine.rb`.
         class Buffer
           JS_REGEX_CACHE_MAX = 512
           JS_REGEX_MAX_INPUT_BYTES = 50_000

@@ -6,7 +6,7 @@ module TavernKit
       class Engine < TavernKit::Lore::Engine::Base
         # Group filtering + scoring helpers (ST-like inclusion groups).
         #
-        # Pure refactor: extracted from `silly_tavern/lore/engine.rb` (Wave 6 large-file split).
+        # Pure refactor: extracted from `silly_tavern/lore/engine.rb`.
 
         private
 

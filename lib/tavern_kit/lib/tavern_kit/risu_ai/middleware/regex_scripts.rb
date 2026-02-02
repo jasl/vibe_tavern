@@ -3,7 +3,7 @@
 module TavernKit
   module RisuAI
     module Middleware
-      # Wave 5f Stage 3: Regex scripts (request-time modifications).
+      # Stage: regex scripts (request-time modifications).
       #
       # This applies scripts in `ctx[:risuai_regex_scripts]` to every block's
       # content in `mode: :request` (tolerant; no-op when none are configured).

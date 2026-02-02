@@ -3,7 +3,7 @@
 module TavernKit
   module SillyTavern
     module Middleware
-      # Wave 4: ST token budget enforcement (delegates to Core Trimmer).
+      # ST token budget enforcement (delegates to Core Trimmer).
       class Trimming < TavernKit::Prompt::Middleware::Base
         private
 

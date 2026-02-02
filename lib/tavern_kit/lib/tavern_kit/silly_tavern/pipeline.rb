@@ -12,9 +12,9 @@ require_relative "middleware/trimming"
 
 module TavernKit
   module SillyTavern
-    # Default SillyTavern middleware chain (Wave 4).
+    # Default SillyTavern middleware chain.
     #
-    # Stage names are pinned by docs/rewrite/wave4-contracts.md.
+    # Stage names are pinned by `lib/tavern_kit/docs/contracts/prompt-orchestration.md`.
     Pipeline = TavernKit::Prompt::Pipeline.new do
       use TavernKit::SillyTavern::Middleware::Hooks, name: :hooks
       use TavernKit::SillyTavern::Middleware::Lore, name: :lore

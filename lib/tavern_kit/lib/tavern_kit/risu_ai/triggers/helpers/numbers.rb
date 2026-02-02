@@ -5,7 +5,7 @@ module TavernKit
     module Triggers
       module_function
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def numeric_equal?(a, b)
         na = safe_float(a)
         nb = safe_float(b)
@@ -14,7 +14,7 @@ module TavernKit
         na == nb
       end
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def approx_equal?(a, b)
         na = safe_float(a)
         nb = safe_float(b)
@@ -27,7 +27,7 @@ module TavernKit
         (na - nb).abs < 0.0001
       end
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def numeric_compare?(a, b, op)
         na = safe_float(a)
         nb = safe_float(b)
@@ -36,7 +36,7 @@ module TavernKit
         na.public_send(op, nb)
       end
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def safe_float(value)
         s = value.to_s.strip
         return Float::NAN if s == "NaN"
@@ -50,7 +50,7 @@ module TavernKit
 
       # JS Array#slice index conversion (ToIntegerOrInfinity + bounds clamp).
       #
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def js_slice_index(value, len)
         num = value.is_a?(Numeric) ? value.to_f : safe_float(value)
         inf = num.infinite?
@@ -70,7 +70,7 @@ module TavernKit
       # - integer numbers render without ".0"
       # - NaN/Infinity render as their identifier strings
       #
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def format_js_number(value)
         num = value.is_a?(Numeric) ? value.to_f : safe_float(value)
         return "NaN" if num.nan?
@@ -81,7 +81,7 @@ module TavernKit
         (num % 1).zero? ? num.to_i.to_s : num.to_s
       end
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def parse_js_float_prefix(value)
         s = value.to_s.lstrip
         return Float::NAN if s.empty?
@@ -97,7 +97,7 @@ module TavernKit
       end
       private_class_method :parse_js_float_prefix
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def v2_calc_string(expr)
         tokens = v2_calc_tokenize(expr)
         rpn = v2_calc_to_rpn(tokens)
@@ -234,7 +234,7 @@ module TavernKit
       end
       private_class_method :v2_calc_eval_rpn
 
-      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb` (Wave 6 large-file split).
+      # Pure refactor: extracted from `risu_ai/triggers/helpers.rb`.
       def equivalent?(a, b)
         tv = b.to_s
         sv = a.to_s

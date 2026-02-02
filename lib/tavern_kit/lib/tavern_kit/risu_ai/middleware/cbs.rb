@@ -3,7 +3,7 @@
 module TavernKit
   module RisuAI
     module Middleware
-      # Wave 5f Stage 3: CBS macro expansion for all blocks.
+      # Stage: CBS macro expansion for all blocks.
       class CBS < TavernKit::Prompt::Middleware::Base
         private
 
