@@ -5,6 +5,7 @@ require_relative "triggers/helpers"
 require_relative "triggers/conditions"
 require_relative "triggers/v2_collection_effects"
 require_relative "triggers/v2_string_effects"
+require_relative "triggers/v2_state_effects"
 require_relative "triggers/runner"
 
 module TavernKit
