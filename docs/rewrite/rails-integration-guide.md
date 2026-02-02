@@ -138,6 +138,7 @@ Notes:
   You can still pass richer inputs (character/user/preset/lore) now, and add
   middlewares later to consume them.
 - Preserve `variables_store` per chat; do not share it between concurrent chats.
+- See `docs/rewrite/vibe-tavern-pipeline.md` for the precise supported contract and behaviors.
 
 ## Extending / Adding App-owned Pipelines
 
