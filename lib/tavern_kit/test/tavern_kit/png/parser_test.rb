@@ -48,6 +48,32 @@ class TavernKit::Png::ParserTest < Minitest::Test
     File.delete(path) if path && File.exist?(path)
   end
 
+  def test_text_chunk_too_large_raises_parse_error
+    png = build_png_with_raw_text_chunk("a", "x" * 9) # keyword(1) + NUL + 9 = 11 bytes
+
+    path = File.join(FIXTURES_DIR, "test_text_chunk_too_large.png")
+    File.binwrite(path, png)
+
+    assert_raises(TavernKit::Png::ParseError) do
+      TavernKit::Png::Parser.extract_text_chunks(path, max_text_chunk_bytes: 10)
+    end
+  ensure
+    File.delete(path) if path && File.exist?(path)
+  end
+
+  def test_inflated_ztxt_chunk_too_large_raises_parse_error
+    png = build_png_with_ztxt_chunk("note", "A" * 100)
+
+    path = File.join(FIXTURES_DIR, "test_ztxt_inflate_limit.png")
+    File.binwrite(path, png)
+
+    assert_raises(TavernKit::Png::ParseError) do
+      TavernKit::Png::Parser.extract_text_chunks(path, max_inflated_text_bytes: 50)
+    end
+  ensure
+    File.delete(path) if path && File.exist?(path)
+  end
+
   def test_extract_card_payload_decodes_base64_json
     card_hash = { "spec" => "chara_card_v2", "spec_version" => "2.0",
                   "data" => { "name" => "Seraphina", "description" => "An angel" } }
@@ -157,5 +183,46 @@ class TavernKit::Png::ParserTest < Minitest::Test
     iend = build_chunk("IEND", "")
 
     sig + ihdr + idat + text_chunks.join + iend
+  end
+
+  def build_png_with_raw_text_chunk(keyword, raw_text)
+    sig = "\x89PNG\r\n\x1a\n".b
+
+    ihdr_data = [1, 1, 8, 2, 0, 0, 0].pack("NNCCCCC")
+    ihdr = build_chunk("IHDR", ihdr_data)
+
+    raw = "\x00\xFF\xFF\xFF"
+    compressed = Zlib::Deflate.deflate(raw)
+    idat = build_chunk("IDAT", compressed)
+
+    text_data = "#{keyword}\x00#{raw_text}"
+    text_chunk = build_chunk("tEXt", text_data)
+
+    iend = build_chunk("IEND", "")
+
+    sig + ihdr + idat + text_chunk + iend
+  end
+
+  def build_png_with_ztxt_chunk(keyword, plain_text)
+    sig = "\x89PNG\r\n\x1a\n".b
+
+    ihdr_data = [1, 1, 8, 2, 0, 0, 0].pack("NNCCCCC")
+    ihdr = build_chunk("IHDR", ihdr_data)
+
+    raw = "\x00\xFF\xFF\xFF"
+    compressed = Zlib::Deflate.deflate(raw)
+    idat = build_chunk("IDAT", compressed)
+
+    ztxt_compressed = Zlib::Deflate.deflate(plain_text)
+    ztxt_data = +"".b
+    ztxt_data << keyword
+    ztxt_data << "\x00"
+    ztxt_data << "\x00" # compression method 0 (deflate)
+    ztxt_data << ztxt_compressed
+    ztxt_chunk = build_chunk("zTXt", ztxt_data)
+
+    iend = build_chunk("IEND", "")
+
+    sig + ihdr + idat + ztxt_chunk + iend
   end
 end

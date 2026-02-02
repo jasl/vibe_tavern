@@ -17,6 +17,12 @@ module TavernKit
     module Parser
       PNG_SIGNATURE = "\x89PNG\r\n\x1a\n".b
       CARD_KEYWORDS = %w[ccv3 chara].freeze
+      TEXT_CHUNK_TYPES = %w[tEXt zTXt iTXt].freeze
+
+      # Safety limits: PNGs can have large IDAT chunks (image bytes). We avoid
+      # loading non-text chunks into memory and only bound metadata text chunks.
+      DEFAULT_MAX_TEXT_CHUNK_BYTES = 5 * 1024 * 1024 # 5 MiB
+      DEFAULT_MAX_INFLATED_TEXT_BYTES = 2 * 1024 * 1024 # 2 MiB
 
       module_function
 
@@ -25,10 +31,11 @@ module TavernKit
       # @param path [String] path to PNG file
       # @return [Array<Hash>] array of { keyword:, text:, chunk: } hashes
       # @raise [TavernKit::Png::ParseError] if file is not a valid PNG
-      def extract_text_chunks(path)
+      def extract_text_chunks(path, max_text_chunk_bytes: DEFAULT_MAX_TEXT_CHUNK_BYTES, max_inflated_text_bytes: DEFAULT_MAX_INFLATED_TEXT_BYTES)
         chunks = []
 
         File.open(path, "rb") do |f|
+          file_size = File.size(path).to_i
           sig = f.read(8)
           unless sig == PNG_SIGNATURE
             raise ParseError, "Invalid PNG signature in #{path}"
@@ -43,23 +50,37 @@ module TavernKit
               raise ParseError, "Truncated chunk type in #{path}"
             end
 
-            data = f.read(len)
-            if data.nil? || data.bytesize < len
+            # Ensure the file has enough bytes remaining for this chunk payload + CRC.
+            if f.pos + len.to_i + 4 > file_size
               raise ParseError, "Truncated chunk data for #{type} in #{path}"
             end
 
-            _crc = f.read(4) # Skip CRC validation
+            if TEXT_CHUNK_TYPES.include?(type)
+              limit = Integer(max_text_chunk_bytes)
+              raise ArgumentError, "max_text_chunk_bytes must be positive" if limit <= 0
+              raise ParseError, "Text chunk too large: #{type} (#{len} bytes)" if len.to_i > limit
 
-            case type
-            when "tEXt"
-              entry = decode_text(data)
-              chunks << entry if entry
-            when "zTXt"
-              entry = decode_ztxt(data)
-              chunks << entry if entry
-            when "iTXt"
-              entry = decode_itxt(data)
-              chunks << entry if entry
+              data = f.read(len)
+              if data.nil? || data.bytesize < len
+                raise ParseError, "Truncated chunk data for #{type} in #{path}"
+              end
+
+              _crc = f.read(4) # Skip CRC validation
+
+              case type
+              when "tEXt"
+                entry = decode_text(data)
+                chunks << entry if entry
+              when "zTXt"
+                entry = decode_ztxt(data, max_inflated_text_bytes: max_inflated_text_bytes)
+                chunks << entry if entry
+              when "iTXt"
+                entry = decode_itxt(data, max_inflated_text_bytes: max_inflated_text_bytes)
+                chunks << entry if entry
+              end
+            else
+              # Skip non-text chunk payload + CRC without loading into memory.
+              f.seek(len.to_i + 4, IO::SEEK_CUR)
             end
 
             break if type == "IEND"
@@ -76,8 +97,8 @@ module TavernKit
       # @param path [String] path to PNG file
       # @return [Hash] parsed JSON card data
       # @raise [TavernKit::Png::ParseError] if no card found or parse fails
-      def extract_card_payload(path)
-        chunks = extract_text_chunks(path)
+      def extract_card_payload(path, **limits)
+        chunks = extract_text_chunks(path, **limits)
         chosen = pick_card_chunk(chunks)
 
         if chosen.nil?
@@ -129,7 +150,7 @@ module TavernKit
       end
 
       # @api private
-      def decode_ztxt(data)
+      def decode_ztxt(data, max_inflated_text_bytes: DEFAULT_MAX_INFLATED_TEXT_BYTES)
         key_bytes, idx = split_cstring(data, 0)
         return nil if key_bytes.nil?
 
@@ -141,17 +162,15 @@ module TavernKit
         return nil unless compression_method == 0 # deflate
 
         compressed = data[idx..] || "".b
-        begin
-          text = Zlib::Inflate.inflate(compressed)
-        rescue Zlib::DataError
-          return nil
-        end
+        text = inflate_limited(compressed, max_bytes: max_inflated_text_bytes)
 
         { keyword: keyword, text: safe_utf8(text), chunk: "zTXt" }
+      rescue Zlib::DataError
+        nil
       end
 
       # @api private
-      def decode_itxt(data)
+      def decode_itxt(data, max_inflated_text_bytes: DEFAULT_MAX_INFLATED_TEXT_BYTES)
         key_bytes, idx = split_cstring(data, 0)
         return nil if key_bytes.nil?
 
@@ -175,14 +194,47 @@ module TavernKit
         if compression_flag == 1
           return nil unless compression_method == 0
 
-          begin
-            text_bytes = Zlib::Inflate.inflate(text_bytes)
-          rescue Zlib::DataError
-            return nil
-          end
+          text_bytes = inflate_limited(text_bytes, max_bytes: max_inflated_text_bytes)
         end
 
         { keyword: keyword, text: safe_utf8(text_bytes), chunk: "iTXt" }
+      rescue Zlib::DataError
+        nil
+      end
+
+      # Inflate a deflate-compressed string with a hard output size cap.
+      #
+      # Uses incremental feeding to keep intermediate allocations bounded.
+      def inflate_limited(compressed, max_bytes:)
+        limit = Integer(max_bytes)
+        raise ArgumentError, "max_inflated_text_bytes must be positive" if limit <= 0
+
+        inflater = Zlib::Inflate.new
+        out = +""
+
+        # Small-ish input chunk size helps keep intermediate output chunks small
+        # even for very high compression ratios.
+        chunk_size = 1024
+        idx = 0
+        bytes = compressed.to_s.b
+
+        while idx < bytes.bytesize
+          piece = bytes.byteslice(idx, chunk_size)
+          idx += chunk_size
+
+          produced = inflater.inflate(piece)
+          out << produced unless produced.empty?
+
+          raise ParseError, "Inflated text chunk too large (> #{limit} bytes)" if out.bytesize > limit
+        end
+
+        tail = inflater.finish
+        out << tail unless tail.empty?
+        raise ParseError, "Inflated text chunk too large (> #{limit} bytes)" if out.bytesize > limit
+
+        out
+      ensure
+        inflater&.close
       end
 
       # @api private
