@@ -144,4 +144,3 @@ If you need parity with:
 - RisuAI: use `TavernKit::RisuAI.build`
 
 See: `docs/rewrite/rails-integration-guide.md` (Appendices).
-

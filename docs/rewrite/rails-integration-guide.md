@@ -139,6 +139,7 @@ Notes:
   middlewares later to consume them.
 - Preserve `variables_store` per chat; do not share it between concurrent chats.
 - See `docs/rewrite/vibe-tavern-pipeline.md` for the precise supported contract and behaviors.
+- For the planned Liquid-based macros system (variables + side-effect tags), see `docs/rewrite/liquid-macros.md`.
 
 ## Extending / Adding App-owned Pipelines
 
