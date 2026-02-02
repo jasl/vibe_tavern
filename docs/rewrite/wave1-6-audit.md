@@ -156,4 +156,3 @@ Tracked in `docs/rewrite/backlogs.md`:
 - CLI tooling
 - UI directives/examples (RisuAI-like presentation parsing)
 - Regex timeouts (explicitly not planned; use size guardrails instead)
-

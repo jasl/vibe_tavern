@@ -3,6 +3,10 @@
 require "test_helper"
 
 class StCharacterCardsTest < Minitest::Test
+  # Upstream references:
+  # - resources/SillyTavern/src/character-card-parser.js @ bba43f332
+  #   - read(): prefer ccv3 over chara when both exist
+  #   - write(): dual-write chara + ccv3 best-effort
   def test_png_read_prefers_ccv3
     TavernKit::Ingest.open("test/fixtures/files/ccv3_over_chara.png") do |bundle|
       assert bundle.character.v3?
