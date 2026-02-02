@@ -22,13 +22,16 @@ module TavernKit
           enabled = enabled.nil? ? enabled_from_runtime(runtime) : enabled
           return text.to_s unless enabled
 
+          merged_registers = registers.is_a?(Hash) ? registers.dup : {}
+          merged_registers[:runtime] ||= runtime if runtime
+
           TavernKit::VibeTavern::LiquidMacros.render(
             text,
             assigns: assigns,
             variables_store: variables_store,
             strict: strict,
             on_error: on_error,
-            registers: registers,
+            registers: merged_registers,
           )
         end
 

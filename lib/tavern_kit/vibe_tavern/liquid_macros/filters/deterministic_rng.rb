@@ -100,7 +100,7 @@ module TavernKit
 
           def runtime_hash_from_context
             rt = @context&.registers&.[](:runtime)
-            return TavernKit::Utils.deep_stringify_keys(rt.to_h) if rt.respond_to?(:to_h)
+            return TavernKit::Utils.deep_stringify_keys(rt.to_h) if rt && rt.respond_to?(:to_h)
 
             raw = @context&.[]("runtime")
             raw.is_a?(Hash) ? raw : nil

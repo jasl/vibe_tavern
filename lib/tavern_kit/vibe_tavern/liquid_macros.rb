@@ -75,6 +75,28 @@ module TavernKit
         raise if strict || on_error == :raise
         source
       end
+
+      # Convenience: render using a prompt-building Context.
+      #
+      # @param ctx [TavernKit::Prompt::Context]
+      # @param text [String]
+      def render_for(ctx, text, strict: nil, on_error: :passthrough, registers: {})
+        strict = strict.nil? ? (ctx.respond_to?(:strict?) ? ctx.strict? : false) : strict
+        store = ctx.respond_to?(:variables_store) ? ctx.variables_store : nil
+        runtime = ctx.respond_to?(:runtime) ? ctx.runtime : nil
+
+        merged_registers = registers.is_a?(Hash) ? registers.dup : {}
+        merged_registers[:runtime] ||= runtime if runtime
+
+        render(
+          text,
+          assigns: TavernKit::VibeTavern::LiquidMacros::Assigns.build(ctx),
+          variables_store: store,
+          strict: strict,
+          on_error: on_error,
+          registers: merged_registers,
+        )
+      end
     end
   end
 end

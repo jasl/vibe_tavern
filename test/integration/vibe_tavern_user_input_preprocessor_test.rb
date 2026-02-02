@@ -28,6 +28,21 @@ class VibeTavernUserInputPreprocessorTest < ActiveSupport::TestCase
     assert_equal "happy", out
   end
 
+  test "passes runtime through to filters via registers" do
+    store = TavernKit::VariablesStore::InMemory.new
+    runtime = TavernKit::Runtime::Base.build({ message_index: 5, rng_word: "seed" }, type: :app)
+
+    out =
+      TavernKit::VibeTavern::UserInputPreprocessor.call(
+        %({{ "a,b,c" | pick }}),
+        variables_store: store,
+        enabled: true,
+        runtime: runtime,
+      )
+
+    assert_equal "a", out.strip
+  end
+
   test "uses runtime toggles to enable preprocessing" do
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)

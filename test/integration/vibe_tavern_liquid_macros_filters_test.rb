@@ -22,7 +22,7 @@ class VibeTavernLiquidMacrosFiltersTest < ActiveSupport::TestCase
       )
 
     # Deterministic expected value (pinned by this test).
-    assert_equal "b", out.strip
+    assert_equal "a", out.strip
   end
 
   test "pick works on array input and supports escaped commas" do
@@ -56,7 +56,7 @@ class VibeTavernLiquidMacrosFiltersTest < ActiveSupport::TestCase
         assigns: assigns,
       )
 
-    assert_equal "9", out.strip
+    assert_equal "7", out.strip
   end
 
   test "time helpers can be made deterministic via runtime.now_ms" do
