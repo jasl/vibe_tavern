@@ -1,0 +1,33 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "TestConsume",
+    "sql": "WITH t_1_Canada_ProductCanada AS (SELECT * FROM (\n  \n    SELECT\n      'milk' AS col0,\n      10 AS price UNION ALL\n  \n    SELECT\n      'oil' AS col0,\n      150 AS price UNION ALL\n  \n    SELECT\n      'doctors' AS col0,\n      500 AS price\n) AS UNUSED_TABLE_NAME  ),\nt_2_Usa_ProductUSA AS (SELECT * FROM (\n  \n    SELECT\n      'software' AS col0,\n      50 AS price UNION ALL\n  \n    SELECT\n      'movies' AS col0,\n      100 AS price UNION ALL\n  \n    SELECT\n      'grain' AS col0,\n      2 AS price\n) AS UNUSED_TABLE_NAME  ),\nt_0_Canada_Consume AS (SELECT * FROM (\n  \n    SELECT\n      Canada_ProductCanada.col0 AS col0\n    FROM\n      t_1_Canada_ProductCanada AS Canada_ProductCanada UNION ALL\n  \n    SELECT\n      Usa_ProductUSA.col0 AS col0\n    FROM\n      t_2_Usa_ProductUSA AS Usa_ProductUSA\n) AS UNUSED_TABLE_NAME  ORDER BY col0 )\nSELECT\n  (Canada_Consume).*\nFROM\n  t_0_Canada_Consume AS Canada_Consume ORDER BY col0"
+   },
+   "name": "TestConsume",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "psql",
+ "final_predicates": [
+  "TestConsume"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "TestConsume",
+   "predicate": "TestConsume"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord657281595\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord657281595') then create type logicarecord657281595 as (col0 text); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

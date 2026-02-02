@@ -1,0 +1,933 @@
+[
+ {
+  "full_text": "@Engine(\"psql\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"psql\"",
+        "literal": {
+         "the_string": {
+          "the_string": "psql"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Parent(\"A\", \"B\")",
+  "head": {
+   "predicate_name": "L_Parent",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"A\"",
+        "literal": {
+         "the_string": {
+          "the_string": "A"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"B\"",
+        "literal": {
+         "the_string": {
+          "the_string": "B"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Parent(\"B\", \"C\")",
+  "head": {
+   "predicate_name": "L_Parent",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"B\"",
+        "literal": {
+         "the_string": {
+          "the_string": "B"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"C\"",
+        "literal": {
+         "the_string": {
+          "the_string": "C"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Parent(\"C\", \"D\")",
+  "head": {
+   "predicate_name": "L_Parent",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"C\"",
+        "literal": {
+         "the_string": {
+          "the_string": "C"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"D\"",
+        "literal": {
+         "the_string": {
+          "the_string": "D"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Parent(\"B\", \"E\")",
+  "head": {
+   "predicate_name": "L_Parent",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"B\"",
+        "literal": {
+         "the_string": {
+          "the_string": "B"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"E\"",
+        "literal": {
+         "the_string": {
+          "the_string": "E"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Parent(\"A\", \"F\")",
+  "head": {
+   "predicate_name": "L_Parent",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"A\"",
+        "literal": {
+         "the_string": {
+          "the_string": "A"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"F\"",
+        "literal": {
+         "the_string": {
+          "the_string": "F"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Parent(\"A\", \"G\")",
+  "head": {
+   "predicate_name": "L_Parent",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"A\"",
+        "literal": {
+         "the_string": {
+          "the_string": "A"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"G\"",
+        "literal": {
+         "the_string": {
+          "the_string": "G"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Parent(\"G\", \"H\")",
+  "head": {
+   "predicate_name": "L_Parent",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"G\"",
+        "literal": {
+         "the_string": {
+          "the_string": "G"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"H\"",
+        "literal": {
+         "the_string": {
+          "the_string": "H"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Parent",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "parent",
+            "variable": {
+             "var_name": "parent"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "child",
+            "variable": {
+             "var_name": "child"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "ChildrenOf(parent) List= child :-\n  Parent(parent, child)",
+  "head": {
+   "predicate_name": "L_ChildrenOf",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "parent",
+        "variable": {
+         "var_name": "parent"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "List",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "expression_heritage": "child",
+               "variable": {
+                "var_name": "child"
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " List= child"
+        },
+        "expression_heritage": " List= child"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Parent",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "parent",
+            "variable": {
+             "var_name": "parent"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "NumChildren(parent) += 1 :-\n  Parent(parent)",
+  "head": {
+   "predicate_name": "L_NumChildren",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "parent",
+        "variable": {
+         "var_name": "parent"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "Agg+",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "expression_heritage": "1",
+               "literal": {
+                "the_number": {
+                 "number": "1"
+                }
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " += 1"
+        },
+        "expression_heritage": " += 1"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Parent",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "L_Parent",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Grandparent(a, b) :-\n  Parent(a, x), Parent(x, b)",
+  "head": {
+   "predicate_name": "L_Grandparent",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "b",
+        "variable": {
+         "var_name": "b"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@OrderBy(Test, \"col0\", \"col1\", \"col2\")",
+  "head": {
+   "predicate_name": "@OrderBy",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "Test",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_Test"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"col0\"",
+        "literal": {
+         "the_string": {
+          "the_string": "col0"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"col1\"",
+        "literal": {
+         "the_string": {
+          "the_string": "col1"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 3,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"col2\"",
+        "literal": {
+         "the_string": {
+          "the_string": "col2"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Parent",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "parent",
+            "variable": {
+             "var_name": "parent"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "child",
+            "variable": {
+             "var_name": "child"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Test(\"Parent\", parent, child) :- Parent(parent, child)",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"Parent\"",
+        "literal": {
+         "the_string": {
+          "the_string": "Parent"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "parent",
+        "variable": {
+         "var_name": "parent"
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "expression_heritage": "child",
+        "variable": {
+         "var_name": "child"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Grandparent",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Test(\"Grandparent\", a, b) :- Grandparent(a, b)",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"Grandparent\"",
+        "literal": {
+         "the_string": {
+          "the_string": "Grandparent"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "expression_heritage": "b",
+        "variable": {
+         "var_name": "b"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test(\"NumChildren\", parent, ToString(NumChildren(parent)))",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"NumChildren\"",
+        "literal": {
+         "the_string": {
+          "the_string": "NumChildren"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "parent",
+        "variable": {
+         "var_name": "parent"
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "ToString",
+         "record": {
+          "field_value": [
+           {
+            "field": 0,
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "L_NumChildren",
+               "record": {
+                "field_value": [
+                 {
+                  "field": 0,
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "parent",
+                    "variable": {
+                     "var_name": "parent"
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "NumChildren(parent)"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "ToString(NumChildren(parent))"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test(\"ChildrenOf\", parent, ArrayToString(ChildrenOf(parent), \",\"))",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"ChildrenOf\"",
+        "literal": {
+         "the_string": {
+          "the_string": "ChildrenOf"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "parent",
+        "variable": {
+         "var_name": "parent"
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "ArrayToString",
+         "record": {
+          "field_value": [
+           {
+            "field": 0,
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "L_ChildrenOf",
+               "record": {
+                "field_value": [
+                 {
+                  "field": 0,
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "parent",
+                    "variable": {
+                     "var_name": "parent"
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "ChildrenOf(parent)"
+             }
+            }
+           },
+           {
+            "field": 1,
+            "value": {
+             "expression": {
+              "expression_heritage": "\",\"",
+              "literal": {
+               "the_string": {
+                "the_string": ","
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "ArrayToString(ChildrenOf(parent), \",\")"
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

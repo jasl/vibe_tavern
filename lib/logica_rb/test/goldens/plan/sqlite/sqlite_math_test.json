@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "SELECT * FROM (\n  \n    SELECT\n      SQRT(2) AS col0 UNION ALL\n  \n    SELECT\n      (POW(2, 3)) AS col0 UNION ALL\n  \n    SELECT\n      EXP(1) AS col0 UNION ALL\n  \n    SELECT\n      LOG((POW(2.7182818284, 5))) AS col0 UNION ALL\n  \n    SELECT\n      SIN(((3.141592) / (3))) AS col0 UNION ALL\n  \n    SELECT\n      COS(((3.141592) / (3))) AS col0 UNION ALL\n  \n    SELECT\n      ACOS(-1) AS col0 UNION ALL\n  \n    SELECT\n      ASIN(1) AS col0 UNION ALL\n  \n    SELECT\n      SPLIT('a,b,cd,ef', ',') AS col0 UNION ALL\n  \n    SELECT\n      JOIN_STRINGS(JSON_ARRAY('abc', 'de', 'fg'), ',') AS col0\n) AS UNUSED_TABLE_NAME  "
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

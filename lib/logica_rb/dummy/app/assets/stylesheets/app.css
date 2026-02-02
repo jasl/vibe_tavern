@@ -1,0 +1,122 @@
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 980px;
+  margin: 24px auto;
+  padding: 0 16px 32px;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.nav {
+  display: flex;
+  gap: 12px;
+}
+
+.nav-link {
+  text-decoration: none;
+}
+
+.muted {
+  opacity: 0.75;
+}
+
+.report-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: grid;
+  gap: 12px;
+}
+
+.report-item {
+  padding: 12px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 10px;
+}
+
+.report-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.field {
+  margin: 12px 0;
+}
+
+.text-input,
+.code-input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.code-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.button {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  background: transparent;
+  cursor: pointer;
+}
+
+.alert {
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 0, 0, 0.35);
+  background: rgba(255, 0, 0, 0.06);
+}
+
+.code {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  overflow: auto;
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 10px;
+}
+
+table.results {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.results th,
+table.results td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.25);
+  white-space: nowrap;
+}
+
+table.results thead th {
+  position: sticky;
+  top: 0;
+  background: rgba(127, 127, 127, 0.1);
+}

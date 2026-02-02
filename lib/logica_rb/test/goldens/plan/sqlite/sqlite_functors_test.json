@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "SELECT\n  't2' AS logica_value"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_8_F_r0 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_7_F_r1 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value UNION ALL\n  \n    SELECT\n      F_r0.col0 AS col0,\n      ((F_r0.logica_value) + (1)) AS logica_value\n    FROM\n      t_8_F_r0 AS F_r0\n) AS UNUSED_TABLE_NAME  ),\nt_6_F_r2 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value UNION ALL\n  \n    SELECT\n      F_r1.col0 AS col0,\n      ((F_r1.logica_value) + (1)) AS logica_value\n    FROM\n      t_7_F_r1 AS F_r1\n) AS UNUSED_TABLE_NAME  ),\nt_5_F_r3 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value UNION ALL\n  \n    SELECT\n      F_r2.col0 AS col0,\n      ((F_r2.logica_value) + (1)) AS logica_value\n    FROM\n      t_6_F_r2 AS F_r2\n) AS UNUSED_TABLE_NAME  ),\nt_4_F_r4 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value UNION ALL\n  \n    SELECT\n      F_r3.col0 AS col0,\n      ((F_r3.logica_value) + (1)) AS logica_value\n    FROM\n      t_5_F_r3 AS F_r3\n) AS UNUSED_TABLE_NAME  ),\nt_3_F_r5 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value UNION ALL\n  \n    SELECT\n      F_r4.col0 AS col0,\n      ((F_r4.logica_value) + (1)) AS logica_value\n    FROM\n      t_4_F_r4 AS F_r4\n) AS UNUSED_TABLE_NAME  ),\nt_2_F_r6 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value UNION ALL\n  \n    SELECT\n      F_r5.col0 AS col0,\n      ((F_r5.logica_value) + (1)) AS logica_value\n    FROM\n      t_3_F_r5 AS F_r5\n) AS UNUSED_TABLE_NAME  ),\nt_1_F_r7 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value UNION ALL\n  \n    SELECT\n      F_r6.col0 AS col0,\n      ((F_r6.logica_value) + (1)) AS logica_value\n    FROM\n      t_2_F_r6 AS F_r6\n) AS UNUSED_TABLE_NAME  ),\nt_0_F AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS logica_value UNION ALL\n  \n    SELECT\n      F_r7.col0 AS col0,\n      ((F_r7.logica_value) + (1)) AS logica_value\n    FROM\n      t_1_F_r7 AS F_r7\n) AS UNUSED_TABLE_NAME  ),\nt_17_Q_r0 AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_16_Q_r1 AS (SELECT * FROM (\n  \n    SELECT\n      Q_r0.col0 AS col0\n    FROM\n      t_17_Q_r0 AS Q_r0 UNION ALL\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_15_Q_r2 AS (SELECT * FROM (\n  \n    SELECT\n      Q_r1.col0 AS col0\n    FROM\n      t_16_Q_r1 AS Q_r1 UNION ALL\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_14_Q_r3 AS (SELECT * FROM (\n  \n    SELECT\n      Q_r2.col0 AS col0\n    FROM\n      t_15_Q_r2 AS Q_r2 UNION ALL\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_13_Q_r4 AS (SELECT * FROM (\n  \n    SELECT\n      Q_r3.col0 AS col0\n    FROM\n      t_14_Q_r3 AS Q_r3 UNION ALL\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_12_Q_r5 AS (SELECT * FROM (\n  \n    SELECT\n      Q_r4.col0 AS col0\n    FROM\n      t_13_Q_r4 AS Q_r4 UNION ALL\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_11_Q_r6 AS (SELECT * FROM (\n  \n    SELECT\n      Q_r5.col0 AS col0\n    FROM\n      t_12_Q_r5 AS Q_r5 UNION ALL\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_10_Q_r7 AS (SELECT * FROM (\n  \n    SELECT\n      Q_r6.col0 AS col0\n    FROM\n      t_11_Q_r6 AS Q_r6 UNION ALL\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_9_Q AS (SELECT * FROM (\n  \n    SELECT\n      Q_r7.col0 AS col0\n    FROM\n      t_10_Q_r7 AS Q_r7 UNION ALL\n  \n    SELECT\n      1 AS col0\n) AS UNUSED_TABLE_NAME  )\nSELECT * FROM (\n  \n    SELECT\n      'F' AS col0,\n      F.col0 AS col1,\n      F.logica_value AS col2\n    FROM\n      t_0_F AS F UNION ALL\n  \n    SELECT\n      'Q' AS col0,\n      -1 AS col1,\n      Q.col0 AS col2\n    FROM\n      t_9_Q AS Q\n) AS UNUSED_TABLE_NAME  "
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

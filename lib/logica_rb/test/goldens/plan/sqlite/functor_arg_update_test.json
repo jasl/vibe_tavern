@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_0_D_f2 AS (SELECT * FROM (\n  \n    SELECT\n      'z2' AS col0 UNION ALL\n  \n    SELECT\n      'z1' AS col0\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  D_f2.col0 AS col0\nFROM\n  t_0_D_f2 AS D_f2"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

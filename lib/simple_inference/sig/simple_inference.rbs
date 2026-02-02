@@ -1,0 +1,71 @@
+module SimpleInference
+  VERSION: String
+
+  class Response
+    attr_reader status: Integer
+    attr_reader headers: Hash[String, untyped]
+    attr_reader body: untyped
+    attr_reader raw_body: String?
+
+    def initialize: (status: Integer, headers: Hash[untyped, untyped], body: untyped, ?raw_body: String?) -> void
+    def success?: () -> bool
+    def to_h: () -> Hash[Symbol, untyped]
+  end
+
+  module OpenAI
+    class ChatResult
+      attr_reader content: String?
+      attr_reader usage: Hash[Symbol, untyped]?
+      attr_reader finish_reason: String?
+      attr_reader logprobs: Array[Hash[untyped, untyped]]?
+      attr_reader response: Response
+    end
+
+    class ChatStream
+      include Enumerable[String]
+      attr_reader result: ChatResult?
+    end
+
+    def self.chat_completion_content: (untyped) -> String?
+    def self.chat_completion_finish_reason: (untyped) -> String?
+    def self.chat_completion_usage: (untyped) -> Hash[Symbol, untyped]?
+    def self.chat_completion_logprobs: (untyped) -> Array[Hash[untyped, untyped]]?
+    def self.chat_completion_chunk_delta: (untyped) -> String?
+    def self.normalize_content: (untyped) -> String?
+  end
+
+  class Client
+    def initialize: (?Hash[untyped, untyped]) -> void
+
+    def chat: (
+      model: String,
+      messages: Array[Hash[untyped, untyped]],
+      ?stream: bool?,
+      ?include_usage: bool?,
+      ?request_logprobs: bool,
+      ?top_logprobs: Integer?,
+      **untyped
+    ) { (String) -> void } -> OpenAI::ChatResult
+
+    def chat_stream: (
+      model: String,
+      messages: Array[Hash[untyped, untyped]],
+      ?include_usage: bool?,
+      ?request_logprobs: bool,
+      ?top_logprobs: Integer?,
+      **untyped
+    ) -> OpenAI::ChatStream
+
+    def chat_completions: (**untyped) -> Response
+    def chat_completions_stream: (**untyped) { (Hash[untyped, untyped]) -> void } -> Response
+
+    def embeddings: (**untyped) -> Response
+    def rerank: (**untyped) -> Response
+    def list_models: () -> Response
+    def models: () -> Array[String]
+    def health: () -> Response
+    def healthy?: () -> bool
+    def audio_transcriptions: (**untyped) -> Response
+    def audio_translations: (**untyped) -> Response
+  end
+end

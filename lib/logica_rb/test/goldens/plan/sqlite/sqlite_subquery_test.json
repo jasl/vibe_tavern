@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_1_Employee AS (SELECT * FROM (\n  \n    SELECT\n      'A' AS name,\n      'Kirkland' AS city UNION ALL\n  \n    SELECT\n      'B' AS name,\n      'Seattle' AS city UNION ALL\n  \n    SELECT\n      'C' AS name,\n      'Kirkland' AS city UNION ALL\n  \n    SELECT\n      'D' AS name,\n      'Los Angeles' AS city\n) AS UNUSED_TABLE_NAME  ),\nt_2_Office AS (SELECT * FROM (\n  \n    SELECT\n      'Kirkland' AS city,\n      'Washington' AS state UNION ALL\n  \n    SELECT\n      'Seattle' AS city,\n      'Washington' AS state UNION ALL\n  \n    SELECT\n      'Los Angeles' AS city,\n      'California' AS state\n) AS UNUSED_TABLE_NAME  ),\nt_3_State AS (SELECT\n  t_4_Office.state AS col0\nFROM\n  t_2_Office AS t_4_Office\nGROUP BY t_4_Office.state),\nt_0_EmployeesInState AS (SELECT\n  State.col0 AS state,\n  (SELECT\n  SUM(MagicalEntangle(1, x_10.value)) AS logica_value\nFROM\n  t_1_Employee AS Employee, t_2_Office AS Office, JSON_EACH(JSON_ARRAY(0)) as x_10\nWHERE\n  (Office.city = Employee.city) AND\n  (Office.state = State.col0)) AS employee_count\nFROM\n  t_3_State AS State)\nSELECT\n  EmployeesInState.*\nFROM\n  t_0_EmployeesInState AS EmployeesInState"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

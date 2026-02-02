@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_3_CustomerPurchase AS (SELECT * FROM (\n  \n    SELECT\n      'John' AS customer_name,\n      'apple' AS item_name,\n      2 AS quantity UNION ALL\n  \n    SELECT\n      'John' AS customer_name,\n      'banana' AS item_name,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      'John' AS customer_name,\n      'orange' AS item_name,\n      3 AS quantity UNION ALL\n  \n    SELECT\n      'John' AS customer_name,\n      'orange' AS item_name,\n      3 AS quantity UNION ALL\n  \n    SELECT\n      'Jane' AS customer_name,\n      'pear' AS item_name,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      'Jane' AS customer_name,\n      'banana' AS item_name,\n      2 AS quantity UNION ALL\n  \n    SELECT\n      'Jane' AS customer_name,\n      'apple' AS item_name,\n      2 AS quantity\n) AS UNUSED_TABLE_NAME  ),\nt_4_PercentageDiscout AS (SELECT * FROM (\n  \n    SELECT\n      'apple' AS item_name,\n      10 AS percentage UNION ALL\n  \n    SELECT\n      'orange' AS item_name,\n      20 AS percentage\n) AS UNUSED_TABLE_NAME  ),\nt_5_StoreItem AS (SELECT * FROM (\n  \n    SELECT\n      'apple' AS name,\n      2.0 AS price UNION ALL\n  \n    SELECT\n      'banana' AS name,\n      1.0 AS price UNION ALL\n  \n    SELECT\n      'orange' AS name,\n      1.5 AS price UNION ALL\n  \n    SELECT\n      'pear' AS name,\n      3.0 AS price\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  CustomerPurchase.customer_name AS customer_name,\n  SUM(((((StoreItem.price) * (((t_0_PercentageDiscout.percentage) / (100.0))))) * (CustomerPurchase.quantity))) AS total_savings,\n  MAX(((t_0_PercentageDiscout.percentage) / (100.0))) AS max_fraction\nFROM\n  t_3_CustomerPurchase AS CustomerPurchase, t_4_PercentageDiscout AS PercentageDiscout, t_5_StoreItem AS StoreItem, t_4_PercentageDiscout AS t_0_PercentageDiscout\nWHERE\n  (PercentageDiscout.item_name = CustomerPurchase.item_name) AND\n  (StoreItem.name = CustomerPurchase.item_name) AND\n  (t_0_PercentageDiscout.item_name = CustomerPurchase.item_name)\nGROUP BY CustomerPurchase.customer_name ORDER BY customer_name"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

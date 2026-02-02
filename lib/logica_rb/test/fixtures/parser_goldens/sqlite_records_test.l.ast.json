@@ -1,0 +1,642 @@
+[
+ {
+  "full_text": "@Engine(\"sqlite\", type_checking: true)",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"sqlite\"",
+        "literal": {
+         "the_string": {
+          "the_string": "sqlite"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "type_checking",
+      "value": {
+       "expression": {
+        "expression_heritage": "true",
+        "literal": {
+         "the_bool": {
+          "the_bool": "true"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "T(a: 1, b: 2)",
+  "head": {
+   "predicate_name": "L_T",
+   "record": {
+    "field_value": [
+     {
+      "field": "a",
+      "value": {
+       "expression": {
+        "expression_heritage": "1",
+        "literal": {
+         "the_number": {
+          "number": "1"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "b",
+      "value": {
+       "expression": {
+        "expression_heritage": "2",
+        "literal": {
+         "the_number": {
+          "number": "2"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "T(a: 3, b: 4)",
+  "head": {
+   "predicate_name": "L_T",
+   "record": {
+    "field_value": [
+     {
+      "field": "a",
+      "value": {
+       "expression": {
+        "expression_heritage": "3",
+        "literal": {
+         "the_number": {
+          "number": "3"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "b",
+      "value": {
+       "expression": {
+        "expression_heritage": "4",
+        "literal": {
+         "the_number": {
+          "number": "4"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_T",
+       "record": {
+        "field_value": [
+         {
+          "field": "*",
+          "value": {
+           "expression": {
+            "expression_heritage": "r",
+            "variable": {
+             "var_name": "r"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "r.a",
+        "subscript": {
+         "record": {
+          "expression_heritage": "r",
+          "variable": {
+           "var_name": "r"
+          }
+         },
+         "subscript": {
+          "literal": {
+           "the_symbol": {
+            "symbol": "a"
+           }
+          }
+         }
+        }
+       },
+       "right_hand_side": {
+        "expression_heritage": "1",
+        "literal": {
+         "the_number": {
+          "number": "1"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "D(..r) :- T(..r), r.a == 1",
+  "head": {
+   "predicate_name": "L_D",
+   "record": {
+    "field_value": [
+     {
+      "field": "*",
+      "value": {
+       "expression": {
+        "expression_heritage": "r",
+        "variable": {
+         "var_name": "r"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_T",
+       "record": {
+        "field_value": [
+         {
+          "field": "a",
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "E(two_a: 2 * a) :- T(a:)",
+  "head": {
+   "predicate_name": "L_E",
+   "record": {
+    "field_value": [
+     {
+      "field": "two_a",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "*",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "2",
+              "literal": {
+               "the_number": {
+                "number": "2"
+               }
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "a",
+              "variable": {
+               "var_name": "a"
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "2 * a"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "=",
+       "record": {
+        "field_value": [
+         {
+          "field": "left",
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": "right",
+          "value": {
+           "expression": {
+            "expression_heritage": "5",
+            "literal": {
+             "the_number": {
+              "number": "5"
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "F(a) = {a:, b: 2 * a} :- a = 5",
+  "head": {
+   "predicate_name": "L_F",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "{a:, b: 2 * a}",
+        "record": {
+         "field_value": [
+          {
+           "field": "a",
+           "value": {
+            "expression": {
+             "expression_heritage": "a",
+             "variable": {
+              "var_name": "a"
+             }
+            }
+           }
+          },
+          {
+           "field": "b",
+           "value": {
+            "expression": {
+             "call": {
+              "predicate_name": "*",
+              "record": {
+               "field_value": [
+                {
+                 "field": "left",
+                 "value": {
+                  "expression": {
+                   "expression_heritage": "2",
+                   "literal": {
+                    "the_number": {
+                     "number": "2"
+                    }
+                   }
+                  }
+                 }
+                },
+                {
+                 "field": "right",
+                 "value": {
+                  "expression": {
+                   "expression_heritage": "a",
+                   "variable": {
+                    "var_name": "a"
+                   }
+                  }
+                 }
+                }
+               ]
+              }
+             },
+             "expression_heritage": "2 * a"
+            }
+           }
+          }
+         ]
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@OrderBy(Test, \"a\", \"ta\")",
+  "head": {
+   "predicate_name": "@OrderBy",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "Test",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_Test"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"a\"",
+        "literal": {
+         "the_string": {
+          "the_string": "a"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"ta\"",
+        "literal": {
+         "the_string": {
+          "the_string": "ta"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_D",
+       "record": {
+        "field_value": [
+         {
+          "field": "a",
+          "value": {
+           "expression": {
+            "expression_heritage": "c",
+            "variable": {
+             "var_name": "c"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "L_T",
+       "record": {
+        "field_value": [
+         {
+          "field": "*",
+          "value": {
+           "expression": {
+            "expression_heritage": "r",
+            "variable": {
+             "var_name": "r"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "L_E",
+       "record": {
+        "field_value": [
+         {
+          "field": "*",
+          "value": {
+           "expression": {
+            "expression_heritage": "two_a_record",
+            "variable": {
+             "var_name": "two_a_record"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "L_F",
+       "record": {
+        "field_value": [
+         {
+          "field": "*",
+          "value": {
+           "expression": {
+            "expression_heritage": "f",
+            "variable": {
+             "var_name": "f"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Test(a: r.a, b: r.b, r:, c:, two_a_record:, ta: two_a_record.two_a,\n     f:) :-\n  D(a: c), T(..r), E(..two_a_record), F(..f)",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": "a",
+      "value": {
+       "expression": {
+        "expression_heritage": "r.a",
+        "subscript": {
+         "record": {
+          "expression_heritage": "r",
+          "variable": {
+           "var_name": "r"
+          }
+         },
+         "subscript": {
+          "literal": {
+           "the_symbol": {
+            "symbol": "a"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "b",
+      "value": {
+       "expression": {
+        "expression_heritage": "r.b",
+        "subscript": {
+         "record": {
+          "expression_heritage": "r",
+          "variable": {
+           "var_name": "r"
+          }
+         },
+         "subscript": {
+          "literal": {
+           "the_symbol": {
+            "symbol": "b"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "r",
+      "value": {
+       "expression": {
+        "expression_heritage": "r",
+        "variable": {
+         "var_name": "r"
+        }
+       }
+      }
+     },
+     {
+      "field": "c",
+      "value": {
+       "expression": {
+        "expression_heritage": "c",
+        "variable": {
+         "var_name": "c"
+        }
+       }
+      }
+     },
+     {
+      "field": "two_a_record",
+      "value": {
+       "expression": {
+        "expression_heritage": "two_a_record",
+        "variable": {
+         "var_name": "two_a_record"
+        }
+       }
+      }
+     },
+     {
+      "field": "ta",
+      "value": {
+       "expression": {
+        "expression_heritage": "two_a_record.two_a",
+        "subscript": {
+         "record": {
+          "expression_heritage": "two_a_record",
+          "variable": {
+           "var_name": "two_a_record"
+          }
+         },
+         "subscript": {
+          "literal": {
+           "the_symbol": {
+            "symbol": "two_a"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "f",
+      "value": {
+       "expression": {
+        "expression_heritage": "f",
+        "variable": {
+         "var_name": "f"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

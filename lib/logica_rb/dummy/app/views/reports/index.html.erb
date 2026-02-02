@@ -1,0 +1,33 @@
+<% content_for :title, "Reports" %>
+
+<div class="container">
+  <header class="header">
+    <h1>logica_rb BI demo</h1>
+    <nav class="nav">
+      <%= link_to "Reports", reports_path, class: "nav-link" %>
+      <%= link_to "New report", new_report_path, class: "nav-link" %>
+      <%= link_to "Custom query", new_custom_query_path, class: "nav-link" %>
+    </nav>
+  </header>
+
+  <p class="muted">
+    Reports can be file-mode (<code>file:</code>) or source-mode (<code>source:</code>).
+    Source-mode runs with safer defaults (<code>trusted: false</code>, query-only SQL, no imports unless explicitly enabled).
+  </p>
+
+  <ul class="report-list">
+    <% @reports.each do |report| %>
+      <li class="report-item">
+        <div class="report-title">
+          <%= link_to report.name, report_path(report) %>
+        </div>
+        <div class="muted">
+          <%= report.mode %> · <code><%= report.predicate %></code>
+          <% if report.mode_file? %>
+            · <code><%= report.file %></code>
+          <% end %>
+        </div>
+      </li>
+    <% end %>
+  </ul>
+</div>

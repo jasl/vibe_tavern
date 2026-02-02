@@ -1,0 +1,42 @@
+name: DB Results
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  db_results:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev libsqlite3-dev
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - name: Run DB results tests (SQLite)
+        run: LOGICA_DB_RESULTS=1 bundle exec rake test:db_results_sqlite
+      - name: Run DB results tests (Postgres)
+        run: LOGICA_DB_RESULTS=1 DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres bundle exec rake test:db_results_psql

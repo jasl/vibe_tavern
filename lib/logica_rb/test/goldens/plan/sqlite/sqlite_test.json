@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_0_Animal AS (SELECT * FROM (\n  \n    SELECT\n      'cat' AS col0 UNION ALL\n  \n    SELECT\n      'dog' AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_1_Color AS (SELECT * FROM (\n  \n    SELECT\n      'white' AS col0 UNION ALL\n  \n    SELECT\n      'black' AS col0 UNION ALL\n  \n    SELECT\n      'brown' AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_2_Action AS (SELECT * FROM (\n  \n    SELECT\n      'runs' AS col0 UNION ALL\n  \n    SELECT\n      'jumps' AS col0 UNION ALL\n  \n    SELECT\n      'sleeps' AS col0\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ((((((((((Color.col0) || (' '))) || (Animal.col0))) || (' '))) || (Action.col0))) || ('.')) AS col0\nFROM\n  t_0_Animal AS Animal, t_1_Color AS Color, t_2_Action AS Action"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

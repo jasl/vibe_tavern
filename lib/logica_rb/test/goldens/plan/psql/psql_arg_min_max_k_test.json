@@ -1,0 +1,33 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_2_Data AS (SELECT * FROM (\n  \n    SELECT\n      10 AS v,\n      'a' AS payload UNION ALL\n  \n    SELECT\n      5 AS v,\n      'b' AS payload UNION ALL\n  \n    SELECT\n      20 AS v,\n      'c' AS payload UNION ALL\n  \n    SELECT\n      100 AS v,\n      'd' AS payload UNION ALL\n  \n    SELECT\n      30 AS v,\n      'e' AS payload UNION ALL\n  \n    SELECT\n      15 AS v,\n      'f' AS payload\n) AS UNUSED_TABLE_NAME  ),\nt_0_TestArgMax AS (SELECT\n  ((ARRAY_AGG(ROW(Data.payload)::logicarecord462007516 order by Data.v desc))[1]).argpod AS logica_value\nFROM\n  t_2_Data AS Data),\nt_3_TestArgMaxK AS (SELECT\n  (ARRAY_AGG(ROW(t_4_Data.payload, t_4_Data.v)::logicarecord388208798 order by t_4_Data.v desc))[1:3] AS logica_value\nFROM\n  t_2_Data AS t_4_Data),\nt_6_TestArgMin AS (SELECT\n  ((ARRAY_AGG(ROW(t_7_Data.payload)::logicarecord462007516 order by t_7_Data.v))[1]).argpod AS logica_value\nFROM\n  t_2_Data AS t_7_Data),\nt_9_TestArgMinK AS (SELECT\n  (ARRAY_AGG(ROW(t_10_Data.payload, t_10_Data.v)::logicarecord388208798 order by t_10_Data.v))[1:2] AS logica_value\nFROM\n  t_2_Data AS t_10_Data)\nSELECT * FROM (\n  \n    SELECT\n      'Max' AS opt,\n      TestArgMax.logica_value AS arg_opt,\n      TestArgMaxK.logica_value AS arg_opt_k\n    FROM\n      t_0_TestArgMax AS TestArgMax, t_3_TestArgMaxK AS TestArgMaxK UNION ALL\n  \n    SELECT\n      'Min' AS opt,\n      TestArgMin.logica_value AS arg_opt,\n      TestArgMinK.logica_value AS arg_opt_k\n    FROM\n      t_6_TestArgMin AS TestArgMin, t_9_TestArgMinK AS TestArgMinK\n) AS UNUSED_TABLE_NAME  ORDER BY arg_opt "
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord462007516\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord462007516') then create type logicarecord462007516 as (argpod text); end if;\n-- Logica type: logicarecord183863755\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord183863755') then create type logicarecord183863755 as (arg text, value numeric); end if;\n-- Logica type: logicarecord388208798\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord388208798') then create type logicarecord388208798 as (payload text, v numeric); end if;\n-- Logica type: logicarecord68214556\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord68214556') then create type logicarecord68214556 as (arg logicarecord462007516, value numeric); end if;\n-- Logica type: logicarecord843555759\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord843555759') then create type logicarecord843555759 as (arg logicarecord388208798, value numeric); end if;\n-- Logica type: logicarecord540637728\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord540637728') then create type logicarecord540637728 as (arg logicarecord388208798, lim numeric, value numeric); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

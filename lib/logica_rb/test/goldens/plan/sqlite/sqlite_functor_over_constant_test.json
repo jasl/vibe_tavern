@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "SELECT * FROM (\n  \n    SELECT\n      'T' AS col0,\n      'a' AS col1,\n      'b' AS col2 UNION ALL\n  \n    SELECT\n      'T2' AS col0,\n      'A' AS col1,\n      'B' AS col2 UNION ALL\n  \n    SELECT\n      'T3' AS col0,\n      10 AS col1,\n      20 AS col2\n) AS UNUSED_TABLE_NAME  "
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

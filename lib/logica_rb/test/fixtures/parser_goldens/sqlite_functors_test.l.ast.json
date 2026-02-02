@@ -1,0 +1,247 @@
+[
+ {
+  "full_text": "@Engine(\"sqlite\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"sqlite\"",
+        "literal": {
+         "the_string": {
+          "the_string": "sqlite"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "T1() = \"t1\"",
+  "head": {
+   "predicate_name": "L_T1",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "\"t1\"",
+        "literal": {
+         "the_string": {
+          "the_string": "t1"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "F() = T1()",
+  "head": {
+   "predicate_name": "L_F",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "L_T1",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "T1()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "D := F()",
+  "head": {
+   "predicate_name": "@Make",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "D",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_D"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_F"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "record": {
+         "field_value": []
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "B() = D()",
+  "head": {
+   "predicate_name": "L_B",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "L_D",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "D()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "T2() = \"t2\"",
+  "head": {
+   "predicate_name": "L_T2",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "\"t2\"",
+        "literal": {
+         "the_string": {
+          "the_string": "t2"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "A := B(T1: T2)",
+  "head": {
+   "predicate_name": "@Make",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "A",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_A"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_B"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "record": {
+         "field_value": [
+          {
+           "field": "L_T1",
+           "value": {
+            "expression": {
+             "expression_heritage": "T2",
+             "literal": {
+              "the_predicate": {
+               "predicate_name": "L_T2"
+              }
+             }
+            }
+           }
+          }
+         ]
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test() = A()",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "L_A",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "A()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

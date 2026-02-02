@@ -48,14 +48,14 @@ gem "turbo-rails"
 # Hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]
 gem "stimulus-rails"
 
-# OpenAI compatible API client
-gem "simple_inference"
-# Fiber-friendly HTTP client
 gem "httpx"
 
 gem "js_regex_to_ruby"
+
 gem "easy_talk", path: "lib/easy_talk"
 gem "tavern_kit", path: "lib/tavern_kit"
+gem "simple_inference", path: "lib/simple_inference"
+gem "logica_rb", path: "lib/logica_rb"
 
 # ZIP processing for CharX format
 gem "rubyzip", require: "zip"

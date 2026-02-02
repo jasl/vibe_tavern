@@ -1,0 +1,51 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "T",
+    "sql": "DROP TABLE IF EXISTS logica_home.T CASCADE;\nCREATE TABLE logica_home.T AS SELECT\n  ARRAY[]::logicarecord435113620[] AS logica_value\nFROM\n  (SELECT 'singleton' as s) as unused_singleton;"
+   },
+   "name": "T",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_0_Q AS (SELECT\n  SUM((x_4).f) AS logica_value\nFROM\n  logica_home.T AS T, UNNEST(T.logica_value) as x_4)\nSELECT\n  Q.logica_value AS logica_value\nFROM\n  t_0_Q AS Q"
+   },
+   "name": "Test",
+   "requires": [
+    "T"
+   ],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [
+  [
+   "T",
+   "Test"
+  ]
+ ],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord435113620\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord435113620') then create type logicarecord435113620 as (f numeric); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

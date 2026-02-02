@@ -1,0 +1,160 @@
+<% content_for :title, @report&.name || "Report" %>
+
+<div class="container">
+  <header class="header">
+    <h1><%= @report&.name || "Report" %></h1>
+    <nav class="nav">
+      <%= link_to "All reports", reports_path, class: "nav-link" %>
+      <%= link_to "Edit", edit_report_path(@report), class: "nav-link" %>
+      <%= link_to "Custom query", new_custom_query_path, class: "nav-link" %>
+    </nav>
+  </header>
+
+  <p class="muted">
+    Mode: <code><%= @report.mode %></code> · Predicate: <code><%= @report.predicate %></code> · Engine: <code><%= @report.engine %></code>
+  </p>
+
+  <%= form_with url: run_report_path(@report), method: :post, local: true do %>
+    <% if @can_run_isolated_plan %>
+      <div class="field">
+        <%= label_tag :run_mode, "Run mode" %>
+        <%= select_tag :run_mode, options_for_select([["Query", "query"], ["Isolated plan (Postgres)", "isolated_plan"]], @run_mode), class: "text-input" %>
+      </div>
+    <% else %>
+      <%= hidden_field_tag :run_mode, "query" %>
+    <% end %>
+
+    <div class="field">
+      <label>Report source (Logica)</label>
+      <div class="muted">
+        <%= @report.mode_file? ? "File:" : "Source:" %>
+        <code><%= @report_source_label %></code>
+      </div>
+      <% if @report_source_error %>
+        <div class="muted"><%= @report_source_error %></div>
+      <% end %>
+      <% if @report_source.present? %>
+        <pre class="code"><code><%= @report_source %></code></pre>
+      <% end %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :flags_json, "Flags (JSON)" %>
+      <div class="muted">
+        Flags are compile-time parameters passed to Logica compilation (user_flags). They must be declared in the report source with
+        <code>@DefineFlag</code> (otherwise compilation fails).
+        Prefer <code>FlagValue("name")</code> for values (it becomes a quoted SQL literal). Use <code>${name}</code> only for trusted raw substitution.
+        <pre class="code"><code>@DefineFlag("min_total_cents", "0");
+@DefineFlag("status", "placed");
+
+# Use as value (safe):
+min_total_cents = Cast(FlagValue("min_total_cents"), "INTEGER");
+status = FlagValue("status");</code></pre>
+        <pre class="code"><code>{ "min_total_cents": 1000, "status": "placed" }</code></pre>
+      </div>
+
+      <details class="muted">
+        <summary>Show this report's flags_schema/default_flags</summary>
+        <p class="muted">flags_schema:</p>
+        <pre class="code"><code><%= @flags_schema_json %></code></pre>
+        <p class="muted">default_flags:</p>
+        <pre class="code"><code><%= @default_flags_json %></code></pre>
+      </details>
+
+      <%= text_area_tag :flags_json, @flags_json, class: "code-input", rows: 6 %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :page, "Page" %>
+      <%= number_field_tag :page, @page, min: 1, class: "text-input" %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :per_page, "Per page (max #{Bi::ReportRunner::MAX_PER_PAGE})" %>
+      <%= number_field_tag :per_page, @per_page, min: 1, max: Bi::ReportRunner::MAX_PER_PAGE, class: "text-input" %>
+    </div>
+
+    <div class="field">
+      <label>Cache</label>
+      <div class="muted">
+        <%= check_box_tag :refresh, "1", !!@refresh %>
+        <%= label_tag :refresh, "Refresh (bypass cache for this run)" %>
+      </div>
+    </div>
+
+    <%= submit_tag "Run report", class: "button" %>
+  <% end %>
+
+  <% if @error %>
+    <div class="alert">
+      <strong><%= @error.class.name %></strong>
+      <div><%= @error.message %></div>
+    </div>
+  <% end %>
+
+  <% if @sql || @executed_sql %>
+    <h2>SQL</h2>
+    <% if @sql %>
+      <p class="muted">Compiled:</p>
+      <pre class="code"><code><%= @sql %></code></pre>
+    <% end %>
+    <% if @executed_sql %>
+      <p class="muted">Executed (pagination/max_rows applied):</p>
+      <pre class="code"><code><%= @executed_sql %></code></pre>
+    <% end %>
+  <% end %>
+
+  <% if @plan_json %>
+    <h2>Plan JSON</h2>
+    <pre class="code"><code><%= @plan_json %></code></pre>
+  <% end %>
+
+  <% if @result %>
+    <h2>Result</h2>
+    <% if !@cached.nil? %>
+      <p class="muted">cached: <code><%= @cached %></code></p>
+    <% end %>
+
+    <% if @functions_used || @relations_used %>
+      <details class="muted">
+        <summary>Query analysis</summary>
+        <p class="muted">functions_used: <code><%= JSON.generate(Array(@functions_used)) %></code></p>
+        <p class="muted">relations_used: <code><%= JSON.generate(Array(@relations_used)) %></code></p>
+      </details>
+    <% end %>
+
+    <%= render "shared/result_table", result: @result %>
+  <% end %>
+
+  <% if @runs&.any? %>
+    <h2>Run history</h2>
+    <div class="table-wrap">
+      <table class="results">
+        <thead>
+          <tr>
+            <th>At</th>
+            <th>Status</th>
+            <th>Duration</th>
+            <th>Rows</th>
+            <th>Functions</th>
+            <th>Relations</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @runs.each do |run| %>
+            <tr>
+              <td><%= run.created_at %></td>
+              <td><%= run.status %></td>
+              <td><%= run.duration_ms %>ms</td>
+              <td><%= run.row_count %></td>
+              <td><%= Array(run.functions_used).join(", ") %></td>
+              <td><%= Array(run.respond_to?(:relations_used) ? run.relations_used : []).join(", ") %></td>
+              <td><%= run.error_class %> <%= run.error_message %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</div>

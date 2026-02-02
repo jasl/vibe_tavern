@@ -1,0 +1,1701 @@
+[
+ {
+  "full_text": "@Engine(\"sqlite\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"sqlite\"",
+        "literal": {
+         "the_string": {
+          "the_string": "sqlite"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"a\", \"b\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"a\"",
+        "literal": {
+         "the_string": {
+          "the_string": "a"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"b\"",
+        "literal": {
+         "the_string": {
+          "the_string": "b"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"a\", \"c\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"a\"",
+        "literal": {
+         "the_string": {
+          "the_string": "a"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"c\"",
+        "literal": {
+         "the_string": {
+          "the_string": "c"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"c\", \"d\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"c\"",
+        "literal": {
+         "the_string": {
+          "the_string": "c"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"d\"",
+        "literal": {
+         "the_string": {
+          "the_string": "d"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"e\", \"d\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"e\"",
+        "literal": {
+         "the_string": {
+          "the_string": "e"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"d\"",
+        "literal": {
+         "the_string": {
+          "the_string": "d"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"h\", \"d\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"h\"",
+        "literal": {
+         "the_string": {
+          "the_string": "h"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"d\"",
+        "literal": {
+         "the_string": {
+          "the_string": "d"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"d\", \"i\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"d\"",
+        "literal": {
+         "the_string": {
+          "the_string": "d"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"i\"",
+        "literal": {
+         "the_string": {
+          "the_string": "i"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"d\", \"j\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"d\"",
+        "literal": {
+         "the_string": {
+          "the_string": "d"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"j\"",
+        "literal": {
+         "the_string": {
+          "the_string": "j"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"j\", \"d\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"j\"",
+        "literal": {
+         "the_string": {
+          "the_string": "j"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"d\"",
+        "literal": {
+         "the_string": {
+          "the_string": "d"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"i\", \"a\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"i\"",
+        "literal": {
+         "the_string": {
+          "the_string": "i"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"a\"",
+        "literal": {
+         "the_string": {
+          "the_string": "a"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"f\", \"g\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"f\"",
+        "literal": {
+         "the_string": {
+          "the_string": "f"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"g\"",
+        "literal": {
+         "the_string": {
+          "the_string": "g"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Link(\"g\", \"f\")",
+  "head": {
+   "predicate_name": "L_Link",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"g\"",
+        "literal": {
+         "the_string": {
+          "the_string": "g"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"f\"",
+        "literal": {
+         "the_string": {
+          "the_string": "f"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Link",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       },
+       "right_hand_side": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Vertex(x) distinct :- Link(a, b), (x == a | x == b)",
+  "head": {
+   "predicate_name": "L_Vertex_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Link",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       },
+       "right_hand_side": {
+        "expression_heritage": "b",
+        "variable": {
+         "var_name": "b"
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Vertex(x) distinct :- Link(a, b), (x == a | x == b)",
+  "head": {
+   "predicate_name": "L_Vertex_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Link",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "Degree(x) += 1.0 :- Link(x)",
+  "head": {
+   "predicate_name": "L_Degree",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "Agg+",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "expression_heritage": "1.0",
+               "literal": {
+                "the_number": {
+                 "number": "1.0"
+                }
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " += 1.0"
+        },
+        "expression_heritage": " += 1.0"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Vertex",
+       "record": {
+        "field_value": []
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "NumVertices() += 1 :- Vertex()",
+  "head": {
+   "predicate_name": "L_NumVertices",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "Agg+",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "expression_heritage": "1",
+               "literal": {
+                "the_number": {
+                 "number": "1"
+                }
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " += 1"
+        },
+        "expression_heritage": " += 1"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Vertex",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "PageRank(x) += 1.0 :- Vertex(x)",
+  "head": {
+   "predicate_name": "L_PageRank_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "1.0",
+        "literal": {
+         "the_number": {
+          "number": "1.0"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Link",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "y",
+            "variable": {
+             "var_name": "y"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "PageRank(y) += 0.5 * PageRank(x) /  Degree(x) :-\n  Link(x, y)",
+  "head": {
+   "predicate_name": "L_PageRank_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "y",
+        "variable": {
+         "var_name": "y"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "*",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "0.5",
+              "literal": {
+               "the_number": {
+                "number": "0.5"
+               }
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "/",
+               "record": {
+                "field_value": [
+                 {
+                  "field": "left",
+                  "value": {
+                   "expression": {
+                    "call": {
+                     "predicate_name": "L_PageRank",
+                     "record": {
+                      "field_value": [
+                       {
+                        "field": 0,
+                        "value": {
+                         "expression": {
+                          "expression_heritage": "x",
+                          "variable": {
+                           "var_name": "x"
+                          }
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "expression_heritage": "PageRank(x)"
+                   }
+                  }
+                 },
+                 {
+                  "field": "right",
+                  "value": {
+                   "expression": {
+                    "call": {
+                     "predicate_name": "L_Degree",
+                     "record": {
+                      "field_value": [
+                       {
+                        "field": 0,
+                        "value": {
+                         "expression": {
+                          "expression_heritage": "x",
+                          "variable": {
+                           "var_name": "x"
+                          }
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "expression_heritage": "Degree(x)"
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "PageRank(x) /  Degree(x)"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "0.5 * PageRank(x) /  Degree(x)"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test := PageRank()",
+  "head": {
+   "predicate_name": "@Make",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "Test",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_Test"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_PageRank"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "record": {
+         "field_value": []
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Link",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Flow(a, b) = 0.5 * PageRank(a) / Degree(a) :- Link(a, b)",
+  "head": {
+   "predicate_name": "L_Flow",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "b",
+        "variable": {
+         "var_name": "b"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "*",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "0.5",
+              "literal": {
+               "the_number": {
+                "number": "0.5"
+               }
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "/",
+               "record": {
+                "field_value": [
+                 {
+                  "field": "left",
+                  "value": {
+                   "expression": {
+                    "call": {
+                     "predicate_name": "L_PageRank",
+                     "record": {
+                      "field_value": [
+                       {
+                        "field": 0,
+                        "value": {
+                         "expression": {
+                          "expression_heritage": "a",
+                          "variable": {
+                           "var_name": "a"
+                          }
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "expression_heritage": "PageRank(a)"
+                   }
+                  }
+                 },
+                 {
+                  "field": "right",
+                  "value": {
+                   "expression": {
+                    "call": {
+                     "predicate_name": "L_Degree",
+                     "record": {
+                      "field_value": [
+                       {
+                        "field": 0,
+                        "value": {
+                         "expression": {
+                          "expression_heritage": "a",
+                          "variable": {
+                           "var_name": "a"
+                          }
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "expression_heritage": "Degree(a)"
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "PageRank(a) / Degree(a)"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "0.5 * PageRank(a) / Degree(a)"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "distinct_denoted": true,
+  "full_text": "TotalMass() += PageRank()",
+  "head": {
+   "predicate_name": "L_TotalMass",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "Agg+",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "call": {
+                "predicate_name": "L_PageRank",
+                "record": {
+                 "field_value": []
+                }
+               },
+               "expression_heritage": "PageRank()"
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " += PageRank()"
+        },
+        "expression_heritage": " += PageRank()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "PageRankProbability(x) = PageRank(x) / TotalMass()",
+  "head": {
+   "predicate_name": "L_PageRankProbability",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "/",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "L_PageRank",
+               "record": {
+                "field_value": [
+                 {
+                  "field": 0,
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "x",
+                    "variable": {
+                     "var_name": "x"
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "PageRank(x)"
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "L_TotalMass",
+               "record": {
+                "field_value": []
+               }
+              },
+              "expression_heritage": "TotalMass()"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "PageRank(x) / TotalMass()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Vertex",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "PageRankCheckStep(x) += 0.5 / NumVertices() :- Vertex(x)",
+  "head": {
+   "predicate_name": "L_PageRankCheckStep_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "/",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "0.5",
+              "literal": {
+               "the_number": {
+                "number": "0.5"
+               }
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "L_NumVertices",
+               "record": {
+                "field_value": []
+               }
+              },
+              "expression_heritage": "NumVertices()"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "0.5 / NumVertices()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Link",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "y",
+            "variable": {
+             "var_name": "y"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "PageRankCheckStep(y) += 0.5 * PageRankProbability(x) / Degree(x) :-\n  Link(x, y)",
+  "head": {
+   "predicate_name": "L_PageRankCheckStep_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "y",
+        "variable": {
+         "var_name": "y"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "*",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "0.5",
+              "literal": {
+               "the_number": {
+                "number": "0.5"
+               }
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "/",
+               "record": {
+                "field_value": [
+                 {
+                  "field": "left",
+                  "value": {
+                   "expression": {
+                    "call": {
+                     "predicate_name": "L_PageRankProbability",
+                     "record": {
+                      "field_value": [
+                       {
+                        "field": 0,
+                        "value": {
+                         "expression": {
+                          "expression_heritage": "x",
+                          "variable": {
+                           "var_name": "x"
+                          }
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "expression_heritage": "PageRankProbability(x)"
+                   }
+                  }
+                 },
+                 {
+                  "field": "right",
+                  "value": {
+                   "expression": {
+                    "call": {
+                     "predicate_name": "L_Degree",
+                     "record": {
+                      "field_value": [
+                       {
+                        "field": 0,
+                        "value": {
+                         "expression": {
+                          "expression_heritage": "x",
+                          "variable": {
+                           "var_name": "x"
+                          }
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "expression_heritage": "Degree(x)"
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "PageRankProbability(x) / Degree(x)"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "0.5 * PageRankProbability(x) / Degree(x)"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Vertex_MultBodyAggAux",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 0
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "Vertex(x) distinct :- Link(a, b), (x == a | x == b)",
+  "head": {
+   "predicate_name": "L_Vertex",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 0
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_PageRank_MultBodyAggAux",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 0
+            }
+           }
+          }
+         },
+         {
+          "field": "logica_value",
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": "logica_value"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "PageRank(y) += 0.5 * PageRank(x) /  Degree(x) :-\n  Link(x, y)",
+  "head": {
+   "predicate_name": "L_PageRank",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 0
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "Agg+",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "variable": {
+                "var_name": "logica_value"
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " += 1.0"
+        },
+        "expression_heritage": " += 1.0"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_PageRankCheckStep_MultBodyAggAux",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 0
+            }
+           }
+          }
+         },
+         {
+          "field": "logica_value",
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": "logica_value"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "PageRankCheckStep(y) += 0.5 * PageRankProbability(x) / Degree(x) :-\n  Link(x, y)",
+  "head": {
+   "predicate_name": "L_PageRankCheckStep",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 0
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "Agg+",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "variable": {
+                "var_name": "logica_value"
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " += 0.5 / NumVertices()"
+        },
+        "expression_heritage": " += 0.5 / NumVertices()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

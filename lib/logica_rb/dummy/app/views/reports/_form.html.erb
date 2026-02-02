@@ -1,0 +1,68 @@
+<%= form_with model: @report, local: true do |f| %>
+  <% if @report.errors.any? %>
+    <div class="alert">
+      <strong>Validation errors</strong>
+      <div><%= @report.errors.full_messages.join(", ") %></div>
+    </div>
+  <% end %>
+
+  <% if @error %>
+    <div class="alert">
+      <strong><%= @error.class.name %></strong>
+      <div><%= @error.message %></div>
+    </div>
+  <% end %>
+
+  <div class="field">
+    <%= f.label :name %>
+    <%= f.text_field :name, class: "text-input" %>
+  </div>
+
+  <div class="field">
+    <%= f.label :mode %>
+    <%= f.select :mode, Report.modes.keys, {}, class: "text-input" %>
+  </div>
+
+  <div class="field">
+    <%= f.label :predicate %>
+    <%= f.text_field :predicate, class: "text-input" %>
+  </div>
+
+  <div class="field">
+    <%= f.label :engine %>
+    <%= f.select :engine, %w[auto sqlite psql], {}, class: "text-input" %>
+  </div>
+
+  <div class="field">
+    <%= f.label :trusted %>
+    <%= f.check_box :trusted %>
+  </div>
+
+  <div class="field">
+    <%= f.label :allow_imports %>
+    <%= f.check_box :allow_imports %>
+  </div>
+
+  <div class="field">
+    <%= f.label :file, "File (relative to import_root)" %>
+    <%= f.text_field :file, class: "text-input" %>
+  </div>
+
+  <div class="field">
+    <%= f.label :source, "Source (Logica)" %>
+    <%= f.text_area :source, class: "code-input", rows: 14 %>
+  </div>
+
+  <div class="field">
+    <%= label_tag "report[flags_schema]", "Flags schema (JSON)" %>
+    <%= text_area_tag "report[flags_schema]", @flags_schema_json, class: "code-input", rows: 8 %>
+    <div class="muted">If empty (<code>{}</code>), flags are rejected. Unknown keys are not allowed.</div>
+  </div>
+
+  <div class="field">
+    <%= label_tag "report[default_flags]", "Default flags (JSON)" %>
+    <%= text_area_tag "report[default_flags]", @default_flags_json, class: "code-input", rows: 6 %>
+  </div>
+
+  <%= f.submit class: "button" %>
+<% end %>

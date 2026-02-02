@@ -1,0 +1,33 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_0_T1 AS (SELECT\n  ((ARRAY_AGG(ROW(ARRAY[x_9]::numeric[])::logicarecord751083768 order by (POW(((x_9) - (3)), 2))))[1]).argpod AS logica_value\nFROM\n  UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 10 - 1) as x)) as x_9),\nt_2_T2 AS (SELECT\n  ((ARRAY_AGG(ROW(ARRAY[x_21, ((x_21) + (1))]::numeric[])::logicarecord751083768 order by (POW(((x_21) - (3)), 2)) desc))[1]).argpod AS logica_value\nFROM\n  UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 10 - 1) as x)) as x_21)\nSELECT\n  T1.logica_value AS col0,\n  T2.logica_value AS col1\nFROM\n  t_0_T1 AS T1, t_2_T2 AS T2"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord751083768\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord751083768') then create type logicarecord751083768 as (argpod numeric[]); end if;\n-- Logica type: logicarecord559501047\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord559501047') then create type logicarecord559501047 as (arg numeric[], value numeric); end if;\n-- Logica type: logicarecord227737178\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord227737178') then create type logicarecord227737178 as (arg logicarecord751083768, value numeric); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

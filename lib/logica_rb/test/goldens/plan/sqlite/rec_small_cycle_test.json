@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_17_C_recursive_head_f1 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_16_A_r0 AS (SELECT\n  C_recursive_head_f1.col0 AS col0\nFROM\n  t_17_C_recursive_head_f1 AS C_recursive_head_f1\nGROUP BY C_recursive_head_f1.col0),\nt_15_C_recursive_head_f2 AS (SELECT * FROM (\n  \n    SELECT\n      A_r0.col0 AS col0\n    FROM\n      t_16_A_r0 AS A_r0 UNION ALL\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_14_A_r1 AS (SELECT\n  C_recursive_head_f2.col0 AS col0\nFROM\n  t_15_C_recursive_head_f2 AS C_recursive_head_f2\nGROUP BY C_recursive_head_f2.col0),\nt_13_C_recursive_head_f3 AS (SELECT * FROM (\n  \n    SELECT\n      A_r1.col0 AS col0\n    FROM\n      t_14_A_r1 AS A_r1 UNION ALL\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_12_A_r2 AS (SELECT\n  C_recursive_head_f3.col0 AS col0\nFROM\n  t_13_C_recursive_head_f3 AS C_recursive_head_f3\nGROUP BY C_recursive_head_f3.col0),\nt_11_C_recursive_head_f4 AS (SELECT * FROM (\n  \n    SELECT\n      A_r2.col0 AS col0\n    FROM\n      t_12_A_r2 AS A_r2 UNION ALL\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_10_A_r3 AS (SELECT\n  C_recursive_head_f4.col0 AS col0\nFROM\n  t_11_C_recursive_head_f4 AS C_recursive_head_f4\nGROUP BY C_recursive_head_f4.col0),\nt_9_C_recursive_head_f5 AS (SELECT * FROM (\n  \n    SELECT\n      A_r3.col0 AS col0\n    FROM\n      t_10_A_r3 AS A_r3 UNION ALL\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_8_A_r4 AS (SELECT\n  C_recursive_head_f5.col0 AS col0\nFROM\n  t_9_C_recursive_head_f5 AS C_recursive_head_f5\nGROUP BY C_recursive_head_f5.col0),\nt_7_C_recursive_head_f6 AS (SELECT * FROM (\n  \n    SELECT\n      A_r4.col0 AS col0\n    FROM\n      t_8_A_r4 AS A_r4 UNION ALL\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_6_A_r5 AS (SELECT\n  C_recursive_head_f6.col0 AS col0\nFROM\n  t_7_C_recursive_head_f6 AS C_recursive_head_f6\nGROUP BY C_recursive_head_f6.col0),\nt_5_C_recursive_head_f7 AS (SELECT * FROM (\n  \n    SELECT\n      A_r5.col0 AS col0\n    FROM\n      t_6_A_r5 AS A_r5 UNION ALL\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_4_A_r6 AS (SELECT\n  C_recursive_head_f7.col0 AS col0\nFROM\n  t_5_C_recursive_head_f7 AS C_recursive_head_f7\nGROUP BY C_recursive_head_f7.col0),\nt_3_C_recursive_head_f8 AS (SELECT * FROM (\n  \n    SELECT\n      A_r6.col0 AS col0\n    FROM\n      t_4_A_r6 AS A_r6 UNION ALL\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_2_A_r7 AS (SELECT\n  C_recursive_head_f8.col0 AS col0\nFROM\n  t_3_C_recursive_head_f8 AS C_recursive_head_f8\nGROUP BY C_recursive_head_f8.col0),\nt_1_C_recursive_head_f9 AS (SELECT * FROM (\n  \n    SELECT\n      A_r7.col0 AS col0\n    FROM\n      t_2_A_r7 AS A_r7 UNION ALL\n  \n    SELECT\n      0 AS col0\n) AS UNUSED_TABLE_NAME  ),\nt_0_A AS (SELECT\n  C_recursive_head_f9.col0 AS col0\nFROM\n  t_1_C_recursive_head_f9 AS C_recursive_head_f9\nGROUP BY C_recursive_head_f9.col0)\nSELECT\n  A.col0 AS col0\nFROM\n  t_0_A AS A"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

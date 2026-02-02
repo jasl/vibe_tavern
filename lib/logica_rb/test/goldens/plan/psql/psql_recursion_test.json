@@ -1,0 +1,128 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Distance",
+    "sql": "DROP TABLE IF EXISTS logica_home.Distance CASCADE;\nCREATE TABLE logica_home.Distance AS WITH t_11_Edge AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      2 AS col1 UNION ALL\n  \n    SELECT\n      2 AS col0,\n      3 AS col1 UNION ALL\n  \n    SELECT\n      3 AS col0,\n      4 AS col1 UNION ALL\n  \n    SELECT\n      4 AS col0,\n      5 AS col1 UNION ALL\n  \n    SELECT\n      6 AS col0,\n      7 AS col1 UNION ALL\n  \n    SELECT\n      7 AS col0,\n      8 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      10 AS col1 UNION ALL\n  \n    SELECT\n      10 AS col0,\n      11 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      11 AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_3_Distance_MultBodyAggAux_f5 AS (SELECT * FROM (\n  \n    SELECT\n      Distance_ifr3.col0 AS col0,\n      Distance_ifr3.col0 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.Distance_ifr1 AS Distance_ifr3 UNION ALL\n  \n    SELECT\n      t_24_Distance_ifr3.col0 AS col0,\n      t_25_Distance_ifr3.col1 AS col1,\n      ((t_24_Distance_ifr3.logica_value) + (t_25_Distance_ifr3.logica_value)) AS logica_value\n    FROM\n      logica_home.Distance_ifr1 AS t_24_Distance_ifr3, logica_home.Distance_ifr1 AS t_25_Distance_ifr3\n    WHERE\n      (t_25_Distance_ifr3.col0 = t_24_Distance_ifr3.col1) UNION ALL\n  \n    SELECT\n      t_26_Distance_ifr3.col1 AS col0,\n      t_26_Distance_ifr3.col0 AS col1,\n      t_26_Distance_ifr3.logica_value AS logica_value\n    FROM\n      logica_home.Distance_ifr1 AS t_26_Distance_ifr3 UNION ALL\n  \n    SELECT\n      t_27_Edge.col0 AS col0,\n      t_27_Edge.col1 AS col1,\n      1 AS logica_value\n    FROM\n      t_11_Edge AS t_27_Edge\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Distance_MultBodyAggAux_f5.col0 AS col0,\n  Distance_MultBodyAggAux_f5.col1 AS col1,\n  MIN(Distance_MultBodyAggAux_f5.logica_value) AS logica_value\nFROM\n  t_3_Distance_MultBodyAggAux_f5 AS Distance_MultBodyAggAux_f5\nGROUP BY Distance_MultBodyAggAux_f5.col0, Distance_MultBodyAggAux_f5.col1 ORDER BY col0, col1;"
+   },
+   "name": "Distance",
+   "requires": [
+    "Distance_ifr3"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Distance_ifr0",
+    "sql": "DROP TABLE IF EXISTS logica_home.Distance_ifr0 CASCADE;\nCREATE TABLE logica_home.Distance_ifr0 AS WITH t_11_Edge AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      2 AS col1 UNION ALL\n  \n    SELECT\n      2 AS col0,\n      3 AS col1 UNION ALL\n  \n    SELECT\n      3 AS col0,\n      4 AS col1 UNION ALL\n  \n    SELECT\n      4 AS col0,\n      5 AS col1 UNION ALL\n  \n    SELECT\n      6 AS col0,\n      7 AS col1 UNION ALL\n  \n    SELECT\n      7 AS col0,\n      8 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      10 AS col1 UNION ALL\n  \n    SELECT\n      10 AS col0,\n      11 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      11 AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_7_Distance_MultBodyAggAux_f1 AS (SELECT * FROM (\n  \n    SELECT\n      Edge.col0 AS col0,\n      Edge.col1 AS col1,\n      1 AS logica_value\n    FROM\n      t_11_Edge AS Edge\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Distance_MultBodyAggAux_f1.col0 AS col0,\n  Distance_MultBodyAggAux_f1.col1 AS col1,\n  MIN(Distance_MultBodyAggAux_f1.logica_value) AS logica_value\nFROM\n  t_7_Distance_MultBodyAggAux_f1 AS Distance_MultBodyAggAux_f1\nGROUP BY Distance_MultBodyAggAux_f1.col0, Distance_MultBodyAggAux_f1.col1 ORDER BY col0, col1;"
+   },
+   "name": "Distance_ifr0",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Distance_ifr1",
+    "sql": "DROP TABLE IF EXISTS logica_home.Distance_ifr1 CASCADE;\nCREATE TABLE logica_home.Distance_ifr1 AS WITH t_11_Edge AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      2 AS col1 UNION ALL\n  \n    SELECT\n      2 AS col0,\n      3 AS col1 UNION ALL\n  \n    SELECT\n      3 AS col0,\n      4 AS col1 UNION ALL\n  \n    SELECT\n      4 AS col0,\n      5 AS col1 UNION ALL\n  \n    SELECT\n      6 AS col0,\n      7 AS col1 UNION ALL\n  \n    SELECT\n      7 AS col0,\n      8 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      10 AS col1 UNION ALL\n  \n    SELECT\n      10 AS col0,\n      11 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      11 AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_6_Distance_MultBodyAggAux_f2 AS (SELECT * FROM (\n  \n    SELECT\n      Distance_ifr0.col0 AS col0,\n      Distance_ifr0.col0 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.Distance_ifr0 AS Distance_ifr0 UNION ALL\n  \n    SELECT\n      t_12_Distance_ifr0.col0 AS col0,\n      t_13_Distance_ifr0.col1 AS col1,\n      ((t_12_Distance_ifr0.logica_value) + (t_13_Distance_ifr0.logica_value)) AS logica_value\n    FROM\n      logica_home.Distance_ifr0 AS t_12_Distance_ifr0, logica_home.Distance_ifr0 AS t_13_Distance_ifr0\n    WHERE\n      (t_13_Distance_ifr0.col0 = t_12_Distance_ifr0.col1) UNION ALL\n  \n    SELECT\n      t_14_Distance_ifr0.col1 AS col0,\n      t_14_Distance_ifr0.col0 AS col1,\n      t_14_Distance_ifr0.logica_value AS logica_value\n    FROM\n      logica_home.Distance_ifr0 AS t_14_Distance_ifr0 UNION ALL\n  \n    SELECT\n      t_15_Edge.col0 AS col0,\n      t_15_Edge.col1 AS col1,\n      1 AS logica_value\n    FROM\n      t_11_Edge AS t_15_Edge\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Distance_MultBodyAggAux_f2.col0 AS col0,\n  Distance_MultBodyAggAux_f2.col1 AS col1,\n  MIN(Distance_MultBodyAggAux_f2.logica_value) AS logica_value\nFROM\n  t_6_Distance_MultBodyAggAux_f2 AS Distance_MultBodyAggAux_f2\nGROUP BY Distance_MultBodyAggAux_f2.col0, Distance_MultBodyAggAux_f2.col1 ORDER BY col0, col1;"
+   },
+   "name": "Distance_ifr1",
+   "requires": [
+    "Distance_ifr0"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Distance_ifr2",
+    "sql": "DROP TABLE IF EXISTS logica_home.Distance_ifr2 CASCADE;\nCREATE TABLE logica_home.Distance_ifr2 AS WITH t_11_Edge AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      2 AS col1 UNION ALL\n  \n    SELECT\n      2 AS col0,\n      3 AS col1 UNION ALL\n  \n    SELECT\n      3 AS col0,\n      4 AS col1 UNION ALL\n  \n    SELECT\n      4 AS col0,\n      5 AS col1 UNION ALL\n  \n    SELECT\n      6 AS col0,\n      7 AS col1 UNION ALL\n  \n    SELECT\n      7 AS col0,\n      8 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      10 AS col1 UNION ALL\n  \n    SELECT\n      10 AS col0,\n      11 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      11 AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_5_Distance_MultBodyAggAux_f3 AS (SELECT * FROM (\n  \n    SELECT\n      Distance_ifr1.col0 AS col0,\n      Distance_ifr1.col0 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.Distance_ifr1 AS Distance_ifr1 UNION ALL\n  \n    SELECT\n      t_16_Distance_ifr1.col0 AS col0,\n      t_17_Distance_ifr1.col1 AS col1,\n      ((t_16_Distance_ifr1.logica_value) + (t_17_Distance_ifr1.logica_value)) AS logica_value\n    FROM\n      logica_home.Distance_ifr1 AS t_16_Distance_ifr1, logica_home.Distance_ifr1 AS t_17_Distance_ifr1\n    WHERE\n      (t_17_Distance_ifr1.col0 = t_16_Distance_ifr1.col1) UNION ALL\n  \n    SELECT\n      t_18_Distance_ifr1.col1 AS col0,\n      t_18_Distance_ifr1.col0 AS col1,\n      t_18_Distance_ifr1.logica_value AS logica_value\n    FROM\n      logica_home.Distance_ifr1 AS t_18_Distance_ifr1 UNION ALL\n  \n    SELECT\n      t_19_Edge.col0 AS col0,\n      t_19_Edge.col1 AS col1,\n      1 AS logica_value\n    FROM\n      t_11_Edge AS t_19_Edge\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Distance_MultBodyAggAux_f3.col0 AS col0,\n  Distance_MultBodyAggAux_f3.col1 AS col1,\n  MIN(Distance_MultBodyAggAux_f3.logica_value) AS logica_value\nFROM\n  t_5_Distance_MultBodyAggAux_f3 AS Distance_MultBodyAggAux_f3\nGROUP BY Distance_MultBodyAggAux_f3.col0, Distance_MultBodyAggAux_f3.col1 ORDER BY col0, col1;"
+   },
+   "name": "Distance_ifr2",
+   "requires": [
+    "Distance_ifr1"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Distance_ifr3",
+    "sql": "DROP TABLE IF EXISTS logica_home.Distance_ifr1 CASCADE;\nCREATE TABLE logica_home.Distance_ifr1 AS WITH t_11_Edge AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      2 AS col1 UNION ALL\n  \n    SELECT\n      2 AS col0,\n      3 AS col1 UNION ALL\n  \n    SELECT\n      3 AS col0,\n      4 AS col1 UNION ALL\n  \n    SELECT\n      4 AS col0,\n      5 AS col1 UNION ALL\n  \n    SELECT\n      6 AS col0,\n      7 AS col1 UNION ALL\n  \n    SELECT\n      7 AS col0,\n      8 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      10 AS col1 UNION ALL\n  \n    SELECT\n      10 AS col0,\n      11 AS col1 UNION ALL\n  \n    SELECT\n      9 AS col0,\n      11 AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_4_Distance_MultBodyAggAux_f4 AS (SELECT * FROM (\n  \n    SELECT\n      Distance_ifr2.col0 AS col0,\n      Distance_ifr2.col0 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.Distance_ifr2 AS Distance_ifr2 UNION ALL\n  \n    SELECT\n      t_20_Distance_ifr2.col0 AS col0,\n      t_21_Distance_ifr2.col1 AS col1,\n      ((t_20_Distance_ifr2.logica_value) + (t_21_Distance_ifr2.logica_value)) AS logica_value\n    FROM\n      logica_home.Distance_ifr2 AS t_20_Distance_ifr2, logica_home.Distance_ifr2 AS t_21_Distance_ifr2\n    WHERE\n      (t_21_Distance_ifr2.col0 = t_20_Distance_ifr2.col1) UNION ALL\n  \n    SELECT\n      t_22_Distance_ifr2.col1 AS col0,\n      t_22_Distance_ifr2.col0 AS col1,\n      t_22_Distance_ifr2.logica_value AS logica_value\n    FROM\n      logica_home.Distance_ifr2 AS t_22_Distance_ifr2 UNION ALL\n  \n    SELECT\n      t_23_Edge.col0 AS col0,\n      t_23_Edge.col1 AS col1,\n      1 AS logica_value\n    FROM\n      t_11_Edge AS t_23_Edge\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Distance_MultBodyAggAux_f4.col0 AS col0,\n  Distance_MultBodyAggAux_f4.col1 AS col1,\n  MIN(Distance_MultBodyAggAux_f4.logica_value) AS logica_value\nFROM\n  t_4_Distance_MultBodyAggAux_f4 AS Distance_MultBodyAggAux_f4\nGROUP BY Distance_MultBodyAggAux_f4.col0, Distance_MultBodyAggAux_f4.col1 ORDER BY col0, col1;"
+   },
+   "name": "Distance_ifr3",
+   "requires": [
+    "Distance_ifr2"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_1_ComponentOf AS (SELECT\n  t_2_Distance.col0 AS col0,\n  MIN(t_2_Distance.col1) AS logica_value\nFROM\n  logica_home.Distance AS t_2_Distance\nGROUP BY t_2_Distance.col0 ORDER BY col0)\nSELECT\n  ComponentOf.col0 AS vertex,\n  ComponentOf.logica_value AS component,\n  ARRAY_AGG(ROW(Distance.logica_value, Distance.col1)::logicarecord605846997 order by - Distance.col1) AS distances\nFROM\n  t_1_ComponentOf AS ComponentOf, logica_home.Distance AS Distance\nWHERE\n  (Distance.col0 = ComponentOf.col0)\nGROUP BY ComponentOf.col0, ComponentOf.logica_value ORDER BY vertex"
+   },
+   "name": "Test",
+   "requires": [
+    "Distance"
+   ],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [
+  [
+   "Distance",
+   "Test"
+  ],
+  [
+   "Distance_ifr0",
+   "Distance_ifr1"
+  ],
+  [
+   "Distance_ifr1",
+   "Distance_ifr2"
+  ],
+  [
+   "Distance_ifr2",
+   "Distance_ifr3"
+  ],
+  [
+   "Distance_ifr3",
+   "Distance"
+  ]
+ ],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {
+  "Distance": {
+   "predicates": [
+    "Distance_ifr2",
+    "Distance_ifr3"
+   ],
+   "repetitions": 24,
+   "stop_signal": ""
+  }
+ },
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord605846997\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord605846997') then create type logicarecord605846997 as (d numeric, y numeric); end if;\n-- Logica type: logicarecord428993633\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord428993633') then create type logicarecord428993633 as (arg numeric, value logicarecord605846997); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

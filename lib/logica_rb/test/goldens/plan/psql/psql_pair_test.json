@@ -1,0 +1,33 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_1_Word AS (SELECT * FROM (\n  \n    SELECT\n      'fire' AS col0 UNION ALL\n  \n    SELECT\n      'water' AS col0 UNION ALL\n  \n    SELECT\n      'wind' AS col0 UNION ALL\n  \n    SELECT\n      'sun' AS col0\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ARRAY_AGG(ROW(LENGTH(Word.col0), Word.col0)::logicarecord929842458 order by LENGTH(Word.col0)) AS logica_value\nFROM\n  t_1_Word AS Word"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord929842458\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord929842458') then create type logicarecord929842458 as (length numeric, word text); end if;\n-- Logica type: logicarecord615622689\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord615622689') then create type logicarecord615622689 as (arg numeric, value logicarecord929842458); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

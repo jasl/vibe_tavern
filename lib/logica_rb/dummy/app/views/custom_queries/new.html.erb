@@ -1,0 +1,77 @@
+<% content_for :title, "Custom query" %>
+
+<div class="container">
+  <header class="header">
+    <h1>Custom query</h1>
+    <nav class="nav">
+      <%= link_to "Built-in reports", reports_path, class: "nav-link" %>
+      <%= link_to "Custom query", new_custom_query_path, class: "nav-link" %>
+    </nav>
+  </header>
+
+  <p class="muted">
+    This runs <code>source:</code> mode with <code>trusted: false</code>.
+    SQL is validated as query-only and executed under <code>prevent_writes</code>; PostgreSQL adds <code>SET LOCAL statement_timeout</code>.
+  </p>
+
+  <%= form_with url: custom_queries_path, method: :post, local: true do %>
+    <div class="field">
+      <%= label_tag :name, "Save as report name (optional)" %>
+      <%= text_field_tag :name, @name, class: "text-input" %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :predicate, "Predicate" %>
+      <%= text_field_tag :predicate, @predicate, class: "text-input" %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :source, "Logica source" %>
+      <%= text_area_tag :source, @source, class: "code-input", rows: 18 %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :flags_json, "Flags (JSON)" %>
+      <%= text_area_tag :flags_json, @flags_json, class: "code-input", rows: 6 %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :allow_imports, "Allow imports" %>
+      <%= check_box_tag :allow_imports, "1", @allow_imports %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :page, "Page" %>
+      <%= number_field_tag :page, @page, min: 1, class: "text-input" %>
+    </div>
+
+    <div class="field">
+      <%= label_tag :per_page, "Per page (max #{Bi::ReportRunner::MAX_PER_PAGE})" %>
+      <%= number_field_tag :per_page, @per_page, min: 1, max: Bi::ReportRunner::MAX_PER_PAGE, class: "text-input" %>
+    </div>
+
+    <%= submit_tag "Run query", name: "intent", value: "run", class: "button" %>
+    <%= submit_tag "Save as report", name: "intent", value: "save", class: "button" %>
+  <% end %>
+
+  <% if @error %>
+    <div class="alert">
+      <strong><%= @error.class.name %></strong>
+      <div><%= @error.message %></div>
+    </div>
+  <% end %>
+
+  <% if @sql %>
+    <h2>SQL</h2>
+    <pre class="code"><code><%= @sql %></code></pre>
+    <% if @executed_sql %>
+      <p class="muted">Executed (pagination/max_rows applied):</p>
+      <pre class="code"><code><%= @executed_sql %></code></pre>
+    <% end %>
+  <% end %>
+
+  <% if @result %>
+    <h2>Result</h2>
+    <%= render "shared/result_table", result: @result %>
+  <% end %>
+</div>

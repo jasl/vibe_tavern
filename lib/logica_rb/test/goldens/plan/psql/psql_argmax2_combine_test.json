@@ -1,0 +1,33 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "SELECT\n  CAST((SELECT\n  (ARRAY_AGG(((CASE WHEN x_8 = 0 THEN ROW(x_7, x_7)::logicarecord884343024 ELSE NULL END)).arg order by ((CASE WHEN x_8 = 0 THEN ROW(x_7, x_7)::logicarecord884343024 ELSE NULL END)).value desc))[1:2] AS logica_value\nFROM\n  UNNEST(ARRAY[x_2]::numeric[]) as x_7, UNNEST(ARRAY[0]::numeric[]) as x_8) AS numeric[]) AS col0\nFROM\n  UNNEST(ARRAY[1, 2]::numeric[]) as x_2"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord884343024\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord884343024') then create type logicarecord884343024 as (arg numeric, value numeric); end if;\n-- Logica type: logicarecord321788516\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord321788516') then create type logicarecord321788516 as (arg numeric, lim numeric, value numeric); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

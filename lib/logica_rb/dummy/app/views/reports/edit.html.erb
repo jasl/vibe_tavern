@@ -1,0 +1,13 @@
+<% content_for :title, "Edit report" %>
+
+<div class="container">
+  <header class="header">
+    <h1>Edit report</h1>
+    <nav class="nav">
+      <%= link_to "All reports", reports_path, class: "nav-link" %>
+      <%= link_to "View", report_path(@report), class: "nav-link" %>
+    </nav>
+  </header>
+
+  <%= render "form" %>
+</div>

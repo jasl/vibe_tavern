@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_3_T AS (SELECT * FROM (\n  \n    SELECT\n      1 AS a,\n      2 AS b UNION ALL\n  \n    SELECT\n      3 AS a,\n      4 AS b\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  JSON_EXTRACT(JSON_OBJECT('a', T.a, 'b', T.b), \"$.a\") AS a,\n  JSON_EXTRACT(JSON_OBJECT('a', T.a, 'b', T.b), \"$.b\") AS b,\n  JSON_OBJECT('a', T.a, 'b', T.b) AS r,\n  JSON_EXTRACT(JSON_OBJECT('a', t_0_T.a, 'b', t_0_T.b), \"$.a\") AS c,\n  JSON_OBJECT('two_a', ((2) * (t_1_T.a))) AS two_a_record,\n  ((2) * (t_1_T.a)) AS ta,\n  JSON_OBJECT('0', 5, 'logica_value', JSON_OBJECT('a', 5, 'b', ((2) * (5)))) AS f\nFROM\n  t_3_T AS t_0_T, t_3_T AS T, t_3_T AS t_1_T\nWHERE\n  (JSON_EXTRACT(JSON_OBJECT('a', t_0_T.a, 'b', t_0_T.b), \"$.a\") = 1) ORDER BY a, ta"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

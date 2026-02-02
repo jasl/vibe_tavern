@@ -1,0 +1,33 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_0_Parent AS (SELECT * FROM (\n  \n    SELECT\n      'A' AS col0,\n      'B' AS col1 UNION ALL\n  \n    SELECT\n      'B' AS col0,\n      'C' AS col1 UNION ALL\n  \n    SELECT\n      'C' AS col0,\n      'D' AS col1 UNION ALL\n  \n    SELECT\n      'B' AS col0,\n      'E' AS col1 UNION ALL\n  \n    SELECT\n      'A' AS col0,\n      'F' AS col1 UNION ALL\n  \n    SELECT\n      'A' AS col0,\n      'G' AS col1 UNION ALL\n  \n    SELECT\n      'G' AS col0,\n      'H' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_3_NumChildren AS (SELECT\n  t_4_Parent.col0 AS col0,\n  SUM(1) AS logica_value\nFROM\n  t_0_Parent AS t_4_Parent\nGROUP BY t_4_Parent.col0),\nt_5_ChildrenOf AS (SELECT\n  t_6_Parent.col0 AS col0,\n  ARRAY_AGG(t_6_Parent.col1) AS logica_value\nFROM\n  t_0_Parent AS t_6_Parent\nGROUP BY t_6_Parent.col0)\nSELECT * FROM (\n  \n    SELECT\n      'Parent' AS col0,\n      Parent.col0 AS col1,\n      Parent.col1 AS col2\n    FROM\n      t_0_Parent AS Parent UNION ALL\n  \n    SELECT\n      'Grandparent' AS col0,\n      t_1_Parent.col0 AS col1,\n      t_2_Parent.col1 AS col2\n    FROM\n      t_0_Parent AS t_1_Parent, t_0_Parent AS t_2_Parent\n    WHERE\n      (t_2_Parent.col0 = t_1_Parent.col1) UNION ALL\n  \n    SELECT\n      'NumChildren' AS col0,\n      NumChildren.col0 AS col1,\n      CAST(NumChildren.logica_value AS TEXT) AS col2\n    FROM\n      t_3_NumChildren AS NumChildren UNION ALL\n  \n    SELECT\n      'ChildrenOf' AS col0,\n      ChildrenOf.col0 AS col1,\n      ARRAY_TO_STRING(ChildrenOf.logica_value, ',') AS col2\n    FROM\n      t_5_ChildrenOf AS ChildrenOf\n) AS UNUSED_TABLE_NAME  ORDER BY col0, col1, col2 "
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

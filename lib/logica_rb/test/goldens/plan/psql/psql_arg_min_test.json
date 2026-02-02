@@ -1,0 +1,33 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_1_Employee AS (SELECT * FROM (\n  \n    SELECT\n      'Eng' AS dep,\n      'John' AS name,\n      8 AS vacation_days UNION ALL\n  \n    SELECT\n      'Eng' AS dep,\n      'James' AS name,\n      4 AS vacation_days UNION ALL\n  \n    SELECT\n      'Eng' AS dep,\n      'Matthew' AS name,\n      2 AS vacation_days UNION ALL\n  \n    SELECT\n      'Eng' AS dep,\n      'Jeremy' AS name,\n      5 AS vacation_days UNION ALL\n  \n    SELECT\n      'Sales' AS dep,\n      'Evan' AS name,\n      7 AS vacation_days\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Employee.dep AS dep,\n  ((ARRAY_AGG(ROW(Employee.name)::logicarecord462007516 order by Employee.vacation_days))[1]).argpod AS person\nFROM\n  t_1_Employee AS Employee\nGROUP BY Employee.dep"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord462007516\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord462007516') then create type logicarecord462007516 as (argpod text); end if;\n-- Logica type: logicarecord183863755\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord183863755') then create type logicarecord183863755 as (arg text, value numeric); end if;\n-- Logica type: logicarecord68214556\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord68214556') then create type logicarecord68214556 as (arg logicarecord462007516, value numeric); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

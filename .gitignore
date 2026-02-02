@@ -103,6 +103,26 @@
 /lib/easy_talk/tmp/
 /lib/easy_talk/*.gem
 
+/lib/simple_inference/.bundle/
+/lib/simple_inference/.yardoc
+/lib/simple_inference/_yardoc/
+/lib/simple_inference/coverage/
+/lib/simple_inference/doc/
+/lib/simple_inference/pkg/
+/lib/simple_inference/spec/reports/
+/lib/simple_inference/tmp/
+/lib/simple_inference/*.gem
+
+/lib/logica_rb/.bundle/
+/lib/logica_rb/.yardoc
+/lib/logica_rb/_yardoc/
+/lib/logica_rb/coverage/
+/lib/logica_rb/doc/
+/lib/logica_rb/pkg/
+/lib/logica_rb/spec/reports/
+/lib/logica_rb/tmp/
+/lib/logica_rb/*.gem
+
 # Local resources
 /resources
 

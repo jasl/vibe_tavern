@@ -1,0 +1,124 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://logica_rb.local/plan.schema.json",
+ "title": "LogicaRb Plan v1",
+ "type": "object",
+ "required": [
+  "schema",
+  "engine",
+  "final_predicates",
+  "outputs",
+  "preambles",
+  "dependency_edges",
+  "data_dependency_edges",
+  "iterations",
+  "config"
+ ],
+ "properties": {
+  "schema": {
+   "const": "logica_rb.plan.v1"
+  },
+  "engine": {
+   "enum": ["sqlite", "psql"]
+  },
+  "final_predicates": {
+   "type": "array",
+   "items": { "type": "string" }
+  },
+  "outputs": {
+   "type": "array",
+   "items": { "$ref": "#/$defs/outputEntry" }
+  },
+  "preambles": {
+   "type": "array",
+   "items": { "type": "string" }
+  },
+  "dependency_edges": {
+   "type": "array",
+   "items": { "$ref": "#/$defs/edge" }
+  },
+  "data_dependency_edges": {
+   "type": "array",
+   "items": { "$ref": "#/$defs/edge" }
+  },
+  "iterations": {
+   "type": "object",
+   "additionalProperties": { "$ref": "#/$defs/iteration" }
+  },
+  "config": {
+   "type": "array",
+   "items": { "$ref": "#/$defs/configEntry" }
+  }
+ },
+ "additionalProperties": false,
+ "$defs": {
+  "edge": {
+   "type": "array",
+   "prefixItems": [
+    { "type": "string" },
+    { "type": "string" }
+   ],
+   "items": false,
+   "minItems": 2,
+   "maxItems": 2
+  },
+  "iteration": {
+   "type": "object",
+   "required": ["predicates", "repetitions", "stop_signal"],
+   "properties": {
+    "predicates": {
+     "type": "array",
+     "items": { "type": "string" }
+    },
+    "repetitions": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "stop_signal": {
+     "type": "string" }
+   },
+   "additionalProperties": false
+  },
+  "outputEntry": {
+   "type": "object",
+   "required": ["predicate", "node", "kind"],
+   "properties": {
+    "predicate": { "type": "string" },
+    "node": { "type": "string" },
+    "kind": { "enum": ["table"] }
+   },
+   "additionalProperties": false
+  },
+  "action": {
+   "type": "object",
+   "required": ["predicate", "launcher"],
+   "properties": {
+    "predicate": { "type": "string" },
+    "launcher": { "enum": ["none", "query"] },
+    "engine": { "enum": ["sqlite", "psql"] },
+    "sql": { "type": "string" }
+   },
+   "allOf": [
+    {
+     "if": { "properties": { "launcher": { "const": "query" } } },
+     "then": { "required": ["engine", "sql"] }
+    }
+   ],
+   "additionalProperties": false
+  },
+  "configEntry": {
+   "type": "object",
+   "required": ["name", "type", "requires", "action"],
+   "properties": {
+    "name": { "type": "string" },
+    "type": { "enum": ["data", "intermediate", "final"] },
+    "requires": {
+     "type": "array",
+     "items": { "type": "string" }
+    },
+    "action": { "$ref": "#/$defs/action" }
+   },
+   "additionalProperties": false
+  }
+ }
+}

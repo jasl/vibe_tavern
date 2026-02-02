@@ -1,0 +1,33 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_2_Buyer AS (SELECT * FROM (\n  \n    SELECT\n      11 AS buyer_id,\n      1 AS purchase_id UNION ALL\n  \n    SELECT\n      12 AS buyer_id,\n      2 AS purchase_id UNION ALL\n  \n    SELECT\n      13 AS buyer_id,\n      3 AS purchase_id UNION ALL\n  \n    SELECT\n      14 AS buyer_id,\n      4 AS purchase_id UNION ALL\n  \n    SELECT\n      12 AS buyer_id,\n      5 AS purchase_id UNION ALL\n  \n    SELECT\n      13 AS buyer_id,\n      6 AS purchase_id UNION ALL\n  \n    SELECT\n      14 AS buyer_id,\n      7 AS purchase_id UNION ALL\n  \n    SELECT\n      11 AS buyer_id,\n      8 AS purchase_id\n) AS UNUSED_TABLE_NAME  ),\nt_3_BuyEvent AS (SELECT * FROM (\n  \n    SELECT\n      1 AS purchase_id,\n      'Soap' AS item,\n      3 AS quantity UNION ALL\n  \n    SELECT\n      2 AS purchase_id,\n      'Milk' AS item,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      3 AS purchase_id,\n      'Bread' AS item,\n      2 AS quantity UNION ALL\n  \n    SELECT\n      3 AS purchase_id,\n      'Coffee' AS item,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      4 AS purchase_id,\n      'Firewood' AS item,\n      5 AS quantity UNION ALL\n  \n    SELECT\n      4 AS purchase_id,\n      'Soap' AS item,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      5 AS purchase_id,\n      'Milk' AS item,\n      4 AS quantity UNION ALL\n  \n    SELECT\n      5 AS purchase_id,\n      'Bread' AS item,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      5 AS purchase_id,\n      'Coffee' AS item,\n      2 AS quantity UNION ALL\n  \n    SELECT\n      6 AS purchase_id,\n      'Firewood' AS item,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      6 AS purchase_id,\n      'Soap' AS item,\n      3 AS quantity UNION ALL\n  \n    SELECT\n      7 AS purchase_id,\n      'Milk' AS item,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      7 AS purchase_id,\n      'Bread' AS item,\n      2 AS quantity UNION ALL\n  \n    SELECT\n      7 AS purchase_id,\n      'Coffee' AS item,\n      1 AS quantity UNION ALL\n  \n    SELECT\n      8 AS purchase_id,\n      'Firewood' AS item,\n      5 AS quantity UNION ALL\n  \n    SELECT\n      8 AS purchase_id,\n      'Soap' AS item,\n      1 AS quantity\n) AS UNUSED_TABLE_NAME  ),\nt_4_Items AS (SELECT * FROM (\n  \n    SELECT\n      'Soap' AS item,\n      20 AS price UNION ALL\n  \n    SELECT\n      'Milk' AS item,\n      10 AS price UNION ALL\n  \n    SELECT\n      'Bread' AS item,\n      5 AS price UNION ALL\n  \n    SELECT\n      'Coffee' AS item,\n      7 AS price UNION ALL\n  \n    SELECT\n      'Firewood' AS item,\n      15 AS price\n) AS UNUSED_TABLE_NAME  ),\nt_0_Purchase AS (SELECT\n  Buyer.purchase_id AS purchase_id,\n  ARRAY_AGG(ROW(BuyEvent.item, Items.price, BuyEvent.quantity)::logicarecord547335026) AS items,\n  Buyer.buyer_id AS buyer_id\nFROM\n  t_2_Buyer AS Buyer, t_3_BuyEvent AS BuyEvent, t_4_Items AS Items\nWHERE\n  (BuyEvent.purchase_id = Buyer.purchase_id) AND\n  (Items.item = BuyEvent.item)\nGROUP BY Buyer.purchase_id, Buyer.buyer_id ORDER BY purchase_id)\nSELECT\n  x_4 AS buyer_id,\n  CAST((SELECT\n  ARRAY_AGG((CASE WHEN x_8 = 0 THEN ROW(Purchase.items)::logicarecord839295167 ELSE NULL END)) AS logica_value\nFROM\n  t_0_Purchase AS Purchase, UNNEST(ARRAY[0]::numeric[]) as x_8\nWHERE\n  (Purchase.buyer_id = x_4)) AS logicarecord839295167[]) AS purchases\nFROM\n  UNNEST(CAST((SELECT\n    ARRAY_AGG(DISTINCT (CASE WHEN x_25 = 0 THEN t_5_Buyer.buyer_id ELSE NULL END)) AS logica_value\n  FROM\n    t_2_Buyer AS t_5_Buyer, UNNEST(ARRAY[0]::numeric[]) as x_25) AS numeric[])) as x_4 ORDER BY buyer_id"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord547335026\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord547335026') then create type logicarecord547335026 as (item text, price numeric, quantity numeric); end if;\n-- Logica type: logicarecord839295167\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord839295167') then create type logicarecord839295167 as (purchase logicarecord547335026[]); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

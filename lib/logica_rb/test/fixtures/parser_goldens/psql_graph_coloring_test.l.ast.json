@@ -1,0 +1,2388 @@
+[
+ {
+  "full_text": "@Engine(\"psql\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"psql\"",
+        "literal": {
+         "the_string": {
+          "the_string": "psql"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "-+-(left:x, right:y) = ToString(x) ++ \":\" ++ ToString(y)",
+  "head": {
+   "predicate_name": "-+-",
+   "record": {
+    "field_value": [
+     {
+      "field": "left",
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": "right",
+      "value": {
+       "expression": {
+        "expression_heritage": "y",
+        "variable": {
+         "var_name": "y"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "++",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "++",
+               "record": {
+                "field_value": [
+                 {
+                  "field": "left",
+                  "value": {
+                   "expression": {
+                    "call": {
+                     "predicate_name": "ToString",
+                     "record": {
+                      "field_value": [
+                       {
+                        "field": 0,
+                        "value": {
+                         "expression": {
+                          "expression_heritage": "x",
+                          "variable": {
+                           "var_name": "x"
+                          }
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "expression_heritage": "ToString(x)"
+                   }
+                  }
+                 },
+                 {
+                  "field": "right",
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "\":\"",
+                    "literal": {
+                     "the_string": {
+                      "the_string": ":"
+                     }
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "ToString(x) ++ \":\""
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "ToString",
+               "record": {
+                "field_value": [
+                 {
+                  "field": 0,
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "y",
+                    "variable": {
+                     "var_name": "y"
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "ToString(y)"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "ToString(x) ++ \":\" ++ ToString(y)"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "inclusion": {
+       "element": {
+        "expression_heritage": "i",
+        "variable": {
+         "var_name": "i"
+        }
+       },
+       "list": {
+        "call": {
+         "predicate_name": "Range",
+         "record": {
+          "field_value": [
+           {
+            "field": 0,
+            "value": {
+             "expression": {
+              "expression_heritage": "6",
+              "literal": {
+               "the_number": {
+                "number": "6"
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "Range(6)"
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "G(\"a\" -+- i, \"a\" -+- (i + 1)) :- i in Range(6)",
+  "head": {
+   "predicate_name": "G",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "-+-",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "\"a\"",
+              "literal": {
+               "the_string": {
+                "the_string": "a"
+               }
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "i",
+              "variable": {
+               "var_name": "i"
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "\"a\" -+- i"
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "-+-",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "\"a\"",
+              "literal": {
+               "the_string": {
+                "the_string": "a"
+               }
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "+",
+               "record": {
+                "field_value": [
+                 {
+                  "field": "left",
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "i",
+                    "variable": {
+                     "var_name": "i"
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "field": "right",
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "1",
+                    "literal": {
+                     "the_number": {
+                      "number": "1"
+                     }
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "i + 1"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "\"a\" -+- (i + 1)"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@Recursive(L, 8, iterative: true)",
+  "head": {
+   "predicate_name": "@Recursive",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "L",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "8",
+        "literal": {
+         "the_number": {
+          "number": "8"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "iterative",
+      "value": {
+       "expression": {
+        "expression_heritage": "true",
+        "literal": {
+         "the_bool": {
+          "the_bool": "true"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "L(1, 1, 2, 1) distinct",
+  "head": {
+   "predicate_name": "L_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "1",
+        "literal": {
+         "the_number": {
+          "number": "1"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "1",
+        "literal": {
+         "the_number": {
+          "number": "1"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "expression_heritage": "2",
+        "literal": {
+         "the_number": {
+          "number": "2"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 3,
+      "value": {
+       "expression": {
+        "expression_heritage": "1",
+        "literal": {
+         "the_number": {
+          "number": "1"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         },
+         {
+          "field": 2,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": 3,
+          "value": {
+           "expression": {
+            "expression_heritage": "y",
+            "variable": {
+             "var_name": "y"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "L(x, y, x * 2, y) distinct :- L(a, b, x, y)",
+  "head": {
+   "predicate_name": "L_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "y",
+        "variable": {
+         "var_name": "y"
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "*",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "x",
+              "variable": {
+               "var_name": "x"
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "2",
+              "literal": {
+               "the_number": {
+                "number": "2"
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "x * 2"
+       }
+      }
+     },
+     {
+      "field": 3,
+      "value": {
+       "expression": {
+        "expression_heritage": "y",
+        "variable": {
+         "var_name": "y"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         },
+         {
+          "field": 2,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": 3,
+          "value": {
+           "expression": {
+            "expression_heritage": "y",
+            "variable": {
+             "var_name": "y"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "L(x, y, x, y * 3) distinct :- L(a, b, x, y)",
+  "head": {
+   "predicate_name": "L_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "y",
+        "variable": {
+         "var_name": "y"
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": 3,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "*",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "y",
+              "variable": {
+               "var_name": "y"
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "3",
+              "literal": {
+               "the_number": {
+                "number": "3"
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "y * 3"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "y",
+            "variable": {
+             "var_name": "y"
+            }
+           }
+          }
+         },
+         {
+          "field": 2,
+          "value": {
+           "expression": {
+            "expression_heritage": "x1",
+            "variable": {
+             "var_name": "x1"
+            }
+           }
+          }
+         },
+         {
+          "field": 3,
+          "value": {
+           "expression": {
+            "expression_heritage": "y1",
+            "variable": {
+             "var_name": "y1"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "<",
+       "record": {
+        "field_value": [
+         {
+          "field": "left",
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": "right",
+          "value": {
+           "expression": {
+            "expression_heritage": "6",
+            "literal": {
+             "the_number": {
+              "number": "6"
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "<",
+       "record": {
+        "field_value": [
+         {
+          "field": "left",
+          "value": {
+           "expression": {
+            "expression_heritage": "y",
+            "variable": {
+             "var_name": "y"
+            }
+           }
+          }
+         },
+         {
+          "field": "right",
+          "value": {
+           "expression": {
+            "expression_heritage": "6",
+            "literal": {
+             "the_number": {
+              "number": "6"
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "G(\"b\" -+- x -+- y, \"b\" -+- x1 -+- y1) :- L(x, y, x1, y1), x < 6, y < 6",
+  "head": {
+   "predicate_name": "G",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "-+-",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "-+-",
+               "record": {
+                "field_value": [
+                 {
+                  "field": "left",
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "\"b\"",
+                    "literal": {
+                     "the_string": {
+                      "the_string": "b"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "field": "right",
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "x",
+                    "variable": {
+                     "var_name": "x"
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "\"b\" -+- x"
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "y",
+              "variable": {
+               "var_name": "y"
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "\"b\" -+- x -+- y"
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "-+-",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "-+-",
+               "record": {
+                "field_value": [
+                 {
+                  "field": "left",
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "\"b\"",
+                    "literal": {
+                     "the_string": {
+                      "the_string": "b"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "field": "right",
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "x1",
+                    "variable": {
+                     "var_name": "x1"
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "\"b\" -+- x1"
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "y1",
+              "variable": {
+               "var_name": "y1"
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "\"b\" -+- x1 -+- y1"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "G",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "E(a, b) :- G(a, b) | G(b, a)",
+  "head": {
+   "predicate_name": "E",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "b",
+        "variable": {
+         "var_name": "b"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "G",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "E(a, b) :- G(a, b) | G(b, a)",
+  "head": {
+   "predicate_name": "E",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "b",
+        "variable": {
+         "var_name": "b"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@Recursive(ComponentOf, 25)",
+  "head": {
+   "predicate_name": "@Recursive",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "ComponentOf",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "ComponentOf"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "25",
+        "literal": {
+         "the_number": {
+          "number": "25"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "E",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "ComponentOf(x) Min= x :- E(x)",
+  "head": {
+   "predicate_name": "ComponentOf_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "E",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "y",
+            "variable": {
+             "var_name": "y"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "ComponentOf(x) Min= ComponentOf(y) :- E(x, y)",
+  "head": {
+   "predicate_name": "ComponentOf_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "ComponentOf",
+         "record": {
+          "field_value": [
+           {
+            "field": 0,
+            "value": {
+             "expression": {
+              "expression_heritage": "y",
+              "variable": {
+               "var_name": "y"
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "ComponentOf(y)"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "distinct_denoted": true,
+  "full_text": "ComponentStart() = ComponentOf() distinct",
+  "head": {
+   "predicate_name": "ComponentStart",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "ComponentOf",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "ComponentOf()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "White() = \"#eee\"",
+  "head": {
+   "predicate_name": "White",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "\"#eee\"",
+        "literal": {
+         "the_string": {
+          "the_string": "#eee"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Black() = \"#bbb\"",
+  "head": {
+   "predicate_name": "Black",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "\"#bbb\"",
+        "literal": {
+         "the_string": {
+          "the_string": "#bbb"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Other(White()) = Black()",
+  "head": {
+   "predicate_name": "Other",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "White",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "White()"
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "Black",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "Black()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Other(Black()) = White()",
+  "head": {
+   "predicate_name": "Other",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "Black",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "Black()"
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "White",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "White()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@Recursive(Color, 30)",
+  "head": {
+   "predicate_name": "@Recursive",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "Color",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "Color"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "30",
+        "literal": {
+         "the_number": {
+          "number": "30"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Color(ComponentStart()) = White() distinct",
+  "head": {
+   "predicate_name": "Color_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "ComponentStart",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "ComponentStart()"
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "White",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "White()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "E",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "x",
+            "variable": {
+             "var_name": "x"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "y",
+            "variable": {
+             "var_name": "y"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Color(y) = Other(Color(x)) distinct :- E(x, y)",
+  "head": {
+   "predicate_name": "Color_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "y",
+        "variable": {
+         "var_name": "y"
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "Other",
+         "record": {
+          "field_value": [
+           {
+            "field": 0,
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "Color",
+               "record": {
+                "field_value": [
+                 {
+                  "field": 0,
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "x",
+                    "variable": {
+                     "var_name": "x"
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "Color(x)"
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "Other(Color(x))"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "ColorableVerdict() = (\n    if Max{Count{Color(vertex)} :- E(vertex)} == 1 then\n      \"colorable\"\n    else\n      \"not colorable\")",
+  "head": {
+   "predicate_name": "ColorableVerdict",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "if Max{Count{Color(vertex)} :- E(vertex)} == 1 then\n      \"colorable\"\n    else\n      \"not colorable\"",
+        "implication": {
+         "if_then": [
+          {
+           "condition": {
+            "call": {
+             "predicate_name": "==",
+             "record": {
+              "field_value": [
+               {
+                "field": "left",
+                "value": {
+                 "expression": {
+                  "combine": {
+                   "body": {
+                    "conjunction": {
+                     "conjunct": [
+                      {
+                       "predicate": {
+                        "predicate_name": "E",
+                        "record": {
+                         "field_value": [
+                          {
+                           "field": 0,
+                           "value": {
+                            "expression": {
+                             "expression_heritage": "vertex",
+                             "variable": {
+                              "var_name": "vertex"
+                             }
+                            }
+                           }
+                          }
+                         ]
+                        }
+                       }
+                      }
+                     ]
+                    }
+                   },
+                   "distinct_denoted": true,
+                   "full_text": "Max{Count{Color(vertex)} :- E(vertex)}",
+                   "head": {
+                    "predicate_name": "Combine",
+                    "record": {
+                     "field_value": [
+                      {
+                       "field": "logica_value",
+                       "value": {
+                        "aggregation": {
+                         "expression": {
+                          "call": {
+                           "predicate_name": "Max",
+                           "record": {
+                            "field_value": [
+                             {
+                              "field": 0,
+                              "value": {
+                               "expression": {
+                                "combine": {
+                                 "distinct_denoted": true,
+                                 "full_text": "Count{Color(vertex)}",
+                                 "head": {
+                                  "predicate_name": "Combine",
+                                  "record": {
+                                   "field_value": [
+                                    {
+                                     "field": "logica_value",
+                                     "value": {
+                                      "aggregation": {
+                                       "expression": {
+                                        "call": {
+                                         "predicate_name": "Count",
+                                         "record": {
+                                          "field_value": [
+                                           {
+                                            "field": 0,
+                                            "value": {
+                                             "expression": {
+                                              "call": {
+                                               "predicate_name": "Color",
+                                               "record": {
+                                                "field_value": [
+                                                 {
+                                                  "field": 0,
+                                                  "value": {
+                                                   "expression": {
+                                                    "expression_heritage": "vertex",
+                                                    "variable": {
+                                                     "var_name": "vertex"
+                                                    }
+                                                   }
+                                                  }
+                                                 }
+                                                ]
+                                               }
+                                              },
+                                              "expression_heritage": "Color(vertex)"
+                                             }
+                                            }
+                                           }
+                                          ]
+                                         }
+                                        },
+                                        "expression_heritage": "Count{Color(vertex)}"
+                                       },
+                                       "expression_heritage": "Count{Color(vertex)}"
+                                      }
+                                     }
+                                    }
+                                   ]
+                                  }
+                                 }
+                                },
+                                "expression_heritage": "Count{Color(vertex)}"
+                               }
+                              }
+                             }
+                            ]
+                           }
+                          },
+                          "expression_heritage": "Max{Count{Color(vertex)} :- E(vertex)}"
+                         },
+                         "expression_heritage": "Max{Count{Color(vertex)} :- E(vertex)}"
+                        }
+                       }
+                      }
+                     ]
+                    }
+                   }
+                  },
+                  "expression_heritage": "Max{Count{Color(vertex)} :- E(vertex)}"
+                 }
+                }
+               },
+               {
+                "field": "right",
+                "value": {
+                 "expression": {
+                  "expression_heritage": "1",
+                  "literal": {
+                   "the_number": {
+                    "number": "1"
+                   }
+                  }
+                 }
+                }
+               }
+              ]
+             }
+            },
+            "expression_heritage": "Max{Count{Color(vertex)} :- E(vertex)} == 1"
+           },
+           "consequence": {
+            "expression_heritage": "\"colorable\"",
+            "literal": {
+             "the_string": {
+              "the_string": "colorable"
+             }
+            }
+           }
+          }
+         ],
+         "otherwise": {
+          "expression_heritage": "\"not colorable\"",
+          "literal": {
+           "the_string": {
+            "the_string": "not colorable"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "G",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "G2(a, b) :- G(a, b) | a = \"a:0\", b = \"a:6\"",
+  "head": {
+   "predicate_name": "G2",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "b",
+        "variable": {
+         "var_name": "b"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "=",
+       "record": {
+        "field_value": [
+         {
+          "field": "left",
+          "value": {
+           "expression": {
+            "expression_heritage": "a",
+            "variable": {
+             "var_name": "a"
+            }
+           }
+          }
+         },
+         {
+          "field": "right",
+          "value": {
+           "expression": {
+            "expression_heritage": "\"a:0\"",
+            "literal": {
+             "the_string": {
+              "the_string": "a:0"
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "=",
+       "record": {
+        "field_value": [
+         {
+          "field": "left",
+          "value": {
+           "expression": {
+            "expression_heritage": "b",
+            "variable": {
+             "var_name": "b"
+            }
+           }
+          }
+         },
+         {
+          "field": "right",
+          "value": {
+           "expression": {
+            "expression_heritage": "\"a:6\"",
+            "literal": {
+             "the_string": {
+              "the_string": "a:6"
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "G2(a, b) :- G(a, b) | a = \"a:0\", b = \"a:6\"",
+  "head": {
+   "predicate_name": "G2",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "a",
+        "variable": {
+         "var_name": "a"
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "b",
+        "variable": {
+         "var_name": "b"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "ColorableVerdict2 := ColorableVerdict(G: G2)",
+  "head": {
+   "predicate_name": "@Make",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "ColorableVerdict2",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "ColorableVerdict2"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "ColorableVerdict"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "record": {
+         "field_value": [
+          {
+           "field": "G",
+           "value": {
+            "expression": {
+             "expression_heritage": "G2",
+             "literal": {
+              "the_predicate": {
+               "predicate_name": "G2"
+              }
+             }
+            }
+           }
+          }
+         ]
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@OrderBy(Test, \"col0\")",
+  "head": {
+   "predicate_name": "@OrderBy",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "Test",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "Test"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"col0\"",
+        "literal": {
+         "the_string": {
+          "the_string": "col0"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test(\"G1\", ColorableVerdict())",
+  "head": {
+   "predicate_name": "Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"G1\"",
+        "literal": {
+         "the_string": {
+          "the_string": "G1"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "ColorableVerdict",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "ColorableVerdict()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test(\"G2\", ColorableVerdict2())",
+  "head": {
+   "predicate_name": "Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"G2\"",
+        "literal": {
+         "the_string": {
+          "the_string": "G2"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "ColorableVerdict2",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "ColorableVerdict2()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_MultBodyAggAux",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 0
+            }
+           }
+          }
+         },
+         {
+          "field": 1,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 1
+            }
+           }
+          }
+         },
+         {
+          "field": 2,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 2
+            }
+           }
+          }
+         },
+         {
+          "field": 3,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 3
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "L(x, y, x, y * 3) distinct :- L(a, b, x, y)",
+  "head": {
+   "predicate_name": "L",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 0
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 1
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 2
+        }
+       }
+      }
+     },
+     {
+      "field": 3,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 3
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "ComponentOf_MultBodyAggAux",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 0
+            }
+           }
+          }
+         },
+         {
+          "field": "logica_value",
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": "logica_value"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "ComponentOf(x) Min= ComponentOf(y) :- E(x, y)",
+  "head": {
+   "predicate_name": "ComponentOf",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 0
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "Min",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "variable": {
+                "var_name": "logica_value"
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " Min= x"
+        },
+        "expression_heritage": " Min= x"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "Color_MultBodyAggAux",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 0
+            }
+           }
+          }
+         },
+         {
+          "field": "logica_value",
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": "logica_value"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "Color(y) = Other(Color(x)) distinct :- E(x, y)",
+  "head": {
+   "predicate_name": "Color",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 0
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": "logica_value"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

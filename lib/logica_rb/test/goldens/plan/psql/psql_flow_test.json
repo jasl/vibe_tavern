@@ -1,0 +1,1973 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr0",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr0 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr0 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr0",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr1",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr1 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr1 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_52_Opportunity_fr0.path, t_52_Opportunity_fr0.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr0 AS t_52_Opportunity_fr0\n    WHERE\n      (t_52_Opportunity_fr0.logica_value > 0) AND\n      (3 = t_52_Opportunity_fr0.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr1",
+   "requires": [
+    "Opportunity_fr0"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr10",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr10 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr10 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_259_Opportunity_fr9.path, t_259_Opportunity_fr9.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr9 AS t_259_Opportunity_fr9\n    WHERE\n      (t_259_Opportunity_fr9.logica_value > 0) AND\n      (3 = t_259_Opportunity_fr9.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr10",
+   "requires": [
+    "Opportunity_fr9"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr11",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr11 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr11 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_282_Opportunity_fr10.path, t_282_Opportunity_fr10.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr10 AS t_282_Opportunity_fr10\n    WHERE\n      (t_282_Opportunity_fr10.logica_value > 0) AND\n      (3 = t_282_Opportunity_fr10.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr11",
+   "requires": [
+    "Opportunity_fr10"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr12",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr12 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr12 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_305_Opportunity_fr11.path, t_305_Opportunity_fr11.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr11 AS t_305_Opportunity_fr11\n    WHERE\n      (t_305_Opportunity_fr11.logica_value > 0) AND\n      (3 = t_305_Opportunity_fr11.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr12",
+   "requires": [
+    "Opportunity_fr11"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr13",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr13 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr13 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_328_Opportunity_fr12.path, t_328_Opportunity_fr12.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr12 AS t_328_Opportunity_fr12\n    WHERE\n      (t_328_Opportunity_fr12.logica_value > 0) AND\n      (3 = t_328_Opportunity_fr12.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr13",
+   "requires": [
+    "Opportunity_fr12"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr14",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr14 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr14 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_351_Opportunity_fr13.path, t_351_Opportunity_fr13.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr13 AS t_351_Opportunity_fr13\n    WHERE\n      (t_351_Opportunity_fr13.logica_value > 0) AND\n      (3 = t_351_Opportunity_fr13.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr14",
+   "requires": [
+    "Opportunity_fr13"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr15",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr15 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr15 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_374_Opportunity_fr14.path, t_374_Opportunity_fr14.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr14 AS t_374_Opportunity_fr14\n    WHERE\n      (t_374_Opportunity_fr14.logica_value > 0) AND\n      (3 = t_374_Opportunity_fr14.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr15",
+   "requires": [
+    "Opportunity_fr14"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr16",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr16 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr16 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_397_Opportunity_fr15.path, t_397_Opportunity_fr15.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr15 AS t_397_Opportunity_fr15\n    WHERE\n      (t_397_Opportunity_fr15.logica_value > 0) AND\n      (3 = t_397_Opportunity_fr15.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr16",
+   "requires": [
+    "Opportunity_fr15"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr17",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr17 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr17 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_420_Opportunity_fr16.path, t_420_Opportunity_fr16.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr16 AS t_420_Opportunity_fr16\n    WHERE\n      (t_420_Opportunity_fr16.logica_value > 0) AND\n      (3 = t_420_Opportunity_fr16.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr17",
+   "requires": [
+    "Opportunity_fr16"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr18",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr18 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr18 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_443_Opportunity_fr17.path, t_443_Opportunity_fr17.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr17 AS t_443_Opportunity_fr17\n    WHERE\n      (t_443_Opportunity_fr17.logica_value > 0) AND\n      (3 = t_443_Opportunity_fr17.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr18",
+   "requires": [
+    "Opportunity_fr17"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr19",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr19 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr19 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_466_Opportunity_fr18.path, t_466_Opportunity_fr18.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr18 AS t_466_Opportunity_fr18\n    WHERE\n      (t_466_Opportunity_fr18.logica_value > 0) AND\n      (3 = t_466_Opportunity_fr18.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr19",
+   "requires": [
+    "Opportunity_fr18"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr2",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr2 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr2 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_75_Opportunity_fr1.path, t_75_Opportunity_fr1.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr1 AS t_75_Opportunity_fr1\n    WHERE\n      (t_75_Opportunity_fr1.logica_value > 0) AND\n      (3 = t_75_Opportunity_fr1.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr2",
+   "requires": [
+    "Opportunity_fr1"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr3",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr3 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr3 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_98_Opportunity_fr2.path, t_98_Opportunity_fr2.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr2 AS t_98_Opportunity_fr2\n    WHERE\n      (t_98_Opportunity_fr2.logica_value > 0) AND\n      (3 = t_98_Opportunity_fr2.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr3",
+   "requires": [
+    "Opportunity_fr2"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr4",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr4 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr4 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_121_Opportunity_fr3.path, t_121_Opportunity_fr3.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr3 AS t_121_Opportunity_fr3\n    WHERE\n      (t_121_Opportunity_fr3.logica_value > 0) AND\n      (3 = t_121_Opportunity_fr3.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr4",
+   "requires": [
+    "Opportunity_fr3"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr5",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr5 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr5 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_144_Opportunity_fr4.path, t_144_Opportunity_fr4.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr4 AS t_144_Opportunity_fr4\n    WHERE\n      (t_144_Opportunity_fr4.logica_value > 0) AND\n      (3 = t_144_Opportunity_fr4.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr5",
+   "requires": [
+    "Opportunity_fr4"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr6",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr6 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr6 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_167_Opportunity_fr5.path, t_167_Opportunity_fr5.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr5 AS t_167_Opportunity_fr5\n    WHERE\n      (t_167_Opportunity_fr5.logica_value > 0) AND\n      (3 = t_167_Opportunity_fr5.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr6",
+   "requires": [
+    "Opportunity_fr5"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr7",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr7 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr7 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_190_Opportunity_fr6.path, t_190_Opportunity_fr6.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr6 AS t_190_Opportunity_fr6\n    WHERE\n      (t_190_Opportunity_fr6.logica_value > 0) AND\n      (3 = t_190_Opportunity_fr6.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr7",
+   "requires": [
+    "Opportunity_fr6"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr8",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr8 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr8 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_213_Opportunity_fr7.path, t_213_Opportunity_fr7.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr7 AS t_213_Opportunity_fr7\n    WHERE\n      (t_213_Opportunity_fr7.logica_value > 0) AND\n      (3 = t_213_Opportunity_fr7.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr8",
+   "requires": [
+    "Opportunity_fr7"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ActivePath_fr9",
+    "sql": "DROP TABLE IF EXISTS logica_home.ActivePath_fr9 CASCADE;\nCREATE TABLE logica_home.ActivePath_fr9 AS SELECT * FROM (\n  \n    SELECT\n      ROW(ARRAY[ROW(0, 0)::logicarecord6083990]::logicarecord6083990[], 0)::logicarecord865112836 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      ROW(t_236_Opportunity_fr8.path, t_236_Opportunity_fr8.logica_value)::logicarecord865112836 AS logica_value\n    FROM\n      logica_home.Opportunity_fr8 AS t_236_Opportunity_fr8\n    WHERE\n      (t_236_Opportunity_fr8.logica_value > 0) AND\n      (3 = t_236_Opportunity_fr8.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "ActivePath_fr9",
+   "requires": [
+    "Opportunity_fr8"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr0",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr0 CASCADE;\nCREATE TABLE logica_home.Capacity_fr0 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr0",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr1",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr1 CASCADE;\nCREATE TABLE logica_home.Capacity_fr1 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_87_G.col0 AS col0,\n      t_87_G.col1 AS col1,\n      ((((t_87_G.logica_value) - (t_88_Flow_fr0.logica_value))) + (t_89_Flow_fr0.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_87_G, logica_home.Flow_fr0 AS t_88_Flow_fr0, logica_home.Flow_fr0 AS t_89_Flow_fr0\n    WHERE\n      (t_88_Flow_fr0.col0 = t_87_G.col0) AND\n      (t_88_Flow_fr0.col1 = t_87_G.col1) AND\n      (t_89_Flow_fr0.col0 = t_87_G.col1) AND\n      (t_89_Flow_fr0.col1 = t_87_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr1",
+   "requires": [
+    "Flow_fr0",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr10",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr10 CASCADE;\nCREATE TABLE logica_home.Capacity_fr10 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_294_G.col0 AS col0,\n      t_294_G.col1 AS col1,\n      ((((t_294_G.logica_value) - (t_295_Flow_fr9.logica_value))) + (t_296_Flow_fr9.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_294_G, logica_home.Flow_fr9 AS t_295_Flow_fr9, logica_home.Flow_fr9 AS t_296_Flow_fr9\n    WHERE\n      (t_295_Flow_fr9.col0 = t_294_G.col0) AND\n      (t_295_Flow_fr9.col1 = t_294_G.col1) AND\n      (t_296_Flow_fr9.col0 = t_294_G.col1) AND\n      (t_296_Flow_fr9.col1 = t_294_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr10",
+   "requires": [
+    "Flow_fr9",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr11",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr11 CASCADE;\nCREATE TABLE logica_home.Capacity_fr11 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_317_G.col0 AS col0,\n      t_317_G.col1 AS col1,\n      ((((t_317_G.logica_value) - (t_318_Flow_fr10.logica_value))) + (t_319_Flow_fr10.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_317_G, logica_home.Flow_fr10 AS t_318_Flow_fr10, logica_home.Flow_fr10 AS t_319_Flow_fr10\n    WHERE\n      (t_318_Flow_fr10.col0 = t_317_G.col0) AND\n      (t_318_Flow_fr10.col1 = t_317_G.col1) AND\n      (t_319_Flow_fr10.col0 = t_317_G.col1) AND\n      (t_319_Flow_fr10.col1 = t_317_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr11",
+   "requires": [
+    "Flow_fr10",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr12",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr12 CASCADE;\nCREATE TABLE logica_home.Capacity_fr12 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_340_G.col0 AS col0,\n      t_340_G.col1 AS col1,\n      ((((t_340_G.logica_value) - (t_341_Flow_fr11.logica_value))) + (t_342_Flow_fr11.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_340_G, logica_home.Flow_fr11 AS t_341_Flow_fr11, logica_home.Flow_fr11 AS t_342_Flow_fr11\n    WHERE\n      (t_341_Flow_fr11.col0 = t_340_G.col0) AND\n      (t_341_Flow_fr11.col1 = t_340_G.col1) AND\n      (t_342_Flow_fr11.col0 = t_340_G.col1) AND\n      (t_342_Flow_fr11.col1 = t_340_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr12",
+   "requires": [
+    "Flow_fr11",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr13",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr13 CASCADE;\nCREATE TABLE logica_home.Capacity_fr13 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_363_G.col0 AS col0,\n      t_363_G.col1 AS col1,\n      ((((t_363_G.logica_value) - (t_364_Flow_fr12.logica_value))) + (t_365_Flow_fr12.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_363_G, logica_home.Flow_fr12 AS t_364_Flow_fr12, logica_home.Flow_fr12 AS t_365_Flow_fr12\n    WHERE\n      (t_364_Flow_fr12.col0 = t_363_G.col0) AND\n      (t_364_Flow_fr12.col1 = t_363_G.col1) AND\n      (t_365_Flow_fr12.col0 = t_363_G.col1) AND\n      (t_365_Flow_fr12.col1 = t_363_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr13",
+   "requires": [
+    "Flow_fr12",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr14",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr14 CASCADE;\nCREATE TABLE logica_home.Capacity_fr14 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_386_G.col0 AS col0,\n      t_386_G.col1 AS col1,\n      ((((t_386_G.logica_value) - (t_387_Flow_fr13.logica_value))) + (t_388_Flow_fr13.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_386_G, logica_home.Flow_fr13 AS t_387_Flow_fr13, logica_home.Flow_fr13 AS t_388_Flow_fr13\n    WHERE\n      (t_387_Flow_fr13.col0 = t_386_G.col0) AND\n      (t_387_Flow_fr13.col1 = t_386_G.col1) AND\n      (t_388_Flow_fr13.col0 = t_386_G.col1) AND\n      (t_388_Flow_fr13.col1 = t_386_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr14",
+   "requires": [
+    "Flow_fr13",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr15",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr15 CASCADE;\nCREATE TABLE logica_home.Capacity_fr15 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_409_G.col0 AS col0,\n      t_409_G.col1 AS col1,\n      ((((t_409_G.logica_value) - (t_410_Flow_fr14.logica_value))) + (t_411_Flow_fr14.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_409_G, logica_home.Flow_fr14 AS t_410_Flow_fr14, logica_home.Flow_fr14 AS t_411_Flow_fr14\n    WHERE\n      (t_410_Flow_fr14.col0 = t_409_G.col0) AND\n      (t_410_Flow_fr14.col1 = t_409_G.col1) AND\n      (t_411_Flow_fr14.col0 = t_409_G.col1) AND\n      (t_411_Flow_fr14.col1 = t_409_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr15",
+   "requires": [
+    "Flow_fr14",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr16",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr16 CASCADE;\nCREATE TABLE logica_home.Capacity_fr16 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_432_G.col0 AS col0,\n      t_432_G.col1 AS col1,\n      ((((t_432_G.logica_value) - (t_433_Flow_fr15.logica_value))) + (t_434_Flow_fr15.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_432_G, logica_home.Flow_fr15 AS t_433_Flow_fr15, logica_home.Flow_fr15 AS t_434_Flow_fr15\n    WHERE\n      (t_433_Flow_fr15.col0 = t_432_G.col0) AND\n      (t_433_Flow_fr15.col1 = t_432_G.col1) AND\n      (t_434_Flow_fr15.col0 = t_432_G.col1) AND\n      (t_434_Flow_fr15.col1 = t_432_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr16",
+   "requires": [
+    "Flow_fr15",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr17",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr17 CASCADE;\nCREATE TABLE logica_home.Capacity_fr17 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_455_G.col0 AS col0,\n      t_455_G.col1 AS col1,\n      ((((t_455_G.logica_value) - (t_456_Flow_fr16.logica_value))) + (t_457_Flow_fr16.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_455_G, logica_home.Flow_fr16 AS t_456_Flow_fr16, logica_home.Flow_fr16 AS t_457_Flow_fr16\n    WHERE\n      (t_456_Flow_fr16.col0 = t_455_G.col0) AND\n      (t_456_Flow_fr16.col1 = t_455_G.col1) AND\n      (t_457_Flow_fr16.col0 = t_455_G.col1) AND\n      (t_457_Flow_fr16.col1 = t_455_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr17",
+   "requires": [
+    "Flow_fr16",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr18",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr18 CASCADE;\nCREATE TABLE logica_home.Capacity_fr18 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_478_G.col0 AS col0,\n      t_478_G.col1 AS col1,\n      ((((t_478_G.logica_value) - (t_479_Flow_fr17.logica_value))) + (t_480_Flow_fr17.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_478_G, logica_home.Flow_fr17 AS t_479_Flow_fr17, logica_home.Flow_fr17 AS t_480_Flow_fr17\n    WHERE\n      (t_479_Flow_fr17.col0 = t_478_G.col0) AND\n      (t_479_Flow_fr17.col1 = t_478_G.col1) AND\n      (t_480_Flow_fr17.col0 = t_478_G.col1) AND\n      (t_480_Flow_fr17.col1 = t_478_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr18",
+   "requires": [
+    "Flow_fr17",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr2",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr2 CASCADE;\nCREATE TABLE logica_home.Capacity_fr2 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_110_G.col0 AS col0,\n      t_110_G.col1 AS col1,\n      ((((t_110_G.logica_value) - (t_111_Flow_fr1.logica_value))) + (t_112_Flow_fr1.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_110_G, logica_home.Flow_fr1 AS t_111_Flow_fr1, logica_home.Flow_fr1 AS t_112_Flow_fr1\n    WHERE\n      (t_111_Flow_fr1.col0 = t_110_G.col0) AND\n      (t_111_Flow_fr1.col1 = t_110_G.col1) AND\n      (t_112_Flow_fr1.col0 = t_110_G.col1) AND\n      (t_112_Flow_fr1.col1 = t_110_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr2",
+   "requires": [
+    "Flow_fr1",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr3",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr3 CASCADE;\nCREATE TABLE logica_home.Capacity_fr3 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_133_G.col0 AS col0,\n      t_133_G.col1 AS col1,\n      ((((t_133_G.logica_value) - (t_134_Flow_fr2.logica_value))) + (t_135_Flow_fr2.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_133_G, logica_home.Flow_fr2 AS t_134_Flow_fr2, logica_home.Flow_fr2 AS t_135_Flow_fr2\n    WHERE\n      (t_134_Flow_fr2.col0 = t_133_G.col0) AND\n      (t_134_Flow_fr2.col1 = t_133_G.col1) AND\n      (t_135_Flow_fr2.col0 = t_133_G.col1) AND\n      (t_135_Flow_fr2.col1 = t_133_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr3",
+   "requires": [
+    "Flow_fr2",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr4",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr4 CASCADE;\nCREATE TABLE logica_home.Capacity_fr4 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_156_G.col0 AS col0,\n      t_156_G.col1 AS col1,\n      ((((t_156_G.logica_value) - (t_157_Flow_fr3.logica_value))) + (t_158_Flow_fr3.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_156_G, logica_home.Flow_fr3 AS t_157_Flow_fr3, logica_home.Flow_fr3 AS t_158_Flow_fr3\n    WHERE\n      (t_157_Flow_fr3.col0 = t_156_G.col0) AND\n      (t_157_Flow_fr3.col1 = t_156_G.col1) AND\n      (t_158_Flow_fr3.col0 = t_156_G.col1) AND\n      (t_158_Flow_fr3.col1 = t_156_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr4",
+   "requires": [
+    "Flow_fr3",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr5",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr5 CASCADE;\nCREATE TABLE logica_home.Capacity_fr5 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_179_G.col0 AS col0,\n      t_179_G.col1 AS col1,\n      ((((t_179_G.logica_value) - (t_180_Flow_fr4.logica_value))) + (t_181_Flow_fr4.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_179_G, logica_home.Flow_fr4 AS t_180_Flow_fr4, logica_home.Flow_fr4 AS t_181_Flow_fr4\n    WHERE\n      (t_180_Flow_fr4.col0 = t_179_G.col0) AND\n      (t_180_Flow_fr4.col1 = t_179_G.col1) AND\n      (t_181_Flow_fr4.col0 = t_179_G.col1) AND\n      (t_181_Flow_fr4.col1 = t_179_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr5",
+   "requires": [
+    "Flow_fr4",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr6",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr6 CASCADE;\nCREATE TABLE logica_home.Capacity_fr6 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_202_G.col0 AS col0,\n      t_202_G.col1 AS col1,\n      ((((t_202_G.logica_value) - (t_203_Flow_fr5.logica_value))) + (t_204_Flow_fr5.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_202_G, logica_home.Flow_fr5 AS t_203_Flow_fr5, logica_home.Flow_fr5 AS t_204_Flow_fr5\n    WHERE\n      (t_203_Flow_fr5.col0 = t_202_G.col0) AND\n      (t_203_Flow_fr5.col1 = t_202_G.col1) AND\n      (t_204_Flow_fr5.col0 = t_202_G.col1) AND\n      (t_204_Flow_fr5.col1 = t_202_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr6",
+   "requires": [
+    "Flow_fr5",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr7",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr7 CASCADE;\nCREATE TABLE logica_home.Capacity_fr7 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_225_G.col0 AS col0,\n      t_225_G.col1 AS col1,\n      ((((t_225_G.logica_value) - (t_226_Flow_fr6.logica_value))) + (t_227_Flow_fr6.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_225_G, logica_home.Flow_fr6 AS t_226_Flow_fr6, logica_home.Flow_fr6 AS t_227_Flow_fr6\n    WHERE\n      (t_226_Flow_fr6.col0 = t_225_G.col0) AND\n      (t_226_Flow_fr6.col1 = t_225_G.col1) AND\n      (t_227_Flow_fr6.col0 = t_225_G.col1) AND\n      (t_227_Flow_fr6.col1 = t_225_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr7",
+   "requires": [
+    "Flow_fr6",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr8",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr8 CASCADE;\nCREATE TABLE logica_home.Capacity_fr8 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_248_G.col0 AS col0,\n      t_248_G.col1 AS col1,\n      ((((t_248_G.logica_value) - (t_249_Flow_fr7.logica_value))) + (t_250_Flow_fr7.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_248_G, logica_home.Flow_fr7 AS t_249_Flow_fr7, logica_home.Flow_fr7 AS t_250_Flow_fr7\n    WHERE\n      (t_249_Flow_fr7.col0 = t_248_G.col0) AND\n      (t_249_Flow_fr7.col1 = t_248_G.col1) AND\n      (t_250_Flow_fr7.col0 = t_248_G.col1) AND\n      (t_250_Flow_fr7.col1 = t_248_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr8",
+   "requires": [
+    "Flow_fr7",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Capacity_fr9",
+    "sql": "DROP TABLE IF EXISTS logica_home.Capacity_fr9 CASCADE;\nCREATE TABLE logica_home.Capacity_fr9 AS SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      0 AS col1,\n      0 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n    WHERE\n      (1 = 0) UNION ALL\n  \n    SELECT\n      t_271_G.col0 AS col0,\n      t_271_G.col1 AS col1,\n      ((((t_271_G.logica_value) - (t_272_Flow_fr8.logica_value))) + (t_273_Flow_fr8.logica_value)) AS logica_value\n    FROM\n      logica_home.G AS t_271_G, logica_home.Flow_fr8 AS t_272_Flow_fr8, logica_home.Flow_fr8 AS t_273_Flow_fr8\n    WHERE\n      (t_272_Flow_fr8.col0 = t_271_G.col0) AND\n      (t_272_Flow_fr8.col1 = t_271_G.col1) AND\n      (t_273_Flow_fr8.col0 = t_271_G.col1) AND\n      (t_273_Flow_fr8.col1 = t_271_G.col0)\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "Capacity_fr9",
+   "requires": [
+    "Flow_fr8",
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow CASCADE;\nCREATE TABLE logica_home.Flow AS WITH t_0_Flow_MultBodyAggAux_f84 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr19.col0 AS col0,\n      Flow_fr19.col1 AS col1,\n      Flow_fr19.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr19 AS Flow_fr19 UNION ALL\n  \n    SELECT\n      t_459_G.col0 AS col0,\n      t_459_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_459_G UNION ALL\n  \n    SELECT\n      (x_2487).x AS col0,\n      (x_2487).y AS col1,\n      (ActivePath_fr19.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr19 AS ActivePath_fr19, UNNEST((ActivePath_fr19.logica_value).path) as x_2487\n    WHERE\n      ((ActivePath_fr19.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_2521 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr19 AS Opportunity_fr19, UNNEST(ARRAY[0]::numeric[]) as x_2521\n      WHERE\n        (Opportunity_fr19.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr19.logica_value = ROW((ActivePath_fr19.logica_value).path, (ActivePath_fr19.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f84.col0 AS col0,\n  Flow_MultBodyAggAux_f84.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f84.logica_value) AS logica_value\nFROM\n  t_0_Flow_MultBodyAggAux_f84 AS Flow_MultBodyAggAux_f84\nGROUP BY Flow_MultBodyAggAux_f84.col0, Flow_MultBodyAggAux_f84.col1;"
+   },
+   "name": "Flow",
+   "requires": [
+    "ActivePath_fr19",
+    "Flow_fr19",
+    "G",
+    "Opportunity_fr19"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr0",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr0 CASCADE;\nCREATE TABLE logica_home.Flow_fr0 AS WITH t_20_Flow_MultBodyAggAux_f3 AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS G\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f3.col0 AS col0,\n  Flow_MultBodyAggAux_f3.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f3.logica_value) AS logica_value\nFROM\n  t_20_Flow_MultBodyAggAux_f3 AS Flow_MultBodyAggAux_f3\nGROUP BY Flow_MultBodyAggAux_f3.col0, Flow_MultBodyAggAux_f3.col1;"
+   },
+   "name": "Flow_fr0",
+   "requires": [
+    "G"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr1",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr1 CASCADE;\nCREATE TABLE logica_home.Flow_fr1 AS WITH t_19_Flow_MultBodyAggAux_f9 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr0.col0 AS col0,\n      Flow_fr0.col1 AS col1,\n      Flow_fr0.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr0 AS Flow_fr0 UNION ALL\n  \n    SELECT\n      t_30_G.col0 AS col0,\n      t_30_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_30_G UNION ALL\n  \n    SELECT\n      (x_323).x AS col0,\n      (x_323).y AS col1,\n      (ActivePath_fr0.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr0 AS ActivePath_fr0, UNNEST((ActivePath_fr0.logica_value).path) as x_323\n    WHERE\n      ((ActivePath_fr0.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_357 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr0 AS Opportunity_fr0, UNNEST(ARRAY[0]::numeric[]) as x_357\n      WHERE\n        (Opportunity_fr0.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr0.logica_value = ROW((ActivePath_fr0.logica_value).path, (ActivePath_fr0.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f9.col0 AS col0,\n  Flow_MultBodyAggAux_f9.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f9.logica_value) AS logica_value\nFROM\n  t_19_Flow_MultBodyAggAux_f9 AS Flow_MultBodyAggAux_f9\nGROUP BY Flow_MultBodyAggAux_f9.col0, Flow_MultBodyAggAux_f9.col1;"
+   },
+   "name": "Flow_fr1",
+   "requires": [
+    "ActivePath_fr0",
+    "Flow_fr0",
+    "G",
+    "Opportunity_fr0"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr10",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr10 CASCADE;\nCREATE TABLE logica_home.Flow_fr10 AS WITH t_10_Flow_MultBodyAggAux_f43 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr9.col0 AS col0,\n      Flow_fr9.col1 AS col1,\n      Flow_fr9.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr9 AS Flow_fr9 UNION ALL\n  \n    SELECT\n      t_229_G.col0 AS col0,\n      t_229_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_229_G UNION ALL\n  \n    SELECT\n      (x_1337).x AS col0,\n      (x_1337).y AS col1,\n      (ActivePath_fr9.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr9 AS ActivePath_fr9, UNNEST((ActivePath_fr9.logica_value).path) as x_1337\n    WHERE\n      ((ActivePath_fr9.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1371 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr9 AS Opportunity_fr9, UNNEST(ARRAY[0]::numeric[]) as x_1371\n      WHERE\n        (Opportunity_fr9.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr9.logica_value = ROW((ActivePath_fr9.logica_value).path, (ActivePath_fr9.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f43.col0 AS col0,\n  Flow_MultBodyAggAux_f43.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f43.logica_value) AS logica_value\nFROM\n  t_10_Flow_MultBodyAggAux_f43 AS Flow_MultBodyAggAux_f43\nGROUP BY Flow_MultBodyAggAux_f43.col0, Flow_MultBodyAggAux_f43.col1;"
+   },
+   "name": "Flow_fr10",
+   "requires": [
+    "ActivePath_fr9",
+    "Flow_fr9",
+    "G",
+    "Opportunity_fr9"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr11",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr11 CASCADE;\nCREATE TABLE logica_home.Flow_fr11 AS WITH t_9_Flow_MultBodyAggAux_f49 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr10.col0 AS col0,\n      Flow_fr10.col1 AS col1,\n      Flow_fr10.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr10 AS Flow_fr10 UNION ALL\n  \n    SELECT\n      t_252_G.col0 AS col0,\n      t_252_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_252_G UNION ALL\n  \n    SELECT\n      (x_1452).x AS col0,\n      (x_1452).y AS col1,\n      (ActivePath_fr10.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr10 AS ActivePath_fr10, UNNEST((ActivePath_fr10.logica_value).path) as x_1452\n    WHERE\n      ((ActivePath_fr10.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1486 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr10 AS Opportunity_fr10, UNNEST(ARRAY[0]::numeric[]) as x_1486\n      WHERE\n        (Opportunity_fr10.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr10.logica_value = ROW((ActivePath_fr10.logica_value).path, (ActivePath_fr10.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f49.col0 AS col0,\n  Flow_MultBodyAggAux_f49.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f49.logica_value) AS logica_value\nFROM\n  t_9_Flow_MultBodyAggAux_f49 AS Flow_MultBodyAggAux_f49\nGROUP BY Flow_MultBodyAggAux_f49.col0, Flow_MultBodyAggAux_f49.col1;"
+   },
+   "name": "Flow_fr11",
+   "requires": [
+    "ActivePath_fr10",
+    "Flow_fr10",
+    "G",
+    "Opportunity_fr10"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr12",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr12 CASCADE;\nCREATE TABLE logica_home.Flow_fr12 AS WITH t_8_Flow_MultBodyAggAux_f50 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr11.col0 AS col0,\n      Flow_fr11.col1 AS col1,\n      Flow_fr11.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr11 AS Flow_fr11 UNION ALL\n  \n    SELECT\n      t_275_G.col0 AS col0,\n      t_275_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_275_G UNION ALL\n  \n    SELECT\n      (x_1567).x AS col0,\n      (x_1567).y AS col1,\n      (ActivePath_fr11.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr11 AS ActivePath_fr11, UNNEST((ActivePath_fr11.logica_value).path) as x_1567\n    WHERE\n      ((ActivePath_fr11.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1601 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr11 AS Opportunity_fr11, UNNEST(ARRAY[0]::numeric[]) as x_1601\n      WHERE\n        (Opportunity_fr11.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr11.logica_value = ROW((ActivePath_fr11.logica_value).path, (ActivePath_fr11.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f50.col0 AS col0,\n  Flow_MultBodyAggAux_f50.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f50.logica_value) AS logica_value\nFROM\n  t_8_Flow_MultBodyAggAux_f50 AS Flow_MultBodyAggAux_f50\nGROUP BY Flow_MultBodyAggAux_f50.col0, Flow_MultBodyAggAux_f50.col1;"
+   },
+   "name": "Flow_fr12",
+   "requires": [
+    "ActivePath_fr11",
+    "Flow_fr11",
+    "G",
+    "Opportunity_fr11"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr13",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr13 CASCADE;\nCREATE TABLE logica_home.Flow_fr13 AS WITH t_7_Flow_MultBodyAggAux_f55 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr12.col0 AS col0,\n      Flow_fr12.col1 AS col1,\n      Flow_fr12.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr12 AS Flow_fr12 UNION ALL\n  \n    SELECT\n      t_298_G.col0 AS col0,\n      t_298_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_298_G UNION ALL\n  \n    SELECT\n      (x_1682).x AS col0,\n      (x_1682).y AS col1,\n      (ActivePath_fr12.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr12 AS ActivePath_fr12, UNNEST((ActivePath_fr12.logica_value).path) as x_1682\n    WHERE\n      ((ActivePath_fr12.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1716 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr12 AS Opportunity_fr12, UNNEST(ARRAY[0]::numeric[]) as x_1716\n      WHERE\n        (Opportunity_fr12.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr12.logica_value = ROW((ActivePath_fr12.logica_value).path, (ActivePath_fr12.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f55.col0 AS col0,\n  Flow_MultBodyAggAux_f55.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f55.logica_value) AS logica_value\nFROM\n  t_7_Flow_MultBodyAggAux_f55 AS Flow_MultBodyAggAux_f55\nGROUP BY Flow_MultBodyAggAux_f55.col0, Flow_MultBodyAggAux_f55.col1;"
+   },
+   "name": "Flow_fr13",
+   "requires": [
+    "ActivePath_fr12",
+    "Flow_fr12",
+    "G",
+    "Opportunity_fr12"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr14",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr14 CASCADE;\nCREATE TABLE logica_home.Flow_fr14 AS WITH t_6_Flow_MultBodyAggAux_f61 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr13.col0 AS col0,\n      Flow_fr13.col1 AS col1,\n      Flow_fr13.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr13 AS Flow_fr13 UNION ALL\n  \n    SELECT\n      t_321_G.col0 AS col0,\n      t_321_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_321_G UNION ALL\n  \n    SELECT\n      (x_1797).x AS col0,\n      (x_1797).y AS col1,\n      (ActivePath_fr13.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr13 AS ActivePath_fr13, UNNEST((ActivePath_fr13.logica_value).path) as x_1797\n    WHERE\n      ((ActivePath_fr13.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1831 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr13 AS Opportunity_fr13, UNNEST(ARRAY[0]::numeric[]) as x_1831\n      WHERE\n        (Opportunity_fr13.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr13.logica_value = ROW((ActivePath_fr13.logica_value).path, (ActivePath_fr13.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f61.col0 AS col0,\n  Flow_MultBodyAggAux_f61.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f61.logica_value) AS logica_value\nFROM\n  t_6_Flow_MultBodyAggAux_f61 AS Flow_MultBodyAggAux_f61\nGROUP BY Flow_MultBodyAggAux_f61.col0, Flow_MultBodyAggAux_f61.col1;"
+   },
+   "name": "Flow_fr14",
+   "requires": [
+    "ActivePath_fr13",
+    "Flow_fr13",
+    "G",
+    "Opportunity_fr13"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr15",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr15 CASCADE;\nCREATE TABLE logica_home.Flow_fr15 AS WITH t_5_Flow_MultBodyAggAux_f62 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr14.col0 AS col0,\n      Flow_fr14.col1 AS col1,\n      Flow_fr14.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr14 AS Flow_fr14 UNION ALL\n  \n    SELECT\n      t_344_G.col0 AS col0,\n      t_344_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_344_G UNION ALL\n  \n    SELECT\n      (x_1912).x AS col0,\n      (x_1912).y AS col1,\n      (ActivePath_fr14.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr14 AS ActivePath_fr14, UNNEST((ActivePath_fr14.logica_value).path) as x_1912\n    WHERE\n      ((ActivePath_fr14.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1946 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr14 AS Opportunity_fr14, UNNEST(ARRAY[0]::numeric[]) as x_1946\n      WHERE\n        (Opportunity_fr14.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr14.logica_value = ROW((ActivePath_fr14.logica_value).path, (ActivePath_fr14.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f62.col0 AS col0,\n  Flow_MultBodyAggAux_f62.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f62.logica_value) AS logica_value\nFROM\n  t_5_Flow_MultBodyAggAux_f62 AS Flow_MultBodyAggAux_f62\nGROUP BY Flow_MultBodyAggAux_f62.col0, Flow_MultBodyAggAux_f62.col1;"
+   },
+   "name": "Flow_fr15",
+   "requires": [
+    "ActivePath_fr14",
+    "Flow_fr14",
+    "G",
+    "Opportunity_fr14"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr16",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr16 CASCADE;\nCREATE TABLE logica_home.Flow_fr16 AS WITH t_4_Flow_MultBodyAggAux_f67 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr15.col0 AS col0,\n      Flow_fr15.col1 AS col1,\n      Flow_fr15.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr15 AS Flow_fr15 UNION ALL\n  \n    SELECT\n      t_367_G.col0 AS col0,\n      t_367_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_367_G UNION ALL\n  \n    SELECT\n      (x_2027).x AS col0,\n      (x_2027).y AS col1,\n      (ActivePath_fr15.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr15 AS ActivePath_fr15, UNNEST((ActivePath_fr15.logica_value).path) as x_2027\n    WHERE\n      ((ActivePath_fr15.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_2061 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr15 AS Opportunity_fr15, UNNEST(ARRAY[0]::numeric[]) as x_2061\n      WHERE\n        (Opportunity_fr15.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr15.logica_value = ROW((ActivePath_fr15.logica_value).path, (ActivePath_fr15.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f67.col0 AS col0,\n  Flow_MultBodyAggAux_f67.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f67.logica_value) AS logica_value\nFROM\n  t_4_Flow_MultBodyAggAux_f67 AS Flow_MultBodyAggAux_f67\nGROUP BY Flow_MultBodyAggAux_f67.col0, Flow_MultBodyAggAux_f67.col1;"
+   },
+   "name": "Flow_fr16",
+   "requires": [
+    "ActivePath_fr15",
+    "Flow_fr15",
+    "G",
+    "Opportunity_fr15"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr17",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr17 CASCADE;\nCREATE TABLE logica_home.Flow_fr17 AS WITH t_3_Flow_MultBodyAggAux_f73 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr16.col0 AS col0,\n      Flow_fr16.col1 AS col1,\n      Flow_fr16.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr16 AS Flow_fr16 UNION ALL\n  \n    SELECT\n      t_390_G.col0 AS col0,\n      t_390_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_390_G UNION ALL\n  \n    SELECT\n      (x_2142).x AS col0,\n      (x_2142).y AS col1,\n      (ActivePath_fr16.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr16 AS ActivePath_fr16, UNNEST((ActivePath_fr16.logica_value).path) as x_2142\n    WHERE\n      ((ActivePath_fr16.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_2176 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr16 AS Opportunity_fr16, UNNEST(ARRAY[0]::numeric[]) as x_2176\n      WHERE\n        (Opportunity_fr16.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr16.logica_value = ROW((ActivePath_fr16.logica_value).path, (ActivePath_fr16.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f73.col0 AS col0,\n  Flow_MultBodyAggAux_f73.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f73.logica_value) AS logica_value\nFROM\n  t_3_Flow_MultBodyAggAux_f73 AS Flow_MultBodyAggAux_f73\nGROUP BY Flow_MultBodyAggAux_f73.col0, Flow_MultBodyAggAux_f73.col1;"
+   },
+   "name": "Flow_fr17",
+   "requires": [
+    "ActivePath_fr16",
+    "Flow_fr16",
+    "G",
+    "Opportunity_fr16"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr18",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr18 CASCADE;\nCREATE TABLE logica_home.Flow_fr18 AS WITH t_2_Flow_MultBodyAggAux_f74 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr17.col0 AS col0,\n      Flow_fr17.col1 AS col1,\n      Flow_fr17.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr17 AS Flow_fr17 UNION ALL\n  \n    SELECT\n      t_413_G.col0 AS col0,\n      t_413_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_413_G UNION ALL\n  \n    SELECT\n      (x_2257).x AS col0,\n      (x_2257).y AS col1,\n      (ActivePath_fr17.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr17 AS ActivePath_fr17, UNNEST((ActivePath_fr17.logica_value).path) as x_2257\n    WHERE\n      ((ActivePath_fr17.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_2291 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr17 AS Opportunity_fr17, UNNEST(ARRAY[0]::numeric[]) as x_2291\n      WHERE\n        (Opportunity_fr17.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr17.logica_value = ROW((ActivePath_fr17.logica_value).path, (ActivePath_fr17.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f74.col0 AS col0,\n  Flow_MultBodyAggAux_f74.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f74.logica_value) AS logica_value\nFROM\n  t_2_Flow_MultBodyAggAux_f74 AS Flow_MultBodyAggAux_f74\nGROUP BY Flow_MultBodyAggAux_f74.col0, Flow_MultBodyAggAux_f74.col1;"
+   },
+   "name": "Flow_fr18",
+   "requires": [
+    "ActivePath_fr17",
+    "Flow_fr17",
+    "G",
+    "Opportunity_fr17"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr19",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr19 CASCADE;\nCREATE TABLE logica_home.Flow_fr19 AS WITH t_1_Flow_MultBodyAggAux_f79 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr18.col0 AS col0,\n      Flow_fr18.col1 AS col1,\n      Flow_fr18.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr18 AS Flow_fr18 UNION ALL\n  \n    SELECT\n      t_436_G.col0 AS col0,\n      t_436_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_436_G UNION ALL\n  \n    SELECT\n      (x_2372).x AS col0,\n      (x_2372).y AS col1,\n      (ActivePath_fr18.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr18 AS ActivePath_fr18, UNNEST((ActivePath_fr18.logica_value).path) as x_2372\n    WHERE\n      ((ActivePath_fr18.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_2406 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr18 AS Opportunity_fr18, UNNEST(ARRAY[0]::numeric[]) as x_2406\n      WHERE\n        (Opportunity_fr18.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr18.logica_value = ROW((ActivePath_fr18.logica_value).path, (ActivePath_fr18.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f79.col0 AS col0,\n  Flow_MultBodyAggAux_f79.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f79.logica_value) AS logica_value\nFROM\n  t_1_Flow_MultBodyAggAux_f79 AS Flow_MultBodyAggAux_f79\nGROUP BY Flow_MultBodyAggAux_f79.col0, Flow_MultBodyAggAux_f79.col1;"
+   },
+   "name": "Flow_fr19",
+   "requires": [
+    "ActivePath_fr18",
+    "Flow_fr18",
+    "G",
+    "Opportunity_fr18"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr2",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr2 CASCADE;\nCREATE TABLE logica_home.Flow_fr2 AS WITH t_18_Flow_MultBodyAggAux_f10 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr1.col0 AS col0,\n      Flow_fr1.col1 AS col1,\n      Flow_fr1.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr1 AS Flow_fr1 UNION ALL\n  \n    SELECT\n      t_45_G.col0 AS col0,\n      t_45_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_45_G UNION ALL\n  \n    SELECT\n      (x_417).x AS col0,\n      (x_417).y AS col1,\n      (ActivePath_fr1.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr1 AS ActivePath_fr1, UNNEST((ActivePath_fr1.logica_value).path) as x_417\n    WHERE\n      ((ActivePath_fr1.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_451 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr1 AS Opportunity_fr1, UNNEST(ARRAY[0]::numeric[]) as x_451\n      WHERE\n        (Opportunity_fr1.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr1.logica_value = ROW((ActivePath_fr1.logica_value).path, (ActivePath_fr1.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f10.col0 AS col0,\n  Flow_MultBodyAggAux_f10.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f10.logica_value) AS logica_value\nFROM\n  t_18_Flow_MultBodyAggAux_f10 AS Flow_MultBodyAggAux_f10\nGROUP BY Flow_MultBodyAggAux_f10.col0, Flow_MultBodyAggAux_f10.col1;"
+   },
+   "name": "Flow_fr2",
+   "requires": [
+    "ActivePath_fr1",
+    "Flow_fr1",
+    "G",
+    "Opportunity_fr1"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr3",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr3 CASCADE;\nCREATE TABLE logica_home.Flow_fr3 AS WITH t_17_Flow_MultBodyAggAux_f15 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr2.col0 AS col0,\n      Flow_fr2.col1 AS col1,\n      Flow_fr2.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr2 AS Flow_fr2 UNION ALL\n  \n    SELECT\n      t_68_G.col0 AS col0,\n      t_68_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_68_G UNION ALL\n  \n    SELECT\n      (x_532).x AS col0,\n      (x_532).y AS col1,\n      (ActivePath_fr2.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr2 AS ActivePath_fr2, UNNEST((ActivePath_fr2.logica_value).path) as x_532\n    WHERE\n      ((ActivePath_fr2.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_566 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr2 AS Opportunity_fr2, UNNEST(ARRAY[0]::numeric[]) as x_566\n      WHERE\n        (Opportunity_fr2.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr2.logica_value = ROW((ActivePath_fr2.logica_value).path, (ActivePath_fr2.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f15.col0 AS col0,\n  Flow_MultBodyAggAux_f15.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f15.logica_value) AS logica_value\nFROM\n  t_17_Flow_MultBodyAggAux_f15 AS Flow_MultBodyAggAux_f15\nGROUP BY Flow_MultBodyAggAux_f15.col0, Flow_MultBodyAggAux_f15.col1;"
+   },
+   "name": "Flow_fr3",
+   "requires": [
+    "ActivePath_fr2",
+    "Flow_fr2",
+    "G",
+    "Opportunity_fr2"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr4",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr4 CASCADE;\nCREATE TABLE logica_home.Flow_fr4 AS WITH t_16_Flow_MultBodyAggAux_f21 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr3.col0 AS col0,\n      Flow_fr3.col1 AS col1,\n      Flow_fr3.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr3 AS Flow_fr3 UNION ALL\n  \n    SELECT\n      t_91_G.col0 AS col0,\n      t_91_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_91_G UNION ALL\n  \n    SELECT\n      (x_647).x AS col0,\n      (x_647).y AS col1,\n      (ActivePath_fr3.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr3 AS ActivePath_fr3, UNNEST((ActivePath_fr3.logica_value).path) as x_647\n    WHERE\n      ((ActivePath_fr3.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_681 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr3 AS Opportunity_fr3, UNNEST(ARRAY[0]::numeric[]) as x_681\n      WHERE\n        (Opportunity_fr3.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr3.logica_value = ROW((ActivePath_fr3.logica_value).path, (ActivePath_fr3.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f21.col0 AS col0,\n  Flow_MultBodyAggAux_f21.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f21.logica_value) AS logica_value\nFROM\n  t_16_Flow_MultBodyAggAux_f21 AS Flow_MultBodyAggAux_f21\nGROUP BY Flow_MultBodyAggAux_f21.col0, Flow_MultBodyAggAux_f21.col1;"
+   },
+   "name": "Flow_fr4",
+   "requires": [
+    "ActivePath_fr3",
+    "Flow_fr3",
+    "G",
+    "Opportunity_fr3"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr5",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr5 CASCADE;\nCREATE TABLE logica_home.Flow_fr5 AS WITH t_15_Flow_MultBodyAggAux_f22 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr4.col0 AS col0,\n      Flow_fr4.col1 AS col1,\n      Flow_fr4.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr4 AS Flow_fr4 UNION ALL\n  \n    SELECT\n      t_114_G.col0 AS col0,\n      t_114_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_114_G UNION ALL\n  \n    SELECT\n      (x_762).x AS col0,\n      (x_762).y AS col1,\n      (ActivePath_fr4.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr4 AS ActivePath_fr4, UNNEST((ActivePath_fr4.logica_value).path) as x_762\n    WHERE\n      ((ActivePath_fr4.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_796 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr4 AS Opportunity_fr4, UNNEST(ARRAY[0]::numeric[]) as x_796\n      WHERE\n        (Opportunity_fr4.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr4.logica_value = ROW((ActivePath_fr4.logica_value).path, (ActivePath_fr4.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f22.col0 AS col0,\n  Flow_MultBodyAggAux_f22.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f22.logica_value) AS logica_value\nFROM\n  t_15_Flow_MultBodyAggAux_f22 AS Flow_MultBodyAggAux_f22\nGROUP BY Flow_MultBodyAggAux_f22.col0, Flow_MultBodyAggAux_f22.col1;"
+   },
+   "name": "Flow_fr5",
+   "requires": [
+    "ActivePath_fr4",
+    "Flow_fr4",
+    "G",
+    "Opportunity_fr4"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr6",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr6 CASCADE;\nCREATE TABLE logica_home.Flow_fr6 AS WITH t_14_Flow_MultBodyAggAux_f27 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr5.col0 AS col0,\n      Flow_fr5.col1 AS col1,\n      Flow_fr5.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr5 AS Flow_fr5 UNION ALL\n  \n    SELECT\n      t_137_G.col0 AS col0,\n      t_137_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_137_G UNION ALL\n  \n    SELECT\n      (x_877).x AS col0,\n      (x_877).y AS col1,\n      (ActivePath_fr5.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr5 AS ActivePath_fr5, UNNEST((ActivePath_fr5.logica_value).path) as x_877\n    WHERE\n      ((ActivePath_fr5.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_911 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr5 AS Opportunity_fr5, UNNEST(ARRAY[0]::numeric[]) as x_911\n      WHERE\n        (Opportunity_fr5.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr5.logica_value = ROW((ActivePath_fr5.logica_value).path, (ActivePath_fr5.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f27.col0 AS col0,\n  Flow_MultBodyAggAux_f27.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f27.logica_value) AS logica_value\nFROM\n  t_14_Flow_MultBodyAggAux_f27 AS Flow_MultBodyAggAux_f27\nGROUP BY Flow_MultBodyAggAux_f27.col0, Flow_MultBodyAggAux_f27.col1;"
+   },
+   "name": "Flow_fr6",
+   "requires": [
+    "ActivePath_fr5",
+    "Flow_fr5",
+    "G",
+    "Opportunity_fr5"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr7",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr7 CASCADE;\nCREATE TABLE logica_home.Flow_fr7 AS WITH t_13_Flow_MultBodyAggAux_f33 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr6.col0 AS col0,\n      Flow_fr6.col1 AS col1,\n      Flow_fr6.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr6 AS Flow_fr6 UNION ALL\n  \n    SELECT\n      t_160_G.col0 AS col0,\n      t_160_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_160_G UNION ALL\n  \n    SELECT\n      (x_992).x AS col0,\n      (x_992).y AS col1,\n      (ActivePath_fr6.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr6 AS ActivePath_fr6, UNNEST((ActivePath_fr6.logica_value).path) as x_992\n    WHERE\n      ((ActivePath_fr6.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1026 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr6 AS Opportunity_fr6, UNNEST(ARRAY[0]::numeric[]) as x_1026\n      WHERE\n        (Opportunity_fr6.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr6.logica_value = ROW((ActivePath_fr6.logica_value).path, (ActivePath_fr6.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f33.col0 AS col0,\n  Flow_MultBodyAggAux_f33.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f33.logica_value) AS logica_value\nFROM\n  t_13_Flow_MultBodyAggAux_f33 AS Flow_MultBodyAggAux_f33\nGROUP BY Flow_MultBodyAggAux_f33.col0, Flow_MultBodyAggAux_f33.col1;"
+   },
+   "name": "Flow_fr7",
+   "requires": [
+    "ActivePath_fr6",
+    "Flow_fr6",
+    "G",
+    "Opportunity_fr6"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr8",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr8 CASCADE;\nCREATE TABLE logica_home.Flow_fr8 AS WITH t_12_Flow_MultBodyAggAux_f34 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr7.col0 AS col0,\n      Flow_fr7.col1 AS col1,\n      Flow_fr7.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr7 AS Flow_fr7 UNION ALL\n  \n    SELECT\n      t_183_G.col0 AS col0,\n      t_183_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_183_G UNION ALL\n  \n    SELECT\n      (x_1107).x AS col0,\n      (x_1107).y AS col1,\n      (ActivePath_fr7.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr7 AS ActivePath_fr7, UNNEST((ActivePath_fr7.logica_value).path) as x_1107\n    WHERE\n      ((ActivePath_fr7.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1141 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr7 AS Opportunity_fr7, UNNEST(ARRAY[0]::numeric[]) as x_1141\n      WHERE\n        (Opportunity_fr7.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr7.logica_value = ROW((ActivePath_fr7.logica_value).path, (ActivePath_fr7.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f34.col0 AS col0,\n  Flow_MultBodyAggAux_f34.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f34.logica_value) AS logica_value\nFROM\n  t_12_Flow_MultBodyAggAux_f34 AS Flow_MultBodyAggAux_f34\nGROUP BY Flow_MultBodyAggAux_f34.col0, Flow_MultBodyAggAux_f34.col1;"
+   },
+   "name": "Flow_fr8",
+   "requires": [
+    "ActivePath_fr7",
+    "Flow_fr7",
+    "G",
+    "Opportunity_fr7"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Flow_fr9",
+    "sql": "DROP TABLE IF EXISTS logica_home.Flow_fr9 CASCADE;\nCREATE TABLE logica_home.Flow_fr9 AS WITH t_11_Flow_MultBodyAggAux_f39 AS (SELECT * FROM (\n  \n    SELECT\n      Flow_fr8.col0 AS col0,\n      Flow_fr8.col1 AS col1,\n      Flow_fr8.logica_value AS logica_value\n    FROM\n      logica_home.Flow_fr8 AS Flow_fr8 UNION ALL\n  \n    SELECT\n      t_206_G.col0 AS col0,\n      t_206_G.col1 AS col1,\n      0 AS logica_value\n    FROM\n      logica_home.G AS t_206_G UNION ALL\n  \n    SELECT\n      (x_1222).x AS col0,\n      (x_1222).y AS col1,\n      (ActivePath_fr8.logica_value).v AS logica_value\n    FROM\n      logica_home.ActivePath_fr8 AS ActivePath_fr8, UNNEST((ActivePath_fr8.logica_value).path) as x_1222\n    WHERE\n      ((ActivePath_fr8.logica_value).v > 0) AND\n      NOT (CAST((SELECT\n        MIN((CASE WHEN x_1256 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.Opportunity_fr8 AS Opportunity_fr8, UNNEST(ARRAY[0]::numeric[]) as x_1256\n      WHERE\n        (Opportunity_fr8.col0 = 3)) AS numeric) IS NULL) AND\n      (ActivePath_fr8.logica_value = ROW((ActivePath_fr8.logica_value).path, (ActivePath_fr8.logica_value).v)::logicarecord865112836)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Flow_MultBodyAggAux_f39.col0 AS col0,\n  Flow_MultBodyAggAux_f39.col1 AS col1,\n  SUM(Flow_MultBodyAggAux_f39.logica_value) AS logica_value\nFROM\n  t_11_Flow_MultBodyAggAux_f39 AS Flow_MultBodyAggAux_f39\nGROUP BY Flow_MultBodyAggAux_f39.col0, Flow_MultBodyAggAux_f39.col1;"
+   },
+   "name": "Flow_fr9",
+   "requires": [
+    "ActivePath_fr8",
+    "Flow_fr8",
+    "G",
+    "Opportunity_fr8"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "G",
+    "sql": "DROP TABLE IF EXISTS logica_home.G CASCADE;\nCREATE TABLE logica_home.G AS WITH t_23_E AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      1 AS col1,\n      3 AS logica_value UNION ALL\n  \n    SELECT\n      1 AS col0,\n      2 AS col1,\n      10 AS logica_value UNION ALL\n  \n    SELECT\n      2 AS col0,\n      3 AS col1,\n      3 AS logica_value UNION ALL\n  \n    SELECT\n      0 AS col0,\n      4 AS col1,\n      10 AS logica_value UNION ALL\n  \n    SELECT\n      4 AS col0,\n      2 AS col1,\n      10 AS logica_value UNION ALL\n  \n    SELECT\n      1 AS col0,\n      5 AS col1,\n      10 AS logica_value UNION ALL\n  \n    SELECT\n      5 AS col0,\n      3 AS col1,\n      10 AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_21_G_MultBodyAggAux AS (SELECT * FROM (\n  \n    SELECT\n      E.col0 AS col0,\n      E.col1 AS col1,\n      E.logica_value AS logica_value\n    FROM\n      t_23_E AS E UNION ALL\n  \n    SELECT\n      t_25_E.col1 AS col0,\n      t_25_E.col0 AS col1,\n      t_25_E.logica_value AS logica_value\n    FROM\n      t_23_E AS t_25_E\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  G_MultBodyAggAux.col0 AS col0,\n  G_MultBodyAggAux.col1 AS col1,\n  SUM(G_MultBodyAggAux.logica_value) AS logica_value\nFROM\n  t_21_G_MultBodyAggAux AS G_MultBodyAggAux\nGROUP BY G_MultBodyAggAux.col0, G_MultBodyAggAux.col1;"
+   },
+   "name": "G",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr0",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr0 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr0 AS WITH t_38_Opportunity_MultBodyAggAux_f4 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f4.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f4.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f4.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f4.logica_value) AS logica_value\nFROM\n  t_38_Opportunity_MultBodyAggAux_f4 AS Opportunity_MultBodyAggAux_f4\nGROUP BY Opportunity_MultBodyAggAux_f4.col0;"
+   },
+   "name": "Opportunity_fr0",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr1",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr1 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr1 AS WITH t_55_Opportunity_MultBodyAggAux_f5 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr0.col1 AS col0,\n      ROW((t_60_Opportunity_fr0.path || ARRAY[ROW(t_60_Opportunity_fr0.col0, Capacity_fr0.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_60_Opportunity_fr0.logica_value, Capacity_fr0.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_60_Opportunity_fr0.logica_value, Capacity_fr0.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr0 AS t_60_Opportunity_fr0, logica_home.Capacity_fr0 AS Capacity_fr0\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_521 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr0 AS t_67_ActivePath_fr0, UNNEST(ARRAY[0]::numeric[]) as x_521) AS numeric) IS NULL) AND\n      (Capacity_fr0.col0 = t_60_Opportunity_fr0.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f5.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f5.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f5.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f5.logica_value) AS logica_value\nFROM\n  t_55_Opportunity_MultBodyAggAux_f5 AS Opportunity_MultBodyAggAux_f5\nGROUP BY Opportunity_MultBodyAggAux_f5.col0;"
+   },
+   "name": "Opportunity_fr1",
+   "requires": [
+    "ActivePath_fr0",
+    "Capacity_fr0",
+    "Opportunity_fr0"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr10",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr10 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr10 AS WITH t_262_Opportunity_MultBodyAggAux_f44 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr9.col1 AS col0,\n      ROW((t_267_Opportunity_fr9.path || ARRAY[ROW(t_267_Opportunity_fr9.col0, Capacity_fr9.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_267_Opportunity_fr9.logica_value, Capacity_fr9.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_267_Opportunity_fr9.logica_value, Capacity_fr9.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr9 AS t_267_Opportunity_fr9, logica_home.Capacity_fr9 AS Capacity_fr9\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_1556 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr9 AS t_274_ActivePath_fr9, UNNEST(ARRAY[0]::numeric[]) as x_1556) AS numeric) IS NULL) AND\n      (Capacity_fr9.col0 = t_267_Opportunity_fr9.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f44.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f44.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f44.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f44.logica_value) AS logica_value\nFROM\n  t_262_Opportunity_MultBodyAggAux_f44 AS Opportunity_MultBodyAggAux_f44\nGROUP BY Opportunity_MultBodyAggAux_f44.col0;"
+   },
+   "name": "Opportunity_fr10",
+   "requires": [
+    "ActivePath_fr9",
+    "Capacity_fr9",
+    "Opportunity_fr9"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr11",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr11 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr11 AS WITH t_285_Opportunity_MultBodyAggAux_f45 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr10.col1 AS col0,\n      ROW((t_290_Opportunity_fr10.path || ARRAY[ROW(t_290_Opportunity_fr10.col0, Capacity_fr10.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_290_Opportunity_fr10.logica_value, Capacity_fr10.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_290_Opportunity_fr10.logica_value, Capacity_fr10.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr10 AS t_290_Opportunity_fr10, logica_home.Capacity_fr10 AS Capacity_fr10\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_1671 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr10 AS t_297_ActivePath_fr10, UNNEST(ARRAY[0]::numeric[]) as x_1671) AS numeric) IS NULL) AND\n      (Capacity_fr10.col0 = t_290_Opportunity_fr10.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f45.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f45.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f45.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f45.logica_value) AS logica_value\nFROM\n  t_285_Opportunity_MultBodyAggAux_f45 AS Opportunity_MultBodyAggAux_f45\nGROUP BY Opportunity_MultBodyAggAux_f45.col0;"
+   },
+   "name": "Opportunity_fr11",
+   "requires": [
+    "ActivePath_fr10",
+    "Capacity_fr10",
+    "Opportunity_fr10"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr12",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr12 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr12 AS WITH t_308_Opportunity_MultBodyAggAux_f51 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr11.col1 AS col0,\n      ROW((t_313_Opportunity_fr11.path || ARRAY[ROW(t_313_Opportunity_fr11.col0, Capacity_fr11.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_313_Opportunity_fr11.logica_value, Capacity_fr11.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_313_Opportunity_fr11.logica_value, Capacity_fr11.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr11 AS t_313_Opportunity_fr11, logica_home.Capacity_fr11 AS Capacity_fr11\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_1786 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr11 AS t_320_ActivePath_fr11, UNNEST(ARRAY[0]::numeric[]) as x_1786) AS numeric) IS NULL) AND\n      (Capacity_fr11.col0 = t_313_Opportunity_fr11.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f51.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f51.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f51.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f51.logica_value) AS logica_value\nFROM\n  t_308_Opportunity_MultBodyAggAux_f51 AS Opportunity_MultBodyAggAux_f51\nGROUP BY Opportunity_MultBodyAggAux_f51.col0;"
+   },
+   "name": "Opportunity_fr12",
+   "requires": [
+    "ActivePath_fr11",
+    "Capacity_fr11",
+    "Opportunity_fr11"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr13",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr13 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr13 AS WITH t_331_Opportunity_MultBodyAggAux_f56 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr12.col1 AS col0,\n      ROW((t_336_Opportunity_fr12.path || ARRAY[ROW(t_336_Opportunity_fr12.col0, Capacity_fr12.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_336_Opportunity_fr12.logica_value, Capacity_fr12.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_336_Opportunity_fr12.logica_value, Capacity_fr12.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr12 AS t_336_Opportunity_fr12, logica_home.Capacity_fr12 AS Capacity_fr12\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_1901 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr12 AS t_343_ActivePath_fr12, UNNEST(ARRAY[0]::numeric[]) as x_1901) AS numeric) IS NULL) AND\n      (Capacity_fr12.col0 = t_336_Opportunity_fr12.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f56.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f56.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f56.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f56.logica_value) AS logica_value\nFROM\n  t_331_Opportunity_MultBodyAggAux_f56 AS Opportunity_MultBodyAggAux_f56\nGROUP BY Opportunity_MultBodyAggAux_f56.col0;"
+   },
+   "name": "Opportunity_fr13",
+   "requires": [
+    "ActivePath_fr12",
+    "Capacity_fr12",
+    "Opportunity_fr12"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr14",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr14 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr14 AS WITH t_354_Opportunity_MultBodyAggAux_f57 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr13.col1 AS col0,\n      ROW((t_359_Opportunity_fr13.path || ARRAY[ROW(t_359_Opportunity_fr13.col0, Capacity_fr13.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_359_Opportunity_fr13.logica_value, Capacity_fr13.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_359_Opportunity_fr13.logica_value, Capacity_fr13.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr13 AS t_359_Opportunity_fr13, logica_home.Capacity_fr13 AS Capacity_fr13\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_2016 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr13 AS t_366_ActivePath_fr13, UNNEST(ARRAY[0]::numeric[]) as x_2016) AS numeric) IS NULL) AND\n      (Capacity_fr13.col0 = t_359_Opportunity_fr13.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f57.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f57.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f57.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f57.logica_value) AS logica_value\nFROM\n  t_354_Opportunity_MultBodyAggAux_f57 AS Opportunity_MultBodyAggAux_f57\nGROUP BY Opportunity_MultBodyAggAux_f57.col0;"
+   },
+   "name": "Opportunity_fr14",
+   "requires": [
+    "ActivePath_fr13",
+    "Capacity_fr13",
+    "Opportunity_fr13"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr15",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr15 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr15 AS WITH t_377_Opportunity_MultBodyAggAux_f63 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr14.col1 AS col0,\n      ROW((t_382_Opportunity_fr14.path || ARRAY[ROW(t_382_Opportunity_fr14.col0, Capacity_fr14.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_382_Opportunity_fr14.logica_value, Capacity_fr14.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_382_Opportunity_fr14.logica_value, Capacity_fr14.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr14 AS t_382_Opportunity_fr14, logica_home.Capacity_fr14 AS Capacity_fr14\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_2131 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr14 AS t_389_ActivePath_fr14, UNNEST(ARRAY[0]::numeric[]) as x_2131) AS numeric) IS NULL) AND\n      (Capacity_fr14.col0 = t_382_Opportunity_fr14.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f63.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f63.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f63.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f63.logica_value) AS logica_value\nFROM\n  t_377_Opportunity_MultBodyAggAux_f63 AS Opportunity_MultBodyAggAux_f63\nGROUP BY Opportunity_MultBodyAggAux_f63.col0;"
+   },
+   "name": "Opportunity_fr15",
+   "requires": [
+    "ActivePath_fr14",
+    "Capacity_fr14",
+    "Opportunity_fr14"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr16",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr16 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr16 AS WITH t_400_Opportunity_MultBodyAggAux_f68 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr15.col1 AS col0,\n      ROW((t_405_Opportunity_fr15.path || ARRAY[ROW(t_405_Opportunity_fr15.col0, Capacity_fr15.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_405_Opportunity_fr15.logica_value, Capacity_fr15.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_405_Opportunity_fr15.logica_value, Capacity_fr15.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr15 AS t_405_Opportunity_fr15, logica_home.Capacity_fr15 AS Capacity_fr15\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_2246 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr15 AS t_412_ActivePath_fr15, UNNEST(ARRAY[0]::numeric[]) as x_2246) AS numeric) IS NULL) AND\n      (Capacity_fr15.col0 = t_405_Opportunity_fr15.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f68.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f68.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f68.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f68.logica_value) AS logica_value\nFROM\n  t_400_Opportunity_MultBodyAggAux_f68 AS Opportunity_MultBodyAggAux_f68\nGROUP BY Opportunity_MultBodyAggAux_f68.col0;"
+   },
+   "name": "Opportunity_fr16",
+   "requires": [
+    "ActivePath_fr15",
+    "Capacity_fr15",
+    "Opportunity_fr15"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr17",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr17 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr17 AS WITH t_423_Opportunity_MultBodyAggAux_f69 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr16.col1 AS col0,\n      ROW((t_428_Opportunity_fr16.path || ARRAY[ROW(t_428_Opportunity_fr16.col0, Capacity_fr16.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_428_Opportunity_fr16.logica_value, Capacity_fr16.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_428_Opportunity_fr16.logica_value, Capacity_fr16.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr16 AS t_428_Opportunity_fr16, logica_home.Capacity_fr16 AS Capacity_fr16\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_2361 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr16 AS t_435_ActivePath_fr16, UNNEST(ARRAY[0]::numeric[]) as x_2361) AS numeric) IS NULL) AND\n      (Capacity_fr16.col0 = t_428_Opportunity_fr16.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f69.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f69.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f69.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f69.logica_value) AS logica_value\nFROM\n  t_423_Opportunity_MultBodyAggAux_f69 AS Opportunity_MultBodyAggAux_f69\nGROUP BY Opportunity_MultBodyAggAux_f69.col0;"
+   },
+   "name": "Opportunity_fr17",
+   "requires": [
+    "ActivePath_fr16",
+    "Capacity_fr16",
+    "Opportunity_fr16"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr18",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr18 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr18 AS WITH t_446_Opportunity_MultBodyAggAux_f75 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr17.col1 AS col0,\n      ROW((t_451_Opportunity_fr17.path || ARRAY[ROW(t_451_Opportunity_fr17.col0, Capacity_fr17.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_451_Opportunity_fr17.logica_value, Capacity_fr17.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_451_Opportunity_fr17.logica_value, Capacity_fr17.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr17 AS t_451_Opportunity_fr17, logica_home.Capacity_fr17 AS Capacity_fr17\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_2476 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr17 AS t_458_ActivePath_fr17, UNNEST(ARRAY[0]::numeric[]) as x_2476) AS numeric) IS NULL) AND\n      (Capacity_fr17.col0 = t_451_Opportunity_fr17.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f75.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f75.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f75.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f75.logica_value) AS logica_value\nFROM\n  t_446_Opportunity_MultBodyAggAux_f75 AS Opportunity_MultBodyAggAux_f75\nGROUP BY Opportunity_MultBodyAggAux_f75.col0;"
+   },
+   "name": "Opportunity_fr18",
+   "requires": [
+    "ActivePath_fr17",
+    "Capacity_fr17",
+    "Opportunity_fr17"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr19",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr19 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr19 AS WITH t_469_Opportunity_MultBodyAggAux_f80 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr18.col1 AS col0,\n      ROW((t_474_Opportunity_fr18.path || ARRAY[ROW(t_474_Opportunity_fr18.col0, Capacity_fr18.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_474_Opportunity_fr18.logica_value, Capacity_fr18.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_474_Opportunity_fr18.logica_value, Capacity_fr18.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr18 AS t_474_Opportunity_fr18, logica_home.Capacity_fr18 AS Capacity_fr18\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_2591 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr18 AS t_481_ActivePath_fr18, UNNEST(ARRAY[0]::numeric[]) as x_2591) AS numeric) IS NULL) AND\n      (Capacity_fr18.col0 = t_474_Opportunity_fr18.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f80.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f80.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f80.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f80.logica_value) AS logica_value\nFROM\n  t_469_Opportunity_MultBodyAggAux_f80 AS Opportunity_MultBodyAggAux_f80\nGROUP BY Opportunity_MultBodyAggAux_f80.col0;"
+   },
+   "name": "Opportunity_fr19",
+   "requires": [
+    "ActivePath_fr18",
+    "Capacity_fr18",
+    "Opportunity_fr18"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr2",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr2 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr2 AS WITH t_78_Opportunity_MultBodyAggAux_f11 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr1.col1 AS col0,\n      ROW((t_83_Opportunity_fr1.path || ARRAY[ROW(t_83_Opportunity_fr1.col0, Capacity_fr1.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_83_Opportunity_fr1.logica_value, Capacity_fr1.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_83_Opportunity_fr1.logica_value, Capacity_fr1.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr1 AS t_83_Opportunity_fr1, logica_home.Capacity_fr1 AS Capacity_fr1\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_636 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr1 AS t_90_ActivePath_fr1, UNNEST(ARRAY[0]::numeric[]) as x_636) AS numeric) IS NULL) AND\n      (Capacity_fr1.col0 = t_83_Opportunity_fr1.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f11.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f11.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f11.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f11.logica_value) AS logica_value\nFROM\n  t_78_Opportunity_MultBodyAggAux_f11 AS Opportunity_MultBodyAggAux_f11\nGROUP BY Opportunity_MultBodyAggAux_f11.col0;"
+   },
+   "name": "Opportunity_fr2",
+   "requires": [
+    "ActivePath_fr1",
+    "Capacity_fr1",
+    "Opportunity_fr1"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr3",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr3 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr3 AS WITH t_101_Opportunity_MultBodyAggAux_f16 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr2.col1 AS col0,\n      ROW((t_106_Opportunity_fr2.path || ARRAY[ROW(t_106_Opportunity_fr2.col0, Capacity_fr2.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_106_Opportunity_fr2.logica_value, Capacity_fr2.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_106_Opportunity_fr2.logica_value, Capacity_fr2.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr2 AS t_106_Opportunity_fr2, logica_home.Capacity_fr2 AS Capacity_fr2\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_751 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr2 AS t_113_ActivePath_fr2, UNNEST(ARRAY[0]::numeric[]) as x_751) AS numeric) IS NULL) AND\n      (Capacity_fr2.col0 = t_106_Opportunity_fr2.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f16.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f16.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f16.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f16.logica_value) AS logica_value\nFROM\n  t_101_Opportunity_MultBodyAggAux_f16 AS Opportunity_MultBodyAggAux_f16\nGROUP BY Opportunity_MultBodyAggAux_f16.col0;"
+   },
+   "name": "Opportunity_fr3",
+   "requires": [
+    "ActivePath_fr2",
+    "Capacity_fr2",
+    "Opportunity_fr2"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr4",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr4 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr4 AS WITH t_124_Opportunity_MultBodyAggAux_f17 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr3.col1 AS col0,\n      ROW((t_129_Opportunity_fr3.path || ARRAY[ROW(t_129_Opportunity_fr3.col0, Capacity_fr3.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_129_Opportunity_fr3.logica_value, Capacity_fr3.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_129_Opportunity_fr3.logica_value, Capacity_fr3.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr3 AS t_129_Opportunity_fr3, logica_home.Capacity_fr3 AS Capacity_fr3\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_866 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr3 AS t_136_ActivePath_fr3, UNNEST(ARRAY[0]::numeric[]) as x_866) AS numeric) IS NULL) AND\n      (Capacity_fr3.col0 = t_129_Opportunity_fr3.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f17.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f17.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f17.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f17.logica_value) AS logica_value\nFROM\n  t_124_Opportunity_MultBodyAggAux_f17 AS Opportunity_MultBodyAggAux_f17\nGROUP BY Opportunity_MultBodyAggAux_f17.col0;"
+   },
+   "name": "Opportunity_fr4",
+   "requires": [
+    "ActivePath_fr3",
+    "Capacity_fr3",
+    "Opportunity_fr3"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr5",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr5 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr5 AS WITH t_147_Opportunity_MultBodyAggAux_f23 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr4.col1 AS col0,\n      ROW((t_152_Opportunity_fr4.path || ARRAY[ROW(t_152_Opportunity_fr4.col0, Capacity_fr4.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_152_Opportunity_fr4.logica_value, Capacity_fr4.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_152_Opportunity_fr4.logica_value, Capacity_fr4.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr4 AS t_152_Opportunity_fr4, logica_home.Capacity_fr4 AS Capacity_fr4\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_981 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr4 AS t_159_ActivePath_fr4, UNNEST(ARRAY[0]::numeric[]) as x_981) AS numeric) IS NULL) AND\n      (Capacity_fr4.col0 = t_152_Opportunity_fr4.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f23.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f23.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f23.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f23.logica_value) AS logica_value\nFROM\n  t_147_Opportunity_MultBodyAggAux_f23 AS Opportunity_MultBodyAggAux_f23\nGROUP BY Opportunity_MultBodyAggAux_f23.col0;"
+   },
+   "name": "Opportunity_fr5",
+   "requires": [
+    "ActivePath_fr4",
+    "Capacity_fr4",
+    "Opportunity_fr4"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr6",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr6 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr6 AS WITH t_170_Opportunity_MultBodyAggAux_f28 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr5.col1 AS col0,\n      ROW((t_175_Opportunity_fr5.path || ARRAY[ROW(t_175_Opportunity_fr5.col0, Capacity_fr5.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_175_Opportunity_fr5.logica_value, Capacity_fr5.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_175_Opportunity_fr5.logica_value, Capacity_fr5.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr5 AS t_175_Opportunity_fr5, logica_home.Capacity_fr5 AS Capacity_fr5\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_1096 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr5 AS t_182_ActivePath_fr5, UNNEST(ARRAY[0]::numeric[]) as x_1096) AS numeric) IS NULL) AND\n      (Capacity_fr5.col0 = t_175_Opportunity_fr5.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f28.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f28.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f28.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f28.logica_value) AS logica_value\nFROM\n  t_170_Opportunity_MultBodyAggAux_f28 AS Opportunity_MultBodyAggAux_f28\nGROUP BY Opportunity_MultBodyAggAux_f28.col0;"
+   },
+   "name": "Opportunity_fr6",
+   "requires": [
+    "ActivePath_fr5",
+    "Capacity_fr5",
+    "Opportunity_fr5"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr7",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr7 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr7 AS WITH t_193_Opportunity_MultBodyAggAux_f29 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr6.col1 AS col0,\n      ROW((t_198_Opportunity_fr6.path || ARRAY[ROW(t_198_Opportunity_fr6.col0, Capacity_fr6.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_198_Opportunity_fr6.logica_value, Capacity_fr6.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_198_Opportunity_fr6.logica_value, Capacity_fr6.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr6 AS t_198_Opportunity_fr6, logica_home.Capacity_fr6 AS Capacity_fr6\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_1211 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr6 AS t_205_ActivePath_fr6, UNNEST(ARRAY[0]::numeric[]) as x_1211) AS numeric) IS NULL) AND\n      (Capacity_fr6.col0 = t_198_Opportunity_fr6.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f29.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f29.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f29.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f29.logica_value) AS logica_value\nFROM\n  t_193_Opportunity_MultBodyAggAux_f29 AS Opportunity_MultBodyAggAux_f29\nGROUP BY Opportunity_MultBodyAggAux_f29.col0;"
+   },
+   "name": "Opportunity_fr7",
+   "requires": [
+    "ActivePath_fr6",
+    "Capacity_fr6",
+    "Opportunity_fr6"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr8",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr8 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr8 AS WITH t_216_Opportunity_MultBodyAggAux_f35 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr7.col1 AS col0,\n      ROW((t_221_Opportunity_fr7.path || ARRAY[ROW(t_221_Opportunity_fr7.col0, Capacity_fr7.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_221_Opportunity_fr7.logica_value, Capacity_fr7.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_221_Opportunity_fr7.logica_value, Capacity_fr7.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr7 AS t_221_Opportunity_fr7, logica_home.Capacity_fr7 AS Capacity_fr7\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_1326 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr7 AS t_228_ActivePath_fr7, UNNEST(ARRAY[0]::numeric[]) as x_1326) AS numeric) IS NULL) AND\n      (Capacity_fr7.col0 = t_221_Opportunity_fr7.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f35.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f35.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f35.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f35.logica_value) AS logica_value\nFROM\n  t_216_Opportunity_MultBodyAggAux_f35 AS Opportunity_MultBodyAggAux_f35\nGROUP BY Opportunity_MultBodyAggAux_f35.col0;"
+   },
+   "name": "Opportunity_fr8",
+   "requires": [
+    "ActivePath_fr7",
+    "Capacity_fr7",
+    "Opportunity_fr7"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Opportunity_fr9",
+    "sql": "DROP TABLE IF EXISTS logica_home.Opportunity_fr9 CASCADE;\nCREATE TABLE logica_home.Opportunity_fr9 AS WITH t_239_Opportunity_MultBodyAggAux_f40 AS (SELECT * FROM (\n  \n    SELECT\n      0 AS col0,\n      ROW(ARRAY[]::logicarecord6083990[], 100)::logicarecord870775962 AS path,\n      100 AS logica_value\n    FROM\n      (SELECT 'singleton' as s) as unused_singleton UNION ALL\n  \n    SELECT\n      Capacity_fr8.col1 AS col0,\n      ROW((t_244_Opportunity_fr8.path || ARRAY[ROW(t_244_Opportunity_fr8.col0, Capacity_fr8.col1)::logicarecord6083990]::logicarecord6083990[]), ((LEAST(t_244_Opportunity_fr8.logica_value, Capacity_fr8.logica_value)) - (0.001)))::logicarecord870775962 AS path,\n      ((LEAST(t_244_Opportunity_fr8.logica_value, Capacity_fr8.logica_value)) - (0.001)) AS logica_value\n    FROM\n      logica_home.Opportunity_fr8 AS t_244_Opportunity_fr8, logica_home.Capacity_fr8 AS Capacity_fr8\n    WHERE\n      (CAST((SELECT\n        MIN((CASE WHEN x_1441 = 0 THEN 1 ELSE NULL END)) AS logica_value\n      FROM\n        logica_home.ActivePath_fr8 AS t_251_ActivePath_fr8, UNNEST(ARRAY[0]::numeric[]) as x_1441) AS numeric) IS NULL) AND\n      (Capacity_fr8.col0 = t_244_Opportunity_fr8.col0)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Opportunity_MultBodyAggAux_f40.col0 AS col0,\n  ((ARRAY_AGG(ROW((Opportunity_MultBodyAggAux_f40.path).arg)::logicarecord565712478 order by (Opportunity_MultBodyAggAux_f40.path).value desc))[1]).argpod AS path,\n  MAX(Opportunity_MultBodyAggAux_f40.logica_value) AS logica_value\nFROM\n  t_239_Opportunity_MultBodyAggAux_f40 AS Opportunity_MultBodyAggAux_f40\nGROUP BY Opportunity_MultBodyAggAux_f40.col0;"
+   },
+   "name": "Opportunity_fr9",
+   "requires": [
+    "ActivePath_fr8",
+    "Capacity_fr8",
+    "Opportunity_fr8"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "SELECT\n  Flow.col0 AS col0,\n  Flow.col1 AS col1,\n  Flow.logica_value AS logica_value\nFROM\n  logica_home.Flow AS Flow ORDER BY col0, col1"
+   },
+   "name": "Test",
+   "requires": [
+    "Flow"
+   ],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [
+  [
+   "ActivePath_fr0",
+   "Flow_fr1"
+  ],
+  [
+   "ActivePath_fr0",
+   "Opportunity_fr1"
+  ],
+  [
+   "ActivePath_fr1",
+   "Flow_fr2"
+  ],
+  [
+   "ActivePath_fr1",
+   "Opportunity_fr2"
+  ],
+  [
+   "ActivePath_fr10",
+   "Flow_fr11"
+  ],
+  [
+   "ActivePath_fr10",
+   "Opportunity_fr11"
+  ],
+  [
+   "ActivePath_fr11",
+   "Flow_fr12"
+  ],
+  [
+   "ActivePath_fr11",
+   "Opportunity_fr12"
+  ],
+  [
+   "ActivePath_fr12",
+   "Flow_fr13"
+  ],
+  [
+   "ActivePath_fr12",
+   "Opportunity_fr13"
+  ],
+  [
+   "ActivePath_fr13",
+   "Flow_fr14"
+  ],
+  [
+   "ActivePath_fr13",
+   "Opportunity_fr14"
+  ],
+  [
+   "ActivePath_fr14",
+   "Flow_fr15"
+  ],
+  [
+   "ActivePath_fr14",
+   "Opportunity_fr15"
+  ],
+  [
+   "ActivePath_fr15",
+   "Flow_fr16"
+  ],
+  [
+   "ActivePath_fr15",
+   "Opportunity_fr16"
+  ],
+  [
+   "ActivePath_fr16",
+   "Flow_fr17"
+  ],
+  [
+   "ActivePath_fr16",
+   "Opportunity_fr17"
+  ],
+  [
+   "ActivePath_fr17",
+   "Flow_fr18"
+  ],
+  [
+   "ActivePath_fr17",
+   "Opportunity_fr18"
+  ],
+  [
+   "ActivePath_fr18",
+   "Flow_fr19"
+  ],
+  [
+   "ActivePath_fr18",
+   "Opportunity_fr19"
+  ],
+  [
+   "ActivePath_fr19",
+   "Flow"
+  ],
+  [
+   "ActivePath_fr2",
+   "Flow_fr3"
+  ],
+  [
+   "ActivePath_fr2",
+   "Opportunity_fr3"
+  ],
+  [
+   "ActivePath_fr3",
+   "Flow_fr4"
+  ],
+  [
+   "ActivePath_fr3",
+   "Opportunity_fr4"
+  ],
+  [
+   "ActivePath_fr4",
+   "Flow_fr5"
+  ],
+  [
+   "ActivePath_fr4",
+   "Opportunity_fr5"
+  ],
+  [
+   "ActivePath_fr5",
+   "Flow_fr6"
+  ],
+  [
+   "ActivePath_fr5",
+   "Opportunity_fr6"
+  ],
+  [
+   "ActivePath_fr6",
+   "Flow_fr7"
+  ],
+  [
+   "ActivePath_fr6",
+   "Opportunity_fr7"
+  ],
+  [
+   "ActivePath_fr7",
+   "Flow_fr8"
+  ],
+  [
+   "ActivePath_fr7",
+   "Opportunity_fr8"
+  ],
+  [
+   "ActivePath_fr8",
+   "Flow_fr9"
+  ],
+  [
+   "ActivePath_fr8",
+   "Opportunity_fr9"
+  ],
+  [
+   "ActivePath_fr9",
+   "Flow_fr10"
+  ],
+  [
+   "ActivePath_fr9",
+   "Opportunity_fr10"
+  ],
+  [
+   "Capacity_fr0",
+   "Opportunity_fr1"
+  ],
+  [
+   "Capacity_fr1",
+   "Opportunity_fr2"
+  ],
+  [
+   "Capacity_fr10",
+   "Opportunity_fr11"
+  ],
+  [
+   "Capacity_fr11",
+   "Opportunity_fr12"
+  ],
+  [
+   "Capacity_fr12",
+   "Opportunity_fr13"
+  ],
+  [
+   "Capacity_fr13",
+   "Opportunity_fr14"
+  ],
+  [
+   "Capacity_fr14",
+   "Opportunity_fr15"
+  ],
+  [
+   "Capacity_fr15",
+   "Opportunity_fr16"
+  ],
+  [
+   "Capacity_fr16",
+   "Opportunity_fr17"
+  ],
+  [
+   "Capacity_fr17",
+   "Opportunity_fr18"
+  ],
+  [
+   "Capacity_fr18",
+   "Opportunity_fr19"
+  ],
+  [
+   "Capacity_fr2",
+   "Opportunity_fr3"
+  ],
+  [
+   "Capacity_fr3",
+   "Opportunity_fr4"
+  ],
+  [
+   "Capacity_fr4",
+   "Opportunity_fr5"
+  ],
+  [
+   "Capacity_fr5",
+   "Opportunity_fr6"
+  ],
+  [
+   "Capacity_fr6",
+   "Opportunity_fr7"
+  ],
+  [
+   "Capacity_fr7",
+   "Opportunity_fr8"
+  ],
+  [
+   "Capacity_fr8",
+   "Opportunity_fr9"
+  ],
+  [
+   "Capacity_fr9",
+   "Opportunity_fr10"
+  ],
+  [
+   "Flow",
+   "Test"
+  ],
+  [
+   "Flow_fr0",
+   "Capacity_fr1"
+  ],
+  [
+   "Flow_fr0",
+   "Flow_fr1"
+  ],
+  [
+   "Flow_fr1",
+   "Capacity_fr2"
+  ],
+  [
+   "Flow_fr1",
+   "Flow_fr2"
+  ],
+  [
+   "Flow_fr10",
+   "Capacity_fr11"
+  ],
+  [
+   "Flow_fr10",
+   "Flow_fr11"
+  ],
+  [
+   "Flow_fr11",
+   "Capacity_fr12"
+  ],
+  [
+   "Flow_fr11",
+   "Flow_fr12"
+  ],
+  [
+   "Flow_fr12",
+   "Capacity_fr13"
+  ],
+  [
+   "Flow_fr12",
+   "Flow_fr13"
+  ],
+  [
+   "Flow_fr13",
+   "Capacity_fr14"
+  ],
+  [
+   "Flow_fr13",
+   "Flow_fr14"
+  ],
+  [
+   "Flow_fr14",
+   "Capacity_fr15"
+  ],
+  [
+   "Flow_fr14",
+   "Flow_fr15"
+  ],
+  [
+   "Flow_fr15",
+   "Capacity_fr16"
+  ],
+  [
+   "Flow_fr15",
+   "Flow_fr16"
+  ],
+  [
+   "Flow_fr16",
+   "Capacity_fr17"
+  ],
+  [
+   "Flow_fr16",
+   "Flow_fr17"
+  ],
+  [
+   "Flow_fr17",
+   "Capacity_fr18"
+  ],
+  [
+   "Flow_fr17",
+   "Flow_fr18"
+  ],
+  [
+   "Flow_fr18",
+   "Flow_fr19"
+  ],
+  [
+   "Flow_fr19",
+   "Flow"
+  ],
+  [
+   "Flow_fr2",
+   "Capacity_fr3"
+  ],
+  [
+   "Flow_fr2",
+   "Flow_fr3"
+  ],
+  [
+   "Flow_fr3",
+   "Capacity_fr4"
+  ],
+  [
+   "Flow_fr3",
+   "Flow_fr4"
+  ],
+  [
+   "Flow_fr4",
+   "Capacity_fr5"
+  ],
+  [
+   "Flow_fr4",
+   "Flow_fr5"
+  ],
+  [
+   "Flow_fr5",
+   "Capacity_fr6"
+  ],
+  [
+   "Flow_fr5",
+   "Flow_fr6"
+  ],
+  [
+   "Flow_fr6",
+   "Capacity_fr7"
+  ],
+  [
+   "Flow_fr6",
+   "Flow_fr7"
+  ],
+  [
+   "Flow_fr7",
+   "Capacity_fr8"
+  ],
+  [
+   "Flow_fr7",
+   "Flow_fr8"
+  ],
+  [
+   "Flow_fr8",
+   "Capacity_fr9"
+  ],
+  [
+   "Flow_fr8",
+   "Flow_fr9"
+  ],
+  [
+   "Flow_fr9",
+   "Capacity_fr10"
+  ],
+  [
+   "Flow_fr9",
+   "Flow_fr10"
+  ],
+  [
+   "G",
+   "Capacity_fr1"
+  ],
+  [
+   "G",
+   "Capacity_fr10"
+  ],
+  [
+   "G",
+   "Capacity_fr11"
+  ],
+  [
+   "G",
+   "Capacity_fr12"
+  ],
+  [
+   "G",
+   "Capacity_fr13"
+  ],
+  [
+   "G",
+   "Capacity_fr14"
+  ],
+  [
+   "G",
+   "Capacity_fr15"
+  ],
+  [
+   "G",
+   "Capacity_fr16"
+  ],
+  [
+   "G",
+   "Capacity_fr17"
+  ],
+  [
+   "G",
+   "Capacity_fr18"
+  ],
+  [
+   "G",
+   "Capacity_fr2"
+  ],
+  [
+   "G",
+   "Capacity_fr3"
+  ],
+  [
+   "G",
+   "Capacity_fr4"
+  ],
+  [
+   "G",
+   "Capacity_fr5"
+  ],
+  [
+   "G",
+   "Capacity_fr6"
+  ],
+  [
+   "G",
+   "Capacity_fr7"
+  ],
+  [
+   "G",
+   "Capacity_fr8"
+  ],
+  [
+   "G",
+   "Capacity_fr9"
+  ],
+  [
+   "G",
+   "Flow"
+  ],
+  [
+   "G",
+   "Flow_fr0"
+  ],
+  [
+   "G",
+   "Flow_fr1"
+  ],
+  [
+   "G",
+   "Flow_fr10"
+  ],
+  [
+   "G",
+   "Flow_fr11"
+  ],
+  [
+   "G",
+   "Flow_fr12"
+  ],
+  [
+   "G",
+   "Flow_fr13"
+  ],
+  [
+   "G",
+   "Flow_fr14"
+  ],
+  [
+   "G",
+   "Flow_fr15"
+  ],
+  [
+   "G",
+   "Flow_fr16"
+  ],
+  [
+   "G",
+   "Flow_fr17"
+  ],
+  [
+   "G",
+   "Flow_fr18"
+  ],
+  [
+   "G",
+   "Flow_fr19"
+  ],
+  [
+   "G",
+   "Flow_fr2"
+  ],
+  [
+   "G",
+   "Flow_fr3"
+  ],
+  [
+   "G",
+   "Flow_fr4"
+  ],
+  [
+   "G",
+   "Flow_fr5"
+  ],
+  [
+   "G",
+   "Flow_fr6"
+  ],
+  [
+   "G",
+   "Flow_fr7"
+  ],
+  [
+   "G",
+   "Flow_fr8"
+  ],
+  [
+   "G",
+   "Flow_fr9"
+  ],
+  [
+   "Opportunity_fr0",
+   "ActivePath_fr1"
+  ],
+  [
+   "Opportunity_fr0",
+   "Flow_fr1"
+  ],
+  [
+   "Opportunity_fr0",
+   "Opportunity_fr1"
+  ],
+  [
+   "Opportunity_fr1",
+   "ActivePath_fr2"
+  ],
+  [
+   "Opportunity_fr1",
+   "Flow_fr2"
+  ],
+  [
+   "Opportunity_fr1",
+   "Opportunity_fr2"
+  ],
+  [
+   "Opportunity_fr10",
+   "ActivePath_fr11"
+  ],
+  [
+   "Opportunity_fr10",
+   "Flow_fr11"
+  ],
+  [
+   "Opportunity_fr10",
+   "Opportunity_fr11"
+  ],
+  [
+   "Opportunity_fr11",
+   "ActivePath_fr12"
+  ],
+  [
+   "Opportunity_fr11",
+   "Flow_fr12"
+  ],
+  [
+   "Opportunity_fr11",
+   "Opportunity_fr12"
+  ],
+  [
+   "Opportunity_fr12",
+   "ActivePath_fr13"
+  ],
+  [
+   "Opportunity_fr12",
+   "Flow_fr13"
+  ],
+  [
+   "Opportunity_fr12",
+   "Opportunity_fr13"
+  ],
+  [
+   "Opportunity_fr13",
+   "ActivePath_fr14"
+  ],
+  [
+   "Opportunity_fr13",
+   "Flow_fr14"
+  ],
+  [
+   "Opportunity_fr13",
+   "Opportunity_fr14"
+  ],
+  [
+   "Opportunity_fr14",
+   "ActivePath_fr15"
+  ],
+  [
+   "Opportunity_fr14",
+   "Flow_fr15"
+  ],
+  [
+   "Opportunity_fr14",
+   "Opportunity_fr15"
+  ],
+  [
+   "Opportunity_fr15",
+   "ActivePath_fr16"
+  ],
+  [
+   "Opportunity_fr15",
+   "Flow_fr16"
+  ],
+  [
+   "Opportunity_fr15",
+   "Opportunity_fr16"
+  ],
+  [
+   "Opportunity_fr16",
+   "ActivePath_fr17"
+  ],
+  [
+   "Opportunity_fr16",
+   "Flow_fr17"
+  ],
+  [
+   "Opportunity_fr16",
+   "Opportunity_fr17"
+  ],
+  [
+   "Opportunity_fr17",
+   "ActivePath_fr18"
+  ],
+  [
+   "Opportunity_fr17",
+   "Flow_fr18"
+  ],
+  [
+   "Opportunity_fr17",
+   "Opportunity_fr18"
+  ],
+  [
+   "Opportunity_fr18",
+   "ActivePath_fr19"
+  ],
+  [
+   "Opportunity_fr18",
+   "Flow_fr19"
+  ],
+  [
+   "Opportunity_fr18",
+   "Opportunity_fr19"
+  ],
+  [
+   "Opportunity_fr19",
+   "Flow"
+  ],
+  [
+   "Opportunity_fr2",
+   "ActivePath_fr3"
+  ],
+  [
+   "Opportunity_fr2",
+   "Flow_fr3"
+  ],
+  [
+   "Opportunity_fr2",
+   "Opportunity_fr3"
+  ],
+  [
+   "Opportunity_fr3",
+   "ActivePath_fr4"
+  ],
+  [
+   "Opportunity_fr3",
+   "Flow_fr4"
+  ],
+  [
+   "Opportunity_fr3",
+   "Opportunity_fr4"
+  ],
+  [
+   "Opportunity_fr4",
+   "ActivePath_fr5"
+  ],
+  [
+   "Opportunity_fr4",
+   "Flow_fr5"
+  ],
+  [
+   "Opportunity_fr4",
+   "Opportunity_fr5"
+  ],
+  [
+   "Opportunity_fr5",
+   "ActivePath_fr6"
+  ],
+  [
+   "Opportunity_fr5",
+   "Flow_fr6"
+  ],
+  [
+   "Opportunity_fr5",
+   "Opportunity_fr6"
+  ],
+  [
+   "Opportunity_fr6",
+   "ActivePath_fr7"
+  ],
+  [
+   "Opportunity_fr6",
+   "Flow_fr7"
+  ],
+  [
+   "Opportunity_fr6",
+   "Opportunity_fr7"
+  ],
+  [
+   "Opportunity_fr7",
+   "ActivePath_fr8"
+  ],
+  [
+   "Opportunity_fr7",
+   "Flow_fr8"
+  ],
+  [
+   "Opportunity_fr7",
+   "Opportunity_fr8"
+  ],
+  [
+   "Opportunity_fr8",
+   "ActivePath_fr9"
+  ],
+  [
+   "Opportunity_fr8",
+   "Flow_fr9"
+  ],
+  [
+   "Opportunity_fr8",
+   "Opportunity_fr9"
+  ],
+  [
+   "Opportunity_fr9",
+   "ActivePath_fr10"
+  ],
+  [
+   "Opportunity_fr9",
+   "Flow_fr10"
+  ],
+  [
+   "Opportunity_fr9",
+   "Opportunity_fr10"
+  ]
+ ],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord6083990\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord6083990') then create type logicarecord6083990 as (x numeric, y numeric); end if;\n-- Logica type: logicarecord565712478\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord565712478') then create type logicarecord565712478 as (argpod logicarecord6083990[]); end if;\n-- Logica type: logicarecord865112836\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord865112836') then create type logicarecord865112836 as (path logicarecord6083990[], v numeric); end if;\n-- Logica type: logicarecord870775962\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord870775962') then create type logicarecord870775962 as (arg logicarecord6083990[], value numeric); end if;\n-- Logica type: logicarecord134751316\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord134751316') then create type logicarecord134751316 as (arg logicarecord565712478, value numeric); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

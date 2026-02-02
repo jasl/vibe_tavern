@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_1_Usa_ProductUSA AS (SELECT * FROM (\n  \n    SELECT\n      'software' AS col0,\n      50 AS price UNION ALL\n  \n    SELECT\n      'movies' AS col0,\n      100 AS price UNION ALL\n  \n    SELECT\n      'grain' AS col0,\n      2 AS price\n) AS UNUSED_TABLE_NAME  ),\nt_0_Taxation_ProductTax AS (SELECT\n  Usa_ProductUSA.col0 AS col0,\n  ((Usa_ProductUSA.price) * (0.1)) AS tax\nFROM\n  t_1_Usa_ProductUSA AS Usa_ProductUSA)\nSELECT\n  Taxation_ProductTax.*\nFROM\n  t_0_Taxation_ProductTax AS Taxation_ProductTax"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

@@ -1,0 +1,412 @@
+[
+ {
+  "full_text": "@Engine(\"sqlite\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"sqlite\"",
+        "literal": {
+         "the_string": {
+          "the_string": "sqlite"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "r",
+        "variable": {
+         "var_name": "r"
+        }
+       },
+       "right_hand_side": {
+        "call": {
+         "predicate_name": "Range",
+         "record": {
+          "field_value": [
+           {
+            "field": 0,
+            "value": {
+             "expression": {
+              "expression_heritage": "5",
+              "literal": {
+               "the_number": {
+                "number": "5"
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "Range(5)"
+       }
+      }
+     },
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "r_sq",
+        "variable": {
+         "var_name": "r_sq"
+        }
+       },
+       "right_hand_side": {
+        "combine": {
+         "body": {
+          "conjunction": {
+           "conjunct": [
+            {
+             "inclusion": {
+              "element": {
+               "expression_heritage": "x",
+               "variable": {
+                "var_name": "x"
+               }
+              },
+              "list": {
+               "expression_heritage": "r",
+               "variable": {
+                "var_name": "r"
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "distinct_denoted": true,
+         "full_text": "r_sq List= (x * x :- x in r)",
+         "head": {
+          "predicate_name": "Combine",
+          "record": {
+           "field_value": [
+            {
+             "field": "logica_value",
+             "value": {
+              "aggregation": {
+               "expression": {
+                "call": {
+                 "predicate_name": "List",
+                 "record": {
+                  "field_value": [
+                   {
+                    "field": 0,
+                    "value": {
+                     "expression": {
+                      "call": {
+                       "predicate_name": "*",
+                       "record": {
+                        "field_value": [
+                         {
+                          "field": "left",
+                          "value": {
+                           "expression": {
+                            "expression_heritage": "x",
+                            "variable": {
+                             "var_name": "x"
+                            }
+                           }
+                          }
+                         },
+                         {
+                          "field": "right",
+                          "value": {
+                           "expression": {
+                            "expression_heritage": "x",
+                            "variable": {
+                             "var_name": "x"
+                            }
+                           }
+                          }
+                         }
+                        ]
+                       }
+                      },
+                      "expression_heritage": "x * x"
+                     }
+                    }
+                   }
+                  ]
+                 }
+                },
+                "expression_heritage": "r_sq List= (x * x :- x in r)"
+               },
+               "expression_heritage": "r_sq List= (x * x :- x in r)"
+              }
+             }
+            }
+           ]
+          }
+         }
+        },
+        "expression_heritage": "r_sq List= (x * x :- x in r)"
+       }
+      }
+     },
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "r_sq_l",
+        "variable": {
+         "var_name": "r_sq_l"
+        }
+       },
+       "right_hand_side": {
+        "combine": {
+         "body": {
+          "conjunction": {
+           "conjunct": [
+            {
+             "inclusion": {
+              "element": {
+               "expression_heritage": "x",
+               "variable": {
+                "var_name": "x"
+               }
+              },
+              "list": {
+               "expression_heritage": "r_sq",
+               "variable": {
+                "var_name": "r_sq"
+               }
+              }
+             }
+            },
+            {
+             "predicate": {
+              "predicate_name": ">",
+              "record": {
+               "field_value": [
+                {
+                 "field": "left",
+                 "value": {
+                  "expression": {
+                   "expression_heritage": "x",
+                   "variable": {
+                    "var_name": "x"
+                   }
+                  }
+                 }
+                },
+                {
+                 "field": "right",
+                 "value": {
+                  "expression": {
+                   "expression_heritage": "5",
+                   "literal": {
+                    "the_number": {
+                     "number": "5"
+                    }
+                   }
+                  }
+                 }
+                }
+               ]
+              }
+             }
+            }
+           ]
+          }
+         },
+         "distinct_denoted": true,
+         "full_text": "r_sq_l List= (x :- x in r_sq, x > 5)",
+         "head": {
+          "predicate_name": "Combine",
+          "record": {
+           "field_value": [
+            {
+             "field": "logica_value",
+             "value": {
+              "aggregation": {
+               "expression": {
+                "call": {
+                 "predicate_name": "List",
+                 "record": {
+                  "field_value": [
+                   {
+                    "field": 0,
+                    "value": {
+                     "expression": {
+                      "expression_heritage": "x",
+                      "variable": {
+                       "var_name": "x"
+                      }
+                     }
+                    }
+                   }
+                  ]
+                 }
+                },
+                "expression_heritage": "r_sq_l List= (x :- x in r_sq, x > 5)"
+               },
+               "expression_heritage": "r_sq_l List= (x :- x in r_sq, x > 5)"
+              }
+             }
+            }
+           ]
+          }
+         }
+        },
+        "expression_heritage": "r_sq_l List= (x :- x in r_sq, x > 5)"
+       }
+      }
+     },
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "records",
+        "variable": {
+         "var_name": "records"
+        }
+       },
+       "right_hand_side": {
+        "expression_heritage": "[{a: 1, b: \"one\"}, {a: 2, b: \"two\"}]",
+        "literal": {
+         "the_list": {
+          "element": [
+           {
+            "expression_heritage": "{a: 1, b: \"one\"}",
+            "record": {
+             "field_value": [
+              {
+               "field": "a",
+               "value": {
+                "expression": {
+                 "expression_heritage": "1",
+                 "literal": {
+                  "the_number": {
+                   "number": "1"
+                  }
+                 }
+                }
+               }
+              },
+              {
+               "field": "b",
+               "value": {
+                "expression": {
+                 "expression_heritage": "\"one\"",
+                 "literal": {
+                  "the_string": {
+                   "the_string": "one"
+                  }
+                 }
+                }
+               }
+              }
+             ]
+            }
+           },
+           {
+            "expression_heritage": "{a: 2, b: \"two\"}",
+            "record": {
+             "field_value": [
+              {
+               "field": "a",
+               "value": {
+                "expression": {
+                 "expression_heritage": "2",
+                 "literal": {
+                  "the_number": {
+                   "number": "2"
+                  }
+                 }
+                }
+               }
+              },
+              {
+               "field": "b",
+               "value": {
+                "expression": {
+                 "expression_heritage": "\"two\"",
+                 "literal": {
+                  "the_string": {
+                   "the_string": "two"
+                  }
+                 }
+                }
+               }
+              }
+             ]
+            }
+           }
+          ]
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Test(\n    r:,\n    r_sq:,\n    r_sq_l:,\n    records:) :-\n  r == Range(5),\n  r_sq List= (x * x :- x in r),\n  r_sq_l List= (x :- x in r_sq, x > 5),\n  records == [{a: 1, b: \"one\"}, {a: 2, b: \"two\"}]",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": "r",
+      "value": {
+       "expression": {
+        "expression_heritage": "r",
+        "variable": {
+         "var_name": "r"
+        }
+       }
+      }
+     },
+     {
+      "field": "r_sq",
+      "value": {
+       "expression": {
+        "expression_heritage": "r_sq",
+        "variable": {
+         "var_name": "r_sq"
+        }
+       }
+      }
+     },
+     {
+      "field": "r_sq_l",
+      "value": {
+       "expression": {
+        "expression_heritage": "r_sq_l",
+        "variable": {
+         "var_name": "r_sq_l"
+        }
+       }
+      }
+     },
+     {
+      "field": "records",
+      "value": {
+       "expression": {
+        "expression_heritage": "records",
+        "variable": {
+         "var_name": "records"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

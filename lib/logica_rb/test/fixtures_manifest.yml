@@ -1,0 +1,404 @@
+generated_at: '2025-12-25T12:36:01.113782Z'
+source: upstream logica.zip integration_tests/ + import_tests/ + type_inference/research/integration_tests
+supported_engines:
+- sqlite
+- psql
+tests:
+  sqlite:
+  - name: functor_arg_update_test
+    src: integration_tests/functor_arg_update_test.l
+    golden: integration_tests/functor_arg_update_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: import_root_test
+    src: integration_tests/import_root_test.l
+    golden: integration_tests/import_root_test.txt
+    predicate: Test
+    import_root: integration_tests/import_tests
+    runner: default
+    db_results: true
+  - name: rec_cycle_test
+    src: integration_tests/rec_cycle_test.l
+    golden: integration_tests/rec_cycle_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: rec_small_cycle_test
+    src: integration_tests/rec_small_cycle_test.l
+    golden: integration_tests/rec_small_cycle_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_array_sub_test
+    src: integration_tests/sqlite_array_sub_test.l
+    golden: integration_tests/sqlite_array_sub_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_array_test
+    src: integration_tests/sqlite_array_test.l
+    golden: integration_tests/sqlite_array_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_assignment_test
+    src: integration_tests/sqlite_assignment_test.l
+    golden: integration_tests/sqlite_assignment_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_combine_test
+    src: integration_tests/sqlite_combine_test.l
+    golden: integration_tests/sqlite_combine_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_composite_test
+    src: integration_tests/sqlite_composite_test.l
+    golden: integration_tests/sqlite_composite_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_deep_recursion_test
+    src: integration_tests/sqlite_deep_recursion_test.l
+    golden: integration_tests/sqlite_deep_recursion_test.txt
+    predicate: Test
+    runner: concertina
+  - name: sqlite_element_test
+    src: integration_tests/sqlite_element_test.l
+    golden: integration_tests/sqlite_element_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_file_test
+    src: integration_tests/sqlite_file_test.l
+    golden: integration_tests/sqlite_file_test.txt
+    predicate: Test
+    runner: default
+    library_profile: full
+    unsafe:
+      - file_io
+  - name: sqlite_flat_recursion_test
+    src: integration_tests/sqlite_flat_recursion_test.l
+    golden: integration_tests/sqlite_flat_recursion_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_funcs_test
+    src: integration_tests/sqlite_funcs_test.l
+    golden: integration_tests/sqlite_funcs_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_functor_over_constant_test
+    src: integration_tests/sqlite_functor_over_constant_test.l
+    golden: integration_tests/sqlite_functor_over_constant_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_functors_test
+    src: integration_tests/sqlite_functors_test.l
+    golden: integration_tests/sqlite_functors_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_groupby_test
+    src: integration_tests/sqlite_groupby_test.l
+    golden: integration_tests/sqlite_groupby_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_in_expr_test
+    src: integration_tests/sqlite_in_expr_test.l
+    golden: integration_tests/sqlite_in_expr_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_is_test
+    src: integration_tests/sqlite_is_test.l
+    golden: integration_tests/sqlite_is_test.txt
+    predicate: Test
+    runner: default
+  - name: sqlite_math_test
+    src: integration_tests/sqlite_math_test.l
+    golden: integration_tests/sqlite_math_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_pagerank
+    src: integration_tests/sqlite_pagerank.l
+    golden: integration_tests/sqlite_pagerank.txt
+    predicate: Test
+    runner: default
+  - name: sqlite_reachability
+    src: integration_tests/sqlite_reachability.l
+    golden: integration_tests/sqlite_reachability.txt
+    predicate: Test
+    runner: default
+  - name: sqlite_rec_depth
+    src: integration_tests/sqlite_rec_depth.l
+    golden: integration_tests/sqlite_rec_depth.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_rec_functor
+    src: integration_tests/sqlite_rec_functor.l
+    golden: integration_tests/sqlite_rec_functor.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_record_assembler
+    src: integration_tests/sqlite_record_assembler.l
+    golden: integration_tests/sqlite_record_assembler.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_records_test
+    src: integration_tests/sqlite_records_test.l
+    golden: integration_tests/sqlite_records_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_recursion
+    src: integration_tests/sqlite_recursion.l
+    golden: integration_tests/sqlite_recursion.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_shortest_path_test
+    src: integration_tests/sqlite_shortest_path_test.l
+    golden: integration_tests/sqlite_shortest_path_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_subquery_test
+    src: integration_tests/sqlite_subquery_test.l
+    golden: integration_tests/sqlite_subquery_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_test
+    src: integration_tests/sqlite_test.l
+    golden: integration_tests/sqlite_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_unwrapping_test
+    src: integration_tests/sqlite_unwrapping_test.l
+    golden: integration_tests/sqlite_unwrapping_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: sqlite_winmove_test
+    src: integration_tests/sqlite_winmove_test.l
+    golden: integration_tests/sqlite_winmove_test.txt
+    predicate: Test
+    runner: default
+  - name: ultra_short_cycle_test
+    src: integration_tests/ultra_short_cycle_test.l
+    golden: integration_tests/ultra_short_cycle_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: unification_priority_test
+    src: integration_tests/unification_priority_test.l
+    golden: integration_tests/unification_priority_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  psql:
+  - name: canada_psql_test
+    src: integration_tests/import_tests/canada_psql_test.l
+    golden: integration_tests/import_tests/canada_psql_Consume.txt
+    predicate: TestConsume
+    runner: default
+    db_results: true
+  - name: psql_arg_min_max_k_test
+    src: integration_tests/psql_arg_min_max_k_test.l
+    golden: integration_tests/psql_arg_min_max_k_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_arg_min_test
+    src: integration_tests/psql_arg_min_test.l
+    golden: integration_tests/psql_arg_min_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_argmax2_combine_test
+    src: integration_tests/psql_argmax2_combine_test.l
+    golden: integration_tests/psql_argmax2_combine_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_argmin_list_test
+    src: integration_tests/psql_argmin_list_test.l
+    golden: integration_tests/psql_argmin_list_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_combine2_test
+    src: integration_tests/psql_combine2_test.l
+    golden: integration_tests/psql_combine2_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_combine_test
+    src: integration_tests/psql_combine_test.l
+    golden: integration_tests/psql_combine_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_explicit_typing_test
+    src: integration_tests/psql_explicit_typing_test.l
+    golden: integration_tests/psql_explicit_typing_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_flow_test
+    src: integration_tests/psql_flow_test.l
+    golden: integration_tests/psql_flow_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_game_test
+    src: integration_tests/psql_game_test.l
+    golden: integration_tests/psql_game_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_graph_coloring_test
+    src: integration_tests/psql_graph_coloring_test.l
+    golden: integration_tests/psql_graph_coloring_test.txt
+    predicate: Test
+    runner: concertina
+  - name: psql_pair_test
+    src: integration_tests/psql_pair_test.l
+    golden: integration_tests/psql_pair_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_plusplus_test
+    src: integration_tests/psql_plusplus_test.l
+    golden: integration_tests/psql_plusplus_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_purchase2_test
+    src: integration_tests/psql_purchase2_test.l
+    golden: integration_tests/psql_purchase2_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_purchase3_test
+    src: integration_tests/psql_purchase3_test.l
+    golden: integration_tests/psql_purchase3_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_purchase_test
+    src: integration_tests/psql_purchase_test.l
+    golden: integration_tests/psql_purchase_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_record_combine_test
+    src: integration_tests/psql_record_combine_test.l
+    golden: integration_tests/psql_record_combine_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_recursion_test
+    src: integration_tests/psql_recursion_test.l
+    golden: integration_tests/psql_recursion_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_simple_structs_test
+    src: integration_tests/psql_simple_structs_test.l
+    golden: integration_tests/psql_simple_structs_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_structs_ground_test
+    src: integration_tests/psql_structs_ground_test.l
+    golden: integration_tests/psql_structs_ground_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_test
+    src: integration_tests/psql_test.l
+    golden: integration_tests/psql_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_udf_test
+    src: integration_tests/psql_udf_test.l
+    golden: integration_tests/psql_udf_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psql_win_move_test
+    src: integration_tests/psql_win_move_test.l
+    golden: integration_tests/psql_win_move_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  - name: psqld_empty_list_type_test
+    src: integration_tests/psqld_empty_list_type_test.l
+    golden: integration_tests/psqld_empty_list_type_test.txt
+    predicate: Test
+    runner: default
+    db_results: true
+  type_inference_psql:
+  - name: typing_aggregation_test
+    src: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_aggregation_test.l
+    golden: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_aggregation_test.txt
+  - name: typing_basic_test
+    src: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_basic_test.l
+    golden: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_basic_test.txt
+  - name: typing_combine2_test
+    src: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_combine2_test.l
+    golden: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_combine2_test.txt
+  - name: typing_combines_test
+    src: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_combines_test.l
+    golden: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_combines_test.txt
+  - name: typing_kitchensync_test
+    src: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_kitchensync_test.l
+    golden: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_kitchensync_test.txt
+  - name: typing_lists_test
+    src: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_lists_test.l
+    golden: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_lists_test.txt
+  - name: typing_nested_test
+    src: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_nested_test.l
+    golden: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_nested_test.txt
+  - name: typing_palindrome_puzzle_test
+    src: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_palindrome_puzzle_test.l
+    golden: type_inference/research/integration_tests/type_inference/research/integration_tests/typing_palindrome_puzzle_test.txt
+  unsupported_smoke:
+  - name: array_test
+    src: integration_tests/array_test.l
+    predicate: Test
+    engine: bigquery
+    expect_error: UnsupportedEngine
+  - name: udf_test
+    src: integration_tests/udf_test.l
+    predicate: Test
+    engine: bigquery
+    expect_error: UnsupportedEngine
+  - name: analytic_test
+    src: integration_tests/analytic_test.l
+    predicate: ReadableTest
+    engine: bigquery
+    expect_error: UnsupportedEngine
+  - name: duckdb_json_test
+    src: integration_tests/duckdb_json_test.l
+    predicate: Test
+    engine: duckdb
+    expect_error: UnsupportedEngine
+  - name: clingo_basic_test
+    src: integration_tests/clingo_basic_test.l
+    predicate: Test
+    engine: duckdb
+    expect_error: UnsupportedEngine

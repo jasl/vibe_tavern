@@ -1,0 +1,479 @@
+[
+ {
+  "full_text": "@Engine(\"sqlite\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"sqlite\"",
+        "literal": {
+         "the_string": {
+          "the_string": "sqlite"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Animal(\"cat\")",
+  "head": {
+   "predicate_name": "L_Animal",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"cat\"",
+        "literal": {
+         "the_string": {
+          "the_string": "cat"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Animal(\"dog\")",
+  "head": {
+   "predicate_name": "L_Animal",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"dog\"",
+        "literal": {
+         "the_string": {
+          "the_string": "dog"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Color(\"white\")",
+  "head": {
+   "predicate_name": "L_Color",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"white\"",
+        "literal": {
+         "the_string": {
+          "the_string": "white"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Color(\"black\")",
+  "head": {
+   "predicate_name": "L_Color",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"black\"",
+        "literal": {
+         "the_string": {
+          "the_string": "black"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Color(\"brown\")",
+  "head": {
+   "predicate_name": "L_Color",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"brown\"",
+        "literal": {
+         "the_string": {
+          "the_string": "brown"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Action(\"runs\")",
+  "head": {
+   "predicate_name": "L_Action",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"runs\"",
+        "literal": {
+         "the_string": {
+          "the_string": "runs"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Action(\"jumps\")",
+  "head": {
+   "predicate_name": "L_Action",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"jumps\"",
+        "literal": {
+         "the_string": {
+          "the_string": "jumps"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Action(\"sleeps\")",
+  "head": {
+   "predicate_name": "L_Action",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"sleeps\"",
+        "literal": {
+         "the_string": {
+          "the_string": "sleeps"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Animal",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "animal",
+            "variable": {
+             "var_name": "animal"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "L_Color",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "color",
+            "variable": {
+             "var_name": "color"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     },
+     {
+      "predicate": {
+       "predicate_name": "L_Action",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "action",
+            "variable": {
+             "var_name": "action"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Story(color ++ \" \" ++ animal ++ \" \" ++ action ++ \".\") :-\n  Animal(animal), Color(color), Action(action)",
+  "head": {
+   "predicate_name": "L_Story",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "++",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "++",
+               "record": {
+                "field_value": [
+                 {
+                  "field": "left",
+                  "value": {
+                   "expression": {
+                    "call": {
+                     "predicate_name": "++",
+                     "record": {
+                      "field_value": [
+                       {
+                        "field": "left",
+                        "value": {
+                         "expression": {
+                          "call": {
+                           "predicate_name": "++",
+                           "record": {
+                            "field_value": [
+                             {
+                              "field": "left",
+                              "value": {
+                               "expression": {
+                                "call": {
+                                 "predicate_name": "++",
+                                 "record": {
+                                  "field_value": [
+                                   {
+                                    "field": "left",
+                                    "value": {
+                                     "expression": {
+                                      "expression_heritage": "color",
+                                      "variable": {
+                                       "var_name": "color"
+                                      }
+                                     }
+                                    }
+                                   },
+                                   {
+                                    "field": "right",
+                                    "value": {
+                                     "expression": {
+                                      "expression_heritage": "\" \"",
+                                      "literal": {
+                                       "the_string": {
+                                        "the_string": " "
+                                       }
+                                      }
+                                     }
+                                    }
+                                   }
+                                  ]
+                                 }
+                                },
+                                "expression_heritage": "color ++ \" \""
+                               }
+                              }
+                             },
+                             {
+                              "field": "right",
+                              "value": {
+                               "expression": {
+                                "expression_heritage": "animal",
+                                "variable": {
+                                 "var_name": "animal"
+                                }
+                               }
+                              }
+                             }
+                            ]
+                           }
+                          },
+                          "expression_heritage": "color ++ \" \" ++ animal"
+                         }
+                        }
+                       },
+                       {
+                        "field": "right",
+                        "value": {
+                         "expression": {
+                          "expression_heritage": "\" \"",
+                          "literal": {
+                           "the_string": {
+                            "the_string": " "
+                           }
+                          }
+                         }
+                        }
+                       }
+                      ]
+                     }
+                    },
+                    "expression_heritage": "color ++ \" \" ++ animal ++ \" \""
+                   }
+                  }
+                 },
+                 {
+                  "field": "right",
+                  "value": {
+                   "expression": {
+                    "expression_heritage": "action",
+                    "variable": {
+                     "var_name": "action"
+                    }
+                   }
+                  }
+                 }
+                ]
+               }
+              },
+              "expression_heritage": "color ++ \" \" ++ animal ++ \" \" ++ action"
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "\".\"",
+              "literal": {
+               "the_string": {
+                "the_string": "."
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "color ++ \" \" ++ animal ++ \" \" ++ action ++ \".\""
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Story",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "expression_heritage": "s",
+            "variable": {
+             "var_name": "s"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Test(s) :- Story(s)",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "s",
+        "variable": {
+         "var_name": "s"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

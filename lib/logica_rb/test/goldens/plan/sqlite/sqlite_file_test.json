@@ -1,0 +1,31 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "sqlite",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "SELECT\n  JOIN_STRINGS((SELECT\n  JSON_GROUP_ARRAY(MagicalEntangle(x_34.value, x_35.value)) AS logica_value\nFROM\n  JSON_EACH(ReadFile('/tmp/sqlite_file_test_data.txt')) as x_34, JSON_EACH(JSON_ARRAY(0)) as x_35\nWHERE\n  (x_34.value > 10)), '/') AS col0\nFROM\n  (SELECT 'singleton' as s) as unused_singleton\nWHERE\n  ('OK' = WriteFile('/tmp/sqlite_file_test_data.txt', (SELECT\n    JSON_GROUP_ARRAY(MagicalEntangle(((x_40.value) * (2)), x_41.value)) AS logica_value\n  FROM\n    JSON_EACH((select json_group_array(n) from (with recursive t as(select 0 as n union all select n + 1 as n from t where n + 1 < 10) select n from t) where n < 10)) as x_40, JSON_EACH(JSON_ARRAY(0)) as x_41)))"
+   },
+   "name": "Test",
+   "requires": [],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [],
+ "engine": "sqlite",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [],
+ "schema": "logica_rb.plan.v1"
+}

@@ -1,0 +1,732 @@
+[
+ {
+  "full_text": "@Engine(\"sqlite\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"sqlite\"",
+        "literal": {
+         "the_string": {
+          "the_string": "sqlite"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "S() = 0",
+  "head": {
+   "predicate_name": "L_S",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "0",
+        "literal": {
+         "the_number": {
+          "number": "0"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@Recursive(N, 1000)",
+  "head": {
+   "predicate_name": "@Recursive",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "N",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_N"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "1000",
+        "literal": {
+         "the_number": {
+          "number": "1000"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "N() = S()",
+  "head": {
+   "predicate_name": "L_N",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "L_S",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "S()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "N() = N() + 1",
+  "head": {
+   "predicate_name": "L_N",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "+",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "L_N",
+               "record": {
+                "field_value": []
+               }
+              },
+              "expression_heritage": "N()"
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "1",
+              "literal": {
+               "the_number": {
+                "number": "1"
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "N() + 1"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@Recursive(N30, 30)",
+  "head": {
+   "predicate_name": "@Recursive",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "N30",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_N30"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "30",
+        "literal": {
+         "the_number": {
+          "number": "30"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "N30() = 0",
+  "head": {
+   "predicate_name": "L_N30",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "0",
+        "literal": {
+         "the_number": {
+          "number": "0"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "N30() = N30() + 1",
+  "head": {
+   "predicate_name": "L_N30",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "+",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "L_N30",
+               "record": {
+                "field_value": []
+               }
+              },
+              "expression_heritage": "N30()"
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "1",
+              "literal": {
+               "the_number": {
+                "number": "1"
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "N30() + 1"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@Recursive(N29, 29)",
+  "head": {
+   "predicate_name": "@Recursive",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "N29",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_N29"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "29",
+        "literal": {
+         "the_number": {
+          "number": "29"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "N29() = 0",
+  "head": {
+   "predicate_name": "L_N29",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "0",
+        "literal": {
+         "the_number": {
+          "number": "0"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "N29() = N29() + 1",
+  "head": {
+   "predicate_name": "L_N29",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "+",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "call": {
+               "predicate_name": "L_N29",
+               "record": {
+                "field_value": []
+               }
+              },
+              "expression_heritage": "N29()"
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "1",
+              "literal": {
+               "the_number": {
+                "number": "1"
+               }
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "N29() + 1"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "SM() = 100",
+  "head": {
+   "predicate_name": "L_SM",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "100",
+        "literal": {
+         "the_number": {
+          "number": "100"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "M := N(S: SM)",
+  "head": {
+   "predicate_name": "@Make",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "M",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_M"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_N"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "record": {
+         "field_value": [
+          {
+           "field": "L_S",
+           "value": {
+            "expression": {
+             "expression_heritage": "SM",
+             "literal": {
+              "the_predicate": {
+               "predicate_name": "L_SM"
+              }
+             }
+            }
+           }
+          }
+         ]
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "@OrderBy(Test, \"col0\")",
+  "head": {
+   "predicate_name": "@OrderBy",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "Test",
+        "literal": {
+         "the_predicate": {
+          "predicate_name": "L_Test"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"col0\"",
+        "literal": {
+         "the_string": {
+          "the_string": "col0"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test(\"M\") Max= M()",
+  "head": {
+   "predicate_name": "L_Test_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"M\"",
+        "literal": {
+         "the_string": {
+          "the_string": "M"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "L_M",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "M()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test(\"N\") Max= N()",
+  "head": {
+   "predicate_name": "L_Test_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"N\"",
+        "literal": {
+         "the_string": {
+          "the_string": "N"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "L_N",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "N()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test(\"N30\") Max= N30()",
+  "head": {
+   "predicate_name": "L_Test_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"N30\"",
+        "literal": {
+         "the_string": {
+          "the_string": "N30"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "L_N30",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "N30()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "full_text": "Test(\"N29\") Max= N29()",
+  "head": {
+   "predicate_name": "L_Test_MultBodyAggAux",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"N29\"",
+        "literal": {
+         "the_string": {
+          "the_string": "N29"
+         }
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "L_N29",
+         "record": {
+          "field_value": []
+         }
+        },
+        "expression_heritage": "N29()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "predicate": {
+       "predicate_name": "L_Test_MultBodyAggAux",
+       "record": {
+        "field_value": [
+         {
+          "field": 0,
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": 0
+            }
+           }
+          }
+         },
+         {
+          "field": "logica_value",
+          "value": {
+           "expression": {
+            "variable": {
+             "var_name": "logica_value"
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     }
+    ]
+   }
+  },
+  "distinct_denoted": true,
+  "full_text": "Test(\"N29\") Max= N29()",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "variable": {
+         "var_name": 0
+        }
+       }
+      }
+     },
+     {
+      "field": "logica_value",
+      "value": {
+       "aggregation": {
+        "expression": {
+         "call": {
+          "predicate_name": "Max",
+          "record": {
+           "field_value": [
+            {
+             "field": 0,
+             "value": {
+              "expression": {
+               "variable": {
+                "var_name": "logica_value"
+               }
+              }
+             }
+            }
+           ]
+          }
+         },
+         "expression_heritage": " Max= M()"
+        },
+        "expression_heritage": " Max= M()"
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

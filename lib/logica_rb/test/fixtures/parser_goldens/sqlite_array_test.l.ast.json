@@ -1,0 +1,530 @@
+[
+ {
+  "full_text": "@Engine(\"sqlite\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"sqlite\"",
+        "literal": {
+         "the_string": {
+          "the_string": "sqlite"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "f",
+        "variable": {
+         "var_name": "f"
+        }
+       },
+       "right_hand_side": {
+        "combine": {
+         "body": {
+          "conjunction": {
+           "conjunct": [
+            {
+             "inclusion": {
+              "element": {
+               "expression_heritage": "n",
+               "variable": {
+                "var_name": "n"
+               }
+              },
+              "list": {
+               "call": {
+                "predicate_name": "Range",
+                "record": {
+                 "field_value": [
+                  {
+                   "field": 0,
+                   "value": {
+                    "expression": {
+                     "expression_heritage": "10",
+                     "literal": {
+                      "the_number": {
+                       "number": "10"
+                      }
+                     }
+                    }
+                   }
+                  }
+                 ]
+                }
+               },
+               "expression_heritage": "Range(10)"
+              }
+             }
+            }
+           ]
+          }
+         },
+         "distinct_denoted": true,
+         "full_text": "f Array= (n -> ToInt64(Round((1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5))) :-\n            n in Range(10))",
+         "head": {
+          "predicate_name": "Combine",
+          "record": {
+           "field_value": [
+            {
+             "field": "logica_value",
+             "value": {
+              "aggregation": {
+               "expression": {
+                "call": {
+                 "predicate_name": "Array",
+                 "record": {
+                  "field_value": [
+                   {
+                    "field": 0,
+                    "value": {
+                     "expression": {
+                      "call": {
+                       "predicate_name": "->",
+                       "record": {
+                        "field_value": [
+                         {
+                          "field": "left",
+                          "value": {
+                           "expression": {
+                            "expression_heritage": "n",
+                            "variable": {
+                             "var_name": "n"
+                            }
+                           }
+                          }
+                         },
+                         {
+                          "field": "right",
+                          "value": {
+                           "expression": {
+                            "call": {
+                             "predicate_name": "ToInt64",
+                             "record": {
+                              "field_value": [
+                               {
+                                "field": 0,
+                                "value": {
+                                 "expression": {
+                                  "call": {
+                                   "predicate_name": "Round",
+                                   "record": {
+                                    "field_value": [
+                                     {
+                                      "field": 0,
+                                      "value": {
+                                       "expression": {
+                                        "call": {
+                                         "predicate_name": "/",
+                                         "record": {
+                                          "field_value": [
+                                           {
+                                            "field": "left",
+                                            "value": {
+                                             "expression": {
+                                              "call": {
+                                               "predicate_name": "^",
+                                               "record": {
+                                                "field_value": [
+                                                 {
+                                                  "field": "left",
+                                                  "value": {
+                                                   "expression": {
+                                                    "call": {
+                                                     "predicate_name": "+",
+                                                     "record": {
+                                                      "field_value": [
+                                                       {
+                                                        "field": "left",
+                                                        "value": {
+                                                         "expression": {
+                                                          "expression_heritage": "1",
+                                                          "literal": {
+                                                           "the_number": {
+                                                            "number": "1"
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       },
+                                                       {
+                                                        "field": "right",
+                                                        "value": {
+                                                         "expression": {
+                                                          "call": {
+                                                           "predicate_name": "^",
+                                                           "record": {
+                                                            "field_value": [
+                                                             {
+                                                              "field": "left",
+                                                              "value": {
+                                                               "expression": {
+                                                                "expression_heritage": "5",
+                                                                "literal": {
+                                                                 "the_number": {
+                                                                  "number": "5"
+                                                                 }
+                                                                }
+                                                               }
+                                                              }
+                                                             },
+                                                             {
+                                                              "field": "right",
+                                                              "value": {
+                                                               "expression": {
+                                                                "expression_heritage": "0.5",
+                                                                "literal": {
+                                                                 "the_number": {
+                                                                  "number": "0.5"
+                                                                 }
+                                                                }
+                                                               }
+                                                              }
+                                                             }
+                                                            ]
+                                                           }
+                                                          },
+                                                          "expression_heritage": "5 ^ 0.5"
+                                                         }
+                                                        }
+                                                       }
+                                                      ]
+                                                     }
+                                                    },
+                                                    "expression_heritage": "1 + 5 ^ 0.5"
+                                                   }
+                                                  }
+                                                 },
+                                                 {
+                                                  "field": "right",
+                                                  "value": {
+                                                   "expression": {
+                                                    "expression_heritage": "n",
+                                                    "variable": {
+                                                     "var_name": "n"
+                                                    }
+                                                   }
+                                                  }
+                                                 }
+                                                ]
+                                               }
+                                              },
+                                              "expression_heritage": "(1 + 5 ^ 0.5) ^ n"
+                                             }
+                                            }
+                                           },
+                                           {
+                                            "field": "right",
+                                            "value": {
+                                             "expression": {
+                                              "call": {
+                                               "predicate_name": "*",
+                                               "record": {
+                                                "field_value": [
+                                                 {
+                                                  "field": "left",
+                                                  "value": {
+                                                   "expression": {
+                                                    "call": {
+                                                     "predicate_name": "^",
+                                                     "record": {
+                                                      "field_value": [
+                                                       {
+                                                        "field": "left",
+                                                        "value": {
+                                                         "expression": {
+                                                          "expression_heritage": "2",
+                                                          "literal": {
+                                                           "the_number": {
+                                                            "number": "2"
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       },
+                                                       {
+                                                        "field": "right",
+                                                        "value": {
+                                                         "expression": {
+                                                          "expression_heritage": "n",
+                                                          "variable": {
+                                                           "var_name": "n"
+                                                          }
+                                                         }
+                                                        }
+                                                       }
+                                                      ]
+                                                     }
+                                                    },
+                                                    "expression_heritage": "2 ^ n"
+                                                   }
+                                                  }
+                                                 },
+                                                 {
+                                                  "field": "right",
+                                                  "value": {
+                                                   "expression": {
+                                                    "call": {
+                                                     "predicate_name": "^",
+                                                     "record": {
+                                                      "field_value": [
+                                                       {
+                                                        "field": "left",
+                                                        "value": {
+                                                         "expression": {
+                                                          "expression_heritage": "5",
+                                                          "literal": {
+                                                           "the_number": {
+                                                            "number": "5"
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       },
+                                                       {
+                                                        "field": "right",
+                                                        "value": {
+                                                         "expression": {
+                                                          "expression_heritage": "0.5",
+                                                          "literal": {
+                                                           "the_number": {
+                                                            "number": "0.5"
+                                                           }
+                                                          }
+                                                         }
+                                                        }
+                                                       }
+                                                      ]
+                                                     }
+                                                    },
+                                                    "expression_heritage": "5 ^ 0.5"
+                                                   }
+                                                  }
+                                                 }
+                                                ]
+                                               }
+                                              },
+                                              "expression_heritage": "2 ^ n * 5 ^ 0.5"
+                                             }
+                                            }
+                                           }
+                                          ]
+                                         }
+                                        },
+                                        "expression_heritage": "(1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5)"
+                                       }
+                                      }
+                                     }
+                                    ]
+                                   }
+                                  },
+                                  "expression_heritage": "Round((1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5))"
+                                 }
+                                }
+                               }
+                              ]
+                             }
+                            },
+                            "expression_heritage": "ToInt64(Round((1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5)))"
+                           }
+                          }
+                         }
+                        ]
+                       }
+                      },
+                      "expression_heritage": "n -> ToInt64(Round((1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5)))"
+                     }
+                    }
+                   }
+                  ]
+                 }
+                },
+                "expression_heritage": "f Array= (n -> ToInt64(Round((1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5))) :-\n            n in Range(10))"
+               },
+               "expression_heritage": "f Array= (n -> ToInt64(Round((1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5))) :-\n            n in Range(10))"
+              }
+             }
+            }
+           ]
+          }
+         }
+        },
+        "expression_heritage": "f Array= (n -> ToInt64(Round((1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5))) :-\n            n in Range(10))"
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "FibonacciArray() = f :-\n  f Array= (n -> ToInt64(Round((1 + 5 ^ 0.5) ^ n / (2 ^ n * 5 ^ 0.5))) :-\n            n in Range(10))",
+  "head": {
+   "predicate_name": "L_FibonacciArray",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "f",
+        "variable": {
+         "var_name": "f"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "unification": {
+       "left_hand_side": {
+        "expression_heritage": "v",
+        "variable": {
+         "var_name": "v"
+        }
+       },
+       "right_hand_side": {
+        "combine": {
+         "body": {
+          "conjunction": {
+           "conjunct": [
+            {
+             "inclusion": {
+              "element": {
+               "expression_heritage": "x",
+               "variable": {
+                "var_name": "x"
+               }
+              },
+              "list": {
+               "call": {
+                "predicate_name": "L_FibonacciArray",
+                "record": {
+                 "field_value": []
+                }
+               },
+               "expression_heritage": "FibonacciArray()"
+              }
+             }
+            },
+            {
+             "unification": {
+              "left_hand_side": {
+               "expression_heritage": "s",
+               "variable": {
+                "var_name": "s"
+               }
+              },
+              "right_hand_side": {
+               "call": {
+                "predicate_name": "ToString",
+                "record": {
+                 "field_value": [
+                  {
+                   "field": 0,
+                   "value": {
+                    "expression": {
+                     "expression_heritage": "x",
+                     "variable": {
+                      "var_name": "x"
+                     }
+                    }
+                   }
+                  }
+                 ]
+                }
+               },
+               "expression_heritage": "ToString(x)"
+              }
+             }
+            }
+           ]
+          }
+         },
+         "distinct_denoted": true,
+         "full_text": "v StringAgg= (s :- x in FibonacciArray(), s == ToString(x))",
+         "head": {
+          "predicate_name": "Combine",
+          "record": {
+           "field_value": [
+            {
+             "field": "logica_value",
+             "value": {
+              "aggregation": {
+               "expression": {
+                "call": {
+                 "predicate_name": "StringAgg",
+                 "record": {
+                  "field_value": [
+                   {
+                    "field": 0,
+                    "value": {
+                     "expression": {
+                      "expression_heritage": "s",
+                      "variable": {
+                       "var_name": "s"
+                      }
+                     }
+                    }
+                   }
+                  ]
+                 }
+                },
+                "expression_heritage": "v StringAgg= (s :- x in FibonacciArray(), s == ToString(x))"
+               },
+               "expression_heritage": "v StringAgg= (s :- x in FibonacciArray(), s == ToString(x))"
+              }
+             }
+            }
+           ]
+          }
+         }
+        },
+        "expression_heritage": "v StringAgg= (s :- x in FibonacciArray(), s == ToString(x))"
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Test() = v :-\n  v StringAgg= (s :- x in FibonacciArray(), s == ToString(x))",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": "logica_value",
+      "value": {
+       "expression": {
+        "expression_heritage": "v",
+        "variable": {
+         "var_name": "v"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

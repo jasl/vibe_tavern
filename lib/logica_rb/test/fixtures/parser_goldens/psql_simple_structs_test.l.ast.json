@@ -1,0 +1,373 @@
+[
+ {
+  "full_text": "@Engine(\"psql\")",
+  "head": {
+   "predicate_name": "@Engine",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "expression_heritage": "\"psql\"",
+        "literal": {
+         "the_string": {
+          "the_string": "psql"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "body": {
+   "conjunction": {
+    "conjunct": [
+     {
+      "inclusion": {
+       "element": {
+        "expression_heritage": "x",
+        "variable": {
+         "var_name": "x"
+        }
+       },
+       "list": {
+        "expression_heritage": "[1, 2]",
+        "literal": {
+         "the_list": {
+          "element": [
+           {
+            "expression_heritage": "1",
+            "literal": {
+             "the_number": {
+              "number": "1"
+             }
+            }
+           },
+           {
+            "expression_heritage": "2",
+            "literal": {
+             "the_number": {
+              "number": "2"
+             }
+            }
+           }
+          ]
+         }
+        }
+       }
+      }
+     },
+     {
+      "inclusion": {
+       "element": {
+        "expression_heritage": "y",
+        "variable": {
+         "var_name": "y"
+        }
+       },
+       "list": {
+        "expression_heritage": "[3, 4]",
+        "literal": {
+         "the_list": {
+          "element": [
+           {
+            "expression_heritage": "3",
+            "literal": {
+             "the_number": {
+              "number": "3"
+             }
+            }
+           },
+           {
+            "expression_heritage": "4",
+            "literal": {
+             "the_number": {
+              "number": "4"
+             }
+            }
+           }
+          ]
+         }
+        }
+       }
+      }
+     },
+     {
+      "inclusion": {
+       "element": {
+        "expression_heritage": "z",
+        "variable": {
+         "var_name": "z"
+        }
+       },
+       "list": {
+        "expression_heritage": "[{a: \"abc\"}, {a: \"def\"}]",
+        "literal": {
+         "the_list": {
+          "element": [
+           {
+            "expression_heritage": "{a: \"abc\"}",
+            "record": {
+             "field_value": [
+              {
+               "field": "a",
+               "value": {
+                "expression": {
+                 "expression_heritage": "\"abc\"",
+                 "literal": {
+                  "the_string": {
+                   "the_string": "abc"
+                  }
+                 }
+                }
+               }
+              }
+             ]
+            }
+           },
+           {
+            "expression_heritage": "{a: \"def\"}",
+            "record": {
+             "field_value": [
+              {
+               "field": "a",
+               "value": {
+                "expression": {
+                 "expression_heritage": "\"def\"",
+                 "literal": {
+                  "the_string": {
+                   "the_string": "def"
+                  }
+                 }
+                }
+               }
+              }
+             ]
+            }
+           }
+          ]
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  "full_text": "Test(x -> y,\n     {a: x, b: {c: [x, y]}, c: z},\n     {a: x, b: {c: x, d: y}, some_field: x + y}) :-\n  x in [1, 2],\n  y in [3, 4],\n  z in [{a: \"abc\"}, {a: \"def\"}]",
+  "head": {
+   "predicate_name": "L_Test",
+   "record": {
+    "field_value": [
+     {
+      "field": 0,
+      "value": {
+       "expression": {
+        "call": {
+         "predicate_name": "->",
+         "record": {
+          "field_value": [
+           {
+            "field": "left",
+            "value": {
+             "expression": {
+              "expression_heritage": "x",
+              "variable": {
+               "var_name": "x"
+              }
+             }
+            }
+           },
+           {
+            "field": "right",
+            "value": {
+             "expression": {
+              "expression_heritage": "y",
+              "variable": {
+               "var_name": "y"
+              }
+             }
+            }
+           }
+          ]
+         }
+        },
+        "expression_heritage": "x -> y"
+       }
+      }
+     },
+     {
+      "field": 1,
+      "value": {
+       "expression": {
+        "expression_heritage": "{a: x, b: {c: [x, y]}, c: z}",
+        "record": {
+         "field_value": [
+          {
+           "field": "a",
+           "value": {
+            "expression": {
+             "expression_heritage": "x",
+             "variable": {
+              "var_name": "x"
+             }
+            }
+           }
+          },
+          {
+           "field": "b",
+           "value": {
+            "expression": {
+             "expression_heritage": "{c: [x, y]}",
+             "record": {
+              "field_value": [
+               {
+                "field": "c",
+                "value": {
+                 "expression": {
+                  "expression_heritage": "[x, y]",
+                  "literal": {
+                   "the_list": {
+                    "element": [
+                     {
+                      "expression_heritage": "x",
+                      "variable": {
+                       "var_name": "x"
+                      }
+                     },
+                     {
+                      "expression_heritage": "y",
+                      "variable": {
+                       "var_name": "y"
+                      }
+                     }
+                    ]
+                   }
+                  }
+                 }
+                }
+               }
+              ]
+             }
+            }
+           }
+          },
+          {
+           "field": "c",
+           "value": {
+            "expression": {
+             "expression_heritage": "z",
+             "variable": {
+              "var_name": "z"
+             }
+            }
+           }
+          }
+         ]
+        }
+       }
+      }
+     },
+     {
+      "field": 2,
+      "value": {
+       "expression": {
+        "expression_heritage": "{a: x, b: {c: x, d: y}, some_field: x + y}",
+        "record": {
+         "field_value": [
+          {
+           "field": "a",
+           "value": {
+            "expression": {
+             "expression_heritage": "x",
+             "variable": {
+              "var_name": "x"
+             }
+            }
+           }
+          },
+          {
+           "field": "b",
+           "value": {
+            "expression": {
+             "expression_heritage": "{c: x, d: y}",
+             "record": {
+              "field_value": [
+               {
+                "field": "c",
+                "value": {
+                 "expression": {
+                  "expression_heritage": "x",
+                  "variable": {
+                   "var_name": "x"
+                  }
+                 }
+                }
+               },
+               {
+                "field": "d",
+                "value": {
+                 "expression": {
+                  "expression_heritage": "y",
+                  "variable": {
+                   "var_name": "y"
+                  }
+                 }
+                }
+               }
+              ]
+             }
+            }
+           }
+          },
+          {
+           "field": "some_field",
+           "value": {
+            "expression": {
+             "call": {
+              "predicate_name": "+",
+              "record": {
+               "field_value": [
+                {
+                 "field": "left",
+                 "value": {
+                  "expression": {
+                   "expression_heritage": "x",
+                   "variable": {
+                    "var_name": "x"
+                   }
+                  }
+                 }
+                },
+                {
+                 "field": "right",
+                 "value": {
+                  "expression": {
+                   "expression_heritage": "y",
+                   "variable": {
+                    "var_name": "y"
+                   }
+                  }
+                 }
+                }
+               ]
+              }
+             },
+             "expression_heritage": "x + y"
+            }
+           }
+          }
+         ]
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+]

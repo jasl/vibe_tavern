@@ -1,0 +1,19 @@
+/.bundle/
+/.yardoc
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+*.gem
+
+# Dummy app
+/dummy/db/*.sqlite3
+/dummy/db/*.sqlite3-*
+/dummy/log/
+!/dummy/log/.keep
+/dummy/storage/
+!/dummy/storage/.keep
+/dummy/tmp/
+!/dummy/tmp/.keep

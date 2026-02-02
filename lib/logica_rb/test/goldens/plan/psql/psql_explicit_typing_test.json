@@ -1,0 +1,112 @@
+{
+ "config": [
+  {
+   "action": {
+    "launcher": "none",
+    "predicate": "D"
+   },
+   "name": "D",
+   "requires": [],
+   "type": "data"
+  },
+  {
+   "action": {
+    "launcher": "none",
+    "predicate": "RawE"
+   },
+   "name": "RawE",
+   "requires": [],
+   "type": "data"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "PrepareData",
+    "sql": "DROP TABLE IF EXISTS logica_home.PrepareData CASCADE;\nCREATE TABLE logica_home.PrepareData AS WITH t_2_SaveT AS (SELECT\n  SUM(1) AS logica_value\nFROM\n  logica_home.T AS T),\nt_3_SaveR AS (SELECT\n  SUM(1) AS logica_value\nFROM\n  logica_home.R AS R),\nt_1_PrepareData_MultBodyAggAux AS (SELECT * FROM (\n  \n    SELECT\n      'done' AS col0,\n      1 AS logica_value\n    FROM\n      t_2_SaveT AS SaveT UNION ALL\n  \n    SELECT\n      'done' AS col0,\n      1 AS logica_value\n    FROM\n      t_3_SaveR AS SaveR\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  PrepareData_MultBodyAggAux.col0 AS col0,\n  SUM(PrepareData_MultBodyAggAux.logica_value) AS logica_value\nFROM\n  t_1_PrepareData_MultBodyAggAux AS PrepareData_MultBodyAggAux\nGROUP BY PrepareData_MultBodyAggAux.col0;"
+   },
+   "name": "PrepareData",
+   "requires": [
+    "R",
+    "T"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "R",
+    "sql": "DROP TABLE IF EXISTS logica_home.R CASCADE;\nCREATE TABLE logica_home.R AS SELECT\n  ROW(5, ARRAY[ROW('e')::logicarecord988402559]::logicarecord988402559[])::logicarecord607780065 AS f,\n  'g' AS g;"
+   },
+   "name": "R",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "T",
+    "sql": "DROP TABLE IF EXISTS logica_home.T CASCADE;\nCREATE TABLE logica_home.T AS SELECT * FROM (\n  \n    SELECT\n      1 AS a,\n      'I' AS b UNION ALL\n  \n    SELECT\n      2 AS a,\n      'II' AS b UNION ALL\n  \n    SELECT\n      3 AS a,\n      'III' AS b\n) AS UNUSED_TABLE_NAME  ;"
+   },
+   "name": "T",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "SELECT\n  ROW((RawE).f, (RawE).g)::logicarecord964904363 AS col0,\n  ARRAY_AGG(ROW(D.a, D.b)::logicarecord897399178 order by D.a) AS logica_value\nFROM\n  logica_home.PrepareData AS PrepareData, logica_home.T AS D, logica_home.R AS RawE\nGROUP BY ROW((RawE).f, (RawE).g)::logicarecord964904363"
+   },
+   "name": "Test",
+   "requires": [
+    "D",
+    "PrepareData",
+    "RawE"
+   ],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [
+  [
+   "D",
+   "Test"
+  ],
+  [
+   "PrepareData",
+   "Test"
+  ],
+  [
+   "R",
+   "PrepareData"
+  ],
+  [
+   "RawE",
+   "Test"
+  ],
+  [
+   "T",
+   "PrepareData"
+  ]
+ ],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {},
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\n-- Logica type: logicarecord988402559\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord988402559') then create type logicarecord988402559 as (e text); end if;\n-- Logica type: logicarecord897399178\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord897399178') then create type logicarecord897399178 as (a numeric, b text); end if;\n-- Logica type: logicarecord607780065\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord607780065') then create type logicarecord607780065 as (c numeric, d logicarecord988402559[]); end if;\n-- Logica type: logicarecord597750424\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord597750424') then create type logicarecord597750424 as (arg numeric, value logicarecord897399178); end if;\n-- Logica type: logicarecord964904363\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord964904363') then create type logicarecord964904363 as (f logicarecord607780065, g text); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}

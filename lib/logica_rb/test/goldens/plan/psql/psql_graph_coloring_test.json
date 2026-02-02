@@ -1,0 +1,674 @@
+{
+ "config": [
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color CASCADE;\nCREATE TABLE logica_home.Color AS WITH t_1_ComponentStart AS (SELECT\n  ComponentOf.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf AS ComponentOf\nGROUP BY ComponentOf.logica_value),\nt_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_156_Other AS (SELECT * FROM (\n  \n    SELECT\n      '#eee' AS col0,\n      '#bbb' AS logica_value UNION ALL\n  \n    SELECT\n      '#bbb' AS col0,\n      '#eee' AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_0_Color_MultBodyAggAux_f18 AS (SELECT * FROM (\n  \n    SELECT\n      ComponentStart.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_1_ComponentStart AS ComponentStart UNION ALL\n  \n    SELECT\n      t_94_E.col1 AS col0,\n      Other.logica_value AS logica_value\n    FROM\n      t_4_E AS t_94_E, logica_home.Color_ifr1 AS Color_ifr3, t_156_Other AS Other\n    WHERE\n      (Color_ifr3.col0 = t_94_E.col0) AND\n      (Other.col0 = Color_ifr3.logica_value)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f18.col0 AS col0,\n  Color_MultBodyAggAux_f18.logica_value AS logica_value\nFROM\n  t_0_Color_MultBodyAggAux_f18 AS Color_MultBodyAggAux_f18\nGROUP BY Color_MultBodyAggAux_f18.col0, Color_MultBodyAggAux_f18.logica_value;"
+   },
+   "name": "Color",
+   "requires": [
+    "Color_ifr3",
+    "ComponentOf",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_f20 CASCADE;\nCREATE TABLE logica_home.Color_f20 AS WITH t_183_ComponentStart_f20 AS (SELECT\n  ComponentOf_f20.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf_f20 AS ComponentOf_f20\nGROUP BY ComponentOf_f20.logica_value),\nt_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_156_Other AS (SELECT * FROM (\n  \n    SELECT\n      '#eee' AS col0,\n      '#bbb' AS logica_value UNION ALL\n  \n    SELECT\n      '#bbb' AS col0,\n      '#eee' AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_181_Color_MultBodyAggAux_f18_f20 AS (SELECT * FROM (\n  \n    SELECT\n      ComponentStart_f20.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_183_ComponentStart_f20 AS ComponentStart_f20 UNION ALL\n  \n    SELECT\n      t_281_E_f20.col1 AS col0,\n      t_282_Other.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_281_E_f20, logica_home.Color_ifr1_f20 AS Color_ifr3_f20, t_156_Other AS t_282_Other\n    WHERE\n      (Color_ifr3_f20.col0 = t_281_E_f20.col0) AND\n      (t_282_Other.col0 = Color_ifr3_f20.logica_value)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f18_f20.col0 AS col0,\n  Color_MultBodyAggAux_f18_f20.logica_value AS logica_value\nFROM\n  t_181_Color_MultBodyAggAux_f18_f20 AS Color_MultBodyAggAux_f18_f20\nGROUP BY Color_MultBodyAggAux_f18_f20.col0, Color_MultBodyAggAux_f18_f20.logica_value;"
+   },
+   "name": "Color_f20",
+   "requires": [
+    "Color_ifr3_f20",
+    "ComponentOf_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_ifr0",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_ifr0 CASCADE;\nCREATE TABLE logica_home.Color_ifr0 AS WITH t_1_ComponentStart AS (SELECT\n  ComponentOf.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf AS ComponentOf\nGROUP BY ComponentOf.logica_value),\nt_149_Color_MultBodyAggAux_f14 AS (SELECT * FROM (\n  \n    SELECT\n      t_150_ComponentStart.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_1_ComponentStart AS t_150_ComponentStart\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f14.col0 AS col0,\n  Color_MultBodyAggAux_f14.logica_value AS logica_value\nFROM\n  t_149_Color_MultBodyAggAux_f14 AS Color_MultBodyAggAux_f14\nGROUP BY Color_MultBodyAggAux_f14.col0, Color_MultBodyAggAux_f14.logica_value;"
+   },
+   "name": "Color_ifr0",
+   "requires": [
+    "ComponentOf"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_ifr0_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_ifr0_f20 CASCADE;\nCREATE TABLE logica_home.Color_ifr0_f20 AS WITH t_183_ComponentStart_f20 AS (SELECT\n  ComponentOf_f20.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf_f20 AS ComponentOf_f20\nGROUP BY ComponentOf_f20.logica_value),\nt_349_Color_MultBodyAggAux_f14_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_350_ComponentStart_f20.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_183_ComponentStart_f20 AS t_350_ComponentStart_f20\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f14_f20.col0 AS col0,\n  Color_MultBodyAggAux_f14_f20.logica_value AS logica_value\nFROM\n  t_349_Color_MultBodyAggAux_f14_f20 AS Color_MultBodyAggAux_f14_f20\nGROUP BY Color_MultBodyAggAux_f14_f20.col0, Color_MultBodyAggAux_f14_f20.logica_value;"
+   },
+   "name": "Color_ifr0_f20",
+   "requires": [
+    "ComponentOf_f20"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_ifr1",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_ifr1 CASCADE;\nCREATE TABLE logica_home.Color_ifr1 AS WITH t_1_ComponentStart AS (SELECT\n  ComponentOf.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf AS ComponentOf\nGROUP BY ComponentOf.logica_value),\nt_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_156_Other AS (SELECT * FROM (\n  \n    SELECT\n      '#eee' AS col0,\n      '#bbb' AS logica_value UNION ALL\n  \n    SELECT\n      '#bbb' AS col0,\n      '#eee' AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_134_Color_MultBodyAggAux_f15 AS (SELECT * FROM (\n  \n    SELECT\n      t_135_ComponentStart.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_1_ComponentStart AS t_135_ComponentStart UNION ALL\n  \n    SELECT\n      t_138_E.col1 AS col0,\n      t_139_Other.logica_value AS logica_value\n    FROM\n      t_4_E AS t_138_E, logica_home.Color_ifr0 AS Color_ifr0, t_156_Other AS t_139_Other\n    WHERE\n      (Color_ifr0.col0 = t_138_E.col0) AND\n      (t_139_Other.col0 = Color_ifr0.logica_value)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f15.col0 AS col0,\n  Color_MultBodyAggAux_f15.logica_value AS logica_value\nFROM\n  t_134_Color_MultBodyAggAux_f15 AS Color_MultBodyAggAux_f15\nGROUP BY Color_MultBodyAggAux_f15.col0, Color_MultBodyAggAux_f15.logica_value;"
+   },
+   "name": "Color_ifr1",
+   "requires": [
+    "Color_ifr0",
+    "ComponentOf",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_ifr1_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_ifr1_f20 CASCADE;\nCREATE TABLE logica_home.Color_ifr1_f20 AS WITH t_183_ComponentStart_f20 AS (SELECT\n  ComponentOf_f20.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf_f20 AS ComponentOf_f20\nGROUP BY ComponentOf_f20.logica_value),\nt_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_156_Other AS (SELECT * FROM (\n  \n    SELECT\n      '#eee' AS col0,\n      '#bbb' AS logica_value UNION ALL\n  \n    SELECT\n      '#bbb' AS col0,\n      '#eee' AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_331_Color_MultBodyAggAux_f15_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_332_ComponentStart_f20.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_183_ComponentStart_f20 AS t_332_ComponentStart_f20 UNION ALL\n  \n    SELECT\n      t_335_E_f20.col1 AS col0,\n      t_336_Other.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_335_E_f20, logica_home.Color_ifr0_f20 AS Color_ifr0_f20, t_156_Other AS t_336_Other\n    WHERE\n      (Color_ifr0_f20.col0 = t_335_E_f20.col0) AND\n      (t_336_Other.col0 = Color_ifr0_f20.logica_value)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f15_f20.col0 AS col0,\n  Color_MultBodyAggAux_f15_f20.logica_value AS logica_value\nFROM\n  t_331_Color_MultBodyAggAux_f15_f20 AS Color_MultBodyAggAux_f15_f20\nGROUP BY Color_MultBodyAggAux_f15_f20.col0, Color_MultBodyAggAux_f15_f20.logica_value;"
+   },
+   "name": "Color_ifr1_f20",
+   "requires": [
+    "Color_ifr0_f20",
+    "ComponentOf_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_ifr2",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_ifr2 CASCADE;\nCREATE TABLE logica_home.Color_ifr2 AS WITH t_1_ComponentStart AS (SELECT\n  ComponentOf.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf AS ComponentOf\nGROUP BY ComponentOf.logica_value),\nt_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_156_Other AS (SELECT * FROM (\n  \n    SELECT\n      '#eee' AS col0,\n      '#bbb' AS logica_value UNION ALL\n  \n    SELECT\n      '#bbb' AS col0,\n      '#eee' AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_119_Color_MultBodyAggAux_f16 AS (SELECT * FROM (\n  \n    SELECT\n      t_120_ComponentStart.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_1_ComponentStart AS t_120_ComponentStart UNION ALL\n  \n    SELECT\n      t_123_E.col1 AS col0,\n      t_124_Other.logica_value AS logica_value\n    FROM\n      t_4_E AS t_123_E, logica_home.Color_ifr1 AS Color_ifr1, t_156_Other AS t_124_Other\n    WHERE\n      (Color_ifr1.col0 = t_123_E.col0) AND\n      (t_124_Other.col0 = Color_ifr1.logica_value)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f16.col0 AS col0,\n  Color_MultBodyAggAux_f16.logica_value AS logica_value\nFROM\n  t_119_Color_MultBodyAggAux_f16 AS Color_MultBodyAggAux_f16\nGROUP BY Color_MultBodyAggAux_f16.col0, Color_MultBodyAggAux_f16.logica_value;"
+   },
+   "name": "Color_ifr2",
+   "requires": [
+    "Color_ifr1",
+    "ComponentOf",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_ifr2_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_ifr2_f20 CASCADE;\nCREATE TABLE logica_home.Color_ifr2_f20 AS WITH t_183_ComponentStart_f20 AS (SELECT\n  ComponentOf_f20.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf_f20 AS ComponentOf_f20\nGROUP BY ComponentOf_f20.logica_value),\nt_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_156_Other AS (SELECT * FROM (\n  \n    SELECT\n      '#eee' AS col0,\n      '#bbb' AS logica_value UNION ALL\n  \n    SELECT\n      '#bbb' AS col0,\n      '#eee' AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_313_Color_MultBodyAggAux_f16_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_314_ComponentStart_f20.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_183_ComponentStart_f20 AS t_314_ComponentStart_f20 UNION ALL\n  \n    SELECT\n      t_317_E_f20.col1 AS col0,\n      t_318_Other.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_317_E_f20, logica_home.Color_ifr1_f20 AS Color_ifr1_f20, t_156_Other AS t_318_Other\n    WHERE\n      (Color_ifr1_f20.col0 = t_317_E_f20.col0) AND\n      (t_318_Other.col0 = Color_ifr1_f20.logica_value)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f16_f20.col0 AS col0,\n  Color_MultBodyAggAux_f16_f20.logica_value AS logica_value\nFROM\n  t_313_Color_MultBodyAggAux_f16_f20 AS Color_MultBodyAggAux_f16_f20\nGROUP BY Color_MultBodyAggAux_f16_f20.col0, Color_MultBodyAggAux_f16_f20.logica_value;"
+   },
+   "name": "Color_ifr2_f20",
+   "requires": [
+    "Color_ifr1_f20",
+    "ComponentOf_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_ifr3",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_ifr1 CASCADE;\nCREATE TABLE logica_home.Color_ifr1 AS WITH t_1_ComponentStart AS (SELECT\n  ComponentOf.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf AS ComponentOf\nGROUP BY ComponentOf.logica_value),\nt_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_156_Other AS (SELECT * FROM (\n  \n    SELECT\n      '#eee' AS col0,\n      '#bbb' AS logica_value UNION ALL\n  \n    SELECT\n      '#bbb' AS col0,\n      '#eee' AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_104_Color_MultBodyAggAux_f17 AS (SELECT * FROM (\n  \n    SELECT\n      t_105_ComponentStart.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_1_ComponentStart AS t_105_ComponentStart UNION ALL\n  \n    SELECT\n      t_108_E.col1 AS col0,\n      t_109_Other.logica_value AS logica_value\n    FROM\n      t_4_E AS t_108_E, logica_home.Color_ifr2 AS Color_ifr2, t_156_Other AS t_109_Other\n    WHERE\n      (Color_ifr2.col0 = t_108_E.col0) AND\n      (t_109_Other.col0 = Color_ifr2.logica_value)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f17.col0 AS col0,\n  Color_MultBodyAggAux_f17.logica_value AS logica_value\nFROM\n  t_104_Color_MultBodyAggAux_f17 AS Color_MultBodyAggAux_f17\nGROUP BY Color_MultBodyAggAux_f17.col0, Color_MultBodyAggAux_f17.logica_value;"
+   },
+   "name": "Color_ifr3",
+   "requires": [
+    "Color_ifr2",
+    "ComponentOf",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Color_ifr3_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.Color_ifr1_f20 CASCADE;\nCREATE TABLE logica_home.Color_ifr1_f20 AS WITH t_183_ComponentStart_f20 AS (SELECT\n  ComponentOf_f20.logica_value AS logica_value\nFROM\n  logica_home.ComponentOf_f20 AS ComponentOf_f20\nGROUP BY ComponentOf_f20.logica_value),\nt_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_156_Other AS (SELECT * FROM (\n  \n    SELECT\n      '#eee' AS col0,\n      '#bbb' AS logica_value UNION ALL\n  \n    SELECT\n      '#bbb' AS col0,\n      '#eee' AS logica_value\n) AS UNUSED_TABLE_NAME  ),\nt_295_Color_MultBodyAggAux_f17_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_296_ComponentStart_f20.logica_value AS col0,\n      '#eee' AS logica_value\n    FROM\n      t_183_ComponentStart_f20 AS t_296_ComponentStart_f20 UNION ALL\n  \n    SELECT\n      t_299_E_f20.col1 AS col0,\n      t_300_Other.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_299_E_f20, logica_home.Color_ifr2_f20 AS Color_ifr2_f20, t_156_Other AS t_300_Other\n    WHERE\n      (Color_ifr2_f20.col0 = t_299_E_f20.col0) AND\n      (t_300_Other.col0 = Color_ifr2_f20.logica_value)\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  Color_MultBodyAggAux_f17_f20.col0 AS col0,\n  Color_MultBodyAggAux_f17_f20.logica_value AS logica_value\nFROM\n  t_295_Color_MultBodyAggAux_f17_f20 AS Color_MultBodyAggAux_f17_f20\nGROUP BY Color_MultBodyAggAux_f17_f20.col0, Color_MultBodyAggAux_f17_f20.logica_value;"
+   },
+   "name": "Color_ifr3_f20",
+   "requires": [
+    "Color_ifr2_f20",
+    "ComponentOf_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf CASCADE;\nCREATE TABLE logica_home.ComponentOf AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_2_ComponentOf_MultBodyAggAux_f12 AS (SELECT * FROM (\n  \n    SELECT\n      t_3_E.col0 AS col0,\n      ComponentOf_ifr4.logica_value AS logica_value\n    FROM\n      t_4_E AS t_3_E, logica_home.ComponentOf_ifr2 AS ComponentOf_ifr4\n    WHERE\n      (ComponentOf_ifr4.col0 = t_3_E.col1) UNION ALL\n  \n    SELECT\n      t_91_E.col0 AS col0,\n      t_91_E.col0 AS logica_value\n    FROM\n      t_4_E AS t_91_E\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f12.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f12.logica_value) AS logica_value\nFROM\n  t_2_ComponentOf_MultBodyAggAux_f12 AS ComponentOf_MultBodyAggAux_f12\nGROUP BY ComponentOf_MultBodyAggAux_f12.col0;"
+   },
+   "name": "ComponentOf",
+   "requires": [
+    "ComponentOf_ifr4",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_f20 CASCADE;\nCREATE TABLE logica_home.ComponentOf_f20 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_184_ComponentOf_MultBodyAggAux_f12_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_185_E_f20.col0 AS col0,\n      ComponentOf_ifr4_f20.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_185_E_f20, logica_home.ComponentOf_ifr2_f20 AS ComponentOf_ifr4_f20\n    WHERE\n      (ComponentOf_ifr4_f20.col0 = t_185_E_f20.col1) UNION ALL\n  \n    SELECT\n      t_278_E_f20.col0 AS col0,\n      t_278_E_f20.col0 AS logica_value\n    FROM\n      t_186_E_f20 AS t_278_E_f20\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f12_f20.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f12_f20.logica_value) AS logica_value\nFROM\n  t_184_ComponentOf_MultBodyAggAux_f12_f20 AS ComponentOf_MultBodyAggAux_f12_f20\nGROUP BY ComponentOf_MultBodyAggAux_f12_f20.col0;"
+   },
+   "name": "ComponentOf_f20",
+   "requires": [
+    "ComponentOf_ifr4_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr0",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr0 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr0 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_74_ComponentOf_MultBodyAggAux_f7 AS (SELECT * FROM (\n  \n    SELECT\n      t_77_E.col0 AS col0,\n      t_77_E.col0 AS logica_value\n    FROM\n      t_4_E AS t_77_E\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f7.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f7.logica_value) AS logica_value\nFROM\n  t_74_ComponentOf_MultBodyAggAux_f7 AS ComponentOf_MultBodyAggAux_f7\nGROUP BY ComponentOf_MultBodyAggAux_f7.col0;"
+   },
+   "name": "ComponentOf_ifr0",
+   "requires": [
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr0_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr0_f20 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr0_f20 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_258_ComponentOf_MultBodyAggAux_f7_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_261_E_f20.col0 AS col0,\n      t_261_E_f20.col0 AS logica_value\n    FROM\n      t_186_E_f20 AS t_261_E_f20\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f7_f20.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f7_f20.logica_value) AS logica_value\nFROM\n  t_258_ComponentOf_MultBodyAggAux_f7_f20 AS ComponentOf_MultBodyAggAux_f7_f20\nGROUP BY ComponentOf_MultBodyAggAux_f7_f20.col0;"
+   },
+   "name": "ComponentOf_ifr0_f20",
+   "requires": [
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr1",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr1 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr1 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_63_ComponentOf_MultBodyAggAux_f8 AS (SELECT * FROM (\n  \n    SELECT\n      t_64_E.col0 AS col0,\n      ComponentOf_ifr0.logica_value AS logica_value\n    FROM\n      t_4_E AS t_64_E, logica_home.ComponentOf_ifr0 AS ComponentOf_ifr0\n    WHERE\n      (ComponentOf_ifr0.col0 = t_64_E.col1) UNION ALL\n  \n    SELECT\n      t_87_E.col0 AS col0,\n      t_87_E.col0 AS logica_value\n    FROM\n      t_4_E AS t_87_E\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f8.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f8.logica_value) AS logica_value\nFROM\n  t_63_ComponentOf_MultBodyAggAux_f8 AS ComponentOf_MultBodyAggAux_f8\nGROUP BY ComponentOf_MultBodyAggAux_f8.col0;"
+   },
+   "name": "ComponentOf_ifr1",
+   "requires": [
+    "ComponentOf_ifr0",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr1_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr1_f20 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr1_f20 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_244_ComponentOf_MultBodyAggAux_f8_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_245_E_f20.col0 AS col0,\n      ComponentOf_ifr0_f20.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_245_E_f20, logica_home.ComponentOf_ifr0_f20 AS ComponentOf_ifr0_f20\n    WHERE\n      (ComponentOf_ifr0_f20.col0 = t_245_E_f20.col1) UNION ALL\n  \n    SELECT\n      t_274_E_f20.col0 AS col0,\n      t_274_E_f20.col0 AS logica_value\n    FROM\n      t_186_E_f20 AS t_274_E_f20\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f8_f20.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f8_f20.logica_value) AS logica_value\nFROM\n  t_244_ComponentOf_MultBodyAggAux_f8_f20 AS ComponentOf_MultBodyAggAux_f8_f20\nGROUP BY ComponentOf_MultBodyAggAux_f8_f20.col0;"
+   },
+   "name": "ComponentOf_ifr1_f20",
+   "requires": [
+    "ComponentOf_ifr0_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr2",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr2 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr2 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_52_ComponentOf_MultBodyAggAux_f9 AS (SELECT * FROM (\n  \n    SELECT\n      t_53_E.col0 AS col0,\n      ComponentOf_ifr1.logica_value AS logica_value\n    FROM\n      t_4_E AS t_53_E, logica_home.ComponentOf_ifr1 AS ComponentOf_ifr1\n    WHERE\n      (ComponentOf_ifr1.col0 = t_53_E.col1) UNION ALL\n  \n    SELECT\n      t_88_E.col0 AS col0,\n      t_88_E.col0 AS logica_value\n    FROM\n      t_4_E AS t_88_E\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f9.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f9.logica_value) AS logica_value\nFROM\n  t_52_ComponentOf_MultBodyAggAux_f9 AS ComponentOf_MultBodyAggAux_f9\nGROUP BY ComponentOf_MultBodyAggAux_f9.col0;"
+   },
+   "name": "ComponentOf_ifr2",
+   "requires": [
+    "ComponentOf_ifr1",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr2_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr2_f20 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr2_f20 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_230_ComponentOf_MultBodyAggAux_f9_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_231_E_f20.col0 AS col0,\n      ComponentOf_ifr1_f20.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_231_E_f20, logica_home.ComponentOf_ifr1_f20 AS ComponentOf_ifr1_f20\n    WHERE\n      (ComponentOf_ifr1_f20.col0 = t_231_E_f20.col1) UNION ALL\n  \n    SELECT\n      t_275_E_f20.col0 AS col0,\n      t_275_E_f20.col0 AS logica_value\n    FROM\n      t_186_E_f20 AS t_275_E_f20\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f9_f20.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f9_f20.logica_value) AS logica_value\nFROM\n  t_230_ComponentOf_MultBodyAggAux_f9_f20 AS ComponentOf_MultBodyAggAux_f9_f20\nGROUP BY ComponentOf_MultBodyAggAux_f9_f20.col0;"
+   },
+   "name": "ComponentOf_ifr2_f20",
+   "requires": [
+    "ComponentOf_ifr1_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr3",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr3 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr3 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_41_ComponentOf_MultBodyAggAux_f10 AS (SELECT * FROM (\n  \n    SELECT\n      t_42_E.col0 AS col0,\n      ComponentOf_ifr2.logica_value AS logica_value\n    FROM\n      t_4_E AS t_42_E, logica_home.ComponentOf_ifr2 AS ComponentOf_ifr2\n    WHERE\n      (ComponentOf_ifr2.col0 = t_42_E.col1) UNION ALL\n  \n    SELECT\n      t_89_E.col0 AS col0,\n      t_89_E.col0 AS logica_value\n    FROM\n      t_4_E AS t_89_E\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f10.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f10.logica_value) AS logica_value\nFROM\n  t_41_ComponentOf_MultBodyAggAux_f10 AS ComponentOf_MultBodyAggAux_f10\nGROUP BY ComponentOf_MultBodyAggAux_f10.col0;"
+   },
+   "name": "ComponentOf_ifr3",
+   "requires": [
+    "ComponentOf_ifr2",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr3_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr3_f20 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr3_f20 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_216_ComponentOf_MultBodyAggAux_f10_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_217_E_f20.col0 AS col0,\n      ComponentOf_ifr2_f20.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_217_E_f20, logica_home.ComponentOf_ifr2_f20 AS ComponentOf_ifr2_f20\n    WHERE\n      (ComponentOf_ifr2_f20.col0 = t_217_E_f20.col1) UNION ALL\n  \n    SELECT\n      t_276_E_f20.col0 AS col0,\n      t_276_E_f20.col0 AS logica_value\n    FROM\n      t_186_E_f20 AS t_276_E_f20\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f10_f20.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f10_f20.logica_value) AS logica_value\nFROM\n  t_216_ComponentOf_MultBodyAggAux_f10_f20 AS ComponentOf_MultBodyAggAux_f10_f20\nGROUP BY ComponentOf_MultBodyAggAux_f10_f20.col0;"
+   },
+   "name": "ComponentOf_ifr3_f20",
+   "requires": [
+    "ComponentOf_ifr2_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr4",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr2 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr2 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_30_ComponentOf_MultBodyAggAux_f11 AS (SELECT * FROM (\n  \n    SELECT\n      t_31_E.col0 AS col0,\n      ComponentOf_ifr3.logica_value AS logica_value\n    FROM\n      t_4_E AS t_31_E, logica_home.ComponentOf_ifr3 AS ComponentOf_ifr3\n    WHERE\n      (ComponentOf_ifr3.col0 = t_31_E.col1) UNION ALL\n  \n    SELECT\n      t_90_E.col0 AS col0,\n      t_90_E.col0 AS logica_value\n    FROM\n      t_4_E AS t_90_E\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f11.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f11.logica_value) AS logica_value\nFROM\n  t_30_ComponentOf_MultBodyAggAux_f11 AS ComponentOf_MultBodyAggAux_f11\nGROUP BY ComponentOf_MultBodyAggAux_f11.col0;"
+   },
+   "name": "ComponentOf_ifr4",
+   "requires": [
+    "ComponentOf_ifr3",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "ComponentOf_ifr4_f20",
+    "sql": "DROP TABLE IF EXISTS logica_home.ComponentOf_ifr2_f20 CASCADE;\nCREATE TABLE logica_home.ComponentOf_ifr2_f20 AS WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  ),\nt_202_ComponentOf_MultBodyAggAux_f11_f20 AS (SELECT * FROM (\n  \n    SELECT\n      t_203_E_f20.col0 AS col0,\n      ComponentOf_ifr3_f20.logica_value AS logica_value\n    FROM\n      t_186_E_f20 AS t_203_E_f20, logica_home.ComponentOf_ifr3_f20 AS ComponentOf_ifr3_f20\n    WHERE\n      (ComponentOf_ifr3_f20.col0 = t_203_E_f20.col1) UNION ALL\n  \n    SELECT\n      t_277_E_f20.col0 AS col0,\n      t_277_E_f20.col0 AS logica_value\n    FROM\n      t_186_E_f20 AS t_277_E_f20\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  ComponentOf_MultBodyAggAux_f11_f20.col0 AS col0,\n  MIN(ComponentOf_MultBodyAggAux_f11_f20.logica_value) AS logica_value\nFROM\n  t_202_ComponentOf_MultBodyAggAux_f11_f20 AS ComponentOf_MultBodyAggAux_f11_f20\nGROUP BY ComponentOf_MultBodyAggAux_f11_f20.col0;"
+   },
+   "name": "ComponentOf_ifr4_f20",
+   "requires": [
+    "ComponentOf_ifr3_f20",
+    "L"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "L",
+    "sql": "DROP TABLE IF EXISTS logica_home.L CASCADE;\nCREATE TABLE logica_home.L AS WITH t_12_L_MultBodyAggAux_f5 AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      1 AS col1,\n      2 AS col2,\n      1 AS col3 UNION ALL\n  \n    SELECT\n      L_ifr3.col2 AS col0,\n      L_ifr3.col3 AS col1,\n      ((L_ifr3.col2) * (2)) AS col2,\n      L_ifr3.col3 AS col3\n    FROM\n      logica_home.L_ifr1 AS L_ifr3 UNION ALL\n  \n    SELECT\n      t_21_L_ifr3.col2 AS col0,\n      t_21_L_ifr3.col3 AS col1,\n      t_21_L_ifr3.col2 AS col2,\n      ((t_21_L_ifr3.col3) * (3)) AS col3\n    FROM\n      logica_home.L_ifr1 AS t_21_L_ifr3\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  L_MultBodyAggAux_f5.col0 AS col0,\n  L_MultBodyAggAux_f5.col1 AS col1,\n  L_MultBodyAggAux_f5.col2 AS col2,\n  L_MultBodyAggAux_f5.col3 AS col3\nFROM\n  t_12_L_MultBodyAggAux_f5 AS L_MultBodyAggAux_f5\nGROUP BY L_MultBodyAggAux_f5.col0, L_MultBodyAggAux_f5.col1, L_MultBodyAggAux_f5.col2, L_MultBodyAggAux_f5.col3;"
+   },
+   "name": "L",
+   "requires": [
+    "L_ifr3"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "L_ifr0",
+    "sql": "DROP TABLE IF EXISTS logica_home.L_ifr0 CASCADE;\nCREATE TABLE logica_home.L_ifr0 AS WITH t_16_L_MultBodyAggAux_f1 AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      1 AS col1,\n      2 AS col2,\n      1 AS col3\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  L_MultBodyAggAux_f1.col0 AS col0,\n  L_MultBodyAggAux_f1.col1 AS col1,\n  L_MultBodyAggAux_f1.col2 AS col2,\n  L_MultBodyAggAux_f1.col3 AS col3\nFROM\n  t_16_L_MultBodyAggAux_f1 AS L_MultBodyAggAux_f1\nGROUP BY L_MultBodyAggAux_f1.col0, L_MultBodyAggAux_f1.col1, L_MultBodyAggAux_f1.col2, L_MultBodyAggAux_f1.col3;"
+   },
+   "name": "L_ifr0",
+   "requires": [],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "L_ifr1",
+    "sql": "DROP TABLE IF EXISTS logica_home.L_ifr1 CASCADE;\nCREATE TABLE logica_home.L_ifr1 AS WITH t_15_L_MultBodyAggAux_f2 AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      1 AS col1,\n      2 AS col2,\n      1 AS col3 UNION ALL\n  \n    SELECT\n      L_ifr0.col2 AS col0,\n      L_ifr0.col3 AS col1,\n      ((L_ifr0.col2) * (2)) AS col2,\n      L_ifr0.col3 AS col3\n    FROM\n      logica_home.L_ifr0 AS L_ifr0 UNION ALL\n  \n    SELECT\n      t_18_L_ifr0.col2 AS col0,\n      t_18_L_ifr0.col3 AS col1,\n      t_18_L_ifr0.col2 AS col2,\n      ((t_18_L_ifr0.col3) * (3)) AS col3\n    FROM\n      logica_home.L_ifr0 AS t_18_L_ifr0\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  L_MultBodyAggAux_f2.col0 AS col0,\n  L_MultBodyAggAux_f2.col1 AS col1,\n  L_MultBodyAggAux_f2.col2 AS col2,\n  L_MultBodyAggAux_f2.col3 AS col3\nFROM\n  t_15_L_MultBodyAggAux_f2 AS L_MultBodyAggAux_f2\nGROUP BY L_MultBodyAggAux_f2.col0, L_MultBodyAggAux_f2.col1, L_MultBodyAggAux_f2.col2, L_MultBodyAggAux_f2.col3;"
+   },
+   "name": "L_ifr1",
+   "requires": [
+    "L_ifr0"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "L_ifr2",
+    "sql": "DROP TABLE IF EXISTS logica_home.L_ifr2 CASCADE;\nCREATE TABLE logica_home.L_ifr2 AS WITH t_14_L_MultBodyAggAux_f3 AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      1 AS col1,\n      2 AS col2,\n      1 AS col3 UNION ALL\n  \n    SELECT\n      L_ifr1.col2 AS col0,\n      L_ifr1.col3 AS col1,\n      ((L_ifr1.col2) * (2)) AS col2,\n      L_ifr1.col3 AS col3\n    FROM\n      logica_home.L_ifr1 AS L_ifr1 UNION ALL\n  \n    SELECT\n      t_19_L_ifr1.col2 AS col0,\n      t_19_L_ifr1.col3 AS col1,\n      t_19_L_ifr1.col2 AS col2,\n      ((t_19_L_ifr1.col3) * (3)) AS col3\n    FROM\n      logica_home.L_ifr1 AS t_19_L_ifr1\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  L_MultBodyAggAux_f3.col0 AS col0,\n  L_MultBodyAggAux_f3.col1 AS col1,\n  L_MultBodyAggAux_f3.col2 AS col2,\n  L_MultBodyAggAux_f3.col3 AS col3\nFROM\n  t_14_L_MultBodyAggAux_f3 AS L_MultBodyAggAux_f3\nGROUP BY L_MultBodyAggAux_f3.col0, L_MultBodyAggAux_f3.col1, L_MultBodyAggAux_f3.col2, L_MultBodyAggAux_f3.col3;"
+   },
+   "name": "L_ifr2",
+   "requires": [
+    "L_ifr1"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "L_ifr3",
+    "sql": "DROP TABLE IF EXISTS logica_home.L_ifr1 CASCADE;\nCREATE TABLE logica_home.L_ifr1 AS WITH t_13_L_MultBodyAggAux_f4 AS (SELECT * FROM (\n  \n    SELECT\n      1 AS col0,\n      1 AS col1,\n      2 AS col2,\n      1 AS col3 UNION ALL\n  \n    SELECT\n      L_ifr2.col2 AS col0,\n      L_ifr2.col3 AS col1,\n      ((L_ifr2.col2) * (2)) AS col2,\n      L_ifr2.col3 AS col3\n    FROM\n      logica_home.L_ifr2 AS L_ifr2 UNION ALL\n  \n    SELECT\n      t_20_L_ifr2.col2 AS col0,\n      t_20_L_ifr2.col3 AS col1,\n      t_20_L_ifr2.col2 AS col2,\n      ((t_20_L_ifr2.col3) * (3)) AS col3\n    FROM\n      logica_home.L_ifr2 AS t_20_L_ifr2\n) AS UNUSED_TABLE_NAME  )\nSELECT\n  L_MultBodyAggAux_f4.col0 AS col0,\n  L_MultBodyAggAux_f4.col1 AS col1,\n  L_MultBodyAggAux_f4.col2 AS col2,\n  L_MultBodyAggAux_f4.col3 AS col3\nFROM\n  t_13_L_MultBodyAggAux_f4 AS L_MultBodyAggAux_f4\nGROUP BY L_MultBodyAggAux_f4.col0, L_MultBodyAggAux_f4.col1, L_MultBodyAggAux_f4.col2, L_MultBodyAggAux_f4.col3;"
+   },
+   "name": "L_ifr3",
+   "requires": [
+    "L_ifr2"
+   ],
+   "type": "intermediate"
+  },
+  {
+   "action": {
+    "engine": "psql",
+    "launcher": "query",
+    "predicate": "Test",
+    "sql": "WITH t_5_G AS (SELECT * FROM (\n  \n    SELECT\n      ((CAST('a' AS TEXT) || ':') || CAST(x_43 AS TEXT)) AS col0,\n      ((CAST('a' AS TEXT) || ':') || CAST(((x_43) + (1)) AS TEXT)) AS col1\n    FROM\n      UNNEST((SELECT ARRAY_AGG(x) FROM GENERATE_SERIES(0, 6 - 1) as x)) as x_43 UNION ALL\n  \n    SELECT\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col0 AS TEXT)) AS TEXT) || ':') || CAST(L.col1 AS TEXT)) AS col0,\n      ((CAST(((CAST('b' AS TEXT) || ':') || CAST(L.col2 AS TEXT)) AS TEXT) || ':') || CAST(L.col3 AS TEXT)) AS col1\n    FROM\n      logica_home.L AS L\n    WHERE\n      (L.col0 < 6) AND\n      (L.col1 < 6)\n) AS UNUSED_TABLE_NAME  ),\nt_4_E AS (SELECT * FROM (\n  \n    SELECT\n      G.col0 AS col0,\n      G.col1 AS col1\n    FROM\n      t_5_G AS G UNION ALL\n  \n    SELECT\n      t_22_G.col1 AS col0,\n      t_22_G.col0 AS col1\n    FROM\n      t_5_G AS t_22_G\n) AS UNUSED_TABLE_NAME  ),\nt_187_G2 AS (SELECT * FROM (\n  \n    SELECT\n      t_188_G.col0 AS col0,\n      t_188_G.col1 AS col1\n    FROM\n      t_5_G AS t_188_G UNION ALL\n  \n    SELECT\n      'a:0' AS col0,\n      'a:6' AS col1\n) AS UNUSED_TABLE_NAME  ),\nt_186_E_f20 AS (SELECT * FROM (\n  \n    SELECT\n      G2.col0 AS col0,\n      G2.col1 AS col1\n    FROM\n      t_187_G2 AS G2 UNION ALL\n  \n    SELECT\n      t_198_G2.col1 AS col0,\n      t_198_G2.col0 AS col1\n    FROM\n      t_187_G2 AS t_198_G2\n) AS UNUSED_TABLE_NAME  )\nSELECT * FROM (\n  \n    SELECT\n      'G1' AS col0,\n      CASE WHEN (CAST((SELECT\n      MAX((CASE WHEN x_6 = 0 THEN CAST((SELECT\n      COUNT(DISTINCT (CASE WHEN x_9 = 0 THEN Color.logica_value ELSE NULL END)) AS logica_value\n    FROM\n      logica_home.Color AS Color, UNNEST(ARRAY[0]::numeric[]) as x_9\n    WHERE\n      (Color.col0 = E.col0)) AS numeric) ELSE NULL END)) AS logica_value\n    FROM\n      t_4_E AS E, UNNEST(ARRAY[0]::numeric[]) as x_6) AS numeric) = 1) THEN 'colorable' ELSE 'not colorable' END AS col1 UNION ALL\n  \n    SELECT\n      'G2' AS col0,\n      CASE WHEN (CAST((SELECT\n      MAX((CASE WHEN x_1005 = 0 THEN CAST((SELECT\n      COUNT(DISTINCT (CASE WHEN x_1008 = 0 THEN Color_f20.logica_value ELSE NULL END)) AS logica_value\n    FROM\n      logica_home.Color_f20 AS Color_f20, UNNEST(ARRAY[0]::numeric[]) as x_1008\n    WHERE\n      (Color_f20.col0 = E_f20.col0)) AS numeric) ELSE NULL END)) AS logica_value\n    FROM\n      t_186_E_f20 AS E_f20, UNNEST(ARRAY[0]::numeric[]) as x_1005) AS numeric) = 1) THEN 'colorable' ELSE 'not colorable' END AS col1\n) AS UNUSED_TABLE_NAME  ORDER BY col0 "
+   },
+   "name": "Test",
+   "requires": [
+    "Color",
+    "Color_f20",
+    "L"
+   ],
+   "type": "final"
+  }
+ ],
+ "data_dependency_edges": [],
+ "dependency_edges": [
+  [
+   "Color",
+   "Test"
+  ],
+  [
+   "Color_f20",
+   "Test"
+  ],
+  [
+   "Color_ifr0",
+   "Color_ifr1"
+  ],
+  [
+   "Color_ifr0_f20",
+   "Color_ifr1_f20"
+  ],
+  [
+   "Color_ifr1",
+   "Color_ifr2"
+  ],
+  [
+   "Color_ifr1_f20",
+   "Color_ifr2_f20"
+  ],
+  [
+   "Color_ifr2",
+   "Color_ifr3"
+  ],
+  [
+   "Color_ifr2_f20",
+   "Color_ifr3_f20"
+  ],
+  [
+   "Color_ifr3",
+   "Color"
+  ],
+  [
+   "Color_ifr3_f20",
+   "Color_f20"
+  ],
+  [
+   "ComponentOf",
+   "Color"
+  ],
+  [
+   "ComponentOf",
+   "Color_ifr0"
+  ],
+  [
+   "ComponentOf",
+   "Color_ifr1"
+  ],
+  [
+   "ComponentOf",
+   "Color_ifr2"
+  ],
+  [
+   "ComponentOf",
+   "Color_ifr3"
+  ],
+  [
+   "ComponentOf_f20",
+   "Color_f20"
+  ],
+  [
+   "ComponentOf_f20",
+   "Color_ifr0_f20"
+  ],
+  [
+   "ComponentOf_f20",
+   "Color_ifr1_f20"
+  ],
+  [
+   "ComponentOf_f20",
+   "Color_ifr2_f20"
+  ],
+  [
+   "ComponentOf_f20",
+   "Color_ifr3_f20"
+  ],
+  [
+   "ComponentOf_ifr0",
+   "ComponentOf_ifr1"
+  ],
+  [
+   "ComponentOf_ifr0_f20",
+   "ComponentOf_ifr1_f20"
+  ],
+  [
+   "ComponentOf_ifr1",
+   "ComponentOf_ifr2"
+  ],
+  [
+   "ComponentOf_ifr1_f20",
+   "ComponentOf_ifr2_f20"
+  ],
+  [
+   "ComponentOf_ifr2",
+   "ComponentOf_ifr3"
+  ],
+  [
+   "ComponentOf_ifr2_f20",
+   "ComponentOf_ifr3_f20"
+  ],
+  [
+   "ComponentOf_ifr3",
+   "ComponentOf_ifr4"
+  ],
+  [
+   "ComponentOf_ifr3_f20",
+   "ComponentOf_ifr4_f20"
+  ],
+  [
+   "ComponentOf_ifr4",
+   "ComponentOf"
+  ],
+  [
+   "ComponentOf_ifr4_f20",
+   "ComponentOf_f20"
+  ],
+  [
+   "L",
+   "Color"
+  ],
+  [
+   "L",
+   "Color_f20"
+  ],
+  [
+   "L",
+   "Color_ifr1"
+  ],
+  [
+   "L",
+   "Color_ifr1_f20"
+  ],
+  [
+   "L",
+   "Color_ifr2"
+  ],
+  [
+   "L",
+   "Color_ifr2_f20"
+  ],
+  [
+   "L",
+   "Color_ifr3"
+  ],
+  [
+   "L",
+   "Color_ifr3_f20"
+  ],
+  [
+   "L",
+   "ComponentOf"
+  ],
+  [
+   "L",
+   "ComponentOf_f20"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr0"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr0_f20"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr1"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr1_f20"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr2"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr2_f20"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr3"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr3_f20"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr4"
+  ],
+  [
+   "L",
+   "ComponentOf_ifr4_f20"
+  ],
+  [
+   "L",
+   "Test"
+  ],
+  [
+   "L_ifr0",
+   "L_ifr1"
+  ],
+  [
+   "L_ifr1",
+   "L_ifr2"
+  ],
+  [
+   "L_ifr2",
+   "L_ifr3"
+  ],
+  [
+   "L_ifr3",
+   "L"
+  ]
+ ],
+ "engine": "psql",
+ "final_predicates": [
+  "Test"
+ ],
+ "iterations": {
+  "Color": {
+   "predicates": [
+    "Color_ifr2",
+    "Color_ifr3"
+   ],
+   "repetitions": 14,
+   "stop_signal": ""
+  },
+  "Color_f20": {
+   "predicates": [
+    "Color_ifr2_f20",
+    "Color_ifr3_f20"
+   ],
+   "repetitions": 14,
+   "stop_signal": ""
+  },
+  "ComponentOf": {
+   "predicates": [
+    "ComponentOf_ifr3",
+    "ComponentOf_ifr4"
+   ],
+   "repetitions": 11,
+   "stop_signal": ""
+  },
+  "ComponentOf_f20": {
+   "predicates": [
+    "ComponentOf_ifr3_f20",
+    "ComponentOf_ifr4_f20"
+   ],
+   "repetitions": 11,
+   "stop_signal": ""
+  },
+  "L": {
+   "predicates": [
+    "L_ifr2",
+    "L_ifr3"
+   ],
+   "repetitions": 3,
+   "stop_signal": ""
+  }
+ },
+ "outputs": [
+  {
+   "kind": "table",
+   "node": "Test",
+   "predicate": "Test"
+  }
+ ],
+ "preambles": [
+  "-- Initializing PostgreSQL environment.\nset client_min_messages to warning;\ncreate schema if not exists logica_home;\n-- Empty logica type: logicarecord893574736;\nDO $$ BEGIN if not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord893574736') then create type logicarecord893574736 as (nirvana numeric); end if; END $$;\n\n\nDO $$\nBEGIN\n-- Logica type: logicarecord481217614\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord481217614') then create type logicarecord481217614 as (r logicarecord893574736); end if;\n-- Logica type: logicarecord86796764\nif not exists (select 'I(am) :- I(think)' from pg_type where typname = 'logicarecord86796764') then create type logicarecord86796764 as (s text); end if;\nEND $$;\n"
+ ],
+ "schema": "logica_rb.plan.v1"
+}
