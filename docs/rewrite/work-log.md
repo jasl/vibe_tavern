@@ -28,6 +28,11 @@ Guidelines:
   - Fix Liquid runtime seed wiring; add `render_for(ctx, ...)` helper + tests: `f028797`
   - Add `hash` alias for `hash7`; clarify that `history` is not exposed yet: `84f6068`
   - Add `system_template` (Liquid) to VibeTavern pipeline (optional system block) + tests/docs: `b192c51`
+  - Extend VibeTavern pipeline assembly:
+    - deterministic default system block from character/user (when no override is set)
+    - post-history `system` block (`post_history_instructions` or `post_history_template`)
+    - explicit disable semantics via `meta :system_template, nil` / `meta :post_history_template, nil`
+    - tests/docs: `6c376cd`
 
 ## 2026-02-02
 
