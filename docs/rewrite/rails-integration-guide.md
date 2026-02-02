@@ -140,6 +140,10 @@ Notes:
 - Preserve `variables_store` per chat; do not share it between concurrent chats.
 - See `docs/rewrite/vibe-tavern-pipeline.md` for the precise supported contract and behaviors.
 - For the planned Liquid-based macros system (variables + side-effect tags), see `docs/rewrite/liquid-macros.md`.
+- If you want “user input also runs macros/scripts” (ST/RisuAI-style), keep it
+  app-owned and run it **before persistence** using:
+  `TavernKit::VibeTavern::UserInputPreprocessor.call(...)`.
+  Default toggle: `runtime[:toggles][:expand_user_input_macros]` (off by default).
 
 ## Extending / Adding App-owned Pipelines
 

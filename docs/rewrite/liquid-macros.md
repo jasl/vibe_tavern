@@ -191,12 +191,37 @@ Liquid has its own “strict variables / strict filters” knobs. Our intent:
 - tolerant mode: missing variables/macros degrade to empty output and/or warnings
 - strict mode: missing variables/macros should be actionable (raise or strict warning)
 
-Exact mapping will be finalized when the Liquid engine is implemented and
-covered by characterization tests.
+Current implementation (`TavernKit::VibeTavern::LiquidMacros.render`):
+- `strict: false` renders with Liquid strictness disabled and **returns the
+  original text** when Liquid raises (passthrough).
+- `strict: true` (or `on_error: :raise`) raises `Liquid::Error` so tests/debug
+  can fail fast.
 
 ---
 
-## 6) References
+## 6) User Input Processing (Optional)
+
+By default, we do **not** run Liquid macros on end-user messages.
+
+If you want ST/RisuAI-style behavior (“user input also runs macros/scripts”),
+apply it at the app layer **before persistence** (so what you store is what
+you later show and feed back into prompt history).
+
+We standardize on a simple toggle:
+- `runtime[:toggles][:expand_user_input_macros]` (default: `false`)
+
+Helper:
+- `TavernKit::VibeTavern::UserInputPreprocessor.call(text, variables_store:, runtime:, enabled: nil, strict:, on_error:)`
+
+Notes:
+- Enabling this means user-authored text can execute our write tags
+  (`{% setvar %}`, `{% incvar %}`, etc) and mutate `variables_store`. Treat it
+  as a deliberate feature flag (typically per-user/per-chat).
+- “UI directives” (RisuAI-style) should stay app-owned and should be parsed
+  **after** the LLM response, gated behind its own feature flag, and only from
+  assistant-role output (never from user messages).
+
+## 7) References
 
 Liquid source copy:
 - `resources/liquid` (vendored for reference/porting)
