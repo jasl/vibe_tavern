@@ -40,4 +40,47 @@ class TavernKit::Archive::ZipReaderTest < Minitest::Test
       TavernKit::Archive::ZipReader.open(data, max_entries: 1) { |_| nil }
     end
   end
+
+  def test_enforces_max_entry_bytes
+    data = zip_bytes({ "a.txt" => "123456" })
+
+    err = assert_raises(TavernKit::Archive::ZipError) do
+      TavernKit::Archive::ZipReader.open(data, max_entry_bytes: 5) { |zip| zip.read("a.txt") }
+    end
+
+    assert_match(/too large/i, err.message)
+  end
+
+  def test_enforces_max_total_bytes_budget
+    data = zip_bytes({ "a.txt" => "1234", "b.txt" => "5678" })
+
+    err = assert_raises(TavernKit::Archive::ZipError) do
+      TavernKit::Archive::ZipReader.open(data, max_total_bytes: 6) do |zip|
+        zip.read("a.txt")
+        zip.read("b.txt")
+      end
+    end
+
+    assert_match(/budget exceeded/i, err.message)
+  end
+
+  def test_enforces_max_compression_ratio
+    data = zip_bytes({ "a.txt" => ("a" * 50_000) })
+
+    err = assert_raises(TavernKit::Archive::ZipError) do
+      TavernKit::Archive::ZipReader.open(data, max_compression_ratio: 2) { |zip| zip.read("a.txt") }
+    end
+
+    assert_match(/compression ratio/i, err.message)
+  end
+
+  def test_read_json_raises_on_invalid_json
+    data = zip_bytes({ "manifest.json" => "{not json" })
+
+    err = assert_raises(TavernKit::Archive::ZipError) do
+      TavernKit::Archive::ZipReader.open(data) { |zip| zip.read_json("manifest.json") }
+    end
+
+    assert_match(/not valid json/i, err.message)
+  end
 end
