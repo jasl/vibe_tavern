@@ -1061,7 +1061,7 @@ Provide shortcuts sparingly for very deep namespaces (usually engines/parsers),
 to keep call sites readable.
 
 ```ruby
-# In lib/tavern_kit/silly_tavern/silly_tavern.rb
+# Example: add a shortcut constant inside the platform module
 module TavernKit
   module SillyTavern
     MacroV2 = Macro::V2Engine

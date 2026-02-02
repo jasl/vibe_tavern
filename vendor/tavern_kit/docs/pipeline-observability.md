@@ -46,7 +46,7 @@ debug events. When absent, instrumentation should cost ~0.
 Built-in implementation:
 - `Prompt::Instrumenter::TraceCollector`
 
-Event contract (see `lib/tavern_kit/lib/tavern_kit/prompt/instrumenter.rb`):
+Event contract (see `lib/tavern_kit/prompt/instrumenter.rb`):
 - `:middleware_start` (name:)
 - `:middleware_finish` (name:, stats: optional)
 - `:middleware_error` (name:, error:)

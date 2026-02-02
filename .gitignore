@@ -83,45 +83,45 @@
 /public/assets
 
 # Gem
-/lib/tavern_kit/.bundle/
-/lib/tavern_kit/.yardoc
-/lib/tavern_kit/_yardoc/
-/lib/tavern_kit/coverage/
-/lib/tavern_kit/doc/
-/lib/tavern_kit/pkg/
-/lib/tavern_kit/spec/reports/
-/lib/tavern_kit/tmp/
-/lib/tavern_kit/*.gem
+/vendor/tavern_kit/.bundle/
+/vendor/tavern_kit/.yardoc
+/vendor/tavern_kit/_yardoc/
+/vendor/tavern_kit/coverage/
+/vendor/tavern_kit/doc/
+/vendor/tavern_kit/pkg/
+/vendor/tavern_kit/spec/reports/
+/vendor/tavern_kit/tmp/
+/vendor/tavern_kit/*.gem
 
-/lib/easy_talk/.bundle/
-/lib/easy_talk/.yardoc
-/lib/easy_talk/_yardoc/
-/lib/easy_talk/coverage/
-/lib/easy_talk/doc/
-/lib/easy_talk/pkg/
-/lib/easy_talk/spec/reports/
-/lib/easy_talk/tmp/
-/lib/easy_talk/*.gem
+/vendor/simple_inference/.bundle/
+/vendor/simple_inference/.yardoc
+/vendor/simple_inference/_yardoc/
+/vendor/simple_inference/coverage/
+/vendor/simple_inference/doc/
+/vendor/simple_inference/pkg/
+/vendor/simple_inference/spec/reports/
+/vendor/simple_inference/tmp/
+/vendor/simple_inference/*.gem
 
-/lib/simple_inference/.bundle/
-/lib/simple_inference/.yardoc
-/lib/simple_inference/_yardoc/
-/lib/simple_inference/coverage/
-/lib/simple_inference/doc/
-/lib/simple_inference/pkg/
-/lib/simple_inference/spec/reports/
-/lib/simple_inference/tmp/
-/lib/simple_inference/*.gem
+/vendor/easy_talk/.bundle/
+/vendor/easy_talk/.yardoc
+/vendor/easy_talk/_yardoc/
+/vendor/easy_talk/coverage/
+/vendor/easy_talk/doc/
+/vendor/easy_talk/pkg/
+/vendor/easy_talk/spec/reports/
+/vendor/easy_talk/tmp/
+/vendor/easy_talk/*.gem
 
-/lib/logica_rb/.bundle/
-/lib/logica_rb/.yardoc
-/lib/logica_rb/_yardoc/
-/lib/logica_rb/coverage/
-/lib/logica_rb/doc/
-/lib/logica_rb/pkg/
-/lib/logica_rb/spec/reports/
-/lib/logica_rb/tmp/
-/lib/logica_rb/*.gem
+/vendor/logica_rb/.bundle/
+/vendor/logica_rb/.yardoc
+/vendor/logica_rb/_yardoc/
+/vendor/logica_rb/coverage/
+/vendor/logica_rb/doc/
+/vendor/logica_rb/pkg/
+/vendor/logica_rb/spec/reports/
+/vendor/logica_rb/tmp/
+/vendor/logica_rb/*.gem
 
 # Local resources
 /resources

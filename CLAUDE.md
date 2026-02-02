@@ -146,18 +146,18 @@ JavaScript/CSS:
 
 Embedded gem (TavernKit):
 
-- Path: `lib/tavern_kit/` (standalone Ruby gem, not a Rails app)
-- Setup deps: `lib/tavern_kit/bin/setup`
-- Run gem tests + lint: run from `lib/tavern_kit/` -> `bundle exec rake`
-- Run gem tests only: run from `lib/tavern_kit/` -> `bundle exec rake test`
-- Run gem rubocop: run from `lib/tavern_kit/` -> `bundle exec rubocop`
-- Console: run from `lib/tavern_kit/` -> `bin/console`
+- Path: `vendor/tavern_kit/` (standalone Ruby gem, not a Rails app)
+- Setup deps: `vendor/tavern_kit/bin/setup`
+- Run gem tests + lint: run from `vendor/tavern_kit/` -> `bundle exec rake`
+- Run gem tests only: run from `vendor/tavern_kit/` -> `bundle exec rake test`
+- Run gem rubocop: run from `vendor/tavern_kit/` -> `bundle exec rubocop`
+- Console: run from `vendor/tavern_kit/` -> `bin/console`
 - Dev note: Rails usually won't reload gem code; restart `bin/dev` after changing
-  files under `lib/tavern_kit/`.
+  files under `vendor/tavern_kit/`.
 
-When changing code under `lib/tavern_kit/`, run both:
+When changing code under `vendor/tavern_kit/`, run both:
 
-- Gem suite: `bundle exec rake` (in `lib/tavern_kit/`)
+- Gem suite: `bundle exec rake` (in `vendor/tavern_kit/`)
 - App suite (integration): `bin/rails test`
 
 Generators:

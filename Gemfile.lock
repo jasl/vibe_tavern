@@ -100,7 +100,7 @@ GIT
       zeitwerk (~> 2.6)
 
 PATH
-  remote: lib/easy_talk
+  remote: vendor/easy_talk
   specs:
     easy_talk (3.3.0)
       activemodel (>= 7.0, < 9.0)
@@ -109,19 +109,19 @@ PATH
       sorbet-runtime (~> 0.5)
 
 PATH
-  remote: lib/logica_rb
+  remote: vendor/logica_rb
   specs:
     logica_rb (0.1.0)
       csv (~> 3.3)
       zeitwerk (~> 2)
 
 PATH
-  remote: lib/simple_inference
+  remote: vendor/simple_inference
   specs:
     simple_inference (0.1.5)
 
 PATH
-  remote: lib/tavern_kit
+  remote: vendor/tavern_kit
   specs:
     tavern_kit (0.1.0)
       easy_talk (~> 3, >= 3.3.0)

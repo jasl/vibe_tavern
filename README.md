@@ -4,7 +4,7 @@ Rails app + embedded prompt-building library.
 
 This repo contains:
 - a Rails rewrite (app code in `app/`)
-- an embedded gem: `lib/tavern_kit/` (TavernKit, the prompt-building core)
+- an embedded gem: `vendor/tavern_kit/` (TavernKit, the prompt-building core)
 - reference sources under `resources/` (ignored / for local comparison only)
 
 ## Quickstart
@@ -33,15 +33,15 @@ bin/rubocop
 Embedded gem (TavernKit):
 
 ```sh
-cd lib/tavern_kit && bin/setup
-cd lib/tavern_kit && bundle exec rake test
+cd vendor/tavern_kit && bin/setup
+cd vendor/tavern_kit && bundle exec rake test
 ```
 
 ## Rewrite docs
 
 - Rails rewrite docs: `docs/rewrite/README.md`
-- TavernKit gem docs: `lib/tavern_kit/docs/README.md`
-- TavernKit gem README: `lib/tavern_kit/README.md`
+- TavernKit gem docs: `vendor/tavern_kit/docs/README.md`
+- TavernKit gem README: `vendor/tavern_kit/README.md`
 
 ## License
 

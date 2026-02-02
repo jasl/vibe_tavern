@@ -7,4 +7,4 @@ Start here:
 - Rails integration guide: `docs/rewrite/rails-integration-guide.md`
 - Rails rewrite checklist (models/services/tests; no UI): `docs/rewrite/rails-rewrite-checklist.md`
 
-For the TavernKit gem documentation, see: `lib/tavern_kit/docs/README.md`.
+For the TavernKit gem documentation, see: `vendor/tavern_kit/docs/README.md`.

@@ -9,7 +9,7 @@ From repo root:
 - `bin/rubocop`
 - `ruby bin/lint-eof`
 
-From `lib/tavern_kit/`:
+From the gem root (`vendor/tavern_kit/` in this repo):
 
 - `bundle exec rake` (gem tests + gem rubocop)
 - `bundle exec rake test` (gem tests only)

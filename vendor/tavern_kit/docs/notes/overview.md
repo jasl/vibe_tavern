@@ -27,8 +27,8 @@
 
 ## Quick Scan Findings
 - Rails is already pinned to edge 8.2 in `Gemfile`; Ruby is 4.0.1 (see `.ruby-version`).
-- `easy_talk` and `tavern_kit` are vendored as path gems under `lib/`.
-- `lib/tavern_kit` appears stub-like and is expected to be fully rewritten.
+- `easy_talk` and `tavern_kit` are vendored as path gems under `vendor/`.
+- `vendor/tavern_kit` appeared stub-like (at the time of this scan) and was expected to be fully rewritten.
 - Playground uses `serialize` with a custom `EasyTalkCoder` to map JSONB columns.
 - Rails 8.2 schematized JSON (`has_json` / `has_delegated_json`) is present in the local Rails source.
 
@@ -49,7 +49,7 @@
 1. SillyTavern vs RisuAI parity: **Confirmed** — SillyTavern is the primary source of truth for conflicts.
 2. Target SillyTavern version: **Confirmed** — align to current SillyTavern; use `resources/SillyTavern` snapshot as reference (no commit pin).
 3. JSON strategy: **Needs verification** — Rails 8.2 `has_json` currently documents **no nesting** (boolean/integer/string only). We'll verify in `resources/rails` and determine whether EasyTalk schemas can be mapped or require a hybrid.
-4. EasyTalk fork: **Confirmed** — we can directly modify `lib/easy_talk/` and keep local change notes for later upstream diffing.
+4. EasyTalk fork: **Confirmed** — we can directly modify `vendor/easy_talk/` and keep local change notes for later upstream diffing.
 5. API breakage tolerance: **Confirmed** — no hard compatibility constraints; breaking changes are acceptable if the result is better.
 6. Data migration: **Confirmed** — greenfield rewrite, no production data migration required.
 7. Frontend scope: **Confirmed** — UI can be significantly reshaped, but must be tested for correct rendering/interaction.

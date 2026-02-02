@@ -137,6 +137,10 @@ Tests:
 Deliverable:
 - Rails can build a prompt plan/messages deterministically for both modes.
 
+Note:
+- If the rewrite chooses an app-owned pipeline (not ST/RisuAI), swap the build call to:
+  `TavernKit.build(pipeline: PromptBuilding::Pipeline) { ... }` (and keep the rest of the service contract the same).
+
 Service (single entrypoint):
 - `PromptBuilding::BuildPlan.call(chat:, user_input:, dialect: :openai, strict: Rails.env.test?)`
   - Load persisted content:

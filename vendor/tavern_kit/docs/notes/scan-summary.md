@@ -14,8 +14,8 @@
 - **Rails 8.2 app scaffolding**: Full infrastructure (Puma, Solid Queue/Cache/Cable, Tailwind+DaisyUI, Hotwire, Bun, Propshaft)
 - **Active Storage migration**: Only migration committed; no app models/migrations yet
 - **Result service**: `app/services/result.rb` with success/failure pattern
-- **EasyTalk fork**: `lib/easy_talk/` with `ActiveModelType` adapter already implemented (`to_type`)
-- **TavernKit stub**: `lib/tavern_kit/` with just version.rb and main entry point
+- **EasyTalk fork**: `vendor/easy_talk/` with `ActiveModelType` adapter already implemented (`to_type`)
+- **TavernKit stub**: `vendor/tavern_kit/` with just version.rb and main entry point (at the time of this scan)
 - **Comprehensive documentation**: `CLAUDE.md`, `docs/`, `.sisyphus/` drafts
 - **Test infrastructure**: Minitest, SimpleCov, parallel workers, fixtures dirs created
 - **Frontend CSS**: Tailwind config with SillyTavern message styling (`.mes-*`), CJK typography, DaisyUI theme

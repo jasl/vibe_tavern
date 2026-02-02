@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary = "A Ruby toolkit for SillyTavern-style prompt building"
   spec.description = "TavernKit is a Ruby library for building highly customizable LLM chat prompts inspired by SillyTavern."
-  spec.homepage = "https://github.com/jasl/vibe_tavern/lib/tavern_kit"
+  spec.homepage = "https://github.com/jasl/vibe_tavern/tree/main/vendor/tavern_kit"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 4.0.0"
 

@@ -6,6 +6,7 @@ the gem.
 
 Scope:
 - how to call `TavernKit::SillyTavern.build` / `TavernKit::RisuAI.build`
+- how to call an app-owned custom pipeline (including a custom macro system)
 - what data Rails should persist
 - what state must stay synchronized between the app and the pipeline
 - where file I/O and other side effects belong
@@ -175,6 +176,32 @@ plan =
 
 RisuAI-specific behaviors that depend on app state should be injected through
 `runtime` (metadata/toggles/conditions) and adapters (e.g., memory integration).
+
+## Custom Pipelines (App-owned)
+
+If the Rails rewrite wants to innovate (not copy ST/RisuAI wholesale), define a
+custom prompt-building pipeline in the Rails app and call TavernKit with an
+explicit `pipeline:`:
+
+```ruby
+# lib/prompt_building/pipeline.rb (app-owned)
+module PromptBuilding
+  Pipeline = TavernKit::Prompt::Pipeline.new do
+    # Compose your own middleware chain here (and your own macro system if desired).
+    #
+    # Example:
+    # use MyApp::PromptBuilding::Middleware::Prepare, name: :prepare
+  end
+end
+```
+
+```ruby
+plan =
+  TavernKit.build(pipeline: PromptBuilding::Pipeline) do
+    # Same DSL inputs (character/user/history/preset/lore_books/runtime/etc)
+    message user_input
+  end
+```
 
 ## Persistence + Concurrency (VariablesStore)
 

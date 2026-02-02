@@ -6,9 +6,9 @@ ActiveModel::Type adapter while keeping EasyTalk as the **single source of
 truth** for schema + validations + UI metadata.
 
 ## Status
-- Implemented `EasyTalk::ActiveModelType` in `lib/easy_talk/lib/easy_talk/active_model_type.rb`.
+- Implemented `EasyTalk::ActiveModelType` in `vendor/easy_talk/lib/easy_talk/active_model_type.rb`.
 - Added `to_type` to `EasyTalk::Model` and `EasyTalk::Schema`.
-- Documented in `lib/easy_talk/README.md`.
+- Documented in `vendor/easy_talk/README.md`.
 
 ## Usage (target)
 ```ruby

@@ -36,7 +36,7 @@ compatibility docs:
 - RisuAI compatibility matrix: `docs/compatibility/risuai.md`
 - Core interfaces: `docs/core-interface-design.md`
 - Debugging/observability: `docs/pipeline-observability.md`
-- Rails integration notes: `docs/rewrite/rails-integration-guide.md`
+- Rails integration notes (host app in this repo): `../../docs/rewrite/rails-integration-guide.md`
 
 ## Installation (this repo)
 
@@ -44,7 +44,7 @@ This repository vendors TavernKit as an embedded gem.
 
 ```ruby
 # Gemfile
-gem "tavern_kit", path: "lib/tavern_kit"
+gem "tavern_kit", path: "vendor/tavern_kit"
 ```
 
 ## Quickstart
@@ -170,10 +170,10 @@ See `docs/pipeline-observability.md`.
 ## Development (embedded gem)
 
 ```sh
-cd lib/tavern_kit && bin/setup
-cd lib/tavern_kit && bundle exec rake test
+cd vendor/tavern_kit && bin/setup
+cd vendor/tavern_kit && bundle exec rake test
 ```
 
 ## License
 
-MIT. See `lib/tavern_kit/LICENSE.txt`.
+MIT. See `LICENSE.txt`.

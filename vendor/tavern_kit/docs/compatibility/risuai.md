@@ -106,7 +106,7 @@ TavernKit implements the **prompt-building subset** of CBS macros, plus some
 not render UI).
 
 Concrete mapping lives in:
-- `lib/tavern_kit/lib/tavern_kit/risu_ai/cbs/macros.rb`
+- `lib/tavern_kit/risu_ai/cbs/macros.rb`
 
 Known parity caveat:
 - Anything that depends on real UI state, storage, or network I/O must be

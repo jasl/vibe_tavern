@@ -1,7 +1,10 @@
 # TavernKit Docs
 
 This folder contains the long-form documentation for the embedded `tavern_kit`
-gem (`lib/tavern_kit/`). It is meant to be the stable home for:
+gem (the gem root is `vendor/tavern_kit/` in this repo). Paths in this section
+are relative to the gem root.
+
+It is meant to be the stable home for:
 
 - architecture and interface contracts
 - SillyTavern / RisuAI compatibility notes

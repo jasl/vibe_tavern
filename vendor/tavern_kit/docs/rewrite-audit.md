@@ -1,7 +1,7 @@
 # Implementation Audit (2026-02-02)
 
 This is a "did we actually ship what our docs claim?" audit of the embedded
-`lib/tavern_kit/` gem.
+`tavern_kit` gem (`vendor/tavern_kit/` in this repo).
 
 It is intentionally operational: what exists, what tests prove it, and where
 explicit non-goals/backlogs live.
@@ -12,11 +12,11 @@ References:
 - Compatibility matrices:
   - SillyTavern: `docs/compatibility/sillytavern.md`
   - RisuAI: `docs/compatibility/risuai.md`
-- Rails integration: `docs/rewrite/rails-integration-guide.md`
+- Rails integration (host app): see `docs/rewrite/rails-integration-guide.md` at repo root
 
 ## Gates (green)
 
-- Gem: `cd lib/tavern_kit && bundle exec rake` (tests + gem rubocop)
+- Gem: `cd vendor/tavern_kit && bundle exec rake` (tests + gem rubocop)
 - App CI: `bin/ci`
 - Style: `bin/rubocop`
 - EOF lint: `ruby bin/lint-eof`
@@ -37,10 +37,10 @@ Delivered:
 - Ingest (PNG/APNG/BYAF/CHARX) bundle API with tmp lifecycle
 
 Evidence:
-- Unit tests: `lib/tavern_kit/test/tavern_kit/**/*_test.rb`
-- Conformance: `lib/tavern_kit/test/conformance/ccv2_conformance_test.rb`,
-  `lib/tavern_kit/test/conformance/ccv3_conformance_test.rb`
-- Integration: `lib/tavern_kit/test/integration/*_test.rb`
+- Unit tests: `test/tavern_kit/**/*_test.rb`
+- Conformance: `test/conformance/ccv2_conformance_test.rb`,
+  `test/conformance/ccv3_conformance_test.rb`
+- Integration: `test/integration/*_test.rb`
 
 Intentional divergences vs the legacy gem:
 - Core parsing APIs are Hash-only; file formats are handled via `TavernKit::Ingest`.
@@ -55,9 +55,9 @@ Delivered:
 - ST preset/instruct/context-template config objects and importers
 
 Evidence:
-- `lib/tavern_kit/test/tavern_kit/silly_tavern/preset_test.rb`
-- `lib/tavern_kit/test/tavern_kit/silly_tavern/instruct_test.rb`
-- `lib/tavern_kit/test/tavern_kit/silly_tavern/context_template_test.rb`
+- `test/tavern_kit/silly_tavern/preset_test.rb`
+- `test/tavern_kit/silly_tavern/instruct_test.rb`
+- `test/tavern_kit/silly_tavern/context_template_test.rb`
 
 ### Lore + macros
 
@@ -67,13 +67,13 @@ Delivered:
 - ExamplesParser + ExpanderVars
 
 Evidence:
-- `lib/tavern_kit/test/tavern_kit/silly_tavern/lore/*_test.rb`
-- `lib/tavern_kit/test/tavern_kit/silly_tavern/macro/**/*_test.rb`
-- `lib/tavern_kit/test/tavern_kit/silly_tavern/examples_parser_test.rb`
-- `lib/tavern_kit/test/tavern_kit/silly_tavern/expander_vars_test.rb`
+- `test/tavern_kit/silly_tavern/lore/*_test.rb`
+- `test/tavern_kit/silly_tavern/macro/**/*_test.rb`
+- `test/tavern_kit/silly_tavern/examples_parser_test.rb`
+- `test/tavern_kit/silly_tavern/expander_vars_test.rb`
 - Characterization anchors:
-  - `lib/tavern_kit/test/characterization/st_macros_test.rb`
-  - `lib/tavern_kit/test/characterization/st_world_info_test.rb`
+  - `test/characterization/st_macros_test.rb`
+  - `test/characterization/st_world_info_test.rb`
 
 ### Prompt orchestration pipeline
 
@@ -86,10 +86,10 @@ Delivered:
   - group activation strategies and card merging
 
 Evidence:
-- Guardrails suite (contracts): `lib/tavern_kit/test/characterization/*_contract_test.rb`
-- Integration: `lib/tavern_kit/test/integration/silly_tavern_build_test.rb`
-- Prompt infra: `lib/tavern_kit/test/tavern_kit/trimmer_test.rb`,
-  `lib/tavern_kit/test/tavern_kit/prompt/dialects_test.rb`
+- Guardrails suite (contracts): `test/characterization/*_contract_test.rb`
+- Integration: `test/integration/silly_tavern_build_test.rb`
+- Prompt infra: `test/tavern_kit/trimmer_test.rb`,
+  `test/tavern_kit/prompt/dialects_test.rb`
 
 ## RisuAI Layer (Prompt building)
 
@@ -102,13 +102,13 @@ Delivered:
 
 Evidence:
 - Characterization anchors:
-  - `lib/tavern_kit/test/characterization/risuai_cbs_test.rb`
-  - `lib/tavern_kit/test/characterization/risuai_lorebook_test.rb`
-  - `lib/tavern_kit/test/characterization/risuai_regex_scripts_test.rb`
-  - `lib/tavern_kit/test/characterization/risuai_triggers_test.rb`
+  - `test/characterization/risuai_cbs_test.rb`
+  - `test/characterization/risuai_lorebook_test.rb`
+  - `test/characterization/risuai_regex_scripts_test.rb`
+  - `test/characterization/risuai_triggers_test.rb`
 - Integration:
-  - `lib/tavern_kit/test/integration/risuai_build_test.rb`
-  - `lib/tavern_kit/test/integration/risuai_memory_test.rb`
+  - `test/integration/risuai_build_test.rb`
+  - `test/integration/risuai_memory_test.rb`
 
 Policy (by design):
 - UI/DB/network I/O macros/effects are deferred; app layer injects state via runtime metadata/adapters.
@@ -122,14 +122,14 @@ Delivered:
 - Large-file splits for maintainability (behavior preserved)
 
 Evidence:
-- `lib/tavern_kit/test/tavern_kit/regex_safety_test.rb`
-- `lib/tavern_kit/test/tavern_kit/lru_cache_test.rb`
-- `lib/tavern_kit/test/tavern_kit/js_regex_cache_test.rb`
+- `test/tavern_kit/regex_safety_test.rb`
+- `test/tavern_kit/lru_cache_test.rb`
+- `test/tavern_kit/js_regex_cache_test.rb`
 
 ## Repo hygiene
 
 - No skipped tests in the gem suite.
-- No TODO/FIXME markers across `lib/tavern_kit` and gem docs.
+- No TODO/FIXME markers across `vendor/tavern_kit/` and gem docs.
 - RuboCop clean for both the Rails app and the embedded gem.
 
 ## Explicit non-goals / backlogs

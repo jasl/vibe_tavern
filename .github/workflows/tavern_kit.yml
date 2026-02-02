@@ -7,7 +7,7 @@ on:
 
 defaults:
   run:
-    working-directory: lib/tavern_kit
+    working-directory: vendor/tavern_kit
 
 jobs:
   build:
@@ -27,7 +27,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
-          working-directory: lib/tavern_kit
+          working-directory: vendor/tavern_kit
           bundler-cache: true
 
       - name: Run the default task

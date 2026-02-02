@@ -8,7 +8,7 @@ and what remains as explicit decisions/backlogs.
 
 ## Gates (must stay green)
 
-- `cd lib/tavern_kit && bundle exec rake test`
+- `cd vendor/tavern_kit && bundle exec rake test`
 - `bin/rubocop`
 - `ruby bin/lint-eof`
 - Periodically: `bin/ci`

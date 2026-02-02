@@ -15,7 +15,7 @@ If this file conflicts with `CLAUDE.md`, follow `CLAUDE.md`.
 - Repo: Vibe Tavern (Rails)
 - Legacy reference sources (local symlink, ignored): `resources/tavern_kit`
 - Rails rewrite reference: `resources/tavern_kit/playground`
-- Embedded gem source: `lib/tavern_kit/`
+- Embedded gem source: `vendor/tavern_kit/`
 
 ## Golden Commands
 
@@ -61,9 +61,9 @@ bun run build:css --watch
 Embedded gem (TavernKit):
 
 ```sh
-cd lib/tavern_kit && bin/setup
-cd lib/tavern_kit && bundle exec rake        # gem tests + lint
-cd lib/tavern_kit && bundle exec rake test   # gem tests only
+cd vendor/tavern_kit && bin/setup
+cd vendor/tavern_kit && bundle exec rake        # gem tests + lint
+cd vendor/tavern_kit && bundle exec rake test   # gem tests only
 ```
 
 ## Formatting And Style
