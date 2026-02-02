@@ -179,9 +179,21 @@ RisuAI-specific behaviors that depend on app state should be injected through
 
 ## Custom Pipelines (App-owned)
 
-If the Rails rewrite wants to innovate (not copy ST/RisuAI wholesale), define a
-custom prompt-building pipeline in the Rails app and call TavernKit with an
-explicit `pipeline:`:
+This repo provides an app-owned pipeline namespace for the Rails rewrite:
+`TavernKit::VibeTavern`. It starts intentionally minimal and can evolve without
+carrying ST/RisuAI legacy constraints.
+
+```ruby
+plan =
+  TavernKit::VibeTavern.build do
+    history chat_history
+    runtime { chat_index: chat_index, message_index: message_index }
+    message user_input
+  end
+```
+
+If you want to define additional pipelines, keep them app-owned and call
+TavernKit with an explicit `pipeline:`:
 
 ```ruby
 # lib/prompt_building/pipeline.rb (app-owned)
