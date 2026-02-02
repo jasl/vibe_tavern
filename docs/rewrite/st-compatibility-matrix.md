@@ -2,7 +2,7 @@
 
 Reference: SillyTavern v1.15.0 behavior (staging snapshot `resources/SillyTavern` @ `bba43f332`)
 TavernKit layer: `TavernKit::SillyTavern`
-Last audited: 2026-02-01
+Last audited: 2026-02-02
 
 This matrix is meant to be *operational*, not aspirational: it reflects what
 TavernKit currently does, plus any intentional divergences.

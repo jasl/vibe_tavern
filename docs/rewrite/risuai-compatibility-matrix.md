@@ -2,7 +2,7 @@
 
 Reference: RisuAI source snapshot `resources/Risuai` @ `b8076cae`
 TavernKit layer: `TavernKit::RisuAI`
-Last audited: 2026-02-01
+Last audited: 2026-02-02
 
 This matrix is meant to describe what TavernKit currently implements for RisuAI
 parity, and what is intentionally left to downstream apps.

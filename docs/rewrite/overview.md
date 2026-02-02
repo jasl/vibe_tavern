@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> Historical / discovery document (2026-01-28). This file is kept for context but may be outdated.
+> Current source of truth:
+> - `docs/rewrite/README.md`
+> - `docs/plans/2026-01-29-tavern-kit-rewrite-roadmap.md`
+> - `docs/rewrite/st-compatibility-matrix.md`
+> - `docs/rewrite/risuai-compatibility-matrix.md`
+
 # Vibe Tavern Rewrite - Discovery Overview (2026-01-28)
 
 ## Goals (from user request)

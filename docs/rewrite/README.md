@@ -26,4 +26,3 @@ implementation details:
 
 - `docs/rewrite/overview.md`
 - `docs/rewrite/scan-summary.md`
-
