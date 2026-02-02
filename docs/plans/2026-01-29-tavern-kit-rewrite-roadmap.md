@@ -96,7 +96,7 @@ TavernKit (Core)
 │   ├── ChatHistory::Base + ChatHistory::InMemory
 │   └── VariablesStore::InMemory
 ├── Utilities (Coerce, Utils, Constants, Errors, Png::Parser/Writer)
-└── Ingest (file adapters: JSON/PNG/APNG/BYAF/CHARX; tmp extraction bundle)
+└── Ingest (file adapters: PNG/APNG/BYAF/CHARX; tmp extraction bundle)
 
 TavernKit::SillyTavern
 ├── Config: Preset (40+ ST keys, JSON import), Instruct, ContextTemplate
@@ -244,7 +244,7 @@ plan = TavernKit::SillyTavern.build do
 end
 ```
 
-## Current State (Wave 4 -- Complete)
+## Current State (Wave 6 -- Close-out)
 
 Delivered modules:
 - **Core (Wave 1):** Character/CharacterCard/PNG, Prompt basics (Pipeline/DSL/Plan/Context/Block/Message), PatternMatcher, PromptEntry (basic), Coerce/Utils/Constants/Errors
@@ -253,8 +253,10 @@ Delivered modules:
 - **SillyTavern (Wave 3):** Lore engine (World Info) + Macro engines (V1+V2) + ExamplesParser + ExpanderVars
 - **Core (Wave 4):** Trimmer + Dialects (8 formats) + MaxTokensMiddleware guardrails
 - **SillyTavern (Wave 4):** 9-stage middleware chain + HookRegistry + InjectionRegistry + GroupContext + ST build()/to_messages convenience
+- **RisuAI (Wave 5):** CBS engine + macros + environment, Lorebook engine + decorator parser, TemplateCards, RegexScripts, Triggers, Pipeline + build() convenience, Runtime + Memory interface
+- **Wave 6:** docs (compatibility matrices, rails integration, observability), safety/perf helpers (RegexSafety/LRUCache/JsRegexCache), large-file splits for maintainability
 
-Test status (gem): 593 runs, 0 failures, 0 errors, 0 skips.
+Test status (gem): 619 runs, 0 failures, 0 errors, 0 skips.
 
 ## Gap Summary
 
@@ -275,7 +277,7 @@ Test status (gem): 593 runs, 0 failures, 0 errors, 0 skips.
 | Middleware (9 stages, incl. extension prompts, author's note, persona positions) | **ST** | ~2,700 | ✅ (Wave 4) |
 | HookRegistry + InjectionRegistry (ephemeral, filters) | **ST** | ~300 | ✅ (Wave 4) |
 | GroupContext (4 strategies, 3 modes, card merging) | **ST** | ~300 | ✅ (Wave 4) |
-| RisuAI (CBS Engine 800-1K + CBS Macros 600-800 + Lore 400-500 + Decorators 250-300 + Templates 200-250 + Regex 250-300 + Triggers 500-700 + Pipeline 190-260) | **RisuAI** | ~3,190-4,110 | Wave 5 |
+| RisuAI (CBS Engine 800-1K + CBS Macros 600-800 + Lore 400-500 + Decorators 250-300 + Templates 200-250 + Regex 250-300 + Triggers 500-700 + Pipeline 190-260) | **RisuAI** | ~3,190-4,110 | ✅ (Wave 5) |
 
 ### Key Behavioral Requirements (from ARCHITECTURE.md)
 
@@ -487,7 +489,7 @@ These must be preserved in the SillyTavern layer:
 - ContextTemplate story_string Handlebars compilation tests
 - Instruct stop sequence assembly tests
 - Preset stopping strings integration tests
-- Ingest behavior tests (JSON/PNG/APNG/BYAF/CHARX), incl. tmp lifecycle + lazy assets
+- Ingest behavior tests (PNG/APNG/BYAF/CHARX), incl. tmp lifecycle + lazy assets
 
 **Deliverable:** Core interfaces defined. Lore data structures ready for engine
 implementations. ST Preset loadable from JSON with all prompt-affecting fields.
