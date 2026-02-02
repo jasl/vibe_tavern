@@ -18,6 +18,19 @@ class VibeTavernLiquidMacrosTest < ActiveSupport::TestCase
     assert_equal "x", out.strip
   end
 
+  test "supports ST-style escaped braces" do
+    store = TavernKit::VariablesStore::InMemory.new
+    store.set("mood", "happy", scope: :local)
+
+    out = TavernKit::VibeTavern::LiquidMacros.render(%(\\{\\{ var.mood \\}\\}), variables_store: store)
+    assert_equal "{{ var.mood }}", out.strip
+  end
+
+  test "strips whitespace-only blank lines" do
+    out = TavernKit::VibeTavern::LiquidMacros.render("a\n  \n\t\nb")
+    assert_equal "a\n\n\nb", out
+  end
+
   test "setvar tag writes to local variables store" do
     store = TavernKit::VariablesStore::InMemory.new
 

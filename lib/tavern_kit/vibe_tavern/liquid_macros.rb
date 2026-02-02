@@ -48,12 +48,26 @@ module TavernKit
 
         template = ::Liquid::Template.parse(source, environment: environment)
 
-        template.render(
+        out =
+          template.render(
           liquid_assigns,
           registers: registers.merge(variables_store: store),
           strict_variables: strict,
           strict_filters: strict,
-        ).to_s
+          ).to_s
+
+        # ST-style escaping: `\{\{` / `\}\}` (or `\{` / `\}` generally) should be
+        # preserved through parsing and unescaped after rendering.
+        out = out.gsub(/\\([{}])/, "\\1")
+
+        # Token hygiene: whitespace-only lines are equivalent to blank lines for
+        # prompt-building/Markdown, but consume tokens. We only strip whitespace
+        # on *blank* lines (never on content lines).
+        out = out.gsub(/\A[ \t]+(?=\n)/, "")
+        out = out.gsub(/(?<=\n)[ \t]+(?=\n)/, "")
+        out = out.gsub(/(?<=\n)[ \t]+\z/, "")
+
+        out
       rescue ::Liquid::Error
         raise if strict || on_error == :raise
         source

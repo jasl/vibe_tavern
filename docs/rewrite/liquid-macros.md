@@ -28,6 +28,26 @@ Hello, {{ user }}!
 {{ description }}
 ```
 
+Escaping / literal braces:
+
+- Liquid-native (recommended for large literals):
+
+```liquid
+{% raw %}
+This will not be parsed: {{ var.mood }}
+{% endraw %}
+```
+
+- ST-style (recommended for small inline escapes):
+  - write `\{\{` and `\}\}` (or `\{` / `\}` generally)
+  - our renderer unescapes `\{` → `{` and `\}` → `}` *after* Liquid renders
+
+Example:
+
+```liquid
+\{\{ var.mood \}\}   ->   {{ var.mood }}
+```
+
 Tags (control flow / statements):
 
 ```liquid
@@ -71,7 +91,9 @@ This is ignored.
 ```
 
 Whitespace control (Liquid feature):
-- `{%- ... -%}` trims surrounding whitespace. Use sparingly in prompts.
+- `{%- ... -%}` trims surrounding whitespace/newlines around tags.
+- `{{- ... -}}` trims surrounding whitespace/newlines around outputs.
+- Use this instead of global whitespace stripping when authoring templates.
 
 ---
 
