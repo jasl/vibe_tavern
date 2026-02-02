@@ -8,6 +8,12 @@ module TavernKit
       # Initial goal: unblock Rails integration with a deterministic, typed
       # plan output. Higher-level behaviors (macros/lore/injection/trimming)
       # can be composed later without breaking the app-level entrypoint.
+      #
+      # Current scope:
+      # - optional system block (template or deterministic default)
+      # - history passthrough
+      # - optional post-history instructions
+      # - user message
       class PlanAssembly < TavernKit::Prompt::Middleware::Base
         private
 

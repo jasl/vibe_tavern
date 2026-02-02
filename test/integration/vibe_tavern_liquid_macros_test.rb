@@ -1,6 +1,20 @@
 require "test_helper"
 
 class VibeTavernLiquidMacrosTest < ActiveSupport::TestCase
+  test "configures Liquid resource limits and guards against oversized templates" do
+    env = TavernKit::VibeTavern::LiquidMacros.environment
+    assert_equal TavernKit::VibeTavern::LiquidMacros::DEFAULT_RESOURCE_LIMITS, env.default_resource_limits
+
+    big = "a" * (TavernKit::VibeTavern::LiquidMacros::MAX_TEMPLATE_BYTES + 1)
+
+    out = TavernKit::VibeTavern::LiquidMacros.render(big)
+    assert_equal big, out
+
+    assert_raises(::Liquid::Error) do
+      TavernKit::VibeTavern::LiquidMacros.render(big, strict: true)
+    end
+  end
+
   test "reads variables through var/global drops" do
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)

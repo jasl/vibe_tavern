@@ -159,6 +159,13 @@ Notes:
   app-owned and run it **before persistence** using:
   `TavernKit::VibeTavern::UserInputPreprocessor.call(...)`.
   Default toggle: `runtime[:toggles][:expand_user_input_macros]` (off by default).
+  Important: `runtime[:toggles]` must use **snake_case symbol keys**.
+  If you load toggles from JSON (string keys), normalize before building runtime:
+
+  ```ruby
+  toggles = json_toggles.to_h.transform_keys { |k| TavernKit::Utils.underscore(k).to_sym }
+  runtime = TavernKit::Runtime::Base.build({ toggles: toggles }, type: :app, id: chat.id)
+  ```
 
 ## Extending / Adding App-owned Pipelines
 

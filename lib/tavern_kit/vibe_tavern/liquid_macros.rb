@@ -12,8 +12,19 @@ module TavernKit
     module LiquidMacros
       module_function
 
+      MAX_TEMPLATE_BYTES = 200_000
+      DEFAULT_RESOURCE_LIMITS = {
+        # Conservative defaults to prevent runaway templates.
+        # These are intentionally large enough for prompt-building use.
+        render_length_limit: 200_000,
+        render_score_limit: 200_000,
+        assign_score_limit: 200_000,
+      }.freeze
+
       def environment
         @environment ||= ::Liquid::Environment.build do |env|
+          env.default_resource_limits = DEFAULT_RESOURCE_LIMITS
+
           env.register_filter(TavernKit::VibeTavern::LiquidMacros::Filters::DeterministicRng)
           env.register_filter(TavernKit::VibeTavern::LiquidMacros::Filters::Time)
 
@@ -41,6 +52,12 @@ module TavernKit
       # @param on_error [Symbol] :raise or :passthrough (return original text)
       def render(text, assigns: {}, variables_store: nil, strict: false, on_error: :passthrough, registers: {})
         source = text.to_s
+        if source.bytesize > MAX_TEMPLATE_BYTES
+          raise ::Liquid::Error, "Liquid template is too large (#{source.bytesize} bytes > #{MAX_TEMPLATE_BYTES} bytes)" if strict ||
+            on_error == :raise
+          return source
+        end
+
         store = variables_store
 
         liquid_assigns = (assigns || {}).dup
@@ -51,13 +68,12 @@ module TavernKit
 
         template = ::Liquid::Template.parse(source, environment: environment)
 
-        out =
-          template.render(
+        out = template.render(
           liquid_assigns,
           registers: registers.merge(variables_store: store),
           strict_variables: strict,
           strict_filters: strict,
-          ).to_s
+        ).to_s
 
         # ST-style escaping: `\{\{` / `\}\}` (or `\{` / `\}` generally) should be
         # preserved through parsing and unescaped after rendering.

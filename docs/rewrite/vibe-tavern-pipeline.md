@@ -148,6 +148,13 @@ Immutability:
 - `runtime` cannot be replaced once the pipeline starts executing middlewares.
   If you need different runtime values, construct a new runtime instance per build.
 
+Key normalization:
+- TavernKit normalizes **top-level** runtime keys (snake_case symbols) when you
+  build a runtime from a Hash.
+- Nested hashes inside runtime (e.g. `runtime[:toggles]`) are **not** auto-normalized.
+  If you rely on toggles (e.g. `:expand_user_input_macros`), normalize those keys
+  in the app before injecting runtime.
+
 ## VariablesStore Contract
 
 `variables_store` is session-level mutable state owned by the Rails app.

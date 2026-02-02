@@ -248,6 +248,11 @@ Current implementation (`TavernKit::VibeTavern::LiquidMacros.render`):
   original text** when Liquid raises (passthrough).
 - `strict: true` (or `on_error: :raise`) raises `Liquid::Error` so tests/debug
   can fail fast.
+- Safety limits:
+  - Liquid templates are size-limited (today: 200KB) and rendered with resource
+    limits to avoid runaway output/loops.
+  - In tolerant mode, limit errors passthrough (return original text); in strict
+    mode, they raise.
 
 ---
 
@@ -261,6 +266,16 @@ you later show and feed back into prompt history).
 
 We standardize on a simple toggle:
 - `runtime[:toggles][:expand_user_input_macros]` (default: `false`)
+
+Important:
+- `runtime[:toggles]` must use **snake_case symbol keys**.
+  We do not auto-normalize nested hashes inside runtime. If you load toggles
+  from JSON, normalize keys before building runtime:
+
+```ruby
+toggles = json_toggles.to_h.transform_keys { |k| TavernKit::Utils.underscore(k).to_sym }
+runtime = TavernKit::Runtime::Base.build({ toggles: toggles }, type: :app)
+```
 
 Helper:
 - `TavernKit::VibeTavern::UserInputPreprocessor.call(text, variables_store:, runtime:, enabled: nil, strict:, on_error:)`
