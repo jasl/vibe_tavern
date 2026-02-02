@@ -127,13 +127,15 @@ module TavernKit
       def int(*keys, ext_key: nil, default: 0)
         val = self[*keys]
         val = dig(:extensions, ext_key) if val.nil? && ext_key
-        val.nil? ? default : val.to_i
+        return default if val.nil? || val == true || val == false
+
+        val.to_i
       end
 
       def positive_int(*keys, ext_key: nil)
         val = self[*keys]
         val = dig(:extensions, ext_key) if val.nil? && ext_key
-        return nil if val.nil?
+        return nil if val.nil? || val == true || val == false
 
         i = val.to_i
         i.positive? ? i : nil

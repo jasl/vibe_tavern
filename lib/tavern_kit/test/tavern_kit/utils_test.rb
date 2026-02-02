@@ -103,4 +103,13 @@ class TavernKit::UtilsTest < Minitest::Test
     assert_equal 0, h.int(:missing)
     assert_equal 42, h.int(:missing, default: 42)
   end
+
+  def test_hash_accessor_int_treats_booleans_as_missing
+    h = TavernKit::Utils::HashAccessor.wrap({ "count" => false, "other" => true })
+    assert_equal 0, h.int(:count)
+    assert_equal 7, h.int(:count, default: 7)
+    assert_equal 0, h.int(:other)
+    assert_nil h.positive_int(:count)
+    assert_nil h.positive_int(:other)
+  end
 end
