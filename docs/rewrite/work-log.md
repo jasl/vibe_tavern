@@ -24,6 +24,7 @@ Guidelines:
     - Standard toggle: `runtime[:toggles][:expand_user_input_macros]`
     - Rationale: keep prompt building deterministic and avoid implicit side effects unless explicitly enabled.
   - Pin Liquid assigns contract (`Assigns.build(ctx)`) + tests: `aa2f92f`
+  - Add Liquid P0 filters (deterministic RNG + time helpers) + docs/tests: `9b9ba98`
 
 ## 2026-02-02
 
