@@ -36,10 +36,14 @@ TavernKit owns:
 Recommended persisted shapes:
 - Character (store CCv2/CCv3 JSON hash, plus an app-level model wrapper)
 - Preset / settings (ST preset JSON hash or structured fields)
+- RisuAI prompt template (stored in the RisuAI preset under `promptTemplate`; optionally persisted separately and merged at build-time)
 - Lore books (CC character_book or ST World Info JSON hash)
 - Chat history (messages)
 
-TavernKit is hash-first; it can operate directly on `JSON.parse` hashes.
+TavernKit is hash-first at boundaries; it can operate directly on `JSON.parse` hashes.
+Some pipelines expect typed objects (created via hash-only importers):
+- ST preset: `TavernKit::SillyTavern::Preset::StImporter.new(hash).to_preset`
+- ST World Info: `TavernKit::SillyTavern::Lore::WorldInfoImporter.load_hash(hash)`
 
 ### 2) Session state (must stay in sync)
 
@@ -58,6 +62,20 @@ Rule of thumb:
 - variables_store is *stateful across turns*
 - runtime is a *read-only snapshot for this build*
 
+## Chat History (Message Contract)
+
+`history` can be `nil`, an `Array`, an `Enumerable`, or a `TavernKit::ChatHistory::Base`.
+Each message is recommended to be a `TavernKit::Prompt::Message`, but can also be a Hash
+or a duck-typed object that responds to `role` and `content`.
+
+Ordering matters: `history` must be chronological (oldest -> newest).
+
+Example (ActiveRecord relation):
+
+```ruby
+history = chat.messages.order(:id) # must yield oldest -> newest
+```
+
 ## File I/O and Imports
 
 Core models load from Ruby Hash only:
@@ -66,6 +84,10 @@ Core models load from Ruby Hash only:
 On-disk formats are handled by `TavernKit::Ingest`:
 - PNG/APNG wrapper
 - BYAF / CHARX (ZIP-based; safety limits apply)
+
+Note for Rails:
+- For ActiveStorage blobs, prefer `blob.open { |file| TavernKit::Ingest.open(file.path) { ... } }`
+  so you always get a real filesystem path and an explicit tmp lifetime.
 
 Recommended pattern:
 
@@ -89,6 +111,7 @@ instrumenter = Rails.env.development? ? TavernKit::Prompt::Instrumenter::TraceCo
 
 plan =
   TavernKit::SillyTavern.build do
+    dialect :openai
     character character_obj
     user user_obj
     history chat_history
@@ -115,16 +138,19 @@ payload = plan.to_messages(dialect: :openai, squash_system_messages: st_preset.s
 Notes:
 - For ST, trimming runs and can attach `plan.trim_report` and `plan.trace` when instrumented.
 - Preserve `variables_store` per chat; do not share between concurrent chats.
+- For continue/impersonate/quiet behavior parity, set `generation_type` explicitly
+  (`:continue`, `:impersonate`, `:quiet`, etc).
 
 ## Building a Prompt (RisuAI)
 
 ```ruby
 plan =
   TavernKit::RisuAI.build do
+    dialect :openai
     character character_obj
     user user_obj
     history chat_history
-    template_cards risu_prompt_template
+    preset risu_preset_hash # contains `promptTemplate` (or `prompt_template`)
     lore_books [risu_lorebook]
 
     runtime TavernKit::Runtime::Base.build(
@@ -141,12 +167,31 @@ plan =
 
     variables_store variables_store_obj
 
+    strict Rails.env.test?
+
     message user_input
   end
 ```
 
 RisuAI-specific behaviors that depend on app state should be injected through
 `runtime` (metadata/toggles/conditions) and adapters (e.g., memory integration).
+
+## Persistence + Concurrency (VariablesStore)
+
+`variables_store` is session-level mutable state. Pipelines may mutate it
+through macros/triggers. Rails should persist it back to the chat record
+**after** building a plan.
+
+Note:
+- `TavernKit::VariablesStore::InMemory` is a convenient default for tests.
+- In a Rails app, prefer injecting an application-owned variables store that is
+  both a `VariablesStore` and serializable (so you can persist it back to JSONB
+  after the build).
+
+Recommended default (simple and safe):
+- Wrap “build plan + persist variables_store” in `chat.with_lock` (or a DB
+  transaction with row locking) so concurrent builds for the same chat cannot
+  interleave and corrupt store state.
 
 ## Debugging in Rails
 

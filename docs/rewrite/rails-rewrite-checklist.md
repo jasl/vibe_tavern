@@ -51,11 +51,12 @@ Migrations (suggested tables; adjust naming as desired):
   - `data` (jsonb) - ST World Info hash or CC character_book hash
   - optional: `name`, `format` enum (:silly_tavern_world_info / :character_book / :risu_lorebook)
 - `presets`:
-  - `data` (jsonb) - ST preset hash (or structured fields later)
+  - `data` (jsonb) - ST preset hash, or RisuAI preset hash (includes `promptTemplate`)
   - optional: `name`, `dialect_default`
-- `prompt_templates` (RisuAI):
-  - `data` (jsonb) - promptTemplate array/hash
-  - optional: `name`
+- `prompt_templates` (optional; RisuAI):
+  - Only if you want to store templates separately and reuse them across chats/presets.
+  - The TavernKit pipeline expects `preset` to include `promptTemplate`, so if you persist
+    templates separately, merge them into the preset hash at build-time.
 - `chats`:
   - `character_id`, `preset_id` or `prompt_template_id` (depending on mode)
   - `variables_store` (jsonb) - session-level mutable store (persisted)
