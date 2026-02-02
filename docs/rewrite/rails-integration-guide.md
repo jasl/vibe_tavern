@@ -5,8 +5,9 @@ prompt building, without pulling UI/persistence/network responsibilities into
 the gem.
 
 Scope:
-- how to call `TavernKit::SillyTavern.build` / `TavernKit::RisuAI.build`
-- how to call an app-owned custom pipeline (including a custom macro system)
+- how to call `TavernKit::VibeTavern.build` (app-owned pipeline for the rewrite)
+- how to call `TavernKit::SillyTavern.build` / `TavernKit::RisuAI.build` (compat/parity modes)
+- how to define and call additional app-owned pipelines (including custom macro systems)
 - what data Rails should persist
 - what state must stay synchronized between the app and the pipeline
 - where file I/O and other side effects belong
@@ -187,9 +188,11 @@ carrying ST/RisuAI legacy constraints.
 plan =
   TavernKit::VibeTavern.build do
     history chat_history
-    runtime { chat_index: chat_index, message_index: message_index }
+    runtime({ chat_index: chat_index, message_index: message_index })
     message user_input
   end
+
+payload = plan.to_messages(dialect: :openai)
 ```
 
 If you want to define additional pipelines, keep them app-owned and call
