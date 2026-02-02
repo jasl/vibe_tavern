@@ -256,7 +256,7 @@ Delivered modules:
 - **RisuAI (Wave 5):** CBS engine + macros + environment, Lorebook engine + decorator parser, TemplateCards, RegexScripts, Triggers, Pipeline + build() convenience, Runtime + Memory interface
 - **Wave 6:** docs (compatibility matrices, rails integration, observability), safety/perf helpers (RegexSafety/LRUCache/JsRegexCache), large-file splits for maintainability
 
-Test status (gem): 619 runs, 0 failures, 0 errors, 0 skips.
+Test status (gem): 621 runs, 0 failures, 0 errors, 0 skips.
 
 ## Gap Summary
 

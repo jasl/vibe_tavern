@@ -3,9 +3,9 @@
 require "test_helper"
 
 class RisuaiLorebookTest < Minitest::Test
-  def pending!(reason)
-    skip("Pending RisuAI parity: #{reason}")
-  end
+  # Upstream references:
+  # - resources/Risuai/src/ts/lorebook/*.ts @ b8076cae
+  # - docs/rewrite/risuai-alignment-delta.md (tracked deltas)
 
   def test_full_word_matching
     lore = {

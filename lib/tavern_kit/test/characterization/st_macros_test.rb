@@ -3,9 +3,9 @@
 require "test_helper"
 
 class StMacrosTest < Minitest::Test
-  def pending!(reason)
-    skip("Pending ST parity (Wave 3 Macros): #{reason}")
-  end
+  # Upstream references:
+  # - resources/SillyTavern/public/scripts/macros.js @ bba43f332
+  # - docs/rewrite/st-alignment-delta-v1.15.0.md (tracked deltas)
 
   def test_legacy_marker_rewrites
     engine = TavernKit::SillyTavern::Macro::V2Engine.new

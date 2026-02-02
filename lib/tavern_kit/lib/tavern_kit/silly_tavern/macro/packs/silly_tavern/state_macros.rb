@@ -29,7 +29,7 @@ module TavernKit
 
               case value
               when Hash
-                enabled = value[name] || value[name.to_s] || value[name.to_sym]
+                enabled = TavernKit::Utils::HashAccessor.wrap(value)[name]
                 enabled ? "true" : "false"
               when Array
                 value.map(&:to_s).include?(name) ? "true" : "false"

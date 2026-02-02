@@ -3,9 +3,9 @@
 require "test_helper"
 
 class StWorldInfoTest < Minitest::Test
-  def pending!(reason)
-    skip("Pending ST parity (Wave 3 Lore): #{reason}")
-  end
+  # Upstream references:
+  # - resources/SillyTavern/public/scripts/world-info.js @ bba43f332
+  # - docs/rewrite/st-alignment-delta-v1.15.0.md (tracked deltas)
 
   def test_insertion_strategy_ordering
     entries = TavernKit::SillyTavern::Lore::Engine.sort_entries(

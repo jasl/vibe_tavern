@@ -3,6 +3,11 @@
 require "test_helper"
 
 class Wave4InChatInjectionContractTest < Minitest::Test
+  # Upstream references:
+  # - resources/SillyTavern/public/script.js @ bba43f332
+  #   - doChatInject() (reverse-depth insertion + role ordering)
+  # - resources/SillyTavern/public/scripts/openai.js @ bba43f332
+  #   - populationInjectionPrompts() (PromptManager in-chat grouping)
   FIXTURES_DIR = File.expand_path("../fixtures/silly_tavern/injects", __dir__)
 
   def test_in_chat_depth_and_role_order_matches_st_do_chat_inject

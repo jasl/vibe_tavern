@@ -3,6 +3,9 @@
 require "test_helper"
 
 class Wave4GroupCardMergeContractTest < Minitest::Test
+  # Upstream reference:
+  # - resources/SillyTavern/public/scripts/group-chats.js @ bba43f332
+  #   - getGroupCharacterCardsLazy() (APPEND / APPEND_DISABLED merging)
   FIXTURES_DIR = File.expand_path("../fixtures/silly_tavern/groups", __dir__)
 
   def test_append_modes_merge_cards_like_st

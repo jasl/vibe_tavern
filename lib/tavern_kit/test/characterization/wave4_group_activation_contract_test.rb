@@ -3,6 +3,10 @@
 require "test_helper"
 
 class Wave4GroupActivationContractTest < Minitest::Test
+  # Upstream reference:
+  # - resources/SillyTavern/public/scripts/group-chats.js @ bba43f332
+  #   - generateGroupWrapper() activation strategy branch
+  #     (activateNaturalOrder / activateListOrder / activatePooledOrder / manual)
   FIXTURES_DIR = File.expand_path("../fixtures/silly_tavern/groups", __dir__)
 
   def test_activation_strategies_match_st_group_chats

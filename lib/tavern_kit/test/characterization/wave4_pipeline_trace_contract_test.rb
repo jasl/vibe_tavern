@@ -3,6 +3,8 @@
 require "test_helper"
 
 class Wave4PipelineTraceContractTest < Minitest::Test
+  # Contract reference:
+  # - docs/rewrite/pipeline-observability.md (TraceCollector semantics)
   EXPECTED_STAGE_NAMES = %i[
     hooks
     lore

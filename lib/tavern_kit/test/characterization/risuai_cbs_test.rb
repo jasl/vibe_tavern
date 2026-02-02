@@ -4,12 +4,11 @@ require "test_helper"
 require "base64"
 
 class RisuaiCbsTest < Minitest::Test
+  # Upstream references:
+  # - resources/Risuai/src/ts/cbs.ts @ b8076cae
+  # - docs/rewrite/risuai-alignment-delta.md (tracked deltas)
   def render(text, **context)
     TavernKit::RisuAI::CBS.render(text, **context)
-  end
-
-  def pending!(reason)
-    skip("Pending RisuAI parity: #{reason}")
   end
 
   def test_basic_escapes

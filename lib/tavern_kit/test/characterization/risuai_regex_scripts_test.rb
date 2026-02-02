@@ -3,9 +3,9 @@
 require "test_helper"
 
 class RisuaiRegexScriptsTest < Minitest::Test
-  def pending!(reason)
-    skip("Pending RisuAI parity: #{reason}")
-  end
+  # Upstream references:
+  # - resources/Risuai/src/ts/regexScripts.ts @ b8076cae
+  # - docs/rewrite/risuai-alignment-delta.md (tracked deltas)
 
   def test_ordering_and_flags
     scripts = [
