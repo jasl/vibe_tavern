@@ -128,4 +128,3 @@ When debugging a prompt build, prefer this fixed path:
 - Wrap expensive debug payloads in `ctx.instrument { ... }`.
 - Emit stage-local counters via `ctx.instrument(:stat, stage: ..., key: ..., value: ...)`.
 - Never replace `ctx.runtime` / `ctx.variables_store` once set.
-
