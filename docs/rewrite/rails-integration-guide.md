@@ -106,19 +106,14 @@ TavernKit::Ingest.open(upload.path) do |bundle|
 end
 ```
 
-## Building a Prompt (SillyTavern)
+## Default Prompt Build (VibeTavern)
 
 ```ruby
 instrumenter = Rails.env.development? ? TavernKit::Prompt::Instrumenter::TraceCollector.new : nil
 
 plan =
-  TavernKit::SillyTavern.build do
-    dialect :openai
-    character character_obj
-    user user_obj
+  TavernKit::VibeTavern.build do
     history chat_history
-    preset st_preset
-    lore_books [global_lore, character_lore]
 
     runtime TavernKit::Runtime::Base.build(
       { chat_index: chat_index, message_index: message_index },
@@ -134,69 +129,20 @@ plan =
     message user_input
   end
 
-payload = plan.to_messages(dialect: :openai, squash_system_messages: st_preset.squash_system_messages)
+payload = plan.to_messages(dialect: :openai)
+fingerprint = plan.fingerprint(dialect: :openai)
 ```
 
 Notes:
-- For ST, trimming runs and can attach `plan.trim_report` and `plan.trace` when instrumented.
-- Preserve `variables_store` per chat; do not share between concurrent chats.
-- For continue/impersonate/quiet behavior parity, set `generation_type` explicitly
-  (`:continue`, `:impersonate`, `:quiet`, etc).
+- `TavernKit::VibeTavern` is intentionally minimal at first (history + user input).
+  You can still pass richer inputs (character/user/preset/lore) now, and add
+  middlewares later to consume them.
+- Preserve `variables_store` per chat; do not share it between concurrent chats.
 
-## Building a Prompt (RisuAI)
+## Extending / Adding App-owned Pipelines
 
-```ruby
-plan =
-  TavernKit::RisuAI.build do
-    dialect :openai
-    character character_obj
-    user user_obj
-    history chat_history
-    preset risu_preset_hash # contains `promptTemplate` (or `prompt_template`)
-    lore_books [risu_lorebook]
-
-    runtime TavernKit::Runtime::Base.build(
-      {
-        chat_index: chat_index,
-        message_index: message_index,
-        model: model_name,
-        role: "assistant",
-        cbs_conditions: {},   # optional
-      },
-      type: :app,
-      id: chat_id,
-    )
-
-    variables_store variables_store_obj
-
-    strict Rails.env.test?
-
-    message user_input
-  end
-```
-
-RisuAI-specific behaviors that depend on app state should be injected through
-`runtime` (metadata/toggles/conditions) and adapters (e.g., memory integration).
-
-## Custom Pipelines (App-owned)
-
-This repo provides an app-owned pipeline namespace for the Rails rewrite:
-`TavernKit::VibeTavern`. It starts intentionally minimal and can evolve without
-carrying ST/RisuAI legacy constraints.
-
-```ruby
-plan =
-  TavernKit::VibeTavern.build do
-    history chat_history
-    runtime({ chat_index: chat_index, message_index: message_index })
-    message user_input
-  end
-
-payload = plan.to_messages(dialect: :openai)
-```
-
-If you want to define additional pipelines, keep them app-owned and call
-TavernKit with an explicit `pipeline:`:
+If the rewrite wants additional pipelines beyond `TavernKit::VibeTavern`, keep
+them app-owned and call TavernKit with an explicit `pipeline:`:
 
 ```ruby
 # lib/prompt_building/pipeline.rb (app-owned)
@@ -246,3 +192,81 @@ Use the debug playbook:
 Recommended env-based switches:
 - `strict: true` in tests to fail-fast on warnings
 - `instrumenter: TraceCollector.new` in development
+
+---
+
+## Appendix: SillyTavern Pipeline (parity mode)
+
+Use this when you explicitly want ST behavior parity.
+
+```ruby
+instrumenter = Rails.env.development? ? TavernKit::Prompt::Instrumenter::TraceCollector.new : nil
+
+plan =
+  TavernKit::SillyTavern.build do
+    dialect :openai
+    character character_obj
+    user user_obj
+    history chat_history
+    preset st_preset
+    lore_books [global_lore, character_lore]
+
+    runtime TavernKit::Runtime::Base.build(
+      { chat_index: chat_index, message_index: message_index },
+      type: :app,
+      id: chat_id,
+    )
+
+    variables_store variables_store_obj
+
+    strict Rails.env.test?
+    instrumenter instrumenter
+
+    message user_input
+  end
+
+payload = plan.to_messages(dialect: :openai, squash_system_messages: st_preset.squash_system_messages)
+```
+
+Notes:
+- ST pipeline validates required inputs (`character` and `user`) at build time.
+- For ST, trimming runs and can attach `plan.trim_report` and `plan.trace` when instrumented.
+- For continue/impersonate/quiet behavior parity, set `generation_type` explicitly
+  (`:continue`, `:impersonate`, `:quiet`, etc).
+
+## Appendix: RisuAI Pipeline (parity mode)
+
+Use this when you explicitly want RisuAI behavior parity (prompt-building subset).
+
+```ruby
+plan =
+  TavernKit::RisuAI.build do
+    dialect :openai
+    character character_obj
+    user user_obj
+    history chat_history
+    preset risu_preset_hash # contains `promptTemplate` (or `prompt_template`)
+    lore_books [risu_lorebook]
+
+    runtime TavernKit::Runtime::Base.build(
+      {
+        chat_index: chat_index,
+        message_index: message_index,
+        model: model_name,
+        role: "assistant",
+        cbs_conditions: {},   # optional
+      },
+      type: :app,
+      id: chat_id,
+    )
+
+    variables_store variables_store_obj
+
+    strict Rails.env.test?
+
+    message user_input
+  end
+```
+
+RisuAI-specific behaviors that depend on app state should be injected through
+`runtime` (metadata/toggles/conditions) and adapters (e.g., memory integration).
