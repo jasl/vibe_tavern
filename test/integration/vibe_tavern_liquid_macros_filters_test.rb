@@ -8,6 +8,9 @@ class VibeTavernLiquidMacrosFiltersTest < ActiveSupport::TestCase
 
     out2 = TavernKit::VibeTavern::LiquidMacros.render(%({{ "hello" | hash7 }}))
     assert_equal out.strip, out2.strip
+
+    out3 = TavernKit::VibeTavern::LiquidMacros.render(%({{ "hello" | hash }}))
+    assert_equal out.strip, out3.strip
   end
 
   test "pick chooses deterministically based on runtime message_index + rng_word" do

@@ -68,6 +68,9 @@ Loops:
 {% endfor %}
 ```
 
+Note: `history` is intentionally **not exposed yet** in VibeTavern Liquid assigns.
+When we add it, we will pin its shape with tests and document it here.
+
 Assignment + capture:
 
 ```liquid
@@ -193,6 +196,7 @@ Deterministic RNG (prompt-building safe):
 
 ```liquid
 {{ "hello" | hash7 }}
+{{ "hello" | hash }} {# alias #}
 ```
 
 - `pick` — deterministic pick based on runtime seeds:

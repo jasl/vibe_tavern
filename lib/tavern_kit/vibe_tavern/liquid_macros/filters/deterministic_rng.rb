@@ -20,6 +20,16 @@ module TavernKit
             ""
           end
 
+          # Alias for `hash7` to match upstream macro naming.
+          #
+          # Note: `hash` is also a Ruby core method, so we preserve no-arg
+          # calls (`strainer.hash`) by delegating to `super`.
+          def hash(*args)
+            return super() if args.empty?
+
+            hash7(args.first)
+          end
+
           # Liquid filter: `{{ "a,b,c" | pick }}`
           #
           # Picks a deterministic element from:
