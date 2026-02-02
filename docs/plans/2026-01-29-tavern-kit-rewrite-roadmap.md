@@ -913,12 +913,14 @@ Before declaring Wave 6 done, also run:
 **Done:**
 - README(s): `README.md` + `lib/tavern_kit/README.md`
 - Docs index: `docs/rewrite/README.md`
+- Wave 6 audit notes: `docs/rewrite/wave6-audit.md`
 - Rails integration guide: `docs/rewrite/rails-integration-guide.md`
 - Pipeline debugging/observability guide: `docs/rewrite/pipeline-observability.md`
 - Compatibility matrices: `docs/rewrite/st-compatibility-matrix.md` + `docs/rewrite/risuai-compatibility-matrix.md`
 - Core safety/perf helpers: `TavernKit::RegexSafety`, `TavernKit::LRUCache`, `TavernKit::JsRegexCache`
 - Large-file splits landed for high-risk modules (kept behavior): ST macro engines, RisuAI template cards, RisuAI triggers
 - ZIP safety regression tests expanded: `lib/tavern_kit/test/tavern_kit/archive/zip_reader_test.rb`
+- Ingest asset read regression tests expanded: `lib/tavern_kit/test/tavern_kit/ingest/ingest_test.rb`
 
 **Remaining:**
 - Any additional regression fixtures / property tests discovered during the final audit

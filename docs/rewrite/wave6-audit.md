@@ -54,4 +54,3 @@ and what remains as explicit decisions/backlogs.
   unification into Stores is deferred).
 - UI directives / CLI tooling are tracked in `docs/rewrite/backlogs.md`
   (explicitly out of the rewrite plan).
-
