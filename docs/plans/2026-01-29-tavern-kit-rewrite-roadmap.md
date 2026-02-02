@@ -911,6 +911,7 @@ Before declaring Wave 6 done, also run:
 #### Wave 6 status (as of 2026-02-02)
 
 **Done:**
+- README(s): `README.md` + `lib/tavern_kit/README.md`
 - Docs index: `docs/rewrite/README.md`
 - Rails integration guide: `docs/rewrite/rails-integration-guide.md`
 - Pipeline debugging/observability guide: `docs/rewrite/pipeline-observability.md`
@@ -920,7 +921,6 @@ Before declaring Wave 6 done, also run:
 - ZIP safety regression tests expanded: `lib/tavern_kit/test/tavern_kit/archive/zip_reader_test.rb`
 
 **Remaining:**
-- Finalize `lib/tavern_kit/README.md` (keep last; needs careful wording)
 - Any additional regression fixtures / property tests discovered during the final audit
 - Remaining design decision: whether `runtime.metadata`/toggles should become Stores (currently plain Hashes by design)
 
