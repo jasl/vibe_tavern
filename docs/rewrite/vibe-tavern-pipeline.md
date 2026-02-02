@@ -51,6 +51,7 @@ Currently used by this pipeline:
 - `token_estimator(...)` (optional; defaults to `TavernKit::TokenEstimator.default`)
 - `strict(...)` (optional; affects warning handling across TavernKit)
 - `instrumenter(...)` (optional; enables lightweight instrumentation events)
+- `meta(:system_template, "...")` (optional; Liquid-rendered; prepends a `system` block)
 
 Accepted by the DSL but currently **ignored** by this pipeline (no behavior yet):
 - `dialect(...)`
@@ -69,9 +70,19 @@ The pipeline produces a `TavernKit::Prompt::Plan` with:
 
 The plan can then be rendered by `plan.to_messages(dialect: ...)`.
 
-## Block Semantics (History + User Message)
+## Block Semantics (System Template + History + User Message)
 
 Implementation: `lib/tavern_kit/vibe_tavern/middleware/plan_assembly.rb`
+
+System template (optional):
+- If `ctx[:system_template].to_s.strip` is not empty:
+  - Liquid is rendered using `LiquidMacros.render_for(ctx, ...)`
+  - one block is prepended:
+    - `role`: `:system`
+    - `content`: rendered output
+    - `slot`: `:system`
+    - `token_budget_group`: `:system`
+    - `metadata`: `{ source: :system_template }`
 
 History:
 - Each history message becomes a `TavernKit::Prompt::Block` with:
@@ -94,10 +105,16 @@ User input:
 
 Notes:
 - This pipeline does **not** insert system messages, character cards, lore, or
-  any special injections yet.
+  any special injections yet, except for the optional `system_template`.
 - Message metadata passthrough matters for OpenAI-style tool call flows:
   when a history message includes `metadata[:tool_calls]` / `:tool_call_id`,
   dialect rendering can include those fields.
+
+System template:
+- If `ctx[:system_template]` is present and non-blank, it is rendered via
+  `TavernKit::VibeTavern::LiquidMacros.render_for(ctx, ...)` and inserted as the
+  first block (`role: :system`, `slot: :system`).
+  This is the first integration point for Liquid macros in VibeTavern.
 
 ## Runtime Contract
 

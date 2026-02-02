@@ -32,6 +32,28 @@ module TavernKit
         def build_blocks(ctx)
           blocks = []
 
+          system_template = ctx[:system_template].to_s
+          if !system_template.strip.empty?
+            rendered =
+              TavernKit::VibeTavern::LiquidMacros.render_for(
+                ctx,
+                system_template,
+                strict: ctx.strict?,
+                on_error: :passthrough,
+              )
+
+            rendered = rendered.to_s
+            unless rendered.strip.empty?
+              blocks << TavernKit::Prompt::Block.new(
+                role: :system,
+                content: rendered,
+                slot: :system,
+                token_budget_group: :system,
+                metadata: { source: :system_template },
+              )
+            end
+          end
+
           history = TavernKit::ChatHistory.wrap(ctx.history)
           history.each do |message|
             blocks << TavernKit::Prompt::Block.new(

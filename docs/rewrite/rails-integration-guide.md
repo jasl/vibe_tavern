@@ -126,6 +126,10 @@ plan =
     strict Rails.env.test?
     instrumenter instrumenter
 
+    # Optional: VibeTavern-only system template (Liquid-rendered).
+    # Prefer this over expanding user input at build time.
+    meta :system_template, system_template_text
+
     message user_input
   end
 

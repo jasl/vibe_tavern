@@ -30,6 +30,31 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     assert_equal "Continue.", msgs[2][:content]
   end
 
+  test "optionally prepends a system block from system_template (Liquid-rendered)" do
+    store = TavernKit::VariablesStore::InMemory.new
+    store.set("mood", "happy", scope: :local)
+
+    runtime = TavernKit::Runtime::Base.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
+    character = TavernKit::Character.create(name: "Seraphina", nickname: "Sera")
+
+    plan =
+      TavernKit::VibeTavern.build do
+        runtime runtime
+        variables_store store
+        character character
+
+        meta :system_template, %(You are {{ char }}. Mood={{ var.mood }} Pick={{ "a,b,c" | pick }}.)
+        message "Hello."
+      end
+
+    msgs = plan.to_messages(dialect: :openai)
+
+    assert_equal "system", msgs[0][:role]
+    assert_equal "You are Sera. Mood=happy Pick=a.", msgs[0][:content]
+    assert_equal "user", msgs[1][:role]
+    assert_equal "Hello.", msgs[1][:content]
+  end
+
   test "normalizes runtime input once and ensures variables_store exists" do
     ctx = TavernKit::Prompt::Context.new(user_message: "Hello")
     ctx[:runtime] = { "chatIndex" => 1, :message_index => 2 }
