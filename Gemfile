@@ -48,13 +48,14 @@ gem "turbo-rails"
 # Hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]
 gem "stimulus-rails"
 
-gem "httpx"
-
 gem "js_regex_to_ruby"
-
+gem "liquid"
 gem "easy_talk", path: "vendor/easy_talk"
 gem "tavern_kit", path: "vendor/tavern_kit"
+
+gem "httpx"
 gem "simple_inference", path: "vendor/simple_inference"
+
 gem "logica_rb", path: "vendor/logica_rb"
 
 # ZIP processing for CharX format
