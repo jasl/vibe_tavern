@@ -6,7 +6,7 @@ require "base64"
 class RisuaiCbsTest < Minitest::Test
   # Upstream references:
   # - resources/Risuai/src/ts/cbs.ts @ b8076cae
-  # - lib/tavern_kit/docs/compatibility/risuai-deltas.md (tracked deltas)
+  # - docs/compatibility/risuai-deltas.md (tracked deltas)
   def render(text, **context)
     TavernKit::RisuAI::CBS.render(text, **context)
   end

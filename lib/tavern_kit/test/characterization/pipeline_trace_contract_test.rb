@@ -4,7 +4,7 @@ require "test_helper"
 
 class PipelineTraceContractTest < Minitest::Test
   # Contract reference:
-  # - lib/tavern_kit/docs/pipeline-observability.md (TraceCollector semantics)
+  # - docs/pipeline-observability.md (TraceCollector semantics)
   EXPECTED_STAGE_NAMES = %i[
     hooks
     lore

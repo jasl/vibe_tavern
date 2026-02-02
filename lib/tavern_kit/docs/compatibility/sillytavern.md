@@ -133,7 +133,7 @@ TavernKit core objects are **hash-first**. File formats are handled by
 ### 3.4 Known macro deltas
 
 See:
-- `lib/tavern_kit/docs/compatibility/sillytavern-deltas.md`
+- `docs/compatibility/sillytavern-deltas.md`
 
 ---
 
@@ -190,7 +190,7 @@ See:
 
 | Feature | ST | TavernKit | Notes |
 |---------|----|-----------|-------|
-| ST budget rule (`max_prompt = ctx_window - reserved`) | ✅ | ✅ | See `lib/tavern_kit/docs/contracts/prompt-orchestration.md` |
+| ST budget rule (`max_prompt = ctx_window - reserved`) | ✅ | ✅ | See `docs/contracts/prompt-orchestration.md` |
 | Strategy `:group_order` (examples → lore → history) | ✅ | ✅ | Examples evict as dialogue bundles |
 | Preserve latest user message | ✅ | ✅ | |
 | Trim report + observability | ✅ | ✅ | `ctx.trim_report` |
@@ -230,5 +230,5 @@ Tool/function calling:
 
 ## References
 
-- Prompt orchestration contracts: `lib/tavern_kit/docs/contracts/prompt-orchestration.md`
-- ST deltas: `lib/tavern_kit/docs/compatibility/sillytavern-deltas.md`
+- Prompt orchestration contracts: `docs/contracts/prompt-orchestration.md`
+- ST deltas: `docs/compatibility/sillytavern-deltas.md`

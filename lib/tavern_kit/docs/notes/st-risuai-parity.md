@@ -271,13 +271,13 @@
 
 Further details live in:
 
-- `lib/tavern_kit/docs/core-interface-design.md`
-- `lib/tavern_kit/docs/contracts/prompt-orchestration.md`
-- `lib/tavern_kit/docs/compatibility/sillytavern.md`
-- `lib/tavern_kit/docs/compatibility/risuai.md`
-- `lib/tavern_kit/docs/compatibility/sillytavern-deltas.md`
-- `lib/tavern_kit/docs/compatibility/risuai-deltas.md`
-- Deferred/non-goals: `lib/tavern_kit/docs/backlogs.md`
+- `docs/core-interface-design.md`
+- `docs/contracts/prompt-orchestration.md`
+- `docs/compatibility/sillytavern.md`
+- `docs/compatibility/risuai.md`
+- `docs/compatibility/sillytavern-deltas.md`
+- `docs/compatibility/risuai-deltas.md`
+- Deferred/non-goals: `docs/backlogs.md`
 
 High-level scope map:
 

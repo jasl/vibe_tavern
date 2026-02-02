@@ -1,9 +1,9 @@
 > [!IMPORTANT]
 > Historical / discovery document (2026-01-28). This file is kept for context but may be outdated.
 > Current source of truth:
-> - `lib/tavern_kit/docs/README.md`
-> - `lib/tavern_kit/docs/compatibility/sillytavern.md`
-> - `lib/tavern_kit/docs/compatibility/risuai.md`
+> - `docs/README.md`
+> - `docs/compatibility/sillytavern.md`
+> - `docs/compatibility/risuai.md`
 > - Rails integration docs: `docs/rewrite/rails-integration-guide.md`
 
 # Vibe Tavern Rewrite - Discovery Overview (2026-01-28)
@@ -69,13 +69,13 @@
 - Deep-dive `resources/tavern_kit/ARCHITECTURE.md` and Playground models/services.
 - Extract a parity checklist against SillyTavern/RisuAI for critical behaviors.
 - Draft a JSON strategy doc that maps each settings schema to EasyTalk vs `has_json`.
-- Convert `.sisyphus/` drafts into long-lived docs/backlogs in `lib/tavern_kit/docs/`.
+- Convert `.sisyphus/` drafts into long-lived docs/backlogs in `docs/`.
 
 ## Related Notes
-- StoreModel evaluation: `lib/tavern_kit/docs/notes/store-model-evaluation.md`
+- StoreModel evaluation: `docs/notes/store-model-evaluation.md`
   - Current recommendation: keep EasyTalk as schema source; do not adopt StoreModel as primary.
-- EasyTalk ActiveModel::Type adapter: `lib/tavern_kit/docs/notes/easy_talk-active_model_type.md`
-- ST/RisuAI parity checklist: `lib/tavern_kit/docs/notes/st-risuai-parity.md`
+- EasyTalk ActiveModel::Type adapter: `docs/notes/easy_talk-active_model_type.md`
+- ST/RisuAI parity checklist: `docs/notes/st-risuai-parity.md`
 
 ## Consolidated from .sisyphus (Backlog Drafts)
 - **JSON strategy**: Option C is the chosen direction (fork EasyTalk + ActiveModel::Type integration; preserve nested schemas).

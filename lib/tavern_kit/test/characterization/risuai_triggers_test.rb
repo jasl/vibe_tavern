@@ -5,7 +5,7 @@ require "test_helper"
 class RisuaiTriggersTest < Minitest::Test
   # Upstream references:
   # - resources/Risuai/src/ts/process/triggers.ts @ b8076cae
-  # - lib/tavern_kit/docs/compatibility/risuai-deltas.md (tracked deltas)
+  # - docs/compatibility/risuai-deltas.md (tracked deltas)
 
   def test_condition_var_true
     trigger = {

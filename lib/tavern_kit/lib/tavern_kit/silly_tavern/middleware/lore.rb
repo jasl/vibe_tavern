@@ -5,7 +5,7 @@ module TavernKit
     module Middleware
       # ST World Info orchestration.
       #
-      # Stage contract is pinned in `lib/tavern_kit/docs/contracts/prompt-orchestration.md`.
+      # Stage contract is pinned in `docs/contracts/prompt-orchestration.md`.
       class Lore < TavernKit::Prompt::Middleware::Base
         private
 

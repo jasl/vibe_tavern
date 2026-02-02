@@ -7,11 +7,11 @@ It is intentionally operational: what exists, what tests prove it, and where
 explicit non-goals/backlogs live.
 
 References:
-- Pinned reference sources: `lib/tavern_kit/docs/reference-sources.md`
-- Contracts: `lib/tavern_kit/docs/contracts/prompt-orchestration.md`
+- Pinned reference sources: `docs/reference-sources.md`
+- Contracts: `docs/contracts/prompt-orchestration.md`
 - Compatibility matrices:
-  - SillyTavern: `lib/tavern_kit/docs/compatibility/sillytavern.md`
-  - RisuAI: `lib/tavern_kit/docs/compatibility/risuai.md`
+  - SillyTavern: `docs/compatibility/sillytavern.md`
+  - RisuAI: `docs/compatibility/risuai.md`
 - Rails integration: `docs/rewrite/rails-integration-guide.md`
 
 ## Gates (green)
@@ -117,7 +117,7 @@ Policy (by design):
 ## Docs + hardening
 
 Delivered:
-- Gem docs home: `lib/tavern_kit/docs/README.md`
+- Gem docs home: `docs/README.md`
 - Compatibility matrices + deltas + contracts
 - Safety/perf helpers: `TavernKit::RegexSafety`, `TavernKit::LRUCache`, `TavernKit::JsRegexCache`
 - Large-file splits for maintainability (behavior preserved)
@@ -135,4 +135,4 @@ Evidence:
 
 ## Explicit non-goals / backlogs
 
-Tracked in `lib/tavern_kit/docs/backlogs.md`.
+Tracked in `docs/backlogs.md`.

@@ -55,7 +55,6 @@ Two types of state matter:
 - PNG text-chunk parsing enforces size limits for untrusted metadata chunks.
 
 See:
-- Core interfaces: `lib/tavern_kit/docs/core-interface-design.md`
-- Contracts: `lib/tavern_kit/docs/contracts/prompt-orchestration.md`
-- Security/performance notes: `lib/tavern_kit/docs/security-performance-audit.md`
-
+- Core interfaces: `docs/core-interface-design.md`
+- Contracts: `docs/contracts/prompt-orchestration.md`
+- Security/performance notes: `docs/security-performance-audit.md`

@@ -947,7 +947,7 @@ allow callers to specify a tokenizer hint for more accurate estimation.
 ## 16. Additional Subsystems (Deferred) -- New Section
 
 These subsystems were identified but are explicitly deferred (out of scope for
-the prompt-assembly gem; see `lib/tavern_kit/docs/backlogs.md`) or are not
+the prompt-assembly gem; see `docs/backlogs.md`) or are not
 applicable:
 
 ### 16.1 CFG (Classifier-Free Guidance)

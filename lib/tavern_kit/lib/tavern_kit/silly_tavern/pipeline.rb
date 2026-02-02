@@ -14,7 +14,7 @@ module TavernKit
   module SillyTavern
     # Default SillyTavern middleware chain.
     #
-    # Stage names are pinned by `lib/tavern_kit/docs/contracts/prompt-orchestration.md`.
+    # Stage names are pinned by `docs/contracts/prompt-orchestration.md`.
     Pipeline = TavernKit::Prompt::Pipeline.new do
       use TavernKit::SillyTavern::Middleware::Hooks, name: :hooks
       use TavernKit::SillyTavern::Middleware::Lore, name: :lore

@@ -2,7 +2,7 @@
 
 Date: 2026-01-29
 Source: `resources/Risuai/src/` (full source tree scan)
-Cross-reference: `lib/tavern_kit/docs/notes/st-risuai-parity.md` (prior parity checklist)
+Cross-reference: `docs/notes/st-risuai-parity.md` (prior parity checklist)
 
 ## Purpose
 
@@ -1084,5 +1084,5 @@ documented:
 
 ## Reference
 
-- Parity checklist: `lib/tavern_kit/docs/notes/st-risuai-parity.md`
-- ST alignment delta: `lib/tavern_kit/docs/compatibility/sillytavern-deltas.md`
+- Parity checklist: `docs/notes/st-risuai-parity.md`
+- ST alignment delta: `docs/compatibility/sillytavern-deltas.md`

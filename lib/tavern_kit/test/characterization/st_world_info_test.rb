@@ -5,7 +5,7 @@ require "test_helper"
 class StWorldInfoTest < Minitest::Test
   # Upstream references:
   # - resources/SillyTavern/public/scripts/world-info.js @ bba43f332
-  # - lib/tavern_kit/docs/compatibility/sillytavern-deltas.md (tracked deltas)
+  # - docs/compatibility/sillytavern-deltas.md (tracked deltas)
 
   def test_insertion_strategy_ordering
     entries = TavernKit::SillyTavern::Lore::Engine.sort_entries(

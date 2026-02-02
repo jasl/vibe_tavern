@@ -9,4 +9,3 @@ note the impact in the relevant compatibility delta doc.
 - Legacy TavernKit baseline: `resources/tavern_kit` @ `5e54d324`
 - BYAF spec: `resources/byaf` @ `7ebf2fd`
 - CCv3 spec: `resources/character-card-spec-v3` @ `f3a86af`
-

@@ -5,7 +5,7 @@ require "test_helper"
 class StMacrosTest < Minitest::Test
   # Upstream references:
   # - resources/SillyTavern/public/scripts/macros.js @ bba43f332
-  # - lib/tavern_kit/docs/compatibility/sillytavern-deltas.md (tracked deltas)
+  # - docs/compatibility/sillytavern-deltas.md (tracked deltas)
 
   def test_legacy_marker_rewrites
     engine = TavernKit::SillyTavern::Macro::V2Engine.new

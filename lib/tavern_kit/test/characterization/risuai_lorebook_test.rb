@@ -5,7 +5,7 @@ require "test_helper"
 class RisuaiLorebookTest < Minitest::Test
   # Upstream references:
   # - resources/Risuai/src/ts/lorebook/*.ts @ b8076cae
-  # - lib/tavern_kit/docs/compatibility/risuai-deltas.md (tracked deltas)
+  # - docs/compatibility/risuai-deltas.md (tracked deltas)
 
   def test_full_word_matching
     lore = {

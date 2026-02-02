@@ -977,13 +977,13 @@ end
 
 ## Related Docs
 
-- Contracts: `lib/tavern_kit/docs/contracts/prompt-orchestration.md`
+- Contracts: `docs/contracts/prompt-orchestration.md`
 - Compatibility matrices:
-  - SillyTavern: `lib/tavern_kit/docs/compatibility/sillytavern.md`
-  - RisuAI: `lib/tavern_kit/docs/compatibility/risuai.md`
+  - SillyTavern: `docs/compatibility/sillytavern.md`
+  - RisuAI: `docs/compatibility/risuai.md`
 - Audit notes:
-  - Rewrite audit: `lib/tavern_kit/docs/rewrite-audit.md`
-  - Security/perf audit: `lib/tavern_kit/docs/security-performance-audit.md`
+  - Rewrite audit: `docs/rewrite-audit.md`
+  - Security/perf audit: `docs/security-performance-audit.md`
 
 ## API Style Guidelines
 
@@ -1106,5 +1106,5 @@ entry.activate!     # mutates state (if mutable)
 
 ## Reference
 
-- ST alignment delta: `lib/tavern_kit/docs/compatibility/sillytavern-deltas.md`
-- RisuAI alignment delta: `lib/tavern_kit/docs/compatibility/risuai-deltas.md`
+- ST alignment delta: `docs/compatibility/sillytavern-deltas.md`
+- RisuAI alignment delta: `docs/compatibility/risuai-deltas.md`

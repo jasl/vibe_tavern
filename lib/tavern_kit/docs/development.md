@@ -24,4 +24,3 @@ From `lib/tavern_kit/`:
   (SillyTavern/RisuAI), with pinned source references in test headers.
 - Prefer conformance tests for spec-level behavior (CCv2/CCv3).
 - Keep `strict` mode for tests/debug; keep tolerant defaults for untrusted input.
-

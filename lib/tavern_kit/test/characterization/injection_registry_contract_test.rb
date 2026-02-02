@@ -4,7 +4,7 @@ require "test_helper"
 
 class InjectionRegistryContractTest < Minitest::Test
   # Contract reference:
-  # - lib/tavern_kit/docs/contracts/prompt-orchestration.md (strict/tolerant error policy and injection registry behavior)
+  # - docs/contracts/prompt-orchestration.md (strict/tolerant error policy and injection registry behavior)
   FIXTURES_DIR = File.expand_path("../fixtures/silly_tavern/injects", __dir__)
 
   def test_each_yields_entry_objects_in_lexicographic_id_order

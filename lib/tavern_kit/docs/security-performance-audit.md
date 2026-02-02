@@ -56,4 +56,4 @@ and what remains as explicit decisions/backlogs.
 
 - `runtime.metadata` / `runtime.toggles` remain plain Hashes for now (a future
   unification into Stores is deferred).
-- UI directives / CLI tooling are tracked in `lib/tavern_kit/docs/backlogs.md`.
+- UI directives / CLI tooling are tracked in `docs/backlogs.md`.

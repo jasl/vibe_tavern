@@ -4,7 +4,7 @@ Date: 2026-01-30
 
 This document "pins down" orchestration/output behavior so implementation stays aligned with:
 
-- Reference sources pinned in `lib/tavern_kit/docs/reference-sources.md`
+- Reference sources pinned in `docs/reference-sources.md`
 - SillyTavern staging behavior (reference only; no test/fixture copying)
 - Our pipeline philosophy: tolerant at external input boundaries, fail-fast for programmer errors
 

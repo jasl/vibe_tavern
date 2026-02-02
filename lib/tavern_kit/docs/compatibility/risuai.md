@@ -64,7 +64,7 @@ Defaults in tolerant mode (TavernKit-only):
 - `cbs_conditions: {}`
 
 See:
-- Runtime contract: `lib/tavern_kit/docs/core-interface-design.md` (Runtime section)
+- Runtime contract: `docs/core-interface-design.md` (Runtime section)
 
 ---
 
@@ -197,7 +197,7 @@ Implementation: `TavernKit::RisuAI::Pipeline`.
 | CCv2/CCv3 JSON (hash) | ✅ | ✅ | core model layer is hash-first |
 | PNG wrappers | ✅ | ✅ | via `TavernKit::Ingest` |
 | CHARX / BYAF | ✅ | ✅ | via `TavernKit::Ingest` (zip safety limits apply) |
-| `.risum` modules | ✅ | ⏸️ | Deferred (see `lib/tavern_kit/docs/backlogs.md`) |
+| `.risum` modules | ✅ | ⏸️ | Deferred (see `docs/backlogs.md`) |
 
 ---
 
@@ -225,5 +225,5 @@ TavernKit does **not** ship a concrete memory algorithm (vector DB, summarizer).
 
 ## References
 
-- RisuAI deltas/spec notes: `lib/tavern_kit/docs/compatibility/risuai-deltas.md`
-- Core interface design: `lib/tavern_kit/docs/core-interface-design.md`
+- RisuAI deltas/spec notes: `docs/compatibility/risuai-deltas.md`
+- Core interface design: `docs/core-interface-design.md`
