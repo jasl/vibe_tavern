@@ -23,7 +23,7 @@ Guidelines:
   - Add optional app-layer user input preprocessing toggle (default OFF): `29424df`
     - Standard toggle: `runtime[:toggles][:expand_user_input_macros]`
     - Rationale: keep prompt building deterministic and avoid implicit side effects unless explicitly enabled.
-  - Pin Liquid assigns contract (`Assigns.build(ctx)`) + tests: (next commit)
+  - Pin Liquid assigns contract (`Assigns.build(ctx)`) + tests: `aa2f92f`
 
 ## 2026-02-02
 
