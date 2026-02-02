@@ -27,6 +27,7 @@ Guidelines:
   - Add Liquid P0 filters (deterministic RNG + time helpers) + docs/tests: `9b9ba98`
   - Fix Liquid runtime seed wiring; add `render_for(ctx, ...)` helper + tests: `f028797`
   - Add `hash` alias for `hash7`; clarify that `history` is not exposed yet: `84f6068`
+  - Add `system_template` (Liquid) to VibeTavern pipeline (optional system block) + tests/docs: `b192c51`
 
 ## 2026-02-02
 
