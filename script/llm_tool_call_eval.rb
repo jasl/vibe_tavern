@@ -59,6 +59,8 @@ end
 
 def error_category(message, status: nil)
   msg = message.to_s
+  return "ASSERTION_FAILED" if msg.start_with?("ASSERTION_FAILED:")
+  return "NO_TOOL_CALLS" if msg.start_with?("NO_TOOL_CALLS:")
   return "NO_TOOL_USE_ENDPOINT" if msg.include?("No endpoints found that support tool use")
 
   case status.to_i
@@ -87,12 +89,17 @@ system = <<~SYS.strip
 SYS
 
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
-out_dir = Rails.root.join("tmp", "llm_tool_call_eval", timestamp)
+out_dir = Rails.root.join("tmp", "llm_tool_call_eval_reports", timestamp)
 FileUtils.mkdir_p(out_dir)
 
 reports = []
 
 models.each do |model|
+  idx = reports.length + 1
+  total = models.length
+  $stderr.puts("[#{idx}/#{total}] testing #{model}...")
+  $stderr.flush
+
   workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
 
   client = SimpleInference::Client.new(
@@ -126,8 +133,19 @@ models.each do |model|
     assistant_text = result[:assistant_text]
     trace = result[:trace]
 
-    ok &&= (assistant_text.to_s.strip == "Done.")
-    ok &&= (workspace.draft["foo"] == "bar")
+    fail_reasons = []
+    fail_reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+    fail_reasons << %(draft["foo"] != "bar") unless workspace.draft["foo"] == "bar"
+
+    unless fail_reasons.empty?
+      tool_calls_seen = Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
+      if !tool_calls_seen
+        error = "NO_TOOL_CALLS: assistant did not request any tool calls"
+      else
+        error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
+      end
+      ok = false
+    end
   rescue SimpleInference::Errors::HTTPError => e
     ok = false
     error_status = e.status
@@ -160,6 +178,20 @@ models.each do |model|
   File.write(out_dir.join("#{safe_name}.json"), JSON.pretty_generate(report))
 
   reports << report
+
+  status_str = report[:ok] ? "OK" : "FAIL"
+  extra =
+    if report[:ok]
+      ""
+    elsif report[:error_category] == "NO_TOOL_USE_ENDPOINT"
+      " (no tool-use endpoint)"
+    elsif report[:error_category] == "NO_TOOL_CALLS"
+      " (no tool calls requested)"
+    else
+      ""
+    end
+  $stderr.puts("[#{idx}/#{total}] #{status_str} #{model} (#{elapsed_ms}ms)#{extra}")
+  $stderr.flush
 end
 
 summary = {
