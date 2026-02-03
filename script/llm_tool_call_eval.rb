@@ -116,6 +116,8 @@ models.each do |model|
   ok = true
   error = nil
   error_status = nil
+  error_body = nil
+  error_raw_body = nil
   assistant_text = nil
   trace = nil
 
@@ -130,6 +132,8 @@ models.each do |model|
     ok = false
     error_status = e.status
     error = truncate(e.message, max_chars: 400)
+    error_body = e.body.is_a?(Hash) ? e.body : nil
+    error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
   rescue StandardError => e
     ok = false
     error = truncate("#{e.class}: #{e.message}", max_chars: 400)
@@ -145,6 +149,8 @@ models.each do |model|
     draft: workspace.draft,
     error: error,
     error_status: error_status,
+    error_body: error_body,
+    error_raw_body: error_raw_body,
     error_category: ok ? nil : error_category(error, status: error_status),
     trace: trace,
   }
