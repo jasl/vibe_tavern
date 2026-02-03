@@ -10,7 +10,17 @@ module TavernKit
         MAX_TOOL_ARGS_BYTES = 200_000
         MAX_TOOL_OUTPUT_BYTES = 200_000
 
-        def initialize(client:, model:, workspace:, runtime: nil, variables_store: nil, registry: nil, system: nil, strict: false)
+        def initialize(
+          client:,
+          model:,
+          workspace:,
+          runtime: nil,
+          variables_store: nil,
+          registry: nil,
+          system: nil,
+          strict: false,
+          fix_empty_final: false
+        )
           @client = client
           @model = model.to_s
           @workspace = workspace
@@ -19,6 +29,7 @@ module TavernKit
           @registry = registry || ToolRegistry.new
           @system = system.to_s
           @strict = strict == true
+          @fix_empty_final = fix_empty_final == true
         end
 
         def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS)
@@ -31,13 +42,15 @@ module TavernKit
 
           trace = []
           pending_user_text = user_text.to_s
+          tools_enabled = true
+          empty_final_fixup_attempted = false
 
           max_turns.times do |turn|
             runtime = @runtime
             variables_store = @variables_store
             system = @system
             strict = @strict
-            tools = @registry.openai_tools(expose: :model)
+            tools = tools_enabled ? @registry.openai_tools(expose: :model) : []
             build_history =
               if system.empty?
                 history
@@ -53,7 +66,7 @@ module TavernKit
 
                 llm_options(
                   tools: tools,
-                  tool_choice: "auto",
+                  tool_choice: tools_enabled ? "auto" : "none",
                 )
 
                 strict strict
@@ -79,6 +92,7 @@ module TavernKit
               request: { model: @model, messages_count: messages.size, tools_count: Array(options[:tools] || options["tools"]).size },
               response_summary: {
                 has_tool_calls: !tool_calls.empty?,
+                tool_calls_count: tool_calls.size,
                 finish_reason: body.dig("choices", 0, "finish_reason"),
               },
             }
@@ -89,7 +103,20 @@ module TavernKit
               metadata: tool_calls.empty? ? nil : { tool_calls: tool_calls },
             )
 
-            return { assistant_text: assistant_content, history: history, trace: trace } if tool_calls.empty?
+            if tool_calls.empty?
+              if @fix_empty_final &&
+                  !empty_final_fixup_attempted &&
+                  tools_enabled &&
+                  assistant_content.strip.empty? &&
+                  trace.any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
+                tools_enabled = false
+                empty_final_fixup_attempted = true
+                pending_user_text = %(Reply with a single sentence: "Done.")
+                next
+              end
+
+              return { assistant_text: assistant_content, history: history, trace: trace }
+            end
 
             tool_calls.each do |tc|
               id = tc["id"].to_s
@@ -134,6 +161,7 @@ module TavernKit
             end
 
             pending_user_text = "" # continue after tool results
+            tools_enabled = true
           end
 
           raise "Tool loop exceeded max turns (#{max_turns})"

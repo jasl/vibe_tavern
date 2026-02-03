@@ -24,6 +24,7 @@ end
 # SimpleInference will avoid the common "/v1/v1" footgun automatically.
 base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api")
 api_prefix = ENV.fetch("OPENROUTER_API_PREFIX", "/v1")
+fix_empty_final = ENV["OPENROUTER_FIX_EMPTY_FINAL"].to_s == "1"
 
 DEFAULT_MODELS = [
   "deepseek/deepseek-v3.2",
@@ -150,6 +151,7 @@ models.each do |model|
       workspace: workspace,
       system: system,
       strict: false,
+      fix_empty_final: fix_empty_final,
     )
 
   started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -232,6 +234,7 @@ summary = {
   ts: Time.now.utc.iso8601,
   base_url: base_url,
   api_prefix: api_prefix,
+  fix_empty_final: fix_empty_final,
   output_dir: out_dir.to_s,
   models: reports,
 }
