@@ -227,6 +227,15 @@ module TavernKit
         self
       end
 
+      # Set provider/request options for the current build.
+      #
+      # This is the escape hatch for request-level features that do not belong
+      # in message content (e.g., tool definitions, assistant prefill).
+      def llm_options(options)
+        @context.llm_options = options
+        self
+      end
+
       # Enable or disable strict mode.
       def strict(enabled = true)
         @context.strict = enabled
