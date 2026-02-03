@@ -16,6 +16,10 @@ Guidelines:
 ## 2026-02-03
 
 - Tool calling design decisions (PoC)
+  - Record locked-in decisions (workspace model, user-confirmed facts, provider strategy, plan.llm_options): `74acfad`
+  - Add DB-free tool-calling loop harness + offline tests + optional OpenRouter eval script: `677f3e9`
+  - Support `llm_options(...)` in the prompt DSL (for tools/request-level features): `27f650f`
+  - Refactor embedded `simple_inference` to a protocol-based structure (OpenAI-compatible stays default): `08dd945`
   - Doc: `docs/rewrite/tool-calling.md`
 
 - Liquid-based macros foundation (app-owned, for `TavernKit::VibeTavern`)
