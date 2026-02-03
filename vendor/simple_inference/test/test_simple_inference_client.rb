@@ -28,6 +28,26 @@ class TestSimpleInferenceClient < Minitest::Test
     assert_equal "foo", body["model"]
   end
 
+  def test_chat_completions_does_not_double_v1_when_base_url_includes_v1
+    adapter = Class.new(SimpleInference::HTTPAdapter) do
+      attr_reader :last_request
+
+      def call(env)
+        @last_request = env
+        {
+          status: 200,
+          headers: { "content-type" => "application/json" },
+          body: '{"ok":true}',
+        }
+      end
+    end.new
+
+    client = SimpleInference::Client.new(base_url: "http://example.com/v1", api_key: "secret", adapter: adapter)
+    client.chat_completions(model: "foo", messages: [])
+
+    assert_equal "http://example.com/v1/chat/completions", adapter.last_request[:url]
+  end
+
   def test_parses_json_responses_into_hashes
     adapter = Class.new(SimpleInference::HTTPAdapter) do
       def call(_env)

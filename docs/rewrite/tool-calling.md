@@ -121,6 +121,22 @@ OPENROUTER_API_KEY=... OPENROUTER_MODELS="openai/gpt-4.1-mini,anthropic/claude-3
   bundle exec ruby script/llm_tool_call_eval.rb
 ```
 
+Notes:
+- `SimpleInference` composes the final request URL as `base_url + api_prefix + endpoint`.
+  - Recommended for OpenRouter: `OPENROUTER_BASE_URL=https://openrouter.ai/api` and `OPENROUTER_API_PREFIX=/v1`
+  - If you already set `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`, set `OPENROUTER_API_PREFIX=""`
+
+### Current offline coverage (regression guardrails)
+
+The DB-free tool-loop tests intentionally cover common failure modes that show
+up across real-world models/providers:
+- missing required params (e.g. `workspace_id`)
+- invalid JSON in tool arguments
+- invalid types/paths in patch ops
+- duplicate tool_call IDs
+- overly large tool arguments (size limit)
+- overly large tool outputs (size limit / replacement)
+
 ## Open Questions (Parking Lot)
 
 These are intentionally deferred until we have the PoC loop + tests.

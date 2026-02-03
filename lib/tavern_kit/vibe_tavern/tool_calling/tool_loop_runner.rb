@@ -7,6 +7,8 @@ module TavernKit
     module ToolCalling
       class ToolLoopRunner
         DEFAULT_MAX_TURNS = 12
+        MAX_TOOL_ARGS_BYTES = 200_000
+        MAX_TOOL_OUTPUT_BYTES = 200_000
 
         def initialize(client:, model:, workspace:, runtime: nil, variables_store: nil, registry: nil, system: nil, strict: false)
           @client = client
@@ -69,12 +71,14 @@ module TavernKit
             assistant_msg = body.dig("choices", 0, "message") || {}
             assistant_content = assistant_msg["content"].to_s
             tool_calls = assistant_msg["tool_calls"]
+            tool_calls = Array(tool_calls).select { |tc| tc.is_a?(Hash) }
+            tool_calls = normalize_tool_call_ids(tool_calls)
 
             trace << {
               turn: turn,
               request: { model: @model, messages_count: messages.size, tools_count: Array(options[:tools] || options["tools"]).size },
               response_summary: {
-                has_tool_calls: tool_calls.is_a?(Array) && !tool_calls.empty?,
+                has_tool_calls: !tool_calls.empty?,
                 finish_reason: body.dig("choices", 0, "finish_reason"),
               },
             }
@@ -82,10 +86,9 @@ module TavernKit
             history << TavernKit::Prompt::Message.new(
               role: :assistant,
               content: assistant_content,
-              metadata: tool_calls ? { tool_calls: tool_calls } : nil,
+              metadata: tool_calls.empty? ? nil : { tool_calls: tool_calls },
             )
 
-            tool_calls = Array(tool_calls).select { |tc| tc.is_a?(Hash) }
             return { assistant_text: assistant_content, history: history, trace: trace } if tool_calls.empty?
 
             tool_calls.each do |tc|
@@ -96,23 +99,36 @@ module TavernKit
 
               args = parse_args(args_json)
               result =
-                if args.nil?
-                  {
-                    "ok" => false,
-                    "tool_name" => name,
-                    "data" => {},
-                    "warnings" => [],
-                    "errors" => [
-                      { "code" => "ARGUMENTS_JSON_PARSE_ERROR", "message" => "Invalid JSON in tool call arguments" },
-                    ],
-                  }
+                case args
+                when :invalid_json
+                  tool_error_envelope(name, code: "ARGUMENTS_JSON_PARSE_ERROR", message: "Invalid JSON in tool call arguments")
+                when :too_large
+                  tool_error_envelope(
+                    name,
+                    code: "ARGUMENTS_TOO_LARGE",
+                    message: "Tool call arguments are too large",
+                    data: { "max_bytes" => MAX_TOOL_ARGS_BYTES },
+                  )
                 else
                   dispatcher.execute(name: name, args: args)
                 end
 
+              tool_content = JSON.generate(result)
+              if tool_content.bytesize > MAX_TOOL_OUTPUT_BYTES
+                tool_content =
+                  JSON.generate(
+                    tool_error_envelope(
+                      name,
+                      code: "TOOL_OUTPUT_TOO_LARGE",
+                      message: "Tool output exceeded size limit",
+                      data: { "bytes" => tool_content.bytesize, "max_bytes" => MAX_TOOL_OUTPUT_BYTES },
+                    )
+                  )
+              end
+
               history << TavernKit::Prompt::Message.new(
                 role: :tool,
-                content: JSON.generate(result),
+                content: tool_content,
                 metadata: id.empty? ? nil : { tool_call_id: id },
               )
             end
@@ -147,9 +163,52 @@ module TavernKit
           return {} if value.nil?
           return value if value.is_a?(Hash)
 
-          JSON.parse(value.to_s)
+          str = value.to_s
+          return :too_large if str.bytesize > MAX_TOOL_ARGS_BYTES
+
+          JSON.parse(str)
         rescue JSON::ParserError
-          nil
+          :invalid_json
+        end
+
+        def tool_error_envelope(name, code:, message:, data: nil)
+          {
+            "ok" => false,
+            "tool_name" => name,
+            "data" => data.is_a?(Hash) ? data : {},
+            "warnings" => [],
+            "errors" => [
+              { "code" => code, "message" => message.to_s },
+            ],
+          }
+        end
+
+        # Some models / providers occasionally emit duplicate or empty tool call IDs.
+        # Since we resend the assistant message back to the provider on the next turn,
+        # we can normalize IDs locally as long as we keep assistant.tool_calls[] and
+        # subsequent tool results consistent.
+        def normalize_tool_call_ids(tool_calls)
+          used = {}
+
+          tool_calls.map.with_index do |tool_call, idx|
+            normalized = tool_call.dup
+            base_id = normalized["id"].to_s
+            base_id = "tc_#{idx + 1}" if base_id.empty?
+
+            id = base_id
+            if used.key?(id)
+              n = 2
+              id = "#{base_id}__#{n}"
+              while used.key?(id)
+                n += 1
+                id = "#{base_id}__#{n}"
+              end
+            end
+
+            used[id] = true
+            normalized["id"] = id
+            normalized
+          end
         end
       end
     end

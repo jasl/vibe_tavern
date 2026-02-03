@@ -1,23 +1,14 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "bundler/setup"
 require "json"
 require "time"
 
-require "simple_inference"
-require "tavern_kit"
+# Default settings
+ENV["RAILS_ENV"] ||= "development"
 
-# App-owned pipeline + tool loop (DB-free).
-require_relative "../lib/tavern_kit/vibe_tavern/middleware/prepare"
-require_relative "../lib/tavern_kit/vibe_tavern/middleware/plan_assembly"
-require_relative "../lib/tavern_kit/vibe_tavern/pipeline"
-require_relative "../lib/tavern_kit/vibe_tavern"
-
-require_relative "../lib/tavern_kit/vibe_tavern/tool_calling/workspace"
-require_relative "../lib/tavern_kit/vibe_tavern/tool_calling/tool_registry"
-require_relative "../lib/tavern_kit/vibe_tavern/tool_calling/tool_dispatcher"
-require_relative "../lib/tavern_kit/vibe_tavern/tool_calling/tool_loop_runner"
+# Load Rails environment
+require_relative "../config/environment"
 
 api_key = ENV["OPENROUTER_API_KEY"].to_s
 if api_key.empty?
@@ -25,7 +16,15 @@ if api_key.empty?
   exit 2
 end
 
-base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api")
+api_prefix = ENV.fetch("OPENROUTER_API_PREFIX", "/v1")
+
+# Avoid the common "double /v1" footgun.
+if base_url.end_with?("/v1") && api_prefix == "/v1"
+  warn "OPENROUTER_BASE_URL ends with /v1; auto-setting OPENROUTER_API_PREFIX to empty to avoid /v1/v1."
+  api_prefix = ""
+end
+
 models = ENV.fetch("OPENROUTER_MODELS", ENV["OPENROUTER_MODEL"].to_s).split(",").map(&:strip).reject(&:empty?)
 if models.empty?
   warn "Missing OPENROUTER_MODEL or OPENROUTER_MODELS"
@@ -54,6 +53,7 @@ models.each do |model|
     base_url: base_url,
     api_key: api_key,
     headers: headers,
+    api_prefix: api_prefix,
   )
 
   runner =

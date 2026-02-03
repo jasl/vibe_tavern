@@ -24,6 +24,10 @@ module SimpleInference
         opts.key?(:api_prefix) ? opts[:api_prefix] : ENV.fetch("SIMPLE_INFERENCE_API_PREFIX", "/v1")
       )
 
+      # Avoid the common "/v1/v1" footgun when callers include "/v1" in base_url
+      # and also use the default api_prefix of "/v1".
+      @base_url = strip_api_prefix_from_base_url(@base_url, @api_prefix)
+
       @timeout = to_float_or_nil(opts[:timeout] || ENV["SIMPLE_INFERENCE_TIMEOUT"])
       @open_timeout = to_float_or_nil(opts[:open_timeout] || ENV["SIMPLE_INFERENCE_OPEN_TIMEOUT"])
       @read_timeout = to_float_or_nil(opts[:read_timeout] || ENV["SIMPLE_INFERENCE_READ_TIMEOUT"])
@@ -60,6 +64,13 @@ module SimpleInference
       # Ensure it starts with / and does not end with /
       prefix = "/#{prefix}" unless prefix.start_with?("/")
       prefix.chomp("/")
+    end
+
+    def strip_api_prefix_from_base_url(base_url, api_prefix)
+      return base_url if api_prefix.nil? || api_prefix.empty?
+      return base_url unless base_url.end_with?(api_prefix)
+
+      base_url[0...-api_prefix.length].chomp("/")
     end
 
     def to_float_or_nil(value)
