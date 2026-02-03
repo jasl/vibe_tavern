@@ -325,7 +325,7 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_includes parsed.dig("errors", 0, "code"), "ARGUMENTS_JSON_PARSE_ERROR"
   end
 
-  def test_missing_workspace_id_returns_workspace_not_found
+  def test_missing_workspace_id_is_treated_as_implicit
     requests = []
 
     adapter =
@@ -352,6 +352,71 @@ class ToolLoopRunnerTest < Minitest::Test
                           id: "call_missing_ws",
                           type: "function",
                           function: { name: "state_get", arguments: JSON.generate({}) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" }
+    refute_nil tool_msg
+
+    parsed = JSON.parse(tool_msg["content"])
+    assert_equal true, parsed["ok"]
+    assert parsed.dig("data", "snapshot").is_a?(Hash)
+  end
+
+  def test_mismatched_workspace_id_returns_workspace_not_found
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_wrong_ws",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: "not-the-ws" }) },
                         },
                       ],
                     },

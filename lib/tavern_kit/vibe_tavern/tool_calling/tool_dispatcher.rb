@@ -27,7 +27,11 @@ module TavernKit
           end
 
           workspace_id = args["workspace_id"].to_s
-          if workspace_id.empty? || workspace_id != @workspace.id
+          # In the real app, tools will run within a known workspace context.
+          # For eval robustness across models, treat missing/placeholder IDs as implicit.
+          workspace_id = @workspace.id if workspace_id.empty? || workspace_id == "workspace_id"
+
+          if workspace_id != @workspace.id
             return error_envelope(name, code: "WORKSPACE_NOT_FOUND", message: "Unknown workspace_id: #{workspace_id}")
           end
 
@@ -35,7 +39,8 @@ module TavernKit
           when "state_get"
             ok_envelope(name, "snapshot" => @workspace.snapshot(select: args["select"]))
           when "state_patch"
-            result = @workspace.patch_draft!(args["ops"], etag: args["draft_etag"])
+            # Avoid exposing optimistic locking complexity in early tool-call evals.
+            result = @workspace.patch_draft!(args["ops"], etag: nil)
             ok_envelope(name, result)
           when "facts_propose"
             proposal_id = @workspace.propose_facts!(args["proposals"])

@@ -49,7 +49,7 @@ module TavernKit
                   workspace_id: { type: "string" },
                   select: { type: "array", items: { type: "string" } },
                 },
-                required: ["workspace_id"],
+                required: [],
               },
             ),
             ToolDefinition.new(
@@ -61,7 +61,6 @@ module TavernKit
                 properties: {
                   workspace_id: { type: "string" },
                   request_id: { type: "string" },
-                  draft_etag: { type: "string" },
                   ops: {
                     type: "array",
                     items: {
@@ -77,7 +76,7 @@ module TavernKit
                     },
                   },
                 },
-                required: ["workspace_id", "request_id", "ops"],
+                required: ["request_id", "ops"],
               },
             ),
             ToolDefinition.new(
@@ -103,7 +102,7 @@ module TavernKit
                     },
                   },
                 },
-                required: ["workspace_id", "request_id", "proposals"],
+                required: ["request_id", "proposals"],
               },
             ),
             ToolDefinition.new(
@@ -133,7 +132,7 @@ module TavernKit
                   request_id: { type: "string" },
                   actions: { type: "array", items: { type: "object" } },
                 },
-                required: ["workspace_id", "request_id", "actions"],
+                required: ["request_id", "actions"],
               },
             ),
           ]
