@@ -37,6 +37,7 @@ Rationale:
 - Facts changes are two-step:
   1) `facts.propose` (agent suggests)
   2) `facts.commit` (only after explicit user/UI confirmation)
+- `facts.commit` is **not exposed to the model** in the model-facing tool list.
 
 Rationale:
 - Facts are “strong truth” and must not drift due to model hallucination.
@@ -108,6 +109,18 @@ Purpose:
 Purpose:
 - detect model-specific quirks in tool calling and JSON argument quality.
 
+Script:
+
+```sh
+# Single model
+OPENROUTER_API_KEY=... OPENROUTER_MODEL="openai/gpt-4.1-mini" \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
+# Multiple models
+OPENROUTER_API_KEY=... OPENROUTER_MODELS="openai/gpt-4.1-mini,anthropic/claude-3.5-sonnet" \
+  bundle exec ruby script/llm_tool_call_eval.rb
+```
+
 ## Open Questions (Parking Lot)
 
 These are intentionally deferred until we have the PoC loop + tests.
@@ -118,4 +131,3 @@ These are intentionally deferred until we have the PoC loop + tests.
   small to avoid context bloat)?
 - What is the minimum set of tools for the first editor prototype
   (CCv3-only, import/export later)?
-
