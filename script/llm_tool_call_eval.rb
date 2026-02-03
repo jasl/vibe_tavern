@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "fileutils"
 require "json"
 require "time"
 
@@ -16,24 +17,65 @@ if api_key.empty?
   exit 2
 end
 
+# OpenRouter is OpenAI-compatible. SimpleInference will compose:
+#   base_url + api_prefix + endpoint
+#
+# Use base_url without /v1 (recommended), or include /v1 if you prefer.
+# SimpleInference will avoid the common "/v1/v1" footgun automatically.
 base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api")
 api_prefix = ENV.fetch("OPENROUTER_API_PREFIX", "/v1")
 
-# Avoid the common "double /v1" footgun.
-if base_url.end_with?("/v1") && api_prefix == "/v1"
-  warn "OPENROUTER_BASE_URL ends with /v1; auto-setting OPENROUTER_API_PREFIX to empty to avoid /v1/v1."
-  api_prefix = ""
-end
+DEFAULT_MODELS = %w[
+deepseek/deepseek-v3.2
+deepseek/deepseek-chat-v3-0324
+x-ai/grok-4.1-fast
+minimax/minimax-m2-her
+google/gemini-2.5-flash
+google/gemini-3-flash-preview
+google/gemini-3-pro-preview
+anthropic/claude-opus-4.5
+openai/gpt-5.2-chat
+openai/gpt-5.2
+qwen/qwen3-vl-30b-a3b-instruct
+qwen/qwen3-next-80b-a3b-instruct
+qwen/qwen3-vl-235b-a22b-instruct
+z-ai/glm-4.7
+z-ai/glm-4.7-flash
+].freeze
 
 models = ENV.fetch("OPENROUTER_MODELS", ENV["OPENROUTER_MODEL"].to_s).split(",").map(&:strip).reject(&:empty?)
-if models.empty?
-  warn "Missing OPENROUTER_MODEL or OPENROUTER_MODELS"
-  exit 2
-end
+models = DEFAULT_MODELS if models.empty?
 
 headers = {}
 headers["HTTP-Referer"] = ENV["OPENROUTER_HTTP_REFERER"] if ENV["OPENROUTER_HTTP_REFERER"]
 headers["X-Title"] = ENV["OPENROUTER_X_TITLE"] if ENV["OPENROUTER_X_TITLE"]
+
+def truncate(str, max_chars: 220)
+  s = str.to_s
+  return s if s.length <= max_chars
+
+  "#{s[0, max_chars]}…"
+end
+
+def error_category(message, status: nil)
+  msg = message.to_s
+  return "NO_TOOL_USE_ENDPOINT" if msg.include?("No endpoints found that support tool use")
+
+  case status.to_i
+  when 401 then "AUTH"
+  when 402 then "PAYMENT_REQUIRED"
+  when 403 then "FORBIDDEN"
+  when 404 then "NOT_FOUND"
+  when 408 then "TIMEOUT"
+  when 409 then "CONFLICT"
+  when 413 then "REQUEST_TOO_LARGE"
+  when 422 then "UNPROCESSABLE"
+  when 429 then "RATE_LIMIT"
+  when 500..599 then "UPSTREAM_5XX"
+  else
+    status ? "HTTP_#{status}" : "EXCEPTION"
+  end
+end
 
 system = <<~SYS.strip
   You are a tool-using assistant.
@@ -43,6 +85,10 @@ system = <<~SYS.strip
   - Do NOT call `facts.commit` (it is not available).
   - After tools are done, reply with a single sentence: "Done."
 SYS
+
+timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
+out_dir = Rails.root.join("tmp", "llm_tool_call_eval", timestamp)
+FileUtils.mkdir_p(out_dir)
 
 reports = []
 
@@ -69,6 +115,7 @@ models.each do |model|
 
   ok = true
   error = nil
+  error_status = nil
   assistant_text = nil
   trace = nil
 
@@ -79,28 +126,75 @@ models.each do |model|
 
     ok &&= (assistant_text.to_s.strip == "Done.")
     ok &&= (workspace.draft["foo"] == "bar")
+  rescue SimpleInference::Errors::HTTPError => e
+    ok = false
+    error_status = e.status
+    error = truncate(e.message, max_chars: 400)
   rescue StandardError => e
     ok = false
-    error = "#{e.class}: #{e.message}"
+    error = truncate("#{e.class}: #{e.message}", max_chars: 400)
   end
 
   elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
 
-  reports << {
+  report = {
     model: model,
     ok: ok,
     elapsed_ms: elapsed_ms,
     assistant_text: assistant_text,
     draft: workspace.draft,
     error: error,
+    error_status: error_status,
+    error_category: ok ? nil : error_category(error, status: error_status),
     trace: trace,
   }
+
+  # Always write per-model report (easier to share only the failing ones).
+  safe_name = model.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
+  File.write(out_dir.join("#{safe_name}.json"), JSON.pretty_generate(report))
+
+  reports << report
 end
 
-puts JSON.pretty_generate(
-  {
-    ts: Time.now.utc.iso8601,
-    base_url: base_url,
-    models: reports,
-  }
-)
+summary = {
+  ts: Time.now.utc.iso8601,
+  base_url: base_url,
+  api_prefix: api_prefix,
+  output_dir: out_dir.to_s,
+  models: reports,
+}
+
+File.write(out_dir.join("summary.json"), JSON.pretty_generate(summary))
+
+successes = reports.count { |r| r[:ok] }
+failures = reports.count { |r| !r[:ok] }
+
+puts "LLM Tool Call Eval"
+puts "ts: #{summary[:ts]}"
+puts "base_url: #{base_url}"
+puts "api_prefix: #{api_prefix}"
+puts "models: #{reports.size} (ok=#{successes}, fail=#{failures})"
+puts "full report: #{out_dir.relative_path_from(Rails.root)}"
+puts
+
+header = ["model", "ok", "ms", "status", "category", "error"]
+rows =
+  reports.map do |r|
+    [
+      r[:model].to_s,
+      r[:ok] ? "OK" : "FAIL",
+      r[:elapsed_ms].to_s,
+      r[:error_status] ? r[:error_status].to_s : "-",
+      r[:error_category] || "-",
+      r[:ok] ? "-" : truncate(r[:error].to_s, max_chars: 120),
+    ]
+  end
+
+widths = header.map.with_index { |h, idx| ([h.length] + rows.map { |row| row[idx].length }).max }
+
+fmt = widths.map { |w| "%-#{w}s" }.join(" | ")
+sep = widths.map { |w| "-" * w }.join("-|-")
+
+puts format(fmt, *header)
+puts sep
+rows.each { |row| puts format(fmt, *row) }
