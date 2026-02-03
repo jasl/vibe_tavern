@@ -33,10 +33,14 @@ module TavernKit
       # The "real" editor will likely maintain a larger registry, potentially
       # with per-user authorization and side-effect levels.
       class ToolRegistry
+        # OpenAI/Bedrock/Azure (and others) commonly enforce:
+        #   ^[a-zA-Z0-9_-]{1,128}$
+        #
+        # Avoid "." in tool names for maximum cross-provider compatibility.
         def definitions
           [
             ToolDefinition.new(
-              name: "state.get",
+              name: "state_get",
               description: "Read workspace state (facts/draft/locks/ui_state/versions).",
               parameters: {
                 type: "object",
@@ -49,7 +53,7 @@ module TavernKit
               },
             ),
             ToolDefinition.new(
-              name: "state.patch",
+              name: "state_patch",
               description: "Apply patch operations to draft state (set/delete/append/insert).",
               parameters: {
                 type: "object",
@@ -77,7 +81,7 @@ module TavernKit
               },
             ),
             ToolDefinition.new(
-              name: "facts.propose",
+              name: "facts_propose",
               description: "Propose facts changes (requires explicit user confirmation to commit).",
               parameters: {
                 type: "object",
@@ -103,7 +107,7 @@ module TavernKit
               },
             ),
             ToolDefinition.new(
-              name: "facts.commit",
+              name: "facts_commit",
               description: "Commit a facts proposal (must be triggered by UI/user confirmation).",
               exposed_to_model: false,
               parameters: {
@@ -119,7 +123,7 @@ module TavernKit
               },
             ),
             ToolDefinition.new(
-              name: "ui.render",
+              name: "ui_render",
               description: "Request UI actions (panel/form/modal/upload/etc). No business side effects.",
               parameters: {
                 type: "object",

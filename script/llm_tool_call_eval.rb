@@ -25,22 +25,22 @@ end
 base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api")
 api_prefix = ENV.fetch("OPENROUTER_API_PREFIX", "/v1")
 
-DEFAULT_MODELS = %w[
-deepseek/deepseek-v3.2
-deepseek/deepseek-chat-v3-0324
-x-ai/grok-4.1-fast
-minimax/minimax-m2-her
-google/gemini-2.5-flash
-google/gemini-3-flash-preview
-google/gemini-3-pro-preview
-anthropic/claude-opus-4.5
-openai/gpt-5.2-chat
-openai/gpt-5.2
-qwen/qwen3-vl-30b-a3b-instruct
-qwen/qwen3-next-80b-a3b-instruct
-qwen/qwen3-vl-235b-a22b-instruct
-z-ai/glm-4.7
-z-ai/glm-4.7-flash
+DEFAULT_MODELS = [
+  "deepseek/deepseek-v3.2",
+  "deepseek/deepseek-chat-v3-0324",
+  "x-ai/grok-4.1-fast",
+  # "minimax/minimax-m2-her", # Not support tool use
+  "google/gemini-2.5-flash",
+  "google/gemini-3-flash-preview",
+  "google/gemini-3-pro-preview",
+  "anthropic/claude-opus-4.5",
+  "openai/gpt-5.2-chat",
+  "openai/gpt-5.2",
+  "qwen/qwen3-vl-30b-a3b-instruct",
+  "qwen/qwen3-next-80b-a3b-instruct",
+  "qwen/qwen3-vl-235b-a22b-instruct",
+  "z-ai/glm-4.7",
+  "z-ai/glm-4.7-flash",
 ].freeze
 
 models = ENV.fetch("OPENROUTER_MODELS", ENV["OPENROUTER_MODEL"].to_s).split(",").map(&:strip).reject(&:empty?)
@@ -82,9 +82,9 @@ end
 system = <<~SYS.strip
   You are a tool-using assistant.
   Rules:
-  - Always call `state.get` first.
-  - Then call `state.patch` to set `/draft/foo` to string value "bar".
-  - Do NOT call `facts.commit` (it is not available).
+  - Always call `state_get` first.
+  - Then call `state_patch` to set `/draft/foo` to string value "bar".
+  - Do NOT call `facts_commit` (it is not available).
   - After tools are done, reply with a single sentence: "Done."
 SYS
 

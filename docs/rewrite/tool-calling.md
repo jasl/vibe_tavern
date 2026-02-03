@@ -68,6 +68,7 @@ Rationale:
 
 1) `ToolRegistry`
    - allowlist of tools + JSON schema (keep schemas simple and cross-provider)
+   - tool names must be cross-provider safe (avoid `.`, prefer snake_case)
 
 2) `ToolDispatcher`
    - validates tool name + args

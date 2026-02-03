@@ -4,6 +4,14 @@ module TavernKit
   module VibeTavern
     module ToolCalling
       class ToolDispatcher
+        TOOL_NAME_ALIASES = {
+          "state.get" => "state_get",
+          "state.patch" => "state_patch",
+          "facts.propose" => "facts_propose",
+          "facts.commit" => "facts_commit",
+          "ui.render" => "ui_render",
+        }.freeze
+
         def initialize(workspace:, registry: nil, expose: :model)
           @workspace = workspace
           @registry = registry || ToolRegistry.new
@@ -11,7 +19,7 @@ module TavernKit
         end
 
         def execute(name:, args:)
-          name = name.to_s
+          name = TOOL_NAME_ALIASES.fetch(name.to_s, name.to_s)
           args = args.is_a?(Hash) ? args : {}
 
           unless @registry.include?(name, expose: @expose)
@@ -24,18 +32,18 @@ module TavernKit
           end
 
           case name
-          when "state.get"
+          when "state_get"
             ok_envelope(name, "snapshot" => @workspace.snapshot(select: args["select"]))
-          when "state.patch"
+          when "state_patch"
             result = @workspace.patch_draft!(args["ops"], etag: args["draft_etag"])
             ok_envelope(name, result)
-          when "facts.propose"
+          when "facts_propose"
             proposal_id = @workspace.propose_facts!(args["proposals"])
             ok_envelope(name, "proposal_id" => proposal_id)
-          when "facts.commit"
+          when "facts_commit"
             result = @workspace.commit_facts!(args["proposal_id"], user_confirmed: args["user_confirmed"])
             ok_envelope(name, result)
-          when "ui.render"
+          when "ui_render"
             actions = Array(args["actions"])
             # Store last UI render request for debugging / testing.
             @workspace.ui_state["last_render"] = { "actions" => actions }

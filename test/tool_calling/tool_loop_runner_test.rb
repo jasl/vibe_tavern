@@ -39,7 +39,7 @@ class ToolLoopRunnerTest < Minitest::Test
                           id: "call_1",
                           type: "function",
                           function: {
-                            name: "state.get",
+                            name: "state_get",
                             arguments: JSON.generate({ workspace_id: workspace_id }),
                           },
                         },
@@ -47,7 +47,7 @@ class ToolLoopRunnerTest < Minitest::Test
                           id: "call_2",
                           type: "function",
                           function: {
-                            name: "state.patch",
+                            name: "state_patch",
                             arguments: JSON.generate(
                               {
                                 workspace_id: workspace_id,
@@ -118,9 +118,9 @@ class ToolLoopRunnerTest < Minitest::Test
     assert req1["tools"].is_a?(Array)
 
     tool_names = req1["tools"].map { |t| t.dig("function", "name") }.compact
-    assert_includes tool_names, "state.get"
-    assert_includes tool_names, "state.patch"
-    refute_includes tool_names, "facts.commit"
+    assert_includes tool_names, "state_get"
+    assert_includes tool_names, "state_patch"
+    refute_includes tool_names, "facts_commit"
 
     req2 = JSON.parse(requests[1][:body])
     msgs2 = req2["messages"]
@@ -163,7 +163,7 @@ class ToolLoopRunnerTest < Minitest::Test
                           id: "call_commit",
                           type: "function",
                           function: {
-                            name: "facts.commit",
+                            name: "facts_commit",
                             arguments: JSON.generate(
                               {
                                 workspace_id: workspace_id,
@@ -286,7 +286,7 @@ class ToolLoopRunnerTest < Minitest::Test
                         {
                           id: "call_bad_json",
                           type: "function",
-                          function: { name: "state.get", arguments: "{" }, # invalid JSON
+                          function: { name: "state_get", arguments: "{" }, # invalid JSON
                         },
                       ],
                     },
@@ -351,7 +351,7 @@ class ToolLoopRunnerTest < Minitest::Test
                         {
                           id: "call_missing_ws",
                           type: "function",
-                          function: { name: "state.get", arguments: JSON.generate({}) },
+                          function: { name: "state_get", arguments: JSON.generate({}) },
                         },
                       ],
                     },
@@ -421,7 +421,7 @@ class ToolLoopRunnerTest < Minitest::Test
                           id: "call_bad_path",
                           type: "function",
                           function: {
-                            name: "state.patch",
+                            name: "state_patch",
                             arguments: JSON.generate(
                               {
                                 workspace_id: workspace_id,
@@ -500,13 +500,13 @@ class ToolLoopRunnerTest < Minitest::Test
                         {
                           id: "dup",
                           type: "function",
-                          function: { name: "state.get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
                         },
                         {
                           id: "dup",
                           type: "function",
                           function: {
-                            name: "state.patch",
+                            name: "state_patch",
                             arguments: JSON.generate(
                               {
                                 workspace_id: workspace_id,
@@ -584,7 +584,7 @@ class ToolLoopRunnerTest < Minitest::Test
                           id: "call_big_args",
                           type: "function",
                           function: {
-                            name: "state.patch",
+                            name: "state_patch",
                             arguments: JSON.generate({ workspace_id: workspace_id, request_id: "r1", ops: [], pad: big }),
                           },
                         },
@@ -655,7 +655,7 @@ class ToolLoopRunnerTest < Minitest::Test
                         {
                           id: "call_state_get",
                           type: "function",
-                          function: { name: "state.get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
                         },
                       ],
                     },
