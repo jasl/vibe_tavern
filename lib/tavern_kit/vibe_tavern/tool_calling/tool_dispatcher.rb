@@ -12,6 +12,10 @@ module TavernKit
           "ui.render" => "ui_render",
         }.freeze
 
+        # Eval safety: keep the model-facing patch surface small and deterministic
+        # until the app's full editing API is ready.
+        MODEL_ALLOWED_STATE_PATCH_PATHS = ["/draft/foo"].freeze
+
         def initialize(workspace:, registry: nil, expose: :model)
           @workspace = workspace
           @registry = registry || ToolRegistry.new
@@ -39,8 +43,21 @@ module TavernKit
           when "state_get"
             ok_envelope(name, "snapshot" => @workspace.snapshot(select: args["select"]))
           when "state_patch"
+            ops = args["ops"]
+            unless ops.is_a?(Array) && ops.any?
+              return error_envelope(name, code: "ARGUMENT_ERROR", message: "ops must be a non-empty Array")
+            end
+
+            if @expose == :model && !model_allowed_state_patch_ops?(ops)
+              return error_envelope(
+                name,
+                code: "ARGUMENT_ERROR",
+                message: "Only set on #{MODEL_ALLOWED_STATE_PATCH_PATHS.join(", ")} is allowed",
+              )
+            end
+
             # Avoid exposing optimistic locking complexity in early tool-call evals.
-            result = @workspace.patch_draft!(args["ops"], etag: nil)
+            result = @workspace.patch_draft!(ops, etag: nil)
             ok_envelope(name, result)
           when "facts_propose"
             proposal_id = @workspace.propose_facts!(args["proposals"])
@@ -88,6 +105,14 @@ module TavernKit
               },
             ],
           }
+        end
+
+        def model_allowed_state_patch_ops?(ops)
+          ops.all? do |op|
+            op.is_a?(Hash) &&
+              op["op"].to_s == "set" &&
+              MODEL_ALLOWED_STATE_PATCH_PATHS.include?(op["path"].to_s)
+          end
         end
       end
     end
