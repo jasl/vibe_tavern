@@ -79,13 +79,47 @@ def error_category(message, status: nil)
   end
 end
 
+def provider_error_hint(report)
+  body = report[:error_body]
+  return nil unless body.is_a?(Hash)
+
+  provider = body.dig("error", "metadata", "provider_name").to_s
+  raw = body.dig("error", "metadata", "raw")
+
+  raw_msg =
+    case raw
+    when String
+      begin
+        parsed = JSON.parse(raw)
+        parsed.dig("error", "message") || parsed["message"] || raw
+      rescue JSON::ParserError
+        raw
+      end
+    else
+      nil
+    end
+
+  parts = []
+  parts << provider unless provider.empty?
+  parts << raw_msg.to_s unless raw_msg.to_s.empty?
+  return nil if parts.empty?
+
+  parts.join(": ")
+end
+
 system = <<~SYS.strip
   You are a tool-using assistant.
   Rules:
   - Always call `state_get` first.
+  - IMPORTANT: Call at most ONE tool per assistant message. Do NOT call multiple tools in a single response.
   - Then call `state_patch` to set `/draft/foo` to string value "bar".
+    - Only change the `/draft/foo` path. Do not change other draft keys.
   - Do NOT call `facts_commit` (it is not available).
   - After tools are done, reply with a single sentence: "Done."
+
+  Examples (JSON args):
+  - state_get: {"workspace_id":"..."}
+  - state_patch: {"ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
 SYS
 
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
@@ -218,13 +252,15 @@ puts
 header = ["model", "ok", "ms", "status", "category", "error"]
 rows =
   reports.map do |r|
+    hint = provider_error_hint(r)
+    err = r[:ok] ? "-" : truncate(hint || r[:error].to_s, max_chars: 120)
     [
       r[:model].to_s,
       r[:ok] ? "OK" : "FAIL",
       r[:elapsed_ms].to_s,
       r[:error_status] ? r[:error_status].to_s : "-",
       r[:error_category] || "-",
-      r[:ok] ? "-" : truncate(r[:error].to_s, max_chars: 120),
+      err,
     ]
   end
 
