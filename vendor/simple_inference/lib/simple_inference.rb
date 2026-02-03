@@ -6,6 +6,7 @@ require_relative "simple_inference/errors"
 require_relative "simple_inference/http_adapter"
 require_relative "simple_inference/response"
 require_relative "simple_inference/openai"
+require_relative "simple_inference/protocols/openai_compatible"
 require_relative "simple_inference/client"
 
 module SimpleInference
