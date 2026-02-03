@@ -15,6 +15,9 @@ Guidelines:
 
 ## 2026-02-03
 
+- Tool calling design decisions (PoC)
+  - Doc: `docs/rewrite/tool-calling.md`
+
 - Liquid-based macros foundation (app-owned, for `TavernKit::VibeTavern`)
   - Add Liquid dependency: `88dff88`
   - Add design/reference doc: `0cdd299`
