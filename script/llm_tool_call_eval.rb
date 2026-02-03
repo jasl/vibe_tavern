@@ -25,6 +25,7 @@ end
 base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api")
 api_prefix = ENV.fetch("OPENROUTER_API_PREFIX", "/v1")
 fix_empty_final = ENV["OPENROUTER_FIX_EMPTY_FINAL"].to_s == "1"
+enable_tool_use = ENV.fetch("OPENROUTER_ENABLE_TOOL_USE", "1") == "1"
 
 DEFAULT_MODELS = [
   "deepseek/deepseek-v3.2",
@@ -108,20 +109,28 @@ def provider_error_hint(report)
   parts.join(": ")
 end
 
-system = <<~SYS.strip
-  You are a tool-using assistant.
-  Rules:
-  - Always call `state_get` first.
-  - IMPORTANT: Call at most ONE tool per assistant message. Do NOT call multiple tools in a single response.
-  - Then call `state_patch` to set `/draft/foo` to string value "bar".
-    - Only change the `/draft/foo` path. Do not change other draft keys.
-  - Do NOT call `facts_commit` (it is not available).
-  - After tools are done, reply with a single sentence: "Done."
+system =
+  if enable_tool_use
+    <<~SYS.strip
+      You are a tool-using assistant.
+      Rules:
+      - Always call `state_get` first.
+      - IMPORTANT: Call at most ONE tool per assistant message. Do NOT call multiple tools in a single response.
+      - Then call `state_patch` to set `/draft/foo` to string value "bar".
+        - Only change the `/draft/foo` path. Do not change other draft keys.
+      - Do NOT call `facts_commit` (it is not available).
+      - After tools are done, reply with a single sentence: "Done."
 
-  Examples (JSON args):
-  - state_get: {"workspace_id":"..."}
-  - state_patch: {"ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
-SYS
+      Examples (JSON args):
+      - state_get: {"workspace_id":"..."}
+      - state_patch: {"ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
+    SYS
+  else
+    <<~SYS.strip
+      Tool calling is disabled for this run.
+      Reply with a single sentence: "Done."
+    SYS
+  end
 
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
 out_dir = Rails.root.join("tmp", "llm_tool_call_eval_reports", timestamp)
@@ -152,6 +161,7 @@ models.each do |model|
       system: system,
       strict: false,
       fix_empty_final: fix_empty_final,
+      tool_use: enable_tool_use,
     )
 
   started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -171,11 +181,11 @@ models.each do |model|
 
     fail_reasons = []
     fail_reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
-    fail_reasons << %(draft["foo"] != "bar") unless workspace.draft["foo"] == "bar"
+    fail_reasons << %(draft["foo"] != "bar") if enable_tool_use && workspace.draft["foo"] != "bar"
 
     unless fail_reasons.empty?
-      tool_calls_seen = Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
-      if !tool_calls_seen
+      tool_calls_seen = enable_tool_use && Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
+      if enable_tool_use && !tool_calls_seen
         error = "NO_TOOL_CALLS: assistant did not request any tool calls"
       else
         error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
@@ -235,6 +245,7 @@ summary = {
   base_url: base_url,
   api_prefix: api_prefix,
   fix_empty_final: fix_empty_final,
+  tool_use_enabled: enable_tool_use,
   output_dir: out_dir.to_s,
   models: reports,
 }
@@ -248,6 +259,8 @@ puts "LLM Tool Call Eval"
 puts "ts: #{summary[:ts]}"
 puts "base_url: #{base_url}"
 puts "api_prefix: #{api_prefix}"
+puts "tool_use_enabled: #{enable_tool_use}"
+puts "fix_empty_final: #{fix_empty_final}"
 puts "models: #{reports.size} (ok=#{successes}, fail=#{failures})"
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts

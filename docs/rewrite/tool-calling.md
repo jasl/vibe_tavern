@@ -133,6 +133,8 @@ Notes:
 - `SimpleInference` composes the final request URL as `base_url + api_prefix + endpoint`.
   - Recommended for OpenRouter: `OPENROUTER_BASE_URL=https://openrouter.ai/api` and `OPENROUTER_API_PREFIX=/v1`
   - If you already set `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`, set `OPENROUTER_API_PREFIX=""`
+- You can disable sending `tools` entirely (chat-only mode) via:
+  - `OPENROUTER_ENABLE_TOOL_USE=0`
 
 ### Current offline coverage (regression guardrails)
 

@@ -940,7 +940,63 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_equal 3, requests.length
 
     req3 = JSON.parse(requests[2][:body])
-    assert_equal "none", req3["tool_choice"]
-    assert_equal [], req3["tools"]
+    assert_nil req3["tool_choice"]
+    assert_nil req3["tools"]
+  end
+
+  def test_tool_use_can_be_disabled_to_avoid_sending_tools
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: { role: "assistant", content: "Done." },
+                    finish_reason: "stop",
+                  },
+                ],
+              }
+            else
+              raise "unexpected extra call"
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner =
+      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        tool_use: false,
+      )
+
+    result = runner.run(user_text: "hello")
+    assert_equal "Done.", result[:assistant_text]
+
+    req1 = JSON.parse(requests[0][:body])
+    assert_nil req1["tools"]
+    assert_nil req1["tool_choice"]
   end
 end
