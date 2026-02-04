@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "filtered_tool_registry"
 
 module TavernKit
   module VibeTavern
@@ -46,6 +47,8 @@ module TavernKit
           @tool_calling_fallback_retry_count =
             resolve_tool_calling_fallback_retry_count(explicit: tool_calling_fallback_retry_count, default: 0)
           @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
+
+          @registry = resolve_registry_mask(@registry)
         end
 
         def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS)
@@ -318,6 +321,35 @@ module TavernKit
           return mode if mode
 
           :relaxed
+        end
+
+        # Tool profiles/masking:
+        # - Keep the model-facing tool list small for reliability
+        # - Enforce the same subset in the dispatcher (same registry wrapper)
+        def resolve_registry_mask(registry)
+          allow = runtime_setting_value(:tool_names)
+          allow = runtime_setting_value(:tool_allowlist) if allow.nil?
+          allow = runtime_setting_value(:allowed_tools) if allow.nil?
+
+          deny = runtime_setting_value(:tool_denylist)
+          deny = runtime_setting_value(:disabled_tools) if deny.nil?
+
+          profile = runtime_setting_value(:tool_profile)
+          if allow.nil? && profile
+            allow =
+              case profile.to_s.strip.downcase
+              when "eval_minimal", "minimal"
+                %w[state_get state_patch]
+              when "eval_full", "full", "all"
+                nil
+              else
+                nil
+              end
+          end
+
+          return registry if allow.nil? && deny.nil?
+
+          FilteredToolRegistry.new(base: registry, allow: allow, deny: deny)
         end
 
         def normalize_tool_use_mode(value)

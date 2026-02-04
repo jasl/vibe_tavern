@@ -145,6 +145,17 @@ Notes:
 - By default, the eval script uses a minimal tool profile (only `state_get` and `state_patch`)
   to reduce model variance. You can switch to the full tool registry via:
   - `OPENROUTER_TOOL_PROFILE=full`
+- Tool profiles / masking can also be controlled via runtime config (so app code can
+  change the tool surface without prompt edits):
+  - `runtime[:tool_calling][:tool_profile]`:
+    - `"eval_minimal"` / `"minimal"`: only `state_get`, `state_patch`
+    - `"all"` / `"full"`: all model-exposed tools in the registry
+  - `runtime[:tool_calling][:tool_names]` / `:tool_allowlist` / `:allowed_tools`:
+    - explicit allowlist (Array or comma-separated String)
+  - `runtime[:tool_calling][:tool_denylist]` / `:disabled_tools`:
+    - explicit denylist (Array or comma-separated String)
+  - Masking is enforced both when sending tools **and** when executing tool calls
+    (so the model cannot call hidden tools).
 - The tool loop can optionally do a "finalization retry" when a provider returns an empty
   final assistant message even after successful tool calls.
   - This is configured as a pipeline/runtime setting (`runtime[:tool_calling][:fix_empty_final]`)
