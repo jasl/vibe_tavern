@@ -4,13 +4,7 @@ module TavernKit
   module VibeTavern
     module ToolCalling
       class ToolDispatcher
-        DEFAULT_TOOL_NAME_ALIASES = {
-          "state.get" => "state_get",
-          "state.patch" => "state_patch",
-          "facts.propose" => "facts_propose",
-          "facts.commit" => "facts_commit",
-          "ui.render" => "ui_render",
-        }.freeze
+        DEFAULT_TOOL_NAME_ALIASES = {}.freeze
 
         def initialize(executor:, registry:, expose: :model, tool_name_aliases: nil)
           @executor = executor
