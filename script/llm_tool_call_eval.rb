@@ -39,10 +39,11 @@ DEFAULT_MODELS = [
   "openai/gpt-5.2-chat",
   "openai/gpt-5.2",
   "qwen/qwen3-vl-30b-a3b-instruct",
-  "qwen/qwen3-next-80b-a3b-instruct",
+  "qwen/qwen3-next-80b-a3b-instruct", # Bugged
   "qwen/qwen3-vl-235b-a22b-instruct",
   "z-ai/glm-4.7",
-  "z-ai/glm-4.7-flash",
+  "z-ai/glm-4.7-flash", # Bugged
+  "moonshotai/kimi-k2.5",
 ].freeze
 
 models = ENV.fetch("OPENROUTER_MODELS", ENV["OPENROUTER_MODEL"].to_s).split(",").map(&:strip).reject(&:empty?)
@@ -118,12 +119,14 @@ system =
       - IMPORTANT: Call at most ONE tool per assistant message. Do NOT call multiple tools in a single response.
       - Then call `state_patch` to set `/draft/foo` to string value "bar".
         - Only change the `/draft/foo` path. Do not change other draft keys.
+      - Do NOT ask the user for confirmation. The target value is always "bar", and it is already approved.
+      - If a tool returns ok=false, read `errors[]`, fix your arguments, and call the tool again.
       - Do NOT call `facts_commit` (it is not available).
       - After tools are done, reply with a single sentence: "Done."
 
       Examples (JSON args):
       - state_get: {"workspace_id":"..."}
-      - state_patch: {"ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
+      - state_patch: {"request_id":"r1","ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
     SYS
   else
     <<~SYS.strip
@@ -173,11 +176,20 @@ models.each do |model|
   error_raw_body = nil
   assistant_text = nil
   trace = nil
+  history = nil
 
   begin
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
     assistant_text = result[:assistant_text]
     trace = result[:trace]
+    history =
+      Array(result[:history]).map do |m|
+        if m.respond_to?(:to_serializable_hash)
+          m.to_serializable_hash
+        else
+          { role: m.respond_to?(:role) ? m.role : nil, content: m.respond_to?(:content) ? m.content : m.to_s }
+        end
+      end
 
     fail_reasons = []
     fail_reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
@@ -216,6 +228,7 @@ models.each do |model|
     error_body: error_body,
     error_raw_body: error_raw_body,
     error_category: ok ? nil : error_category(error, status: error_status),
+    history: history,
     trace: trace,
   }
 

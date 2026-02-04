@@ -97,7 +97,7 @@ module TavernKit
               tool_calls = []
             end
 
-            trace << {
+            trace_entry = {
               turn: turn,
               request: { model: @model, messages_count: messages.size, tools_count: Array(options[:tools] || options["tools"]).size },
               response_summary: {
@@ -106,6 +106,14 @@ module TavernKit
                 ignored_tool_calls_count: ignored_tool_calls,
                 finish_reason: body.dig("choices", 0, "finish_reason"),
               },
+              tool_calls: tool_calls.map do |tc|
+                fn = tc["function"].is_a?(Hash) ? tc["function"] : {}
+                {
+                  id: tc["id"].to_s,
+                  name: fn["name"].to_s,
+                  arguments_bytes: fn["arguments"].to_s.bytesize,
+                }
+              end,
             }
 
             history << TavernKit::Prompt::Message.new(
@@ -115,6 +123,8 @@ module TavernKit
             )
 
             if tool_calls.empty?
+              trace << trace_entry
+
               if @fix_empty_final &&
                   !empty_final_fixup_attempted &&
                   tools_enabled &&
@@ -129,6 +139,7 @@ module TavernKit
               return { assistant_text: assistant_content, history: history, trace: trace }
             end
 
+            tool_results = []
             tool_calls.each do |tc|
               id = tc["id"].to_s
               fn = tc["function"].is_a?(Hash) ? tc["function"] : {}
@@ -151,6 +162,18 @@ module TavernKit
                   dispatcher.execute(name: name, args: args)
                 end
 
+              tool_results << {
+                id: id,
+                name: name,
+                ok: result.is_a?(Hash) ? result["ok"] : nil,
+                error_codes:
+                  if result.is_a?(Hash) && result["errors"].is_a?(Array)
+                    result["errors"].filter_map { |e| e.is_a?(Hash) ? e["code"] : nil }
+                  else
+                    []
+                  end,
+              }
+
               tool_content = JSON.generate(result)
               if tool_content.bytesize > MAX_TOOL_OUTPUT_BYTES
                 tool_content =
@@ -170,6 +193,9 @@ module TavernKit
                 metadata: id.empty? ? nil : { tool_call_id: id },
               )
             end
+
+            trace_entry[:tool_results] = tool_results
+            trace << trace_entry
 
             pending_user_text = "" # continue after tool results
             tools_enabled = @tool_use
