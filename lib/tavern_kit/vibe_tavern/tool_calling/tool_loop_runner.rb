@@ -47,6 +47,8 @@ module TavernKit
           @tool_calling_fallback_retry_count =
             resolve_tool_calling_fallback_retry_count(explicit: tool_calling_fallback_retry_count, default: 0)
           @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
+          @max_tool_args_bytes = resolve_bytes_setting(:max_tool_args_bytes, default: MAX_TOOL_ARGS_BYTES)
+          @max_tool_output_bytes = resolve_bytes_setting(:max_tool_output_bytes, default: MAX_TOOL_OUTPUT_BYTES)
 
           @registry = resolve_registry_mask(@registry)
 
@@ -214,7 +216,7 @@ module TavernKit
                     name,
                     code: "ARGUMENTS_TOO_LARGE",
                     message: "Tool call arguments are too large",
-                    data: { "max_bytes" => MAX_TOOL_ARGS_BYTES },
+                    data: { "max_bytes" => @max_tool_args_bytes },
                   )
                 else
                   @dispatcher.execute(name: name, args: args)
@@ -235,14 +237,14 @@ module TavernKit
               }
 
               tool_content = JSON.generate(result)
-              if tool_content.bytesize > MAX_TOOL_OUTPUT_BYTES
+              if tool_content.bytesize > @max_tool_output_bytes
                 tool_content =
                   JSON.generate(
                     tool_error_envelope(
                       name,
                       code: "TOOL_OUTPUT_TOO_LARGE",
                       message: "Tool output exceeded size limit",
-                      data: { "bytes" => tool_content.bytesize, "max_bytes" => MAX_TOOL_OUTPUT_BYTES },
+                      data: { "bytes" => tool_content.bytesize, "max_bytes" => @max_tool_output_bytes },
                     )
                   )
               end
@@ -290,6 +292,18 @@ module TavernKit
           val = runtime_setting_bool(key)
           return val if val == true || val == false
 
+          default
+        end
+
+        def resolve_bytes_setting(key, default:)
+          val = runtime_setting_value(key)
+          return default if val.nil?
+
+          i = Integer(val)
+          return default if i <= 0
+
+          i
+        rescue ArgumentError, TypeError
           default
         end
 
@@ -397,7 +411,7 @@ module TavernKit
           return deep_stringify_keys(value) if value.is_a?(Hash)
 
           str = value.to_s
-          return :too_large if str.bytesize > MAX_TOOL_ARGS_BYTES
+          return :too_large if str.bytesize > @max_tool_args_bytes
 
           parsed = JSON.parse(str)
           return deep_stringify_keys(parsed) if parsed.is_a?(Hash)

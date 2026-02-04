@@ -122,6 +122,10 @@ Script:
 OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
   bundle exec ruby script/llm_tool_call_eval.rb
 
+# Run a subset of scenarios (comma-separated). Use `all` (default) to run all.
+OPENROUTER_SCENARIOS="happy_path,missing_workspace_id" OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
 # Single model
 OPENROUTER_API_KEY=... OPENROUTER_MODEL="openai/gpt-4.1-mini" \
   bundle exec ruby script/llm_tool_call_eval.rb
@@ -147,6 +151,11 @@ Notes:
     - `relaxed`: best-effort; optional retry budget controls whether we retry without tools on provider errors
     - `disabled`: never send tools (chat-only mode)
   - This is also a pipeline/runtime setting: `runtime[:tool_calling][:tool_use_mode]`
+- Tool size guardrails (to reduce provider/model variance and avoid context bloat):
+  - `runtime[:tool_calling][:max_tool_args_bytes]` (default: 200_000)
+    - If tool arguments exceed this size, the tool result is replaced with `{ ok:false, errors:[ARGUMENTS_TOO_LARGE] }`
+  - `runtime[:tool_calling][:max_tool_output_bytes]` (default: 200_000)
+    - If tool output exceeds this size, the tool message content is replaced with `{ ok:false, errors:[TOOL_OUTPUT_TOO_LARGE] }`
 - Optional retry budget (only used in `tool_use_mode=relaxed`):
   - `OPENROUTER_TOOL_CALLING_FALLBACK_RETRY_COUNT=0` (default; no automatic retries)
   - Pipeline/runtime setting: `runtime[:tool_calling][:fallback_retry_count]`
@@ -162,6 +171,8 @@ Notes:
     - explicit denylist (Array or comma-separated String)
   - Masking is enforced both when sending tools **and** when executing tool calls
     (so the model cannot call hidden tools).
+  - Implementation rule: tools in the denylist are not included in the `tools:` list
+    at all (we do not rely on "don't call X" prompt instructions).
 
 Note:
 - A "tool profile" is an app-layer convenience that resolves to allow/deny lists.

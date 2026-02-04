@@ -491,31 +491,245 @@ rescue StandardError
   nil
 end
 
-system =
+SCENARIOS =
   if tools_enabled
-    <<~SYS.strip
-      You are a tool-using assistant.
-      Rules:
-      - Always call `state_get` first.
-      - IMPORTANT: Call at most ONE tool per assistant message. Do NOT call multiple tools in a single response.
-      - Then call `state_patch` to set `/draft/foo` to string value "bar".
-        - Only change the `/draft/foo` path. Do not change other draft keys.
-      - Do NOT ask the user for confirmation. The target value is always "bar", and it is already approved.
-      - If a tool returns ok=false, read `errors[]`, fix your arguments, and call the tool again.
-      - Do NOT reply "Done." until AFTER you have received a successful (ok=true) tool result for `state_patch`.
-      - Do NOT call `facts_commit` (it is not available).
-      - After tools are done, reply with a single sentence: "Done."
+    [
+      {
+        id: "happy_path",
+        title: "Happy path (get -> patch -> done)",
+        runtime_overrides: {},
+        prepare: ->(_workspace) { },
+        system: <<~SYS.strip,
+          You are a tool-using assistant.
+          Rules:
+          - Always call `state_get` first.
+          - IMPORTANT: Call at most ONE tool per assistant message. Do NOT call multiple tools in a single response.
+          - Then call `state_patch` to set `/draft/foo` to string value "bar".
+            - Only change the `/draft/foo` path. Do not change other draft keys.
+          - Do NOT ask the user for confirmation. The target value is always "bar", and it is already approved.
+          - If a tool returns ok=false, read `errors[]`, fix your arguments, and call the tool again.
+          - Do NOT reply "Done." until AFTER you have received a successful (ok=true) tool result for `state_patch`.
+          - Do NOT call `facts_commit` (it is not available).
+          - After tools are done, reply with a single sentence: "Done."
 
-      Examples (JSON args):
-      - state_get: {"workspace_id":"..."}
-      - state_patch: {"request_id":"r1","ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
-    SYS
+          Examples (JSON args):
+          - state_get: {"workspace_id":"..."}
+          - state_patch: {"request_id":"r1","ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
+        SYS
+        user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
+          reasons = []
+          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
+          reasons
+        },
+      },
+      {
+        id: "partial_success_failure",
+        title: "Partial success (state_get ok) + failure (bad state_patch) + recovery",
+        runtime_overrides: {},
+        prepare: ->(_workspace) { },
+        system: <<~SYS.strip,
+          You are a tool-using assistant.
+          Rules:
+          - In your FIRST assistant response, call BOTH tools in a single message:
+            1) `state_get` (valid arguments)
+            2) `state_patch` BUT intentionally use an INVALID path (NOT /draft/foo) so it returns ok=false with ARGUMENT_ERROR.
+          - After you receive tool results, call `state_patch` again with the CORRECT arguments to set `/draft/foo` to "bar".
+          - IMPORTANT: Call at most ONE tool per assistant message after the first response.
+          - After a successful `state_patch`, reply with a single sentence: "Done."
+        SYS
+        user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, trace:, **|
+          reasons = []
+          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
+
+          saw_mixed =
+            Array(trace).any? do |t|
+              t.is_a?(Hash) &&
+                Array(t[:tool_results]).any? { |r| r.is_a?(Hash) && r[:name].to_s == "state_get" && r[:ok] == true } &&
+                Array(t[:tool_results]).any? { |r| r.is_a?(Hash) && r[:name].to_s == "state_patch" && r[:ok] == false }
+            end
+          reasons << "expected at least one turn with mixed tool results (ok + fail)" if tools_enabled && !saw_mixed
+
+          reasons
+        },
+      },
+      {
+        id: "missing_workspace_id",
+        title: "Missing workspace_id (implicit context)",
+        runtime_overrides: {},
+        prepare: ->(_workspace) { },
+        system: <<~SYS.strip,
+          You are a tool-using assistant.
+          Rules:
+          - Always call `state_get` first, but DO NOT pass `workspace_id` in its arguments.
+          - IMPORTANT: Call at most ONE tool per assistant message. Do NOT call multiple tools in a single response.
+          - Then call `state_patch` to set `/draft/foo` to string value "bar".
+            - Do NOT pass `workspace_id` in tool arguments.
+            - Only change the `/draft/foo` path. Do not change other draft keys.
+          - If a tool returns ok=false, read `errors[]`, fix your arguments, and call the tool again.
+          - After tools are done, reply with a single sentence: "Done."
+
+          Examples (JSON args):
+          - state_get: {}
+          - state_patch: {"request_id":"r1","ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
+        SYS
+        user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
+          reasons = []
+          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
+          reasons
+        },
+      },
+      {
+        id: "type_error_recovery",
+        title: "Type error recovery (ops must be Array)",
+        runtime_overrides: {},
+        prepare: ->(_workspace) { },
+        system: <<~SYS.strip,
+          You are a tool-using assistant.
+          Rules:
+          - Always call `state_get` first.
+          - IMPORTANT: Call at most ONE tool per assistant message.
+          - Then call `state_patch` to set `/draft/foo` to string value "bar".
+            - Note: `ops` MUST be an Array; if you send the wrong type, the tool will return ok=false with ARGUMENT_ERROR.
+          - If a tool returns ok=false, read `errors[]`, fix your arguments, and call the tool again.
+          - Do NOT reply "Done." until AFTER you have received a successful (ok=true) tool result for `state_patch`.
+          - After tools are done, reply with a single sentence: "Done."
+        SYS
+        user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
+          reasons = []
+          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
+          reasons
+        },
+      },
+      {
+        id: "duplicate_tool_calls",
+        title: "Multiple tool calls in a single response (state_get + state_patch)",
+        runtime_overrides: {},
+        prepare: ->(_workspace) { },
+        system: <<~SYS.strip,
+          You are a tool-using assistant.
+          Rules:
+          - In your FIRST assistant response, call BOTH tools in a single message:
+            1) `state_get`
+            2) `state_patch` (set `/draft/foo` to string value "bar")
+          - After tools are done, reply with a single sentence: "Done."
+        SYS
+        user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, trace:, **|
+          reasons = []
+          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
+
+          multi =
+            Array(trace).any? do |t|
+              t.is_a?(Hash) && Array(t[:tool_calls]).size >= 2
+            end
+          reasons << "expected >=2 tool calls in a single assistant response" if tools_enabled && !multi
+
+          reasons
+        },
+      },
+      {
+        id: "long_arguments_guard",
+        title: "Long arguments guardrail (ARGUMENTS_TOO_LARGE) + recovery",
+        runtime_overrides: { max_tool_args_bytes: 1_500 },
+        prepare: ->(_workspace) { },
+        system: <<~SYS.strip,
+          You are a tool-using assistant.
+          Rules:
+          - Always call `state_get` first.
+          - Then call `state_patch` to set `/draft/foo` to a string value.
+            - IMPORTANT: First, try a LONG value (>= 2500 'x' characters).
+            - If the tool returns ok=false with ARGUMENTS_TOO_LARGE, retry with the short value "bar".
+          - After a successful `state_patch`, reply with a single sentence: "Done."
+        SYS
+        user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
+          reasons = []
+          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
+          reasons
+        },
+      },
+      {
+        id: "tool_output_truncation",
+        title: "Tool output too large truncation (TOOL_OUTPUT_TOO_LARGE)",
+        runtime_overrides: { max_tool_output_bytes: 5_000 },
+        prepare: lambda { |workspace|
+          workspace.draft["big"] = "x" * 12_000
+        },
+        system: <<~SYS.strip,
+          You are a tool-using assistant.
+          Rules:
+          - Always call `state_get` first.
+          - If the `state_get` tool result returns ok=false with TOOL_OUTPUT_TOO_LARGE, do NOT retry state_get.
+            Proceed to call `state_patch` anyway.
+          - Then call `state_patch` to set `/draft/foo` to string value "bar".
+          - After tools are done, reply with a single sentence: "Done."
+        SYS
+        user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, raw_history:, **|
+          reasons = []
+          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
+
+          saw_truncation =
+            Array(raw_history).any? do |m|
+              next false unless m.respond_to?(:role) && m.respond_to?(:content)
+              next false unless m.role.to_s == "tool"
+
+              m.content.to_s.include?("TOOL_OUTPUT_TOO_LARGE")
+            end
+          reasons << "expected TOOL_OUTPUT_TOO_LARGE to be emitted at least once" unless saw_truncation
+
+          reasons
+        },
+      },
+    ]
   else
-    <<~SYS.strip
-      Tool calling is disabled for this run.
-      Reply with a single sentence: "Done."
-    SYS
+    [
+      {
+        id: "chat_only",
+        title: "Tool calling disabled",
+        runtime_overrides: {},
+        prepare: ->(_workspace) { },
+        system: <<~SYS.strip,
+          Tool calling is disabled for this run.
+          Reply with a single sentence: "Done."
+        SYS
+        user_text: ->(_workspace) { "hello" },
+        assert: lambda { |assistant_text:, **|
+          assistant_text.to_s.strip == "Done." ? [] : [%(assistant_text != "Done.")]
+        },
+      },
+    ]
   end
+
+requested_scenarios =
+  ENV.fetch("OPENROUTER_SCENARIOS", "")
+    .split(",")
+    .map(&:strip)
+    .reject(&:empty?)
+requested_scenarios = nil if requested_scenarios.any? { |v| %w[all full *].include?(v.downcase) }
+
+scenarios =
+  if requested_scenarios
+    SCENARIOS.select { |s| requested_scenarios.include?(s[:id]) }
+  else
+    SCENARIOS
+  end
+
+if scenarios.empty?
+  warn "No scenarios selected. Available: #{SCENARIOS.map { |s| s[:id] }.join(", ")}"
+  exit 2
+end
 
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
 out_dir = Rails.root.join("tmp", "llm_tool_call_eval_reports", timestamp)
@@ -523,8 +737,8 @@ FileUtils.mkdir_p(out_dir)
 
 reports = []
 
-models.each do |model|
-  model_idx = reports.length + 1
+models.each_with_index do |model, model_index|
+  model_idx = model_index + 1
   model_total = models.length
 
   client = SimpleInference::Client.new(
@@ -534,126 +748,179 @@ models.each do |model|
     api_prefix: api_prefix,
   )
 
-  safe_name = model.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
+  safe_model = model.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
 
-  trials = []
+  runs = []
   failures = []
 
   trials_per_model.times do |trial_idx|
-    $stderr.puts("[#{model_idx}/#{model_total}] testing #{model} (trial #{trial_idx + 1}/#{trials_per_model})...")
-    $stderr.flush
+    scenarios.each_with_index do |scenario, scenario_index|
+      scenario_idx = scenario_index + 1
+      scenario_total = scenarios.length
+      scenario_id = scenario.fetch(:id).to_s
+      safe_scenario = scenario_id.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
 
-    workspace = ToolCallEval::Workspace.new
-    tool_executor = ToolCallEval::Executor.new(workspace: workspace)
-    registry =
-      TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
-        definitions: ToolCallEval.tool_definitions,
+      $stderr.puts(
+        "[#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] testing #{model} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
       )
+      $stderr.flush
 
-    runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-        client: client,
-        model: model,
-        tool_executor: tool_executor,
-        runtime:
-          TavernKit::Runtime::Base.build(
-            {
-              tool_calling: {
-                tool_use_mode: tool_use_mode,
-                fallback_retry_count: fallback_retry_count,
-                fix_empty_final: fix_empty_final,
-                tool_allowlist: tool_allowlist,
-              },
-            },
-            type: :app,
-          ),
-        registry: registry,
-        system: system,
-        strict: false,
-      )
+      workspace = ToolCallEval::Workspace.new
+      scenario[:prepare].call(workspace) if scenario[:prepare]
 
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      tool_executor = ToolCallEval::Executor.new(workspace: workspace)
+      registry =
+        TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
+          definitions: ToolCallEval.tool_definitions,
+        )
 
-    ok = true
-    error = nil
-    error_status = nil
-    error_body = nil
-    error_raw_body = nil
-    assistant_text = nil
-    trace = nil
-    history = nil
+      tool_calling =
+        {
+          tool_use_mode: tool_use_mode,
+          fallback_retry_count: fallback_retry_count,
+          fix_empty_final: fix_empty_final,
+          tool_allowlist: tool_allowlist,
+        }.merge(scenario[:runtime_overrides] || {})
 
-    begin
-      result = runner.run(user_text: "workspace_id=#{workspace.id}")
-      assistant_text = result[:assistant_text]
-      trace = result[:trace]
-      history =
-        Array(result[:history]).map do |m|
-          if m.respond_to?(:to_serializable_hash)
-            m.to_serializable_hash
+      runtime =
+        TavernKit::Runtime::Base.build(
+          {
+            tool_calling: tool_calling,
+          },
+          type: :app,
+        )
+
+      runner =
+        TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+          client: client,
+          model: model,
+          tool_executor: tool_executor,
+          runtime: runtime,
+          registry: registry,
+          system: scenario.fetch(:system).to_s,
+          strict: false,
+        )
+
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      ok = true
+      error = nil
+      error_hint = nil
+      error_status = nil
+      error_body = nil
+      error_raw_body = nil
+      assistant_text = nil
+      trace = nil
+      raw_history = nil
+
+      begin
+        user_text = scenario.fetch(:user_text).call(workspace).to_s
+        result = runner.run(user_text: user_text)
+
+        assistant_text = result[:assistant_text]
+        trace = result[:trace]
+        raw_history = Array(result[:history])
+
+        fail_reasons =
+          Array(
+            scenario.fetch(:assert).call(
+              assistant_text: assistant_text,
+              workspace: workspace,
+              tools_enabled: tools_enabled,
+              trace: trace,
+              raw_history: raw_history,
+            )
+          )
+
+        unless fail_reasons.empty?
+          tool_calls_seen =
+            tools_enabled &&
+              Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
+
+          if tools_enabled && !tool_calls_seen
+            error = "NO_TOOL_CALLS: assistant did not request any tool calls"
           else
-            { role: m.respond_to?(:role) ? m.role : nil, content: m.respond_to?(:content) ? m.content : m.to_s }
+            error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
           end
+          ok = false
         end
-
-      fail_reasons = []
-      fail_reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
-      fail_reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
-
-      unless fail_reasons.empty?
-        tool_calls_seen = tools_enabled && Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
-        if tools_enabled && !tool_calls_seen
-          error = "NO_TOOL_CALLS: assistant did not request any tool calls"
-        else
-          error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
-        end
+      rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
         ok = false
+        error = "#{e.code}: #{e.message}"
+      rescue SimpleInference::Errors::HTTPError => e
+        ok = false
+        error_status = e.status
+        error = truncate(e.message, max_chars: 400)
+        error_body = e.body.is_a?(Hash) ? e.body : nil
+        error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
+      rescue StandardError => e
+        ok = false
+        error = truncate("#{e.class}: #{e.message}", max_chars: 400)
       end
-    rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
-      ok = false
-      error = "#{e.code}: #{e.message}"
-    rescue SimpleInference::Errors::HTTPError => e
-      ok = false
-      error_status = e.status
-      error = truncate(e.message, max_chars: 400)
-      error_body = e.body.is_a?(Hash) ? e.body : nil
-      error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
-    rescue StandardError => e
-      ok = false
-      error = truncate("#{e.class}: #{e.message}", max_chars: 400)
+
+      elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+
+      report = {
+        model: model,
+        scenario: scenario_id,
+        trial: trial_idx + 1,
+        ok: ok,
+        elapsed_ms: elapsed_ms,
+        tool_use_mode: tool_use_mode,
+        tools_enabled: tools_enabled,
+        runtime_tool_calling: tool_calling,
+        assistant_text: assistant_text,
+        draft: workspace.draft,
+        error: error,
+        error_status: error_status,
+        error_body: error_body,
+        error_raw_body: error_raw_body,
+        error_category: ok ? nil : error_category(error, status: error_status),
+        history:
+          raw_history&.map do |m|
+            if m.respond_to?(:to_serializable_hash)
+              m.to_serializable_hash
+            else
+              { role: m.respond_to?(:role) ? m.role : nil, content: m.respond_to?(:content) ? m.content : m.to_s }
+            end
+          end,
+        trace: trace,
+      }
+
+      error_hint = provider_error_hint(report)
+      report[:error_hint] = error_hint if error_hint
+
+      file_name = "#{safe_model}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
+      report_path = out_dir.join(file_name)
+      File.write(report_path, JSON.pretty_generate(report))
+
+      run_meta = {
+        model: model,
+        scenario: scenario_id,
+        trial: trial_idx + 1,
+        ok: ok,
+        elapsed_ms: elapsed_ms,
+        error: error,
+        error_hint: error_hint,
+        error_status: error_status,
+        error_category: report[:error_category],
+        report_path: report_path.relative_path_from(Rails.root).to_s,
+      }
+
+      runs << run_meta
+      failures << run_meta unless ok
+
+      status_str = ok ? "OK" : "FAIL"
+      $stderr.puts(
+        "[#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] #{status_str} #{model} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model}, #{elapsed_ms}ms)",
+      )
+      $stderr.flush
     end
-
-    elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
-
-    report = {
-      model: model,
-      trial: trial_idx + 1,
-      ok: ok,
-      elapsed_ms: elapsed_ms,
-      assistant_text: assistant_text,
-      draft: workspace.draft,
-      error: error,
-      error_status: error_status,
-      error_body: error_body,
-      error_raw_body: error_raw_body,
-      error_category: ok ? nil : error_category(error, status: error_status),
-      history: history,
-      trace: trace,
-    }
-
-    File.write(out_dir.join("#{safe_name}__trial_#{format("%02d", trial_idx + 1)}.json"), JSON.pretty_generate(report))
-
-    trials << report
-    failures << report unless report[:ok]
-
-    status_str = report[:ok] ? "OK" : "FAIL"
-    $stderr.puts("[#{model_idx}/#{model_total}] #{status_str} #{model} (trial #{trial_idx + 1}/#{trials_per_model}, #{elapsed_ms}ms)")
-    $stderr.flush
   end
 
-  ok_count = trials.count { |t| t[:ok] }
-  rate = ok_count.fdiv(trials.size)
-  elapsed = trials.map { |t| t[:elapsed_ms].to_i }.sort
+  ok_count = runs.count { |t| t[:ok] }
+  rate = ok_count.fdiv(runs.size)
+  elapsed = runs.map { |t| t[:elapsed_ms].to_i }.sort
   p50 = elapsed[(elapsed.size * 0.50).floor] || 0
   p95 = elapsed[(elapsed.size * 0.95).floor] || 0
 
@@ -662,12 +929,13 @@ models.each do |model|
 
   reports << {
     model: model,
-    runs: trials.size,
+    runs: runs.size,
     ok: ok_count,
     ok_rate: rate,
     ms_p50: p50,
     ms_p95: p95,
-    trials: trials,
+    scenarios: scenarios.map { |s| s[:id] },
+    run_results: runs,
     failure_samples: failure_samples,
   }
 end
@@ -681,6 +949,7 @@ summary = {
   tool_calling_fallback_retry_count: fallback_retry_count,
   tool_allowlist: tool_allowlist,
   trials_per_model: trials_per_model,
+  scenarios: scenarios.map { |s| s[:id] },
   output_dir: out_dir.to_s,
   models: reports,
 }
@@ -700,16 +969,17 @@ puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_allowlist: #{tool_allowlist ? tool_allowlist.join(",") : "(full)"}"
 puts "trials_per_model: #{trials_per_model}"
+puts "scenarios: #{scenarios.map { |s| s[:id] }.join(",")}"
 puts "models: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
 
-header = ["model", "runs", "ok", "rate", "p50_ms", "p95_ms", "status", "category", "error"]
+header = ["model", "runs", "ok", "rate", "p50_ms", "p95_ms", "status", "category", "sample", "error"]
 rows =
   reports.map do |r|
     sample = Array(r[:failure_samples]).first
-    hint = provider_error_hint(sample || {})
-    err = sample ? truncate(hint || sample[:error].to_s, max_chars: 120) : "-"
+    sample_path = sample ? sample[:report_path].to_s : "-"
+    err = sample ? truncate(sample[:error_hint] || sample[:error].to_s, max_chars: 120) : "-"
     [
       r[:model].to_s,
       r[:runs].to_s,
@@ -719,6 +989,7 @@ rows =
       r[:ms_p95].to_s,
       sample && sample[:error_status] ? sample[:error_status].to_s : "-",
       sample ? (sample[:error_category] || "-") : "-",
+      sample_path,
       err,
     ]
   end
