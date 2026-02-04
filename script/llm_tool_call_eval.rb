@@ -36,18 +36,18 @@ fallback_retry_count =
     0
   end
 fallback_retry_count = 0 if fallback_retry_count < 0
-tool_profile = ENV.fetch("OPENROUTER_TOOL_PROFILE", "eval_minimal")
-tool_names =
-  case tool_profile.strip.downcase
-  when "eval_minimal", "minimal"
-    %w[state_get state_patch]
-  when "full", "all"
-    nil
-  else
-    # Treat unknown profiles as "full" in the eval harness; the app layer is
-    # expected to resolve profiles to allow/deny lists.
-    nil
-  end
+tool_allowlist =
+  ENV.fetch("OPENROUTER_TOOL_ALLOWLIST", "")
+    .split(",")
+    .map(&:strip)
+    .reject(&:empty?)
+if tool_allowlist.any? { |n| %w[all full *].include?(n.to_s.strip.downcase) }
+  tool_allowlist = nil
+elsif tool_allowlist.empty? && tools_enabled
+  tool_allowlist = %w[state_get state_patch]
+elsif tool_allowlist.empty?
+  tool_allowlist = nil
+end
 trials_per_model =
   begin
     Integer(ENV.fetch("OPENROUTER_TRIALS", "1"))
@@ -233,20 +233,14 @@ models.each do |model|
           TavernKit::Runtime::Base.build(
             {
               tool_calling: {
-              tool_use_mode: tool_use_mode,
-              fallback_retry_count: fallback_retry_count,
-              fix_empty_final: fix_empty_final,
-              tool_names: tool_names,
+                tool_use_mode: tool_use_mode,
+                fallback_retry_count: fallback_retry_count,
+                fix_empty_final: fix_empty_final,
+                tool_allowlist: tool_allowlist,
+              },
             },
-          },
-          type: :app,
-        ),
-        registry:
-          if tools_enabled && tool_names
-            TavernKit::VibeTavern::ToolCalling::EvalToolRegistry.new
-          else
-            nil
-          end,
+            type: :app,
+          ),
         system: system,
         strict: false,
       )
@@ -358,8 +352,7 @@ summary = {
   fix_empty_final: fix_empty_final,
   tool_use_mode: tool_use_mode,
   tool_calling_fallback_retry_count: fallback_retry_count,
-  tool_profile: tool_profile,
-  tool_names: tool_names,
+  tool_allowlist: tool_allowlist,
   trials_per_model: trials_per_model,
   output_dir: out_dir.to_s,
   models: reports,
@@ -378,8 +371,7 @@ puts "api_prefix: #{api_prefix}"
 puts "tool_use_mode: #{tool_use_mode}"
 puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
-puts "tool_profile: #{tool_profile}"
-puts "tool_names: #{tool_names ? tool_names.join(",") : "(full)"}"
+puts "tool_allowlist: #{tool_allowlist ? tool_allowlist.join(",") : "(full)"}"
 puts "trials_per_model: #{trials_per_model}"
 puts "models: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
