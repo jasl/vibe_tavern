@@ -5,10 +5,9 @@ AllCops:
   Exclude:
     - resources/**/*
 
-# The RuboCop server adds complexity (PID files, background processes) and can be
-# problematic in constrained/sandboxed environments. Keep lint deterministic.
-Server:
-  Enabled: false
+# Note: RuboCop's server mode is a CLI feature, not a config section. If you
+# need deterministic lint in constrained/sandboxed environments, prefer running
+# RuboCop with `--no-server` and a writable `--cache-root`.
 
 # Overwrite or add rules to create your own house style
 

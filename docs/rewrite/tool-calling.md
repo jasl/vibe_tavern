@@ -67,7 +67,8 @@ Rationale:
 ### Components
 
 1) `ToolRegistry`
-   - allowlist of tools + JSON schema (keep schemas simple and cross-provider)
+   - app-owned list of tools + JSON schema (keep schemas simple and cross-provider)
+   - ToolCalling **does not ship any default tool definitions**; tools are injected from the upper layer (app/scripts).
    - tool names must be cross-provider safe (avoid `.`, prefer snake_case)
    - prefer implicit context over passing identifiers (e.g. workspace is implicit; IDs in args are optional)
 
@@ -85,9 +86,12 @@ Rationale:
 
 ### State: in-memory first
 
-For early tool-loop correctness and evaluation, we will implement an in-memory
-workspace store (no DB). The API shape should match the future DB-backed
-implementation so we can swap storage later.
+For early tool-loop correctness and evaluation, the **eval harness** implements
+an in-memory workspace store (no DB). The tool loop runner itself is storage-
+agnostic: it only needs an injected tool registry + executor.
+
+The API shape should match the future DB-backed implementation so we can swap
+storage later.
 
 ## Evaluation Harness
 

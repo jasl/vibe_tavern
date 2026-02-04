@@ -25,7 +25,7 @@ module TavernKit
         def initialize(
           client:,
           model:,
-          workspace:,
+          tool_executor:,
           runtime: nil,
           variables_store: nil,
           registry: nil,
@@ -37,7 +37,7 @@ module TavernKit
         )
           @client = client
           @model = model.to_s
-          @workspace = workspace
+          @tool_executor = tool_executor
           @runtime = runtime
           @variables_store = variables_store
           @registry = registry || ToolRegistry.new
@@ -49,6 +49,15 @@ module TavernKit
           @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
 
           @registry = resolve_registry_mask(@registry)
+
+          if tool_use_enabled? && @tool_executor.nil?
+            raise ArgumentError, "tool_executor is required when tool_use_mode is enabled"
+          end
+
+          @dispatcher =
+            if @tool_executor
+              ToolDispatcher.new(executor: @tool_executor, registry: @registry, expose: :model)
+            end
         end
 
         def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS)
@@ -56,8 +65,6 @@ module TavernKit
 
           history = Array(history).dup
           history = history.map { |m| normalize_history_message(m) }
-
-          dispatcher = ToolDispatcher.new(workspace: @workspace, registry: @registry, expose: :model)
 
           trace = []
           pending_user_text = user_text.to_s
@@ -210,7 +217,7 @@ module TavernKit
                     data: { "max_bytes" => MAX_TOOL_ARGS_BYTES },
                   )
                 else
-                  dispatcher.execute(name: name, args: args)
+                  @dispatcher.execute(name: name, args: args)
                 end
 
               last_tool_ok_by_name[name] = result.is_a?(Hash) ? result["ok"] : nil
@@ -387,14 +394,30 @@ module TavernKit
 
         def parse_args(value)
           return {} if value.nil?
-          return value if value.is_a?(Hash)
+          return deep_stringify_keys(value) if value.is_a?(Hash)
 
           str = value.to_s
           return :too_large if str.bytesize > MAX_TOOL_ARGS_BYTES
 
-          JSON.parse(str)
+          parsed = JSON.parse(str)
+          return deep_stringify_keys(parsed) if parsed.is_a?(Hash)
+
+          :invalid_json
         rescue JSON::ParserError
           :invalid_json
+        end
+
+        def deep_stringify_keys(value)
+          case value
+          when Hash
+            value.each_with_object({}) do |(k, v), out|
+              out[k.to_s] = deep_stringify_keys(v)
+            end
+          when Array
+            value.map { |v| deep_stringify_keys(v) }
+          else
+            value
+          end
         end
 
         def tool_error_envelope(name, code:, message:, data: nil)

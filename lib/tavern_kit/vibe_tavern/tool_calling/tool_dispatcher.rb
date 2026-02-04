@@ -4,7 +4,7 @@ module TavernKit
   module VibeTavern
     module ToolCalling
       class ToolDispatcher
-        TOOL_NAME_ALIASES = {
+        DEFAULT_TOOL_NAME_ALIASES = {
           "state.get" => "state_get",
           "state.patch" => "state_patch",
           "facts.propose" => "facts_propose",
@@ -12,67 +12,30 @@ module TavernKit
           "ui.render" => "ui_render",
         }.freeze
 
-        # Eval safety: keep the model-facing patch surface small and deterministic
-        # until the app's full editing API is ready.
-        MODEL_ALLOWED_STATE_PATCH_PATHS = ["/draft/foo"].freeze
-
-        def initialize(workspace:, registry: nil, expose: :model)
-          @workspace = workspace
-          @registry = registry || ToolRegistry.new
+        def initialize(executor:, registry:, expose: :model, tool_name_aliases: nil)
+          @executor = executor
+          @registry = registry
           @expose = expose
+          @tool_name_aliases = tool_name_aliases || DEFAULT_TOOL_NAME_ALIASES
         end
 
         def execute(name:, args:)
-          name = TOOL_NAME_ALIASES.fetch(name.to_s, name.to_s)
+          name = normalize_tool_name(name.to_s)
           args = args.is_a?(Hash) ? args : {}
 
           unless @registry.include?(name, expose: @expose)
             return error_envelope(name, code: "TOOL_NOT_ALLOWED", message: "Tool not allowed: #{name}")
           end
 
-          workspace_id = args["workspace_id"].to_s
-          # In the real app, tools will run within a known workspace context.
-          # For eval robustness across models, treat missing/placeholder IDs as implicit.
-          workspace_id = @workspace.id if workspace_id.empty? || workspace_id == "workspace_id"
+          result = @executor.call(name: name, args: args)
 
-          if workspace_id != @workspace.id
-            return error_envelope(name, code: "WORKSPACE_NOT_FOUND", message: "Unknown workspace_id: #{workspace_id}")
+          # Allow executors to return already-normalized envelopes, but don't
+          # require it for simple implementations.
+          if result.is_a?(Hash) && (result.key?("ok") || result.key?(:ok))
+            return stringify_keys(result)
           end
 
-          case name
-          when "state_get"
-            ok_envelope(name, "snapshot" => @workspace.snapshot(select: args["select"]))
-          when "state_patch"
-            ops = args["ops"]
-            unless ops.is_a?(Array) && ops.any?
-              return error_envelope(name, code: "ARGUMENT_ERROR", message: "ops must be a non-empty Array")
-            end
-
-            if @expose == :model && !model_allowed_state_patch_ops?(ops)
-              return error_envelope(
-                name,
-                code: "ARGUMENT_ERROR",
-                message: "Only set on #{MODEL_ALLOWED_STATE_PATCH_PATHS.join(", ")} is allowed",
-              )
-            end
-
-            # Avoid exposing optimistic locking complexity in early tool-call evals.
-            result = @workspace.patch_draft!(ops, etag: nil)
-            ok_envelope(name, result)
-          when "facts_propose"
-            proposal_id = @workspace.propose_facts!(args["proposals"])
-            ok_envelope(name, "proposal_id" => proposal_id)
-          when "facts_commit"
-            result = @workspace.commit_facts!(args["proposal_id"], user_confirmed: args["user_confirmed"])
-            ok_envelope(name, result)
-          when "ui_render"
-            actions = Array(args["actions"])
-            # Store last UI render request for debugging / testing.
-            @workspace.ui_state["last_render"] = { "actions" => actions }
-            ok_envelope(name, "rendered" => actions.size)
-          else
-            error_envelope(name, code: "TOOL_NOT_IMPLEMENTED", message: "Tool not implemented: #{name}")
-          end
+          ok_envelope(name, result)
         rescue ArgumentError => e
           error_envelope(name, code: "ARGUMENT_ERROR", message: e.message)
         rescue StandardError => e
@@ -107,11 +70,31 @@ module TavernKit
           }
         end
 
-        def model_allowed_state_patch_ops?(ops)
-          ops.all? do |op|
-            op.is_a?(Hash) &&
-              op["op"].to_s == "set" &&
-              MODEL_ALLOWED_STATE_PATCH_PATHS.include?(op["path"].to_s)
+        def normalize_tool_name(name)
+          normalized = @tool_name_aliases.fetch(name, name)
+
+          # Some providers/models may output `foo.bar` even if we recommend `_`.
+          # If the dotted name is not registered but the underscored variant is,
+          # accept it for robustness.
+          if normalized.include?(".")
+            underscored = normalized.tr(".", "_")
+            return underscored if @registry.include?(underscored, expose: @expose)
+          end
+
+          normalized
+        end
+
+        def stringify_keys(hash)
+          hash.each_with_object({}) do |(k, v), out|
+            out[k.to_s] =
+              case v
+              when Hash
+                stringify_keys(v)
+              when Array
+                v.map { |vv| vv.is_a?(Hash) ? stringify_keys(vv) : vv }
+              else
+                v
+              end
           end
         end
       end

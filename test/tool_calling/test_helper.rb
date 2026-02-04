@@ -12,7 +12,6 @@ require_relative "../../lib/tavern_kit/vibe_tavern/middleware/plan_assembly"
 require_relative "../../lib/tavern_kit/vibe_tavern/pipeline"
 require_relative "../../lib/tavern_kit/vibe_tavern"
 
-require_relative "../../lib/tavern_kit/vibe_tavern/tool_calling/workspace"
 require_relative "../../lib/tavern_kit/vibe_tavern/tool_calling/tool_registry"
 require_relative "../../lib/tavern_kit/vibe_tavern/tool_calling/tool_dispatcher"
 require_relative "../../lib/tavern_kit/vibe_tavern/tool_calling/tool_loop_runner"

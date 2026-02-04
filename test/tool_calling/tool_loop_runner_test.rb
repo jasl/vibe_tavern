@@ -2,7 +2,178 @@
 
 require_relative "test_helper"
 
+require "securerandom"
+
+class ToolCallEvalTestWorkspace
+  attr_reader :id, :draft, :ui_state
+
+  def initialize(id: nil, draft: nil)
+    @id = (id || SecureRandom.uuid).to_s
+    @draft = draft.is_a?(Hash) ? deep_dup(draft) : {}
+    @ui_state = {}
+  end
+
+  def snapshot(select: nil)
+    # For ToolLoopRunner tests we only need a stable, serializable structure.
+    {
+      "draft" => deep_dup(@draft),
+    }
+  end
+
+  def patch_draft!(ops, etag: nil)
+    applied = 0
+    before = deep_dup(@draft)
+
+    begin
+      Array(ops).each do |op|
+        op = op.is_a?(Hash) ? op : {}
+
+        action = op["op"].to_s
+        path = op["path"].to_s
+        value = op.key?("value") ? op["value"] : nil
+
+        raise ArgumentError, "path must start with /draft/" unless path.start_with?("/draft/")
+
+        case action
+        when "set"
+          key = path.delete_prefix("/draft/")
+          raise ArgumentError, "invalid path" if key.include?("/")
+
+          @draft[key] = value
+          applied += 1
+        else
+          raise ArgumentError, "unknown op: #{action.inspect}"
+        end
+      end
+    rescue StandardError
+      @draft = before
+      raise
+    end
+
+    { "applied" => applied }
+  end
+
+  private
+
+  def deep_dup(obj)
+    Marshal.load(Marshal.dump(obj))
+  end
+end
+
+class ToolCallEvalTestExecutor
+  MODEL_ALLOWED_STATE_PATCH_PATHS = ["/draft/foo"].freeze
+
+  def initialize(workspace:)
+    @workspace = workspace
+  end
+
+  def call(name:, args:)
+    args = args.is_a?(Hash) ? args : {}
+
+    workspace_id = args["workspace_id"].to_s
+    workspace_id = @workspace.id if workspace_id.empty? || workspace_id == "workspace_id"
+
+    if workspace_id != @workspace.id
+      return error_envelope(name, code: "WORKSPACE_NOT_FOUND", message: "Unknown workspace_id: #{workspace_id}")
+    end
+
+    case name
+    when "state_get"
+      ok_envelope(name, "snapshot" => @workspace.snapshot(select: args["select"]))
+    when "state_patch"
+      ops = args["ops"]
+      unless ops.is_a?(Array) && ops.any?
+        return error_envelope(name, code: "ARGUMENT_ERROR", message: "ops must be a non-empty Array")
+      end
+
+      unless model_allowed_state_patch_ops?(ops)
+        return error_envelope(
+          name,
+          code: "ARGUMENT_ERROR",
+          message: "Only set on #{MODEL_ALLOWED_STATE_PATCH_PATHS.join(", ")} is allowed",
+        )
+      end
+
+      ok_envelope(name, @workspace.patch_draft!(ops, etag: nil))
+    else
+      error_envelope(name, code: "TOOL_NOT_IMPLEMENTED", message: "Tool not implemented: #{name}")
+    end
+  rescue ArgumentError => e
+    error_envelope(name, code: "ARGUMENT_ERROR", message: e.message)
+  rescue StandardError => e
+    error_envelope(name, code: "INTERNAL_ERROR", message: "#{e.class}: #{e.message}")
+  end
+
+  private
+
+  def ok_envelope(name, data)
+    {
+      "ok" => true,
+      "tool_name" => name,
+      "data" => data.is_a?(Hash) ? data : { "value" => data },
+      "warnings" => [],
+      "errors" => [],
+    }
+  end
+
+  def error_envelope(name, code:, message:)
+    {
+      "ok" => false,
+      "tool_name" => name,
+      "data" => {},
+      "warnings" => [],
+      "errors" => [{ "code" => code, "message" => message.to_s }],
+    }
+  end
+
+  def model_allowed_state_patch_ops?(ops)
+    ops.all? do |op|
+      op.is_a?(Hash) &&
+        op["op"].to_s == "set" &&
+        MODEL_ALLOWED_STATE_PATCH_PATHS.include?(op["path"].to_s)
+    end
+  end
+end
+
 class ToolLoopRunnerTest < Minitest::Test
+  def build_registry
+    defs = [
+      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+        name: "state_get",
+        description: "Read workspace state",
+        parameters: { type: "object", properties: { workspace_id: { type: "string" } } },
+      ),
+      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+        name: "state_patch",
+        description: "Patch draft",
+        parameters: { type: "object", properties: { workspace_id: { type: "string" } } },
+      ),
+      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+        name: "facts_commit",
+        description: "Commit facts (UI only)",
+        exposed_to_model: false,
+        parameters: { type: "object", properties: { workspace_id: { type: "string" } } },
+      ),
+    ]
+
+    TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(definitions: defs)
+  end
+
+  def build_runner(client:, model:, workspace:, registry: build_registry, tool_use_mode: nil, runtime: nil, fix_empty_final: nil, tool_calling_fallback_retry_count: nil, strict: false, system: nil)
+    TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+      client: client,
+      model: model,
+      tool_executor: tool_use_mode == :disabled ? nil : ToolCallEvalTestExecutor.new(workspace: workspace),
+      registry: registry,
+      runtime: runtime,
+      system: system,
+      strict: strict,
+      fix_empty_final: fix_empty_final,
+      tool_use_mode: tool_use_mode,
+      tool_calling_fallback_retry_count: tool_calling_fallback_retry_count,
+    )
+  end
+
   def test_tool_loop_executes_tool_calls_and_continues
     requests = []
 
@@ -89,7 +260,7 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
 
     client =
       SimpleInference::Client.new(
@@ -98,12 +269,7 @@ class ToolLoopRunnerTest < Minitest::Test
         adapter: adapter,
       )
 
-    runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-        client: client,
-        model: "test-model",
-        workspace: workspace,
-      )
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -203,10 +369,10 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -241,16 +407,10 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-        client: client,
-        model: "test-model",
-        workspace: workspace,
-        system: "SYSTEM INSTRUCTIONS",
-      )
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, system: "SYSTEM INSTRUCTIONS")
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -314,9 +474,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -379,9 +539,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -444,9 +604,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -524,9 +684,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -602,9 +762,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -685,9 +845,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -757,9 +917,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -827,10 +987,10 @@ class ToolLoopRunnerTest < Minitest::Test
       end.new(requests)
 
     max = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::MAX_TOOL_OUTPUT_BYTES
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new(draft: { "big" => ("x" * (max + 10_000)) })
+    workspace = ToolCallEvalTestWorkspace.new(draft: { "big" => ("x" * (max + 10_000)) })
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -925,16 +1085,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-        client: client,
-        model: "test-model",
-        workspace: workspace,
-        system: "SYSTEM",
-        fix_empty_final: true,
-      )
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, system: "SYSTEM", fix_empty_final: true)
 
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -989,15 +1142,9 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-        client: client,
-        model: "test-model",
-        workspace: workspace,
-        tool_use_mode: :disabled,
-      )
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :disabled)
 
     result = runner.run(user_text: "hello")
     assert_equal "Done.", result[:assistant_text]
@@ -1045,15 +1192,9 @@ class ToolLoopRunnerTest < Minitest::Test
 
     runtime = TavernKit::Runtime::Base.build({ tool_calling: { tool_use_mode: :disabled } }, type: :app)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-        client: client,
-        model: "test-model",
-        workspace: workspace,
-        runtime: runtime,
-      )
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
 
     result = runner.run(user_text: "hello")
     assert_equal "Done.", result[:assistant_text]
@@ -1093,17 +1234,10 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-        client: client,
-        model: "test-model",
-        workspace: workspace,
-        tool_use_mode: :enforced,
-        system: "SYSTEM",
-      )
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :enforced, system: "SYSTEM")
 
     error = assert_raises(TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError) do
       runner.run(user_text: "workspace_id=#{workspace.id}")
@@ -1146,17 +1280,10 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-        client: client,
-        model: "test-model",
-        workspace: workspace,
-        tool_use_mode: :relaxed,
-        system: "SYSTEM",
-      )
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, system: "SYSTEM")
 
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
     assert_equal "Done.", result[:assistant_text]
@@ -1206,11 +1333,11 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
     runner =
-      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+      build_runner(
         client: client,
         model: "test-model",
         workspace: workspace,

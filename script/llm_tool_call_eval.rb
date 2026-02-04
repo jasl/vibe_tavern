@@ -3,6 +3,7 @@
 
 require "fileutils"
 require "json"
+require "securerandom"
 require "time"
 
 # Default settings
@@ -81,6 +82,326 @@ models = DEFAULT_MODELS if models.empty?
 headers = {}
 headers["HTTP-Referer"] = ENV["OPENROUTER_HTTP_REFERER"] if ENV["OPENROUTER_HTTP_REFERER"]
 headers["X-Title"] = ENV["OPENROUTER_X_TITLE"] if ENV["OPENROUTER_X_TITLE"]
+
+module ToolCallEval
+  class Workspace
+    attr_reader :id, :facts, :draft, :locks, :ui_state
+
+    def initialize(id: nil, facts: nil, draft: nil, locks: nil, ui_state: nil)
+      @id = (id || SecureRandom.uuid).to_s
+      @facts = facts.is_a?(Hash) ? deep_dup(facts) : {}
+      @draft = draft.is_a?(Hash) ? deep_dup(draft) : {}
+      @locks = Array(locks).map(&:to_s)
+      @ui_state = ui_state.is_a?(Hash) ? deep_dup(ui_state) : {}
+      @facts_version = 0
+      @draft_version = 0
+    end
+
+    def facts_etag = "facts:#{@facts_version}"
+    def draft_etag = "draft:#{@draft_version}"
+
+    def snapshot(select: nil)
+      full = {
+        "facts" => deep_dup(@facts),
+        "draft" => deep_dup(@draft),
+        "locks" => { "paths" => @locks.dup },
+        "ui_state" => deep_dup(@ui_state),
+        "versions" => { "facts_etag" => facts_etag, "draft_etag" => draft_etag },
+      }
+
+      paths = Array(select).map(&:to_s).reject(&:empty?)
+      return full if paths.empty?
+
+      paths.each_with_object({}) do |pointer, out|
+        out[pointer] = read_pointer(full, pointer)
+      rescue ArgumentError
+        out[pointer] = nil
+      end
+    end
+
+    def patch_draft!(ops, etag: nil)
+      raise ArgumentError, "etag mismatch" if etag && etag.to_s != draft_etag
+
+      applied = 0
+      before = deep_dup(@draft)
+
+      begin
+        Array(ops).each do |op|
+          op = op.is_a?(Hash) ? op : {}
+
+          action = op["op"].to_s
+          path = op["path"].to_s
+          value = op.key?("value") ? op["value"] : nil
+          index = op["index"]
+
+          raise ArgumentError, "path must start with /draft/" unless path.start_with?("/draft/")
+
+          case action
+          when "set"
+            write_pointer!(@draft, path.delete_prefix("/draft"), value)
+            applied += 1
+          when "delete"
+            delete_pointer!(@draft, path.delete_prefix("/draft"))
+            applied += 1
+          when "append"
+            append_pointer!(@draft, path.delete_prefix("/draft"), value)
+            applied += 1
+          when "insert"
+            insert_pointer!(@draft, path.delete_prefix("/draft"), index, value)
+            applied += 1
+          else
+            raise ArgumentError, "unknown op: #{action.inspect}"
+          end
+        end
+      rescue StandardError
+        # Patch operations are atomic: roll back on any failure.
+        @draft = before
+        raise
+      end
+
+      @draft_version += 1 if applied.positive?
+
+      { "draft_etag" => draft_etag, "applied" => applied }
+    end
+
+    private
+
+    # Very small JSON Pointer helpers (enough for eval).
+    def read_pointer(doc, pointer)
+      raise ArgumentError, "pointer must start with /" unless pointer.to_s.start_with?("/")
+
+      tokens = pointer.split("/").drop(1).map { |t| unescape_pointer_token(t) }
+      tokens.reduce(doc) do |cur, tok|
+        case cur
+        when Hash
+          cur.fetch(tok)
+        when Array
+          cur.fetch(Integer(tok))
+        else
+          raise ArgumentError, "cannot descend into #{cur.class}"
+        end
+      end
+    end
+
+    def write_pointer!(doc, pointer, value)
+      pointer = pointer.to_s
+      return doc.replace(value) if pointer.empty? || pointer == "/"
+
+      raise ArgumentError, "pointer must start with /" unless pointer.start_with?("/")
+
+      tokens = pointer.split("/").drop(1).map { |t| unescape_pointer_token(t) }
+      last = tokens.pop
+      parent = tokens.reduce(doc) { |cur, tok| descend_write!(cur, tok) }
+
+      case parent
+      when Hash
+        parent[last] = value
+      when Array
+        parent[Integer(last)] = value
+      else
+        raise ArgumentError, "cannot write into #{parent.class}"
+      end
+    end
+
+    def delete_pointer!(doc, pointer)
+      raise ArgumentError, "pointer must start with /" unless pointer.to_s.start_with?("/")
+
+      tokens = pointer.split("/").drop(1).map { |t| unescape_pointer_token(t) }
+      last = tokens.pop
+      parent = tokens.reduce(doc) { |cur, tok| descend_write!(cur, tok) }
+
+      case parent
+      when Hash
+        parent.delete(last)
+      when Array
+        parent.delete_at(Integer(last))
+      else
+        raise ArgumentError, "cannot delete from #{parent.class}"
+      end
+    end
+
+    def append_pointer!(doc, pointer, value)
+      arr = read_pointer(doc, pointer)
+      raise ArgumentError, "target is not an Array" unless arr.is_a?(Array)
+
+      arr << value
+    rescue KeyError
+      write_pointer!(doc, pointer, [value])
+    end
+
+    def insert_pointer!(doc, pointer, index, value)
+      arr = read_pointer(doc, pointer)
+      raise ArgumentError, "target is not an Array" unless arr.is_a?(Array)
+
+      i = Integer(index)
+      arr.insert(i, value)
+    rescue KeyError
+      write_pointer!(doc, pointer, [value])
+    end
+
+    def descend_write!(cur, tok)
+      case cur
+      when Hash
+        cur[tok] ||= {}
+        cur[tok]
+      when Array
+        idx = Integer(tok)
+        cur[idx] ||= {}
+        cur[idx]
+      else
+        raise ArgumentError, "cannot descend into #{cur.class}"
+      end
+    end
+
+    def unescape_pointer_token(token)
+      token.to_s.gsub("~1", "/").gsub("~0", "~")
+    end
+
+    def deep_dup(obj)
+      Marshal.load(Marshal.dump(obj))
+    end
+  end
+
+  class Executor
+    # Keep the patch surface tiny for cross-model reliability in eval.
+    MODEL_ALLOWED_STATE_PATCH_PATHS = ["/draft/foo"].freeze
+
+    def initialize(workspace:)
+      @workspace = workspace
+    end
+
+    def call(name:, args:)
+      args = args.is_a?(Hash) ? args : {}
+
+      workspace_id = args["workspace_id"].to_s
+      # For eval robustness across models, treat missing/placeholder IDs as implicit.
+      workspace_id = @workspace.id if workspace_id.empty? || workspace_id == "workspace_id"
+
+      if workspace_id != @workspace.id
+        return error_envelope(name, code: "WORKSPACE_NOT_FOUND", message: "Unknown workspace_id: #{workspace_id}")
+      end
+
+      case name
+      when "state_get"
+        ok_envelope(name, "snapshot" => @workspace.snapshot(select: args["select"]))
+      when "state_patch"
+        ops = args["ops"]
+        unless ops.is_a?(Array) && ops.any?
+          return error_envelope(name, code: "ARGUMENT_ERROR", message: "ops must be a non-empty Array")
+        end
+
+        unless model_allowed_state_patch_ops?(ops)
+          return error_envelope(
+            name,
+            code: "ARGUMENT_ERROR",
+            message: "Only set on #{MODEL_ALLOWED_STATE_PATCH_PATHS.join(", ")} is allowed",
+          )
+        end
+
+        result = @workspace.patch_draft!(ops, etag: nil)
+        ok_envelope(name, result)
+      else
+        error_envelope(name, code: "TOOL_NOT_IMPLEMENTED", message: "Tool not implemented: #{name}")
+      end
+    rescue ArgumentError => e
+      error_envelope(name, code: "ARGUMENT_ERROR", message: e.message)
+    rescue StandardError => e
+      error_envelope(name, code: "INTERNAL_ERROR", message: "#{e.class}: #{e.message}")
+    end
+
+    private
+
+    def ok_envelope(name, data)
+      {
+        "ok" => true,
+        "tool_name" => name,
+        "data" => data.is_a?(Hash) ? data : { "value" => data },
+        "warnings" => [],
+        "errors" => [],
+      }
+    end
+
+    def error_envelope(name, code:, message:)
+      {
+        "ok" => false,
+        "tool_name" => name,
+        "data" => {},
+        "warnings" => [],
+        "errors" => [{ "code" => code, "message" => message.to_s }],
+      }
+    end
+
+    def model_allowed_state_patch_ops?(ops)
+      ops.all? do |op|
+        op.is_a?(Hash) &&
+          op["op"].to_s == "set" &&
+          MODEL_ALLOWED_STATE_PATCH_PATHS.include?(op["path"].to_s)
+      end
+    end
+  end
+
+  def self.tool_definitions
+    [
+      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+        name: "state_get",
+        description: "Read workspace state (facts/draft/locks/ui_state/versions).",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            workspace_id: { type: "string" },
+            select: { type: "array", items: { type: "string" } },
+          },
+          required: [],
+        },
+      ),
+      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+        name: "state_patch",
+        description: "Apply patch operations to draft state (set/delete/append/insert).",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            workspace_id: { type: "string" },
+            request_id: { type: "string" },
+            ops: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  op: { type: "string" },
+                  path: { type: "string" },
+                  value: {},
+                  index: { type: "integer" },
+                },
+                required: ["op", "path"],
+              },
+            },
+          },
+          required: ["request_id", "ops"],
+        },
+      ),
+      # Include but hide (regression guard): model should never see it.
+      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+        name: "facts_commit",
+        description: "Commit a facts proposal (must be triggered by UI/user confirmation).",
+        exposed_to_model: false,
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            workspace_id: { type: "string" },
+            request_id: { type: "string" },
+            proposal_id: { type: "string" },
+            user_confirmed: { type: "boolean" },
+          },
+          required: ["workspace_id", "request_id", "proposal_id", "user_confirmed"],
+        },
+      ),
+    ]
+  end
+end
 
 def truncate(str, max_chars: 220)
   s = str.to_s
@@ -222,13 +543,18 @@ models.each do |model|
     $stderr.puts("[#{model_idx}/#{model_total}] testing #{model} (trial #{trial_idx + 1}/#{trials_per_model})...")
     $stderr.flush
 
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    workspace = ToolCallEval::Workspace.new
+    tool_executor = ToolCallEval::Executor.new(workspace: workspace)
+    registry =
+      TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
+        definitions: ToolCallEval.tool_definitions,
+      )
 
     runner =
       TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
         client: client,
         model: model,
-        workspace: workspace,
+        tool_executor: tool_executor,
         runtime:
           TavernKit::Runtime::Base.build(
             {
@@ -241,6 +567,7 @@ models.each do |model|
             },
             type: :app,
           ),
+        registry: registry,
         system: system,
         strict: false,
       )
@@ -314,7 +641,7 @@ models.each do |model|
       trace: trace,
     }
 
-    File.write(out_dir.join("#{safe_name}__trial_#{format('%02d', trial_idx + 1)}.json"), JSON.pretty_generate(report))
+    File.write(out_dir.join("#{safe_name}__trial_#{format("%02d", trial_idx + 1)}.json"), JSON.pretty_generate(report))
 
     trials << report
     failures << report unless report[:ok]

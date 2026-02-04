@@ -28,115 +28,45 @@ module TavernKit
           def exposed_to_model? = exposed_to_model == true
         end
 
-      # PoC registry: a small allowlist of tools used to validate tool-calling loops.
+      # A small registry that holds tool definitions.
       #
-      # The "real" editor will likely maintain a larger registry, potentially
-      # with per-user authorization and side-effect levels.
+      # This is intentionally "dumb": the app (or scripts) owns which tools
+      # exist and what they do; ToolCalling only needs to (a) expose the JSON
+      # schema to the model and (b) enforce allow/deny rules consistently.
       class ToolRegistry
         # OpenAI/Bedrock/Azure (and others) commonly enforce:
         #   ^[a-zA-Z0-9_-]{1,128}$
         #
         # Avoid "." in tool names for maximum cross-provider compatibility.
-        def definitions
-          [
-            ToolDefinition.new(
-              name: "state_get",
-              description: "Read workspace state (facts/draft/locks/ui_state/versions).",
-              parameters: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  workspace_id: { type: "string" },
-                  select: { type: "array", items: { type: "string" } },
-                },
-                required: [],
-              },
-            ),
-            ToolDefinition.new(
-              name: "state_patch",
-              description: "Apply patch operations to draft state (set/delete/append/insert).",
-              parameters: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  workspace_id: { type: "string" },
-                  request_id: { type: "string" },
-                  ops: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      properties: {
-                        op: { type: "string" },
-                        path: { type: "string" },
-                        value: {},
-                        index: { type: "integer" },
-                      },
-                      required: ["op", "path"],
-                    },
-                  },
-                },
-                required: ["request_id", "ops"],
-              },
-            ),
-            ToolDefinition.new(
-              name: "facts_propose",
-              description: "Propose facts changes (requires explicit user confirmation to commit).",
-              parameters: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  workspace_id: { type: "string" },
-                  request_id: { type: "string" },
-                  proposals: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      properties: {
-                        path: { type: "string" },
-                        value: {},
-                        reason: { type: "string" },
-                      },
-                      required: ["path", "value"],
-                    },
-                  },
-                },
-                required: ["request_id", "proposals"],
-              },
-            ),
-            ToolDefinition.new(
-              name: "facts_commit",
-              description: "Commit a facts proposal (must be triggered by UI/user confirmation).",
-              exposed_to_model: false,
-              parameters: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  workspace_id: { type: "string" },
-                  request_id: { type: "string" },
-                  proposal_id: { type: "string" },
-                  user_confirmed: { type: "boolean" },
-                },
-                required: ["workspace_id", "request_id", "proposal_id", "user_confirmed"],
-              },
-            ),
-            ToolDefinition.new(
-              name: "ui_render",
-              description: "Request UI actions (panel/form/modal/upload/etc). No business side effects.",
-              parameters: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  workspace_id: { type: "string" },
-                  request_id: { type: "string" },
-                  actions: { type: "array", items: { type: "object" } },
-                },
-                required: ["request_id", "actions"],
-              },
-            ),
-          ]
+        def initialize(definitions: [])
+          @definitions =
+            Array(definitions).map do |d|
+              case d
+              when ToolDefinition
+                d
+              when Hash
+                attrs = {
+                  name: d[:name] || d["name"],
+                  description: d[:description] || d["description"],
+                  parameters: d[:parameters] || d["parameters"],
+                }
+
+                exposed =
+                  if d.key?(:exposed_to_model)
+                    d[:exposed_to_model]
+                  elsif d.key?("exposed_to_model")
+                    d["exposed_to_model"]
+                  end
+                attrs[:exposed_to_model] = exposed unless exposed.nil?
+
+                ToolDefinition.new(**attrs)
+              else
+                raise ArgumentError, "Invalid tool definition: #{d.inspect}"
+              end
+            end
         end
+
+        def definitions = @definitions
 
         def openai_tools(expose: :model)
           defs = definitions
