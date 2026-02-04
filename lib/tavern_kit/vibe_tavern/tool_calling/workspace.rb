@@ -99,33 +99,42 @@ module TavernKit
           end
 
           applied = 0
+          before = deep_dup(@draft)
 
-          Array(ops).each do |op|
-            op = op.is_a?(Hash) ? op : {}
+          begin
+            Array(ops).each do |op|
+              op = op.is_a?(Hash) ? op : {}
 
-            action = op["op"].to_s
-            path = op["path"].to_s
-            value = op.key?("value") ? op["value"] : nil
-            index = op["index"]
+              action = op["op"].to_s
+              path = op["path"].to_s
+              value = op.key?("value") ? op["value"] : nil
+              index = op["index"]
 
-            raise ArgumentError, "path must start with /draft/" unless path.start_with?("/draft/")
+              raise ArgumentError, "path must start with /draft/" unless path.start_with?("/draft/")
 
-            case action
-            when "set"
-              write_pointer!(@draft, path.delete_prefix("/draft"), value)
-              applied += 1
-            when "delete"
-              delete_pointer!(@draft, path.delete_prefix("/draft"))
-              applied += 1
-            when "append"
-              append_pointer!(@draft, path.delete_prefix("/draft"), value)
-              applied += 1
-            when "insert"
-              insert_pointer!(@draft, path.delete_prefix("/draft"), index, value)
-              applied += 1
-            else
-              raise ArgumentError, "unknown op: #{action.inspect}"
+              case action
+              when "set"
+                write_pointer!(@draft, path.delete_prefix("/draft"), value)
+                applied += 1
+              when "delete"
+                delete_pointer!(@draft, path.delete_prefix("/draft"))
+                applied += 1
+              when "append"
+                append_pointer!(@draft, path.delete_prefix("/draft"), value)
+                applied += 1
+              when "insert"
+                insert_pointer!(@draft, path.delete_prefix("/draft"), index, value)
+                applied += 1
+              else
+                raise ArgumentError, "unknown op: #{action.inspect}"
+              end
             end
+          rescue StandardError
+            # Patch operations are expected to be atomic. Even if we validate
+            # inputs up front, nested pointer writes can still fail (bad index,
+            # unexpected structure, etc.). Roll back to keep state consistent.
+            @draft = before
+            raise
           end
 
           @draft_version += 1 if applied.positive?
