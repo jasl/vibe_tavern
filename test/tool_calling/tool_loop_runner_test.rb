@@ -1226,6 +1226,92 @@ class ToolLoopRunnerTest < Minitest::Test
     refute_includes tool_msg["content"], "x" * 1000
   end
 
+  def test_tool_result_transform_is_applied_to_tool_output_too_large_envelope
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_state_get",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    max = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::MAX_TOOL_OUTPUT_BYTES
+    workspace = ToolCallEvalTestWorkspace.new(draft: { "big" => ("x" * (max + 10_000)) })
+
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_result_transforms: ["tool_result_compact_envelope"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" }
+    refute_nil tool_msg
+
+    parsed = JSON.parse(tool_msg["content"])
+    assert_equal false, parsed["ok"]
+    assert_includes parsed.dig("errors", 0, "code"), "TOOL_OUTPUT_TOO_LARGE"
+
+    # tool_result_compact_envelope should remove empty warning arrays even for
+    # error envelopes like TOOL_OUTPUT_TOO_LARGE.
+    refute parsed.key?("warnings")
+  end
+
   def test_fix_empty_final_retries
     requests = []
 
@@ -1319,11 +1405,720 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_equal 3, requests.length
 
     req3 = JSON.parse(requests[2][:body])
+    assert_nil req3["tool_choice"]
+    assert_nil req3["tools"]
+
+    user3 = Array(req3["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+    assert_includes user3, "Please provide your final answer"
+  end
+
+  def test_fix_empty_final_retry_prompt_can_be_overridden_and_tools_can_be_kept
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            case @call_count
+            when 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            when 2
+              {
+                choices: [
+                  {
+                    message: { role: "assistant", content: "" }, # empty final
+                    finish_reason: "stop",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  {
+                    message: { role: "assistant", content: "Done." },
+                    finish_reason: "stop",
+                  },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            fix_empty_final_user_text: "FINALIZE_IN_ENGLISH",
+            fix_empty_final_disable_tools: false,
+          },
+        },
+        type: :app,
+      )
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, fix_empty_final: true)
+
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_equal "Done.", result[:assistant_text]
+
+    assert_equal 3, requests.length
+
+    req3 = JSON.parse(requests[2][:body])
     assert_equal "auto", req3["tool_choice"]
     assert req3["tools"].is_a?(Array)
 
     user3 = Array(req3["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
-    assert_includes user3, "Do not call any tools"
+    assert_includes user3, "FINALIZE_IN_ENGLISH"
+  end
+
+  def test_message_transform_can_inject_reasoning_content_on_assistant_tool_call_messages
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            message_transforms: ["assistant_tool_calls_reasoning_content_empty_if_missing"],
+          },
+        },
+        type: :app,
+      )
+
+    tool_calls = [
+      {
+        "id" => "call_1",
+        "type" => "function",
+        "function" => { "name" => "state_get", "arguments" => "{}" },
+      },
+    ]
+
+    history = [
+      TavernKit::Prompt::Message.new(role: :assistant, content: "", metadata: { tool_calls: tool_calls }),
+    ]
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner.run(user_text: "hello", history: history)
+
+    req = JSON.parse(requests[0][:body])
+    assistant_tool_msg =
+      Array(req["messages"]).find do |m|
+        m.is_a?(Hash) && m["role"] == "assistant" && m["tool_calls"].is_a?(Array) && m["tool_calls"].any?
+      end
+
+    refute_nil assistant_tool_msg
+    assert_equal "", assistant_tool_msg["reasoning_content"]
+  end
+
+  def test_message_transform_can_null_out_empty_content_on_assistant_tool_call_messages
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            message_transforms: ["assistant_tool_calls_content_null_if_blank"],
+          },
+        },
+        type: :app,
+      )
+
+    tool_calls = [
+      {
+        "id" => "call_1",
+        "type" => "function",
+        "function" => { "name" => "state_get", "arguments" => "{}" },
+      },
+    ]
+
+    history = [
+      TavernKit::Prompt::Message.new(role: :assistant, content: "", metadata: { tool_calls: tool_calls }),
+    ]
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner.run(user_text: "hello", history: history)
+
+    req = JSON.parse(requests[0][:body])
+    assistant_tool_msg =
+      Array(req["messages"]).find do |m|
+        m.is_a?(Hash) && m["role"] == "assistant" && m["tool_calls"].is_a?(Array) && m["tool_calls"].any?
+      end
+
+    refute_nil assistant_tool_msg
+    assert_nil assistant_tool_msg["content"]
+  end
+
+  def test_tool_transform_can_modify_tools_before_dispatch
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_transforms: ["openai_tools_strip_function_descriptions"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner.run(user_text: "hello")
+
+    req = JSON.parse(requests[0][:body])
+    first_tool = Array(req["tools"]).find { |t| t.is_a?(Hash) && t.dig("function", "name") == "state_get" }
+    refute_nil first_tool
+    refute first_tool.fetch("function", {}).key?("description")
+  end
+
+  def test_response_transform_can_convert_function_call_to_tool_calls
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      function_call: {
+                        name: "state_get",
+                        arguments: JSON.generate({ workspace_id: workspace_id }),
+                      },
+                    },
+                    finish_reason: "function_call",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            response_transforms: ["assistant_function_call_to_tool_calls"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_equal "Done.", result[:assistant_text]
+    assert_equal 2, requests.length
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" }
+    refute_nil tool_msg
+  end
+
+  def test_tool_call_transform_can_fix_blank_tool_call_arguments_before_execution
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_blank",
+                          type: "function",
+                          function: { name: "state_get", arguments: "" },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_call_transforms: ["assistant_tool_calls_arguments_blank_to_empty_object"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" }
+    refute_nil tool_msg
+
+    parsed = JSON.parse(tool_msg["content"])
+    assert_equal true, parsed["ok"]
+  end
+
+  def test_tool_result_transform_can_modify_envelope_before_serialization
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_result_transforms: ["tool_result_compact_envelope"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" }
+    refute_nil tool_msg
+
+    parsed = JSON.parse(tool_msg["content"])
+    assert_equal true, parsed["ok"]
+    refute parsed.key?("warnings")
+    refute parsed.key?("errors")
+  end
+
+  def test_unknown_message_transform_raises_in_strict_mode
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            message_transforms: ["unknown_transform"],
+          },
+        },
+        type: :app,
+      )
+
+    tool_calls = [
+      {
+        "id" => "call_1",
+        "type" => "function",
+        "function" => { "name" => "state_get", "arguments" => "{}" },
+      },
+    ]
+
+    history = [
+      TavernKit::Prompt::Message.new(role: :assistant, content: "", metadata: { tool_calls: tool_calls }),
+    ]
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+
+    assert_raises(ArgumentError) do
+      runner.run(user_text: "hello", history: history)
+    end
+  end
+
+  def test_unknown_tool_transform_raises_in_strict_mode
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_transforms: ["unknown_tool_transform"],
+          },
+        },
+        type: :app,
+      )
+
+    workspace = ToolCallEvalTestWorkspace.new
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:call) do |_env|
+          raise "unexpected request"
+        end
+      end.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+
+    assert_raises(ArgumentError) do
+      runner.run(user_text: "hello")
+    end
+  end
+
+  def test_unknown_response_transform_raises_in_strict_mode
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            response_transforms: ["unknown_response_transform"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+
+    assert_raises(ArgumentError) do
+      runner.run(user_text: "hello")
+    end
+  end
+
+  def test_unknown_tool_call_transform_raises_in_strict_mode
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        { id: "call_1", type: "function", function: { name: "state_get", arguments: "{}" } },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              },
+            ),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_call_transforms: ["unknown_tool_call_transform"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+
+    assert_raises(ArgumentError) do
+      runner.run(user_text: "hello")
+    end
+
+    assert_equal 1, requests.length
+  end
+
+  def test_unknown_tool_result_transform_raises_in_strict_mode
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        { id: "call_1", type: "function", function: { name: "state_get", arguments: "{}" } },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              },
+            ),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_result_transforms: ["unknown_tool_result_transform"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+
+    assert_raises(ArgumentError) do
+      runner.run(user_text: "hello")
+    end
+
+    assert_equal 1, requests.length
   end
 
   def test_tool_use_can_be_disabled_to_avoid_sending_tools

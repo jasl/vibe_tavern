@@ -476,6 +476,21 @@ def error_category(message, status: nil)
   end
 end
 
+def normalize_tool_use_mode(value)
+  s = value.to_s.strip.downcase.tr("-", "_")
+
+  case s
+  when "enforced", "required", "must"
+    "enforced"
+  when "relaxed", "preferred", "optional"
+    "relaxed"
+  when "disabled", "off", "none", "0", "false"
+    "disabled"
+  else
+    s.empty? ? "relaxed" : s
+  end
+end
+
 def provider_error_hint(report)
   body = report[:error_body]
   return nil unless body.is_a?(Hash)
@@ -818,13 +833,21 @@ models.each_with_index do |model, model_index|
         )
 
       tool_calling =
-        {
-          tool_use_mode: tool_use_mode,
-          fallback_retry_count: fallback_retry_count,
-          fix_empty_final: fix_empty_final,
-          tool_allowlist: tool_allowlist,
-          request_overrides: request_overrides,
-        }.merge(scenario[:runtime_overrides] || {})
+        TavernKit::VibeTavern::ToolCalling::Presets.merge(
+          TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling,
+          TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(
+            tool_use_mode: tool_use_mode,
+            fallback_retry_count: fallback_retry_count,
+            fix_empty_final: fix_empty_final,
+            tool_allowlist: tool_allowlist,
+            request_overrides: request_overrides,
+          ),
+          TavernKit::VibeTavern::ToolCalling::Presets.model_defaults(model),
+          scenario[:runtime_overrides] || {},
+        )
+
+      effective_tool_use_mode = normalize_tool_use_mode(tool_calling.fetch(:tool_use_mode, tool_use_mode))
+      effective_tools_enabled = effective_tool_use_mode != "disabled"
 
       runtime =
         TavernKit::Runtime::Base.build(
@@ -867,27 +890,27 @@ models.each_with_index do |model, model_index|
 
         fail_reasons =
           Array(
-            scenario.fetch(:assert).call(
-              assistant_text: assistant_text,
-              workspace: workspace,
-              tools_enabled: tools_enabled,
-              trace: trace,
-              raw_history: raw_history,
+              scenario.fetch(:assert).call(
+                assistant_text: assistant_text,
+                workspace: workspace,
+                tools_enabled: effective_tools_enabled,
+                trace: trace,
+                raw_history: raw_history,
+              )
             )
-          )
 
-        unless fail_reasons.empty?
-          tool_calls_seen =
-            tools_enabled &&
-              Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
+          unless fail_reasons.empty?
+            tool_calls_seen =
+              effective_tools_enabled &&
+                Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
 
-          if tools_enabled && !tool_calls_seen
-            error = "NO_TOOL_CALLS: assistant did not request any tool calls"
-          else
-            error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
+            if effective_tools_enabled && !tool_calls_seen
+              error = "NO_TOOL_CALLS: assistant did not request any tool calls"
+            else
+              error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
+            end
+            ok = false
           end
-          ok = false
-        end
       rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
         ok = false
         error = "#{e.code}: #{e.message}"
@@ -910,8 +933,8 @@ models.each_with_index do |model, model_index|
         trial: trial_idx + 1,
         ok: ok,
         elapsed_ms: elapsed_ms,
-        tool_use_mode: tool_use_mode,
-        tools_enabled: tools_enabled,
+        tool_use_mode: effective_tool_use_mode,
+        tools_enabled: effective_tools_enabled,
         runtime_tool_calling: tool_calling,
         assistant_text: assistant_text,
         draft: workspace.draft,

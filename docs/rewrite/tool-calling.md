@@ -193,6 +193,9 @@ Note:
   - This is configured as a pipeline/runtime setting (`runtime[:tool_calling][:fix_empty_final]`)
   - Default: enabled
   - Eval override: `OPENROUTER_FIX_EMPTY_FINAL=0` to disable
+  - Optional prompt override: `runtime[:tool_calling][:fix_empty_final_user_text]` (String)
+  - By default, the finalization retry does **not** send tools (so the model cannot re-call tools by accident).
+    - Override: `runtime[:tool_calling][:fix_empty_final_disable_tools]=false`
 - Provider/request-level overrides (upper-layer injection):
   - `runtime[:tool_calling][:request_overrides]` (Hash) is merged into the OpenAI-compatible request body.
     - Intended for provider-specific knobs like OpenRouter routing (`route`, `provider`, `transforms`) or standard params (`temperature`).
@@ -202,6 +205,23 @@ Note:
     - `OPENROUTER_TRANSFORMS=middle-out` (comma-separated)
     - `OPENROUTER_PROVIDER_ONLY=...`, `OPENROUTER_PROVIDER_ORDER=...`, `OPENROUTER_PROVIDER_IGNORE=...` (comma-separated)
     - `OPENROUTER_REQUEST_OVERRIDES_JSON='{\"temperature\":0.2}'` (advanced; JSON object)
+- Provider/model message transforms (upper-layer injection):
+  - `runtime[:tool_calling][:message_transforms]` (Array or comma-separated String) applies opt-in transforms to outbound messages before dispatch.
+  - Built-ins: `assistant_tool_calls_content_null_if_blank`, `assistant_tool_calls_reasoning_content_empty_if_missing`
+- Provider/model tool transforms (upper-layer injection):
+  - `runtime[:tool_calling][:tool_transforms]` (Array or comma-separated String) applies opt-in transforms to the outbound `tools:` list before dispatch.
+  - Built-ins: `openai_tools_strip_function_descriptions`
+- Provider/model response transforms (upper-layer injection):
+  - `runtime[:tool_calling][:response_transforms]` (Array or comma-separated String) applies opt-in transforms to the inbound assistant message (`choices[0].message`) before parsing tool calls.
+  - Built-ins: `assistant_function_call_to_tool_calls`, `assistant_tool_calls_arguments_json_string_if_hash`
+- Provider/model tool call transforms (upper-layer injection):
+  - `runtime[:tool_calling][:tool_call_transforms]` (Array or comma-separated String) applies opt-in transforms to parsed `tool_calls` before execution.
+  - Built-ins: `assistant_tool_calls_arguments_blank_to_empty_object`
+  - Aliases: `inbound_tool_call_transforms`
+- Provider/model tool result transforms (upper-layer injection):
+  - `runtime[:tool_calling][:tool_result_transforms]` (Array or comma-separated String) applies opt-in transforms to tool result envelopes before serializing them into tool messages.
+  - Built-ins: `tool_result_compact_envelope`
+  - Aliases: `outbound_tool_result_transforms`, `tool_output_transforms`
 
 ## Model reliability metadata (tool calling)
 

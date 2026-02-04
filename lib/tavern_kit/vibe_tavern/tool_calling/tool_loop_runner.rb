@@ -2,6 +2,11 @@
 
 require "json"
 require_relative "filtered_tool_registry"
+require_relative "message_transforms"
+require_relative "tool_transforms"
+require_relative "response_transforms"
+require_relative "tool_call_transforms"
+require_relative "tool_result_transforms"
 
 module TavernKit
   module VibeTavern
@@ -11,6 +16,7 @@ module TavernKit
         MAX_TOOL_ARGS_BYTES = 200_000
         MAX_TOOL_OUTPUT_BYTES = 200_000
         TOOL_USE_MODES = %i[enforced relaxed disabled].freeze
+        DEFAULT_FIX_EMPTY_FINAL_USER_TEXT = "Please provide your final answer.".freeze
 
         class ToolUseError < StandardError
           attr_reader :code, :details
@@ -83,7 +89,14 @@ module TavernKit
             tools = @registry.openai_tools(expose: :model)
             tool_choice = resolve_tool_choice(default: "auto")
             request_overrides = resolve_request_overrides
+            message_transforms = resolve_message_transforms
+            tool_transforms = resolve_tool_transforms
+            response_transforms = resolve_response_transforms
+            tool_call_transforms = resolve_tool_call_transforms
+            tool_result_transforms = resolve_tool_result_transforms
             request_attempts_left = @tool_use_mode == :relaxed ? @tool_calling_fallback_retry_count : 0
+
+            tools = ToolTransforms.apply(tools, tool_transforms, strict: @strict) if tools_enabled && tool_transforms.any?
 
             response = nil
             plan = nil
@@ -118,6 +131,8 @@ module TavernKit
               options = plan.llm_options || {}
               request = { model: @model, messages: messages }.merge(options)
 
+              MessageTransforms.apply!(request.fetch(:messages), message_transforms, strict: @strict) if message_transforms.any?
+
               response = @client.chat_completions(**request)
             rescue SimpleInference::Errors::HTTPError => e
               if request_attempts_left > 0
@@ -130,11 +145,19 @@ module TavernKit
             end
             body = response.body.is_a?(Hash) ? response.body : {}
 
-            assistant_msg = body.dig("choices", 0, "message") || {}
-            assistant_content = assistant_msg["content"].to_s
-            tool_calls = assistant_msg["tool_calls"]
+            assistant_msg = body.dig("choices", 0, "message")
+            assistant_msg = {} unless assistant_msg.is_a?(Hash)
+            ResponseTransforms.apply!(assistant_msg, response_transforms, strict: @strict) if response_transforms.any?
+
+            assistant_content = assistant_msg.fetch("content", "").to_s
+            tool_calls = deep_symbolize_keys(assistant_msg.fetch("tool_calls", nil))
             tool_calls = Array(tool_calls).select { |tc| tc.is_a?(Hash) }
             tool_calls = normalize_tool_call_ids(tool_calls)
+
+            if tools_enabled && tool_call_transforms.any?
+              tool_calls = ToolCallTransforms.apply(tool_calls, tool_call_transforms, strict: @strict)
+              tool_calls = normalize_tool_call_ids(tool_calls)
+            end
             ignored_tool_calls = 0
 
             unless tools_enabled
@@ -146,7 +169,16 @@ module TavernKit
 
             trace_entry = {
               turn: turn,
-              request: { model: @model, messages_count: messages.size, tools_count: Array(options[:tools] || options["tools"]).size },
+              request: {
+                model: @model,
+                messages_count: messages.size,
+                tools_count: Array(options.fetch(:tools, [])).size,
+                tool_transforms: tool_transforms,
+                message_transforms: message_transforms,
+                response_transforms: response_transforms,
+                tool_call_transforms: tool_call_transforms,
+                tool_result_transforms: tool_result_transforms,
+              },
               response_summary: {
                 has_tool_calls: !tool_calls.empty?,
                 tool_calls_count: tool_calls.size,
@@ -154,11 +186,12 @@ module TavernKit
                 finish_reason: body.dig("choices", 0, "finish_reason"),
               },
               tool_calls: tool_calls.map do |tc|
-                fn = tc["function"].is_a?(Hash) ? tc["function"] : {}
+                fn = tc.fetch(:function, {})
+                fn = {} unless fn.is_a?(Hash)
                 {
-                  id: tc["id"].to_s,
-                  name: fn["name"].to_s,
-                  arguments_bytes: fn["arguments"].to_s.bytesize,
+                  id: tc.fetch(:id, "").to_s,
+                  name: fn.fetch(:name, "").to_s,
+                  arguments_bytes: fn.fetch(:arguments, "").to_s.bytesize,
                 }
               end,
             }
@@ -178,7 +211,9 @@ module TavernKit
                   assistant_content.strip.empty? &&
                   any_tool_calls_seen
                 empty_final_fixup_attempted = true
-                pending_user_text = "Do not call any tools. Provide your final answer."
+                pending_user_text =
+                  resolve_fix_empty_final_user_text(default: DEFAULT_FIX_EMPTY_FINAL_USER_TEXT)
+                tools_enabled = false if resolve_fix_empty_final_disable_tools(default: true)
                 next
               end
 
@@ -202,10 +237,11 @@ module TavernKit
 
             tool_results = []
             tool_calls.each do |tc|
-              id = tc["id"].to_s
-              fn = tc["function"].is_a?(Hash) ? tc["function"] : {}
-              name = fn["name"].to_s
-              args_json = fn["arguments"]
+              id = tc.fetch(:id, "").to_s
+              fn = tc.fetch(:function, {})
+              fn = {} unless fn.is_a?(Hash)
+              name = fn.fetch(:name, "").to_s
+              args_json = fn.fetch(:arguments, nil)
 
               args = parse_args(args_json)
               result =
@@ -223,6 +259,45 @@ module TavernKit
                   @dispatcher.execute(name: name, args: args)
                 end
 
+              if tool_result_transforms.any?
+                result =
+                  ToolResultTransforms.apply(
+                    result,
+                    tool_result_transforms,
+                    tool_name: name,
+                    tool_call_id: id,
+                    strict: @strict,
+                  )
+              end
+
+              tool_content = JSON.generate(result)
+              if tool_content.bytesize > @max_tool_output_bytes
+                too_large_bytes = tool_content.bytesize
+                result =
+                  tool_error_envelope(
+                    name,
+                    code: "TOOL_OUTPUT_TOO_LARGE",
+                    message: "Tool output exceeded size limit",
+                    data: { "bytes" => too_large_bytes, "max_bytes" => @max_tool_output_bytes },
+                  )
+
+                if tool_result_transforms.any?
+                  result =
+                    ToolResultTransforms.apply(
+                      result,
+                      tool_result_transforms,
+                      tool_name: name,
+                      tool_call_id: id,
+                      strict: @strict,
+                    )
+                end
+
+                tool_content =
+                  JSON.generate(
+                    result
+                  )
+              end
+
               last_tool_ok_by_name[name] = result.is_a?(Hash) ? result["ok"] : nil
 
               tool_results << {
@@ -236,19 +311,6 @@ module TavernKit
                     []
                   end,
               }
-
-              tool_content = JSON.generate(result)
-              if tool_content.bytesize > @max_tool_output_bytes
-                tool_content =
-                  JSON.generate(
-                    tool_error_envelope(
-                      name,
-                      code: "TOOL_OUTPUT_TOO_LARGE",
-                      message: "Tool output exceeded size limit",
-                      data: { "bytes" => tool_content.bytesize, "max_bytes" => @max_tool_output_bytes },
-                    )
-                  )
-              end
 
               history << TavernKit::Prompt::Message.new(
                 role: :tool,
@@ -273,10 +335,14 @@ module TavernKit
           return message if message.is_a?(TavernKit::Prompt::Message)
 
           if message.is_a?(Hash)
-            role = (message[:role] || message["role"]).to_s
-            role = role.empty? ? "user" : role
-            content = (message[:content] || message["content"]).to_s
-            metadata = message[:metadata] || message["metadata"]
+            message = deep_symbolize_keys(message)
+
+            role = message.fetch(:role, "user").to_s
+            role = "user" if role.strip.empty?
+
+            content = message.fetch(:content, "").to_s
+            metadata = message.fetch(:metadata, nil)
+
             return TavernKit::Prompt::Message.new(role: role.to_sym, content: content, metadata: metadata)
           end
 
@@ -332,33 +398,56 @@ module TavernKit
           raw = runtime_setting_value(:request_options) if raw.nil?
           return {} unless raw.is_a?(Hash)
 
+          raw = deep_symbolize_keys(raw)
+
           # Keep ownership clear: these keys are controlled by ToolLoopRunner.
-          reserved = %w[model messages tools tool_choice].freeze
+          reserved = %i[model messages tools tool_choice].freeze
           raw.each_with_object({}) do |(k, v), out|
-            key = k.to_s
+            key = k.to_s.to_sym
             next if reserved.include?(key)
 
-            out[k] = v
+            out[key] = v
           end
         end
 
         def runtime_setting_value(key)
           return nil unless @runtime&.respond_to?(:[])
 
-          # Prefer a dedicated namespace under runtime:
-          #   runtime[:tool_calling] => { tool_use_mode: :enforced, fallback_retry_count: 0, fix_empty_final: true }
-          tool_calling = @runtime[:tool_calling]
-          if tool_calling.is_a?(Hash)
+          tool_calling = tool_calling_settings
+          if tool_calling
             val = tool_calling[key]
-            val = tool_calling[key.to_s] if val.nil?
+            return val unless val.nil?
+          end
+
+          runtime_hash = runtime_settings_hash
+          if runtime_hash
+            val = runtime_hash[key]
             return val unless val.nil?
           end
 
           val = @runtime[key]
-          val = @runtime[key.to_s] if val.nil?
           return val unless val.nil?
 
           nil
+        end
+
+        def tool_calling_settings
+          return @tool_calling_settings if defined?(@tool_calling_settings)
+
+          raw =
+            if @runtime.is_a?(Hash)
+              @runtime[:tool_calling] || @runtime["tool_calling"]
+            else
+              @runtime[:tool_calling]
+            end
+
+          @tool_calling_settings = raw.is_a?(Hash) ? deep_symbolize_keys(raw) : nil
+        end
+
+        def runtime_settings_hash
+          return @runtime_settings_hash if defined?(@runtime_settings_hash)
+
+          @runtime_settings_hash = @runtime.is_a?(Hash) ? deep_symbolize_keys(@runtime) : nil
         end
 
         def runtime_setting_bool(key)
@@ -366,6 +455,72 @@ module TavernKit
           return val if val == true || val == false
 
           nil
+        end
+
+        def resolve_fix_empty_final_user_text(default:)
+          raw = runtime_setting_value(:fix_empty_final_user_text)
+          raw = runtime_setting_value(:empty_final_user_text) if raw.nil?
+          raw = runtime_setting_value(:finalization_user_text) if raw.nil?
+
+          text = raw.to_s.strip
+          text.empty? ? default : text
+        end
+
+        def resolve_fix_empty_final_disable_tools(default:)
+          val = runtime_setting_bool(:fix_empty_final_disable_tools)
+          val = runtime_setting_bool(:empty_final_disable_tools) if val.nil?
+          val = runtime_setting_bool(:finalization_disable_tools) if val.nil?
+
+          val.nil? ? default : val
+        end
+
+        def resolve_message_transforms
+          raw = runtime_setting_value(:message_transforms)
+          raw = runtime_setting_value(:outbound_message_transforms) if raw.nil?
+
+          normalize_string_list(raw)
+        end
+
+        def resolve_tool_transforms
+          raw = runtime_setting_value(:tool_transforms)
+          raw = runtime_setting_value(:outbound_tool_transforms) if raw.nil?
+
+          normalize_string_list(raw)
+        end
+
+        def resolve_response_transforms
+          raw = runtime_setting_value(:response_transforms)
+          raw = runtime_setting_value(:inbound_response_transforms) if raw.nil?
+
+          normalize_string_list(raw)
+        end
+
+        def resolve_tool_call_transforms
+          raw = runtime_setting_value(:tool_call_transforms)
+          raw = runtime_setting_value(:inbound_tool_call_transforms) if raw.nil?
+
+          normalize_string_list(raw)
+        end
+
+        def resolve_tool_result_transforms
+          raw = runtime_setting_value(:tool_result_transforms)
+          raw = runtime_setting_value(:outbound_tool_result_transforms) if raw.nil?
+          raw = runtime_setting_value(:tool_output_transforms) if raw.nil?
+
+          normalize_string_list(raw)
+        end
+
+        def normalize_string_list(value)
+          case value
+          when nil
+            []
+          when String
+            value.split(",").map(&:strip).reject(&:empty?)
+          when Array
+            value.map { |v| v.to_s.strip }.reject(&:empty?)
+          else
+            [value.to_s.strip].reject(&:empty?)
+          end
         end
 
         def resolve_tool_use_mode(explicit:)
@@ -481,6 +636,24 @@ module TavernKit
           }
         end
 
+        def deep_symbolize_keys(value)
+          case value
+          when Hash
+            value.each_with_object({}) do |(k, v), out|
+              if k.is_a?(Symbol)
+                out[k] = deep_symbolize_keys(v)
+              else
+                sym = k.to_s.to_sym
+                out[sym] = deep_symbolize_keys(v) unless out.key?(sym)
+              end
+            end
+          when Array
+            value.map { |v| deep_symbolize_keys(v) }
+          else
+            value
+          end
+        end
+
         # Some models / providers occasionally emit duplicate or empty tool call IDs.
         # Since we resend the assistant message back to the provider on the next turn,
         # we can normalize IDs locally as long as we keep assistant.tool_calls[] and
@@ -490,7 +663,7 @@ module TavernKit
 
           tool_calls.map.with_index do |tool_call, idx|
             normalized = tool_call.dup
-            base_id = normalized["id"].to_s
+            base_id = normalized.fetch(:id, "").to_s
             base_id = "tc_#{idx + 1}" if base_id.empty?
 
             id = base_id
@@ -504,7 +677,7 @@ module TavernKit
             end
 
             used[id] = true
-            normalized["id"] = id
+            normalized[:id] = id
             normalized
           end
         end
