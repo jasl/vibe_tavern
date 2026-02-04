@@ -122,11 +122,16 @@ Note:
 Script:
 
 ```sh
-# Run each model multiple times and compute success rate / latency percentiles.
+# Run the default scenario preset (smoke) for each model and compute success rate / latency percentiles.
+# Default preset: happy_path, missing_workspace_id, type_error_recovery, long_arguments_guard
 OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
   bundle exec ruby script/llm_tool_call_eval.rb
 
-# Run a subset of scenarios (comma-separated). Use `all` (default) to run all.
+# Run all scenarios.
+OPENROUTER_SCENARIOS=all OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
+# Run a subset of scenarios (comma-separated). Use `default` (or empty) to run the smoke preset.
 OPENROUTER_SCENARIOS="happy_path,missing_workspace_id" OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
   bundle exec ruby script/llm_tool_call_eval.rb
 
@@ -151,10 +156,15 @@ Notes:
   - If you already set `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`, set `OPENROUTER_API_PREFIX=""`
 - Tool use mode:
   - `OPENROUTER_TOOL_USE_MODE=enforced|relaxed|disabled`
-    - `enforced`: tool calls must succeed; otherwise fail the run (surface error to UI; user can retry)
+    - `enforced`: require at least one tool call; final failure behavior is controlled by `tool_failure_policy`
     - `relaxed`: best-effort; optional retry budget controls whether we retry without tools on provider errors
     - `disabled`: never send tools (chat-only mode)
   - This is also a pipeline/runtime setting: `runtime[:tool_calling][:tool_use_mode]`
+- Tool failure policy (when `tool_use_mode=enforced`):
+  - `OPENROUTER_TOOL_FAILURE_POLICY=fatal|tolerated` (default: `fatal`)
+  - Pipeline/runtime setting: `runtime[:tool_calling][:tool_failure_policy]`
+    - `fatal`: fail the run if any tool ends with `ok=false`
+    - `tolerated`: allow tool failures, but require at least one successful tool result (`ok=true`)
 - Tool size guardrails (to reduce provider/model variance and avoid context bloat):
   - `runtime[:tool_calling][:max_tool_args_bytes]` (default: 200_000)
     - If tool arguments exceed this size, the tool result is replaced with `{ ok:false, errors:[ARGUMENTS_TOO_LARGE] }`
@@ -173,9 +183,9 @@ Notes:
   - Expose all model-facing tools (not recommended for reliability checks): `OPENROUTER_TOOL_ALLOWLIST=all`
 - Tool masking can be controlled via runtime config (so app code can
   change the tool surface without prompt edits):
-  - `runtime[:tool_calling][:tool_names]` / `:tool_allowlist` / `:allowed_tools`:
+  - `runtime[:tool_calling][:tool_allowlist]`:
     - explicit allowlist (Array or comma-separated String)
-  - `runtime[:tool_calling][:tool_denylist]` / `:disabled_tools`:
+  - `runtime[:tool_calling][:tool_denylist]`:
     - explicit denylist (Array or comma-separated String)
   - Masking is enforced both when sending tools **and** when executing tool calls
     (so the model cannot call hidden tools).
@@ -217,11 +227,9 @@ Note:
 - Provider/model tool call transforms (upper-layer injection):
   - `runtime[:tool_calling][:tool_call_transforms]` (Array or comma-separated String) applies opt-in transforms to parsed `tool_calls` before execution.
   - Built-ins: `assistant_tool_calls_arguments_blank_to_empty_object`
-  - Aliases: `inbound_tool_call_transforms`
 - Provider/model tool result transforms (upper-layer injection):
   - `runtime[:tool_calling][:tool_result_transforms]` (Array or comma-separated String) applies opt-in transforms to tool result envelopes before serializing them into tool messages.
   - Built-ins: `tool_result_compact_envelope`
-  - Aliases: `outbound_tool_result_transforms`, `tool_output_transforms`
 
 ## Model reliability metadata (tool calling)
 

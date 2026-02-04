@@ -37,41 +37,30 @@ class PresetsTest < Minitest::Test
     assert_equal [], merged[:tool_allowlist]
   end
 
-  def test_merge_canonicalizes_allowlist_keys
-    merged =
-      TavernKit::VibeTavern::ToolCalling::Presets.merge(
-        { tool_names: ["a"] },
-        { allowed_tools: ["b"] },
-      )
-
-    assert_equal ["a", "b"], merged[:tool_allowlist]
-    refute merged.key?(:tool_names)
-    refute merged.key?(:allowed_tools)
-  end
-
   def test_merge_unions_message_transforms
     merged =
       TavernKit::VibeTavern::ToolCalling::Presets.merge(
         { message_transforms: ["a"] },
-        { outbound_message_transforms: ["b"] },
+        { message_transforms: ["b"] },
       )
 
     assert_equal ["a", "b"], merged[:message_transforms]
-    refute merged.key?(:outbound_message_transforms)
   end
 
   def test_merge_unions_tool_and_response_transforms
     merged =
       TavernKit::VibeTavern::ToolCalling::Presets.merge(
-        { tool_transforms: ["a"] },
         {
-          outbound_tool_transforms: ["b"],
+          tool_transforms: ["a"],
           response_transforms: ["c"],
-          inbound_response_transforms: ["d"],
           tool_call_transforms: ["e"],
-          inbound_tool_call_transforms: ["f"],
           tool_result_transforms: ["g"],
-          tool_output_transforms: ["h"],
+        },
+        {
+          tool_transforms: ["b"],
+          response_transforms: ["d"],
+          tool_call_transforms: ["f"],
+          tool_result_transforms: ["h"],
         },
       )
 
@@ -79,10 +68,6 @@ class PresetsTest < Minitest::Test
     assert_equal ["c", "d"], merged[:response_transforms]
     assert_equal ["e", "f"], merged[:tool_call_transforms]
     assert_equal ["g", "h"], merged[:tool_result_transforms]
-    refute merged.key?(:outbound_tool_transforms)
-    refute merged.key?(:inbound_response_transforms)
-    refute merged.key?(:inbound_tool_call_transforms)
-    refute merged.key?(:tool_output_transforms)
   end
 
   def test_model_defaults_can_disable_tools_for_known_unsupported_models

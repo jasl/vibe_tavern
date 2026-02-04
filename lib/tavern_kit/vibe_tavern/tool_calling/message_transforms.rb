@@ -91,14 +91,3 @@ TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
   "assistant_tool_calls_reasoning_content_empty_if_missing",
   reasoning_content_empty,
 )
-
-# Back-compat aliases for earlier PoC naming.
-TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
-  "deepseek_reasoner_reasoning_content_empty",
-  reasoning_content_empty,
-)
-
-TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
-  "deepseek_reasoning_content_empty",
-  reasoning_content_empty,
-)

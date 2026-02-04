@@ -29,6 +29,9 @@ fix_empty_final = ENV.fetch("OPENROUTER_FIX_EMPTY_FINAL", "1") == "1"
 tool_use_mode =
   ENV.fetch("OPENROUTER_TOOL_USE_MODE", "enforced").strip.downcase
 tool_use_mode = "disabled" unless %w[enforced relaxed disabled].include?(tool_use_mode)
+tool_failure_policy =
+  ENV.fetch("OPENROUTER_TOOL_FAILURE_POLICY", "fatal").strip.downcase
+tool_failure_policy = "fatal" unless %w[fatal tolerated].include?(tool_failure_policy)
 tools_enabled = tool_use_mode != "disabled"
 fallback_retry_count =
   begin
@@ -124,6 +127,12 @@ if (raw = ENV["OPENROUTER_REQUEST_OVERRIDES_JSON"].to_s.strip).length.positive?
   rescue JSON::ParserError
     warn "Invalid OPENROUTER_REQUEST_OVERRIDES_JSON (must be a JSON object). Ignoring."
   end
+end
+
+# Stabilize eval runs across models: prefer sequential tool calls unless a
+# scenario opts in (e.g. multi-tool call cases).
+if tools_enabled && !request_overrides.key?("parallel_tool_calls")
+  request_overrides["parallel_tool_calls"] = false
 end
 
 module ToolCallEval
@@ -599,7 +608,7 @@ SCENARIOS =
       {
         id: "partial_success_failure",
         title: "Partial success (state_get ok) + failure (bad state_patch) + recovery",
-        runtime_overrides: {},
+        runtime_overrides: { request_overrides: { parallel_tool_calls: true } },
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
@@ -683,7 +692,7 @@ SCENARIOS =
       {
         id: "duplicate_tool_calls",
         title: "Multiple tool calls in a single response (state_get + state_patch)",
-        runtime_overrides: {},
+        runtime_overrides: { request_overrides: { parallel_tool_calls: true } },
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
@@ -733,7 +742,7 @@ SCENARIOS =
       {
         id: "tool_output_truncation",
         title: "Tool output too large truncation (TOOL_OUTPUT_TOO_LARGE)",
-        runtime_overrides: { max_tool_output_bytes: 5_000 },
+        runtime_overrides: { max_tool_output_bytes: 5_000, tool_failure_policy: :tolerated },
         prepare: lambda { |workspace|
           workspace.draft["big"] = "x" * 12_000
         },
@@ -784,13 +793,34 @@ SCENARIOS =
     ]
   end
 
-requested_scenarios =
-  ENV.fetch("OPENROUTER_SCENARIOS", "")
+default_scenario_ids =
+  if tools_enabled
+    %w[
+      happy_path
+      missing_workspace_id
+      type_error_recovery
+      long_arguments_guard
+    ]
+  else
+    %w[chat_only]
+  end
+
+raw_requested_scenarios = ENV.fetch("OPENROUTER_SCENARIOS", "").to_s
+requested_scenario_tokens =
+  raw_requested_scenarios
     .split(",")
     .map(&:strip)
     .reject(&:empty?)
-requested_scenarios = nil if requested_scenarios.any? { |v| %w[all full *].include?(v.downcase) }
-requested_scenarios = nil if requested_scenarios&.empty?
+
+requested_scenarios =
+  if requested_scenario_tokens.empty? ||
+      requested_scenario_tokens.any? { |v| %w[default smoke].include?(v.downcase) }
+    default_scenario_ids
+  elsif requested_scenario_tokens.any? { |v| %w[all full *].include?(v.downcase) }
+    nil
+  else
+    requested_scenario_tokens
+  end
 
 scenarios =
   if requested_scenarios
@@ -798,6 +828,15 @@ scenarios =
   else
     SCENARIOS
   end
+
+if scenarios.empty?
+  warn(
+    "No scenarios selected from OPENROUTER_SCENARIOS=#{raw_requested_scenarios.inspect}. " \
+    "Falling back to default: #{default_scenario_ids.join(", ")}",
+  )
+
+  scenarios = SCENARIOS.select { |s| default_scenario_ids.include?(s[:id]) }
+end
 
 if scenarios.empty?
   warn "No scenarios selected. Available: #{SCENARIOS.map { |s| s[:id] }.join(", ")}"
@@ -852,6 +891,7 @@ models.each_with_index do |model, model_index|
           TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling,
           TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(
             tool_use_mode: tool_use_mode,
+            tool_failure_policy: tool_failure_policy,
             fallback_retry_count: fallback_retry_count,
             fix_empty_final: fix_empty_final,
             tool_allowlist: tool_allowlist,
@@ -1028,6 +1068,7 @@ summary = {
   api_prefix: api_prefix,
   fix_empty_final: fix_empty_final,
   tool_use_mode: tool_use_mode,
+  tool_failure_policy: tool_failure_policy,
   tool_calling_fallback_retry_count: fallback_retry_count,
   tool_allowlist: tool_allowlist,
   request_overrides: request_overrides,
@@ -1048,10 +1089,12 @@ puts "ts: #{summary[:ts]}"
 puts "base_url: #{base_url}"
 puts "api_prefix: #{api_prefix}"
 puts "tool_use_mode: #{tool_use_mode}"
+puts "tool_failure_policy: #{tool_failure_policy}"
 puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_allowlist: #{tool_allowlist ? tool_allowlist.join(",") : "(full)"}"
 puts "request_overrides: #{request_overrides.any? ? request_overrides.keys.join(",") : "(none)"}"
+puts "parallel_tool_calls(default): #{request_overrides.fetch("parallel_tool_calls", "(provider default)")}"
 puts "trials_per_model: #{trials_per_model}"
 puts "scenarios: #{scenarios.map { |s| s[:id] }.join(",")}"
 puts "models: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"

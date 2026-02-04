@@ -32,6 +32,7 @@ module TavernKit
         # @return [Hash] a hash suitable for `runtime[:tool_calling]`
         def tool_calling(
           tool_use_mode: :enforced,
+          tool_failure_policy: nil,
           tool_allowlist: nil,
           tool_denylist: nil,
           fix_empty_final: true,
@@ -54,6 +55,7 @@ module TavernKit
             fallback_retry_count: fallback_retry_count,
           }
 
+          h[:tool_failure_policy] = tool_failure_policy unless tool_failure_policy.nil?
           h[:tool_allowlist] = tool_allowlist unless tool_allowlist.nil?
           h[:tool_denylist] = tool_denylist unless tool_denylist.nil?
           h[:tool_choice] = tool_choice unless tool_choice.nil?
@@ -241,24 +243,7 @@ module TavernKit
         private_class_method :deep_merge_tool_calling
 
         def canonical_tool_calling_key(key)
-          case key.to_s
-          when "tool_allowlist", "tool_names", "allowed_tools"
-            :tool_allowlist
-          when "tool_denylist", "disabled_tools"
-            :tool_denylist
-          when "message_transforms", "outbound_message_transforms"
-            :message_transforms
-          when "tool_transforms", "outbound_tool_transforms"
-            :tool_transforms
-          when "response_transforms", "inbound_response_transforms"
-            :response_transforms
-          when "tool_call_transforms", "inbound_tool_call_transforms"
-            :tool_call_transforms
-          when "tool_result_transforms", "outbound_tool_result_transforms", "tool_output_transforms"
-            :tool_result_transforms
-          else
-            key.to_s.to_sym
-          end
+          key.to_s.to_sym
         end
         private_class_method :canonical_tool_calling_key
 

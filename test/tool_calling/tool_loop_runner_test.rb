@@ -1168,6 +1168,90 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_includes parsed.dig("errors", 0, "code"), "ARGUMENTS_TOO_LARGE"
   end
 
+  def test_tool_arguments_hash_too_large_returns_error
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          big = "a" * 1_000
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_big_args_hash",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: { workspace_id: workspace_id, request_id: "r1", ops: [], pad: big },
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            max_tool_args_bytes: 200,
+          },
+        },
+        type: :app,
+      )
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" }
+    refute_nil tool_msg
+
+    parsed = JSON.parse(tool_msg["content"])
+    assert_equal false, parsed["ok"]
+    assert_includes parsed.dig("errors", 0, "code"), "ARGUMENTS_TOO_LARGE"
+  end
+
   def test_tool_output_too_large_is_replaced
     requests = []
 
@@ -2279,6 +2363,186 @@ class ToolLoopRunnerTest < Minitest::Test
     req1 = JSON.parse(requests[0][:body])
     assert req1["tools"].is_a?(Array), "expected tools to be sent in enforced mode"
     assert_equal "auto", req1["tool_choice"]
+  end
+
+  def test_tool_use_mode_enforced_with_fatal_policy_raises_when_a_tool_ends_failed
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_get",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                        {
+                          id: "call_patch",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                request_id: "r1",
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            max_tool_output_bytes: 1_000,
+            tool_failure_policy: :fatal,
+          },
+        },
+        type: :app,
+      )
+
+    workspace = ToolCallEvalTestWorkspace.new(draft: { "big" => ("x" * 5_000) })
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, tool_use_mode: :enforced)
+
+    error = assert_raises(TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError) do
+      runner.run(user_text: "workspace_id=#{workspace.id}")
+    end
+
+    assert_equal "TOOL_ERROR", error.code
+    assert_includes error.message, "state_get"
+  end
+
+  def test_tool_use_mode_enforced_with_tolerated_policy_allows_failed_tool_if_any_tool_succeeds
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_get",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                        {
+                          id: "call_patch",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                request_id: "r1",
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            max_tool_output_bytes: 1_000,
+            tool_failure_policy: :tolerated,
+          },
+        },
+        type: :app,
+      )
+
+    workspace = ToolCallEvalTestWorkspace.new(draft: { "big" => ("x" * 5_000) })
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, tool_use_mode: :enforced)
+
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_equal "Done.", result[:assistant_text]
+    assert_equal "bar", workspace.draft["foo"]
   end
 
   def test_tool_use_mode_relaxed_sends_tools_but_allows_no_tool_calls

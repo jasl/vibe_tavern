@@ -16,6 +16,7 @@ module TavernKit
         MAX_TOOL_ARGS_BYTES = 200_000
         MAX_TOOL_OUTPUT_BYTES = 200_000
         TOOL_USE_MODES = %i[enforced relaxed disabled].freeze
+        TOOL_FAILURE_POLICIES = %i[fatal tolerated].freeze
         DEFAULT_FIX_EMPTY_FINAL_USER_TEXT = "Please provide your final answer.".freeze
 
         class ToolUseError < StandardError
@@ -39,6 +40,7 @@ module TavernKit
           strict: false,
           fix_empty_final: nil,
           tool_use_mode: nil,
+          tool_failure_policy: nil,
           tool_calling_fallback_retry_count: nil
         )
           @client = client
@@ -50,6 +52,7 @@ module TavernKit
           @system = system.to_s
           @strict = strict == true
           @tool_use_mode = resolve_tool_use_mode(explicit: tool_use_mode)
+          @tool_failure_policy = resolve_tool_failure_policy(explicit: tool_failure_policy)
           @tool_calling_fallback_retry_count =
             resolve_tool_calling_fallback_retry_count(explicit: tool_calling_fallback_retry_count, default: 0)
           @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
@@ -79,6 +82,7 @@ module TavernKit
           tools_enabled = tool_use_enabled?
           empty_final_fixup_attempted = false
           any_tool_calls_seen = false
+          any_tool_success_seen = false
           last_tool_ok_by_name = {}
 
           max_turns.times do |turn|
@@ -173,6 +177,8 @@ module TavernKit
                 model: @model,
                 messages_count: messages.size,
                 tools_count: Array(options.fetch(:tools, [])).size,
+                tool_use_mode: @tool_use_mode.to_s,
+                tool_failure_policy: @tool_failure_policy.to_s,
                 tool_transforms: tool_transforms,
                 message_transforms: message_transforms,
                 response_transforms: response_transforms,
@@ -222,12 +228,29 @@ module TavernKit
                   raise ToolUseError.new("NO_TOOL_CALLS", "Tool use is enforced but the assistant requested no tool calls")
                 end
 
-                failed_tools = last_tool_ok_by_name.select { |_name, ok| ok == false }.keys.sort
-                if failed_tools.any?
+                case @tool_failure_policy
+                when :fatal
+                  failed_tools = last_tool_ok_by_name.select { |_name, ok| ok == false }.keys.sort
+                  if failed_tools.any?
+                    raise ToolUseError.new(
+                      "TOOL_ERROR",
+                      "Tool use is enforced but at least one tool call failed: #{failed_tools.join(", ")}",
+                      details: { failed_tools: failed_tools, tool_failure_policy: @tool_failure_policy.to_s },
+                    )
+                  end
+                when :tolerated
+                  unless any_tool_success_seen
+                    raise ToolUseError.new(
+                      "TOOL_ERROR",
+                      "Tool use is enforced but no tool call succeeded (tool_failure_policy=tolerated)",
+                      details: { tool_failure_policy: @tool_failure_policy.to_s },
+                    )
+                  end
+                else
                   raise ToolUseError.new(
                     "TOOL_ERROR",
-                    "Tool use is enforced but at least one tool call failed: #{failed_tools.join(", ")}",
-                    details: { failed_tools: failed_tools },
+                    "Unknown tool_failure_policy: #{@tool_failure_policy.inspect}",
+                    details: { tool_failure_policy: @tool_failure_policy.to_s },
                   )
                 end
               end
@@ -299,6 +322,7 @@ module TavernKit
               end
 
               last_tool_ok_by_name[name] = result.is_a?(Hash) ? result["ok"] : nil
+              any_tool_success_seen ||= (result.is_a?(Hash) && result["ok"] == true)
 
               tool_results << {
                 id: id,
@@ -376,7 +400,6 @@ module TavernKit
 
         def resolve_tool_choice(default:)
           raw = runtime_setting_value(:tool_choice)
-          raw = runtime_setting_value(:tool_choice_mode) if raw.nil?
 
           case raw
           when nil
@@ -395,7 +418,6 @@ module TavernKit
 
         def resolve_request_overrides
           raw = runtime_setting_value(:request_overrides)
-          raw = runtime_setting_value(:request_options) if raw.nil?
           return {} unless raw.is_a?(Hash)
 
           raw = deep_symbolize_keys(raw)
@@ -459,8 +481,6 @@ module TavernKit
 
         def resolve_fix_empty_final_user_text(default:)
           raw = runtime_setting_value(:fix_empty_final_user_text)
-          raw = runtime_setting_value(:empty_final_user_text) if raw.nil?
-          raw = runtime_setting_value(:finalization_user_text) if raw.nil?
 
           text = raw.to_s.strip
           text.empty? ? default : text
@@ -468,44 +488,36 @@ module TavernKit
 
         def resolve_fix_empty_final_disable_tools(default:)
           val = runtime_setting_bool(:fix_empty_final_disable_tools)
-          val = runtime_setting_bool(:empty_final_disable_tools) if val.nil?
-          val = runtime_setting_bool(:finalization_disable_tools) if val.nil?
 
           val.nil? ? default : val
         end
 
         def resolve_message_transforms
           raw = runtime_setting_value(:message_transforms)
-          raw = runtime_setting_value(:outbound_message_transforms) if raw.nil?
 
           normalize_string_list(raw)
         end
 
         def resolve_tool_transforms
           raw = runtime_setting_value(:tool_transforms)
-          raw = runtime_setting_value(:outbound_tool_transforms) if raw.nil?
 
           normalize_string_list(raw)
         end
 
         def resolve_response_transforms
           raw = runtime_setting_value(:response_transforms)
-          raw = runtime_setting_value(:inbound_response_transforms) if raw.nil?
 
           normalize_string_list(raw)
         end
 
         def resolve_tool_call_transforms
           raw = runtime_setting_value(:tool_call_transforms)
-          raw = runtime_setting_value(:inbound_tool_call_transforms) if raw.nil?
 
           normalize_string_list(raw)
         end
 
         def resolve_tool_result_transforms
           raw = runtime_setting_value(:tool_result_transforms)
-          raw = runtime_setting_value(:outbound_tool_result_transforms) if raw.nil?
-          raw = runtime_setting_value(:tool_output_transforms) if raw.nil?
 
           normalize_string_list(raw)
         end
@@ -533,16 +545,46 @@ module TavernKit
           :relaxed
         end
 
+        def resolve_tool_failure_policy(explicit:)
+          policy = normalize_tool_failure_policy(explicit)
+          return policy if policy
+
+          policy = normalize_tool_failure_policy(runtime_setting_value(:tool_failure_policy))
+          return policy if policy
+
+          :fatal
+        end
+
+        def normalize_tool_failure_policy(value)
+          case value
+          when nil
+            nil
+          else
+            s = value.to_s.strip.downcase.tr("-", "_")
+            policy =
+              case s
+              when "fatal"
+                :fatal
+              when "tolerated"
+                :tolerated
+              else
+                nil
+              end
+
+            return nil unless policy
+            return policy if TOOL_FAILURE_POLICIES.include?(policy)
+
+            nil
+          end
+        end
+
         # Tool profiles/masking:
         # - Keep the model-facing tool list small for reliability
         # - Enforce the same subset in the dispatcher (same registry wrapper)
         def resolve_registry_mask(registry)
-          allow = runtime_setting_value(:tool_names)
-          allow = runtime_setting_value(:tool_allowlist) if allow.nil?
-          allow = runtime_setting_value(:allowed_tools) if allow.nil?
+          allow = runtime_setting_value(:tool_allowlist)
 
           deny = runtime_setting_value(:tool_denylist)
-          deny = runtime_setting_value(:disabled_tools) if deny.nil?
 
           return registry if allow.nil? && deny.nil?
 
@@ -598,7 +640,21 @@ module TavernKit
 
         def parse_args(value)
           return {} if value.nil?
-          return deep_stringify_keys(value) if value.is_a?(Hash)
+
+          if value.is_a?(Hash)
+            normalized = deep_stringify_keys(value)
+
+            begin
+              json = JSON.generate(normalized)
+            rescue StandardError
+              return :invalid_json
+            end
+
+            return :too_large if json.bytesize > @max_tool_args_bytes
+            normalized
+          end
+
+          return :invalid_json if value.is_a?(Array)
 
           str = value.to_s
           return :too_large if str.bytesize > @max_tool_args_bytes
