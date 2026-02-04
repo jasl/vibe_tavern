@@ -114,6 +114,10 @@ Purpose:
 Script:
 
 ```sh
+# Run each model multiple times and compute success rate / latency percentiles.
+OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
 # Single model
 OPENROUTER_API_KEY=... OPENROUTER_MODEL="openai/gpt-4.1-mini" \
   bundle exec ruby script/llm_tool_call_eval.rb

@@ -37,6 +37,13 @@ fallback_retry_count =
   end
 fallback_retry_count = 0 if fallback_retry_count < 0
 tool_profile = ENV.fetch("OPENROUTER_TOOL_PROFILE", "eval_minimal")
+trials_per_model =
+  begin
+    Integer(ENV.fetch("OPENROUTER_TRIALS", "1"))
+  rescue ArgumentError
+    1
+  end
+trials_per_model = 1 if trials_per_model < 1
 
 DEFAULT_MODELS = [
   "deepseek/deepseek-v3.2",
@@ -185,12 +192,8 @@ FileUtils.mkdir_p(out_dir)
 reports = []
 
 models.each do |model|
-  idx = reports.length + 1
-  total = models.length
-  $stderr.puts("[#{idx}/#{total}] testing #{model}...")
-  $stderr.flush
-
-  workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+  model_idx = reports.length + 1
+  model_total = models.length
 
   client = SimpleInference::Client.new(
     base_url: base_url,
@@ -199,119 +202,142 @@ models.each do |model|
     api_prefix: api_prefix,
   )
 
-  runner =
-    TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-      client: client,
-      model: model,
-      workspace: workspace,
-      runtime:
-        TavernKit::Runtime::Base.build(
-          {
-            tool_calling: {
-              tool_use_mode: tool_use_mode,
-              fallback_retry_count: fallback_retry_count,
-              fix_empty_final: fix_empty_final,
+  safe_name = model.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
+
+  trials = []
+  failures = []
+
+  trials_per_model.times do |trial_idx|
+    $stderr.puts("[#{model_idx}/#{model_total}] testing #{model} (trial #{trial_idx + 1}/#{trials_per_model})...")
+    $stderr.flush
+
+    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+
+    runner =
+      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+        client: client,
+        model: model,
+        workspace: workspace,
+        runtime:
+          TavernKit::Runtime::Base.build(
+            {
+              tool_calling: {
+                tool_use_mode: tool_use_mode,
+                fallback_retry_count: fallback_retry_count,
+                fix_empty_final: fix_empty_final,
+                tool_profile: tool_profile,
+              },
             },
-          },
-          type: :app,
-        ),
-      registry:
-        if tools_enabled && tool_profile == "eval_minimal"
-          TavernKit::VibeTavern::ToolCalling::EvalToolRegistry.new
-        else
-          nil
-        end,
-      system: system,
-      strict: false,
-    )
+            type: :app,
+          ),
+        registry:
+          if tools_enabled && tool_profile == "eval_minimal"
+            TavernKit::VibeTavern::ToolCalling::EvalToolRegistry.new
+          else
+            nil
+          end,
+        system: system,
+        strict: false,
+      )
 
-  started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-  ok = true
-  error = nil
-  error_status = nil
-  error_body = nil
-  error_raw_body = nil
-  assistant_text = nil
-  trace = nil
-  history = nil
+    ok = true
+    error = nil
+    error_status = nil
+    error_body = nil
+    error_raw_body = nil
+    assistant_text = nil
+    trace = nil
+    history = nil
 
-  begin
-    result = runner.run(user_text: "workspace_id=#{workspace.id}")
-    assistant_text = result[:assistant_text]
-    trace = result[:trace]
-    history =
-      Array(result[:history]).map do |m|
-        if m.respond_to?(:to_serializable_hash)
-          m.to_serializable_hash
-        else
-          { role: m.respond_to?(:role) ? m.role : nil, content: m.respond_to?(:content) ? m.content : m.to_s }
+    begin
+      result = runner.run(user_text: "workspace_id=#{workspace.id}")
+      assistant_text = result[:assistant_text]
+      trace = result[:trace]
+      history =
+        Array(result[:history]).map do |m|
+          if m.respond_to?(:to_serializable_hash)
+            m.to_serializable_hash
+          else
+            { role: m.respond_to?(:role) ? m.role : nil, content: m.respond_to?(:content) ? m.content : m.to_s }
+          end
         end
-      end
 
-    fail_reasons = []
-    fail_reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
-    fail_reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
+      fail_reasons = []
+      fail_reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+      fail_reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
-    unless fail_reasons.empty?
-      tool_calls_seen = tools_enabled && Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
-      if tools_enabled && !tool_calls_seen
-        error = "NO_TOOL_CALLS: assistant did not request any tool calls"
-      else
-        error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
+      unless fail_reasons.empty?
+        tool_calls_seen = tools_enabled && Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
+        if tools_enabled && !tool_calls_seen
+          error = "NO_TOOL_CALLS: assistant did not request any tool calls"
+        else
+          error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
+        end
+        ok = false
       end
+    rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
       ok = false
+      error = "#{e.code}: #{e.message}"
+    rescue SimpleInference::Errors::HTTPError => e
+      ok = false
+      error_status = e.status
+      error = truncate(e.message, max_chars: 400)
+      error_body = e.body.is_a?(Hash) ? e.body : nil
+      error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
+    rescue StandardError => e
+      ok = false
+      error = truncate("#{e.class}: #{e.message}", max_chars: 400)
     end
-  rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
-    ok = false
-    error = "#{e.code}: #{e.message}"
-  rescue SimpleInference::Errors::HTTPError => e
-    ok = false
-    error_status = e.status
-    error = truncate(e.message, max_chars: 400)
-    error_body = e.body.is_a?(Hash) ? e.body : nil
-    error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
-  rescue StandardError => e
-    ok = false
-    error = truncate("#{e.class}: #{e.message}", max_chars: 400)
+
+    elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+
+    report = {
+      model: model,
+      trial: trial_idx + 1,
+      ok: ok,
+      elapsed_ms: elapsed_ms,
+      assistant_text: assistant_text,
+      draft: workspace.draft,
+      error: error,
+      error_status: error_status,
+      error_body: error_body,
+      error_raw_body: error_raw_body,
+      error_category: ok ? nil : error_category(error, status: error_status),
+      history: history,
+      trace: trace,
+    }
+
+    File.write(out_dir.join("#{safe_name}__trial_#{format('%02d', trial_idx + 1)}.json"), JSON.pretty_generate(report))
+
+    trials << report
+    failures << report unless report[:ok]
+
+    status_str = report[:ok] ? "OK" : "FAIL"
+    $stderr.puts("[#{model_idx}/#{model_total}] #{status_str} #{model} (trial #{trial_idx + 1}/#{trials_per_model}, #{elapsed_ms}ms)")
+    $stderr.flush
   end
 
-  elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+  ok_count = trials.count { |t| t[:ok] }
+  rate = ok_count.fdiv(trials.size)
+  elapsed = trials.map { |t| t[:elapsed_ms].to_i }.sort
+  p50 = elapsed[(elapsed.size * 0.50).floor] || 0
+  p95 = elapsed[(elapsed.size * 0.95).floor] || 0
 
-  report = {
+  # Keep a small set of failure samples for quick debugging.
+  failure_samples = failures.first(3)
+
+  reports << {
     model: model,
-    ok: ok,
-    elapsed_ms: elapsed_ms,
-    assistant_text: assistant_text,
-    draft: workspace.draft,
-    error: error,
-    error_status: error_status,
-    error_body: error_body,
-    error_raw_body: error_raw_body,
-    error_category: ok ? nil : error_category(error, status: error_status),
-    history: history,
-    trace: trace,
+    runs: trials.size,
+    ok: ok_count,
+    ok_rate: rate,
+    ms_p50: p50,
+    ms_p95: p95,
+    trials: trials,
+    failure_samples: failure_samples,
   }
-
-  # Always write per-model report (easier to share only the failing ones).
-  safe_name = model.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
-  File.write(out_dir.join("#{safe_name}.json"), JSON.pretty_generate(report))
-
-  reports << report
-
-  status_str = report[:ok] ? "OK" : "FAIL"
-  extra =
-    if report[:ok]
-      ""
-    elsif report[:error_category] == "NO_TOOL_USE_ENDPOINT"
-      " (no tool-use endpoint)"
-    elsif report[:error_category] == "NO_TOOL_CALLS"
-      " (no tool calls requested)"
-    else
-      ""
-    end
-  $stderr.puts("[#{idx}/#{total}] #{status_str} #{model} (#{elapsed_ms}ms)#{extra}")
-  $stderr.flush
 end
 
 summary = {
@@ -322,14 +348,16 @@ summary = {
   tool_use_mode: tool_use_mode,
   tool_calling_fallback_retry_count: fallback_retry_count,
   tool_profile: tool_profile,
+  trials_per_model: trials_per_model,
   output_dir: out_dir.to_s,
   models: reports,
 }
 
 File.write(out_dir.join("summary.json"), JSON.pretty_generate(summary))
 
-successes = reports.count { |r| r[:ok] }
-failures = reports.count { |r| !r[:ok] }
+successes = reports.sum { |r| r[:ok].to_i }
+total_runs = reports.sum { |r| r[:runs].to_i }
+failures = total_runs - successes
 
 puts "LLM Tool Call Eval"
 puts "ts: #{summary[:ts]}"
@@ -339,21 +367,26 @@ puts "tool_use_mode: #{tool_use_mode}"
 puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_profile: #{tool_profile}"
-puts "models: #{reports.size} (ok=#{successes}, fail=#{failures})"
+puts "trials_per_model: #{trials_per_model}"
+puts "models: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
 
-header = ["model", "ok", "ms", "status", "category", "error"]
+header = ["model", "runs", "ok", "rate", "p50_ms", "p95_ms", "status", "category", "error"]
 rows =
   reports.map do |r|
-    hint = provider_error_hint(r)
-    err = r[:ok] ? "-" : truncate(hint || r[:error].to_s, max_chars: 120)
+    sample = Array(r[:failure_samples]).first
+    hint = provider_error_hint(sample || {})
+    err = sample ? truncate(hint || sample[:error].to_s, max_chars: 120) : "-"
     [
       r[:model].to_s,
-      r[:ok] ? "OK" : "FAIL",
-      r[:elapsed_ms].to_s,
-      r[:error_status] ? r[:error_status].to_s : "-",
-      r[:error_category] || "-",
+      r[:runs].to_s,
+      r[:ok].to_s,
+      format("%.0f%%", r[:ok_rate].to_f * 100),
+      r[:ms_p50].to_s,
+      r[:ms_p95].to_s,
+      sample && sample[:error_status] ? sample[:error_status].to_s : "-",
+      sample ? (sample[:error_category] || "-") : "-",
       err,
     ]
   end
