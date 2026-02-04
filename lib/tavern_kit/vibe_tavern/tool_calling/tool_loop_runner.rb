@@ -178,7 +178,7 @@ module TavernKit
                   assistant_content.strip.empty? &&
                   any_tool_calls_seen
                 empty_final_fixup_attempted = true
-                pending_user_text = %(Do not call any tools. Reply with a single sentence: "Done.")
+                pending_user_text = "Do not call any tools. Provide your final answer."
                 next
               end
 
