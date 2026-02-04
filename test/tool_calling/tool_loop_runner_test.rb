@@ -110,6 +110,10 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_equal "Done.", result[:assistant_text]
     assert_equal "bar", workspace.draft["foo"]
 
+    t0 = result[:trace].find { |t| t[:turn] == 0 }
+    refute_nil t0
+    assert_equal %w[state_get state_patch], Array(t0[:tool_calls]).map { |tc| tc[:name] }
+
     assert_equal 2, requests.length
 
     req1 = JSON.parse(requests[0][:body])
