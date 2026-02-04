@@ -18,6 +18,7 @@ Guidelines:
 - Tool calling eval hardening + guardrails
   - Add scenario-based OpenRouter eval suite (`OPENROUTER_SCENARIOS`) + failure sample paths in the report table: `d3f0aaf`
   - Make tool argument/output size limits runtime-configurable (`max_tool_args_bytes`, `max_tool_output_bytes`) and document them: `d3f0aaf`
+  - Add test coverage for runtime denylist masking (tools not exposed + execution blocked): `a1fc3a0`
 
 ## 2026-02-03
 
