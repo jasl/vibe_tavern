@@ -232,3 +232,17 @@ These are intentionally deferred until we have the PoC loop + tests.
   small to avoid context bloat)?
 - What is the minimum set of tools for the first editor prototype
   (CCv3-only, import/export later)?
+
+## Deferred Provider Quirks (Parking Lot)
+
+These are known, real-world provider/model quirks observed in SillyTavern/RisuAI,
+but are intentionally *not* baked into lower layers yet to keep SRP and avoid
+hardcoding vendor hacks. When we see stable reproduction in our own eval runs,
+we can implement them as opt-in upper-layer transforms / presets.
+
+- DeepSeek reasoner: add dummy `reasoning_content: ""` on assistant messages that include `tool_calls`
+  - Motivation: some DeepSeek-*reasoner* routes reject tool-call messages without the field.
+  - Implementation idea (SRP-friendly): an optional message-transform hook before dispatch.
+- Gemini/Claude tool calling: request/response shape adapters (non-OpenAI formats)
+  - Motivation: Gemini function calling and Claude tool_use/tool_result have strict shape/order rules.
+  - Implementation idea: provider adapters in `simple_inference` (protocols), keeping pipeline/tool loop generic.
