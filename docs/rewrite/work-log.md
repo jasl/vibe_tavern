@@ -13,6 +13,12 @@ Guidelines:
 
 ---
 
+## 2026-02-04
+
+- Tool calling eval hardening + guardrails
+  - Add scenario-based OpenRouter eval suite (`OPENROUTER_SCENARIOS`) + failure sample paths in the report table: `d3f0aaf`
+  - Make tool argument/output size limits runtime-configurable (`max_tool_args_bytes`, `max_tool_output_bytes`) and document them: `d3f0aaf`
+
 ## 2026-02-03
 
 - Tool calling design decisions (PoC)
