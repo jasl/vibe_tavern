@@ -115,6 +115,10 @@ Purpose:
 Purpose:
 - detect model-specific quirks in tool calling and JSON argument quality.
 
+Note:
+- The live eval scenarios often enforce a deterministic final assistant sentence (e.g. `"Done."`)
+  purely to make assertions stable. This is not a production prompt pattern.
+
 Script:
 
 ```sh
