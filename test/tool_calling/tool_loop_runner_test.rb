@@ -1059,4 +1059,171 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_nil req1["tools"]
     assert_nil req1["tool_choice"]
   end
+
+  def test_tool_use_mode_enforced_requires_at_least_one_tool_call
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body:
+              JSON.generate(
+                {
+                  choices: [
+                    {
+                      message: { role: "assistant", content: "Done." },
+                      finish_reason: "stop",
+                    },
+                  ],
+                }
+              ),
+          }
+        end
+      end.new(requests)
+
+    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner =
+      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        tool_use_mode: :enforced,
+        system: "SYSTEM",
+      )
+
+    error = assert_raises(TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError) do
+      runner.run(user_text: "workspace_id=#{workspace.id}")
+    end
+
+    assert_equal "NO_TOOL_CALLS", error.code
+
+    req1 = JSON.parse(requests[0][:body])
+    assert req1["tools"].is_a?(Array), "expected tools to be sent in enforced mode"
+    assert_equal "auto", req1["tool_choice"]
+  end
+
+  def test_tool_use_mode_relaxed_sends_tools_but_allows_no_tool_calls
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body:
+              JSON.generate(
+                {
+                  choices: [
+                    {
+                      message: { role: "assistant", content: "Done." },
+                      finish_reason: "stop",
+                    },
+                  ],
+                }
+              ),
+          }
+        end
+      end.new(requests)
+
+    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner =
+      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        tool_use_mode: :relaxed,
+        system: "SYSTEM",
+      )
+
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+    assert_equal "Done.", result[:assistant_text]
+
+    req1 = JSON.parse(requests[0][:body])
+    assert req1["tools"].is_a?(Array), "expected tools to be sent in relaxed mode"
+    assert_equal "auto", req1["tool_choice"]
+  end
+
+  def test_tool_use_mode_relaxed_falls_back_to_chat_only_when_provider_rejects_tool_calling
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          if @call_count == 1
+            {
+              status: 400,
+              headers: { "content-type" => "application/json" },
+              body: JSON.generate({ error: { message: "Provider returned error" } }),
+            }
+          else
+            {
+              status: 200,
+              headers: { "content-type" => "application/json" },
+              body:
+                JSON.generate(
+                  {
+                    choices: [
+                      {
+                        message: { role: "assistant", content: "Done." },
+                        finish_reason: "stop",
+                      },
+                    ],
+                  }
+                ),
+            }
+          end
+        end
+      end.new(requests)
+
+    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner =
+      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        tool_use_mode: :relaxed,
+        system: "SYSTEM",
+      )
+
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+    assert_equal "Done.", result[:assistant_text]
+
+    req1 = JSON.parse(requests[0][:body])
+    assert req1["tools"].is_a?(Array), "expected tools to be sent on first attempt"
+    assert_equal "auto", req1["tool_choice"]
+
+    req2 = JSON.parse(requests[1][:body])
+    assert_nil req2["tools"]
+    assert_nil req2["tool_choice"]
+  end
 end

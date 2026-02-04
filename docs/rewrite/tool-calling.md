@@ -133,8 +133,13 @@ Notes:
 - `SimpleInference` composes the final request URL as `base_url + api_prefix + endpoint`.
   - Recommended for OpenRouter: `OPENROUTER_BASE_URL=https://openrouter.ai/api` and `OPENROUTER_API_PREFIX=/v1`
   - If you already set `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`, set `OPENROUTER_API_PREFIX=""`
-- You can disable sending `tools` entirely (chat-only mode) via:
-  - `OPENROUTER_ENABLE_TOOL_USE=0`
+- Tool use mode:
+  - `OPENROUTER_TOOL_USE_MODE=enforced|relaxed|disabled`
+    - `enforced`: tool calls must succeed; otherwise fail the run (surface error to UI; user can retry)
+    - `relaxed`: best-effort; if provider rejects tool calling, the runner retries once without tools
+    - `disabled`: never send tools (chat-only mode)
+  - This is also a pipeline/runtime setting: `runtime[:tool_calling][:tool_use_mode]`
+  - Back-compat (deprecated): `OPENROUTER_ENABLE_TOOL_USE=0` maps to `OPENROUTER_TOOL_USE_MODE=disabled`
 - By default, the eval script uses a minimal tool profile (only `state_get` and `state_patch`)
   to reduce model variance. You can switch to the full tool registry via:
   - `OPENROUTER_TOOL_PROFILE=full`
@@ -143,6 +148,18 @@ Notes:
   - This is configured as a pipeline/runtime setting (`runtime[:tool_calling][:fix_empty_final]`)
   - Default: enabled
   - Eval override: `OPENROUTER_FIX_EMPTY_FINAL=0` to disable
+
+## Model reliability metadata (tool calling)
+
+In production, tool calling reliability varies by model/provider and may be
+non-deterministic (routing, safety filters, transient provider errors).
+
+Recommendation:
+- When storing LLM connection / model configuration, record whether that model
+  is considered **tool-call reliable** for `tool_use_mode=enforced`.
+  - Example field: `tool_calling_reliable: true|false` (or a `reliability` enum)
+- Use `tool_use_mode=enforced` only with models marked reliable.
+- For non-critical flows, prefer `tool_use_mode=relaxed` (best-effort).
 
 ### Current offline coverage (regression guardrails)
 

@@ -9,6 +9,17 @@ module TavernKit
         DEFAULT_MAX_TURNS = 12
         MAX_TOOL_ARGS_BYTES = 200_000
         MAX_TOOL_OUTPUT_BYTES = 200_000
+        TOOL_USE_MODES = %i[enforced relaxed disabled].freeze
+
+        class ToolUseError < StandardError
+          attr_reader :code, :details
+
+          def initialize(code, message, details: nil)
+            super(message)
+            @code = code.to_s
+            @details = details
+          end
+        end
 
         def initialize(
           client:,
@@ -20,6 +31,7 @@ module TavernKit
           system: nil,
           strict: false,
           fix_empty_final: nil,
+          tool_use_mode: nil,
           tool_use: nil
         )
           @client = client
@@ -30,7 +42,7 @@ module TavernKit
           @registry = registry || ToolRegistry.new
           @system = system.to_s
           @strict = strict == true
-          @tool_use = resolve_bool_setting(:tool_use, explicit: tool_use, default: true)
+          @tool_use_mode = resolve_tool_use_mode(explicit: tool_use_mode, legacy_bool: tool_use)
           @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
         end
 
@@ -44,8 +56,11 @@ module TavernKit
 
           trace = []
           pending_user_text = user_text.to_s
-          tools_enabled = @tool_use
+          tools_enabled = tool_use_enabled?
           empty_final_fixup_attempted = false
+          any_tool_calls_seen = false
+          last_tool_ok_by_name = {}
+          tool_use_fallback_attempted = false
 
           max_turns.times do |turn|
             runtime = @runtime
@@ -82,7 +97,21 @@ module TavernKit
 
             request = { model: @model, messages: messages }.merge(options)
 
-            response = @client.chat_completions(**request)
+            response =
+              begin
+                @client.chat_completions(**request)
+              rescue SimpleInference::Errors::HTTPError => e
+                # In relaxed mode, tool-calling is best-effort. If the provider
+                # rejects tools/tool_choice, retry once without tools to avoid
+                # blocking the whole flow.
+                if @tool_use_mode == :relaxed && tools_enabled && !tool_use_fallback_attempted
+                  tool_use_fallback_attempted = true
+                  tools_enabled = false
+                  redo
+                end
+
+                raise e
+              end
             body = response.body.is_a?(Hash) ? response.body : {}
 
             assistant_msg = body.dig("choices", 0, "message") || {}
@@ -96,6 +125,8 @@ module TavernKit
               ignored_tool_calls = tool_calls.size
               tool_calls = []
             end
+
+            any_tool_calls_seen ||= tool_calls.any?
 
             trace_entry = {
               turn: turn,
@@ -127,13 +158,28 @@ module TavernKit
 
               if @fix_empty_final &&
                   !empty_final_fixup_attempted &&
-                  tools_enabled &&
+                  tool_use_enabled? &&
                   assistant_content.strip.empty? &&
                   trace.any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
                 tools_enabled = false
                 empty_final_fixup_attempted = true
                 pending_user_text = %(Reply with a single sentence: "Done.")
                 next
+              end
+
+              if @tool_use_mode == :enforced
+                unless any_tool_calls_seen
+                  raise ToolUseError.new("NO_TOOL_CALLS", "Tool use is enforced but the assistant requested no tool calls")
+                end
+
+                failed_tools = last_tool_ok_by_name.select { |_name, ok| ok == false }.keys.sort
+                if failed_tools.any?
+                  raise ToolUseError.new(
+                    "TOOL_ERROR",
+                    "Tool use is enforced but at least one tool call failed: #{failed_tools.join(", ")}",
+                    details: { failed_tools: failed_tools },
+                  )
+                end
               end
 
               return { assistant_text: assistant_content, history: history, trace: trace }
@@ -161,6 +207,8 @@ module TavernKit
                 else
                   dispatcher.execute(name: name, args: args)
                 end
+
+              last_tool_ok_by_name[name] = result.is_a?(Hash) ? result["ok"] : nil
 
               tool_results << {
                 id: id,
@@ -198,7 +246,7 @@ module TavernKit
             trace << trace_entry
 
             pending_user_text = "" # continue after tool results
-            tools_enabled = @tool_use
+            tools_enabled = tool_use_enabled?
           end
 
           raise "Tool loop exceeded max turns (#{max_turns})"
@@ -227,13 +275,13 @@ module TavernKit
         def resolve_bool_setting(key, explicit:, default:)
           return explicit == true unless explicit.nil?
 
-          val = runtime_setting(key)
+          val = runtime_setting_bool(key)
           return val if val == true || val == false
 
           default
         end
 
-        def runtime_setting(key)
+        def runtime_setting_value(key)
           return nil unless @runtime&.respond_to?(:[])
 
           # Prefer a dedicated namespace under runtime:
@@ -242,13 +290,72 @@ module TavernKit
           if tool_calling.is_a?(Hash)
             val = tool_calling[key]
             val = tool_calling[key.to_s] if val.nil?
-            return val if val == true || val == false
+            return val unless val.nil?
           end
 
           val = @runtime[key]
+          val = @runtime[key.to_s] if val.nil?
+          return val unless val.nil?
+
+          nil
+        end
+
+        def runtime_setting_bool(key)
+          val = runtime_setting_value(key)
           return val if val == true || val == false
 
           nil
+        end
+
+        def resolve_tool_use_mode(explicit:, legacy_bool:)
+          explicit_mode = normalize_tool_use_mode(explicit)
+          return explicit_mode if explicit_mode
+
+          unless legacy_bool.nil?
+            return legacy_bool == true ? :relaxed : :disabled
+          end
+
+          mode = normalize_tool_use_mode(runtime_setting_value(:tool_use_mode))
+          return mode if mode
+
+          legacy = runtime_setting_bool(:tool_use)
+          return legacy == true ? :relaxed : :disabled if legacy == false || legacy == true
+
+          :relaxed
+        end
+
+        def normalize_tool_use_mode(value)
+          case value
+          when nil
+            nil
+          when true
+            :relaxed
+          when false
+            :disabled
+          else
+            s = value.to_s.strip.downcase
+            s = s.tr("-", "_")
+            mode =
+              case s
+              when "enforced", "required", "must"
+                :enforced
+              when "relaxed", "preferred", "optional"
+                :relaxed
+              when "disabled", "off", "none", "0", "false"
+                :disabled
+              else
+                nil
+              end
+
+            return nil unless mode
+            return mode if TOOL_USE_MODES.include?(mode)
+
+            nil
+          end
+        end
+
+        def tool_use_enabled?
+          @tool_use_mode != :disabled
         end
 
         def parse_args(value)

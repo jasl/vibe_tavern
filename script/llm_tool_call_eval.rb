@@ -25,7 +25,17 @@ end
 base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api")
 api_prefix = ENV.fetch("OPENROUTER_API_PREFIX", "/v1")
 fix_empty_final = ENV.fetch("OPENROUTER_FIX_EMPTY_FINAL", "1") == "1"
-enable_tool_use = ENV.fetch("OPENROUTER_ENABLE_TOOL_USE", "1") == "1"
+tool_use_mode =
+  ENV.fetch("OPENROUTER_TOOL_USE_MODE", "").strip.downcase.then do |v|
+    if v.empty?
+      # Back-compat (deprecated): OPENROUTER_ENABLE_TOOL_USE=0 disables tools.
+      ENV.fetch("OPENROUTER_ENABLE_TOOL_USE", "1") == "1" ? "enforced" : "disabled"
+    else
+      v
+    end
+  end
+tool_use_mode = "disabled" unless %w[enforced relaxed disabled].include?(tool_use_mode)
+tools_enabled = tool_use_mode != "disabled"
 tool_profile = ENV.fetch("OPENROUTER_TOOL_PROFILE", "eval_minimal")
 
 DEFAULT_MODELS = [
@@ -65,6 +75,7 @@ def error_category(message, status: nil)
   msg = message.to_s
   return "ASSERTION_FAILED" if msg.start_with?("ASSERTION_FAILED:")
   return "NO_TOOL_CALLS" if msg.start_with?("NO_TOOL_CALLS:")
+  return "TOOL_ERROR" if msg.start_with?("TOOL_ERROR:")
   return "NO_TOOL_USE_ENDPOINT" if msg.include?("No endpoints found that support tool use")
 
   case status.to_i
@@ -142,7 +153,7 @@ rescue StandardError
 end
 
 system =
-  if enable_tool_use
+  if tools_enabled
     <<~SYS.strip
       You are a tool-using assistant.
       Rules:
@@ -197,14 +208,14 @@ models.each do |model|
         TavernKit::Runtime::Base.build(
           {
             tool_calling: {
-              tool_use: enable_tool_use,
+              tool_use_mode: tool_use_mode,
               fix_empty_final: fix_empty_final,
             },
           },
           type: :app,
         ),
       registry:
-        if enable_tool_use && tool_profile == "eval_minimal"
+        if tools_enabled && tool_profile == "eval_minimal"
           TavernKit::VibeTavern::ToolCalling::EvalToolRegistry.new
         else
           nil
@@ -239,17 +250,20 @@ models.each do |model|
 
     fail_reasons = []
     fail_reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
-    fail_reasons << %(draft["foo"] != "bar") if enable_tool_use && workspace.draft["foo"] != "bar"
+    fail_reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
     unless fail_reasons.empty?
-      tool_calls_seen = enable_tool_use && Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
-      if enable_tool_use && !tool_calls_seen
+      tool_calls_seen = tools_enabled && Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
+      if tools_enabled && !tool_calls_seen
         error = "NO_TOOL_CALLS: assistant did not request any tool calls"
       else
         error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
       end
       ok = false
     end
+  rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
+    ok = false
+    error = "#{e.code}: #{e.message}"
   rescue SimpleInference::Errors::HTTPError => e
     ok = false
     error_status = e.status
@@ -304,7 +318,7 @@ summary = {
   base_url: base_url,
   api_prefix: api_prefix,
   fix_empty_final: fix_empty_final,
-  tool_use_enabled: enable_tool_use,
+  tool_use_mode: tool_use_mode,
   tool_profile: tool_profile,
   output_dir: out_dir.to_s,
   models: reports,
@@ -319,7 +333,7 @@ puts "LLM Tool Call Eval"
 puts "ts: #{summary[:ts]}"
 puts "base_url: #{base_url}"
 puts "api_prefix: #{api_prefix}"
-puts "tool_use_enabled: #{enable_tool_use}"
+puts "tool_use_mode: #{tool_use_mode}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_profile: #{tool_profile}"
 puts "models: #{reports.size} (ok=#{successes}, fail=#{failures})"
