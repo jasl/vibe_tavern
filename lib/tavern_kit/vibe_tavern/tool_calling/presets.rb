@@ -55,9 +55,13 @@ module TavernKit
           end
 
           provider = {}
-          provider[:only] = normalize_string_list(provider_only) if provider_only
-          provider[:order] = normalize_string_list(provider_order) if provider_order
-          provider[:ignore] = normalize_string_list(provider_ignore) if provider_ignore
+          only = normalize_string_list(provider_only) if provider_only
+          order = normalize_string_list(provider_order) if provider_order
+          ignore = normalize_string_list(provider_ignore) if provider_ignore
+
+          provider[:only] = only if only
+          provider[:order] = order if order
+          provider[:ignore] = ignore if ignore
           overrides[:provider] = provider if provider.any?
 
           overrides
