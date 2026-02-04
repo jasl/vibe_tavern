@@ -136,92 +136,6 @@ class ToolLoopRunnerTest < Minitest::Test
     refute_nil tool_result
   end
 
-  def test_fix_empty_final_retries_without_tools
-    requests = []
-
-    adapter =
-      Class.new(SimpleInference::HTTPAdapter) do
-        define_method(:initialize) do |requests|
-          @requests = requests
-          @call_count = 0
-        end
-
-        define_method(:call) do |env|
-          @requests << env
-          @call_count += 1
-
-          body = JSON.parse(env[:body])
-          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
-          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
-
-          response_body =
-            case @call_count
-            when 1
-              {
-                choices: [
-                  {
-                    message: {
-                      role: "assistant",
-                      content: "",
-                      tool_calls: [
-                        {
-                          id: "call_1",
-                          type: "function",
-                          function: {
-                            name: "state_get",
-                            arguments: JSON.generate({ workspace_id: workspace_id }),
-                          },
-                        },
-                      ],
-                    },
-                    finish_reason: "tool_calls",
-                  },
-                ],
-              }
-            when 2
-              # Simulate providers that emit an empty final message after tool calls.
-              {
-                choices: [
-                  {
-                    message: { role: "assistant", content: "" },
-                    finish_reason: "stop",
-                  },
-                ],
-              }
-            else
-              {
-                choices: [
-                  {
-                    message: { role: "assistant", content: "Done." },
-                    finish_reason: "stop",
-                  },
-                ],
-              }
-            end
-
-          {
-            status: 200,
-            headers: { "content-type" => "application/json" },
-            body: JSON.generate(response_body),
-          }
-        end
-      end.new(requests)
-
-    workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
-    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-
-    runner = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(client: client, model: "test-model", workspace: workspace)
-
-    result = runner.run(user_text: "workspace_id=#{workspace.id}")
-
-    assert_equal "Done.", result[:assistant_text]
-    assert_equal 3, requests.length
-
-    req3 = JSON.parse(requests[2][:body])
-    refute req3.key?("tools")
-    refute req3.key?("tool_choice")
-  end
-
   def test_facts_commit_is_not_exposed_to_the_model
     requests = []
 
@@ -930,7 +844,7 @@ class ToolLoopRunnerTest < Minitest::Test
     refute_includes tool_msg["content"], "x" * 1000
   end
 
-  def test_fix_empty_final_retries_without_tools
+  def test_fix_empty_final_retries
     requests = []
 
     adapter =
@@ -1030,8 +944,11 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_equal 3, requests.length
 
     req3 = JSON.parse(requests[2][:body])
-    assert_nil req3["tool_choice"]
-    assert_nil req3["tools"]
+    assert_equal "auto", req3["tool_choice"]
+    assert req3["tools"].is_a?(Array)
+
+    user3 = Array(req3["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+    assert_includes user3, "Do not call any tools"
   end
 
   def test_tool_use_can_be_disabled_to_avoid_sending_tools

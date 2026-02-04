@@ -128,7 +128,7 @@ OPENROUTER_API_KEY=... OPENROUTER_MODELS="openai/gpt-4.1-mini,anthropic/claude-3
 
 # Some models/providers occasionally return an empty final assistant message
 # even after successful tool calls. The PoC runner can optionally do a
-# "finalization" retry without tools.
+# "finalization" retry prompt that asks the model to return a final answer.
 OPENROUTER_FIX_EMPTY_FINAL=1 OPENROUTER_API_KEY=... OPENROUTER_MODEL="qwen/qwen3-next-80b-a3b-instruct" \
   bundle exec ruby script/llm_tool_call_eval.rb
 ```
