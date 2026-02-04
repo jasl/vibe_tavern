@@ -19,8 +19,8 @@ module TavernKit
           registry: nil,
           system: nil,
           strict: false,
-          fix_empty_final: false,
-          tool_use: true
+          fix_empty_final: nil,
+          tool_use: nil
         )
           @client = client
           @model = model.to_s
@@ -30,8 +30,8 @@ module TavernKit
           @registry = registry || ToolRegistry.new
           @system = system.to_s
           @strict = strict == true
-          @fix_empty_final = fix_empty_final == true
-          @tool_use = tool_use == true
+          @tool_use = resolve_bool_setting(:tool_use, explicit: tool_use, default: true)
+          @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
         end
 
         def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS)
@@ -222,6 +222,33 @@ module TavernKit
           end
 
           TavernKit::Prompt::Message.new(role: :user, content: message.to_s)
+        end
+
+        def resolve_bool_setting(key, explicit:, default:)
+          return explicit == true unless explicit.nil?
+
+          val = runtime_setting(key)
+          return val if val == true || val == false
+
+          default
+        end
+
+        def runtime_setting(key)
+          return nil unless @runtime&.respond_to?(:[])
+
+          # Prefer a dedicated namespace under runtime:
+          #   runtime[:tool_calling] => { tool_use: true, fix_empty_final: true }
+          tool_calling = @runtime[:tool_calling]
+          if tool_calling.is_a?(Hash)
+            val = tool_calling[key]
+            val = tool_calling[key.to_s] if val.nil?
+            return val if val == true || val == false
+          end
+
+          val = @runtime[key]
+          return val if val == true || val == false
+
+          nil
         end
 
         def parse_args(value)

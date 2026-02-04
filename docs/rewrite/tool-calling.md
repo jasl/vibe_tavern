@@ -138,6 +138,11 @@ Notes:
 - By default, the eval script uses a minimal tool profile (only `state_get` and `state_patch`)
   to reduce model variance. You can switch to the full tool registry via:
   - `OPENROUTER_TOOL_PROFILE=full`
+- The tool loop can optionally do a "finalization retry" when a provider returns an empty
+  final assistant message even after successful tool calls.
+  - This is configured as a pipeline/runtime setting (`runtime[:tool_calling][:fix_empty_final]`)
+  - Default: enabled
+  - Eval override: `OPENROUTER_FIX_EMPTY_FINAL=0` to disable
 
 ### Current offline coverage (regression guardrails)
 

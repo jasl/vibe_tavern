@@ -24,7 +24,7 @@ end
 # SimpleInference will avoid the common "/v1/v1" footgun automatically.
 base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api")
 api_prefix = ENV.fetch("OPENROUTER_API_PREFIX", "/v1")
-fix_empty_final = ENV["OPENROUTER_FIX_EMPTY_FINAL"].to_s == "1"
+fix_empty_final = ENV.fetch("OPENROUTER_FIX_EMPTY_FINAL", "1") == "1"
 enable_tool_use = ENV.fetch("OPENROUTER_ENABLE_TOOL_USE", "1") == "1"
 tool_profile = ENV.fetch("OPENROUTER_TOOL_PROFILE", "eval_minimal")
 
@@ -174,6 +174,16 @@ models.each do |model|
       client: client,
       model: model,
       workspace: workspace,
+      runtime:
+        TavernKit::Runtime::Base.build(
+          {
+            tool_calling: {
+              tool_use: enable_tool_use,
+              fix_empty_final: fix_empty_final,
+            },
+          },
+          type: :app,
+        ),
       registry:
         if enable_tool_use && tool_profile == "eval_minimal"
           TavernKit::VibeTavern::ToolCalling::EvalToolRegistry.new
@@ -182,8 +192,6 @@ models.each do |model|
         end,
       system: system,
       strict: false,
-      fix_empty_final: fix_empty_final,
-      tool_use: enable_tool_use,
     )
 
   started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
