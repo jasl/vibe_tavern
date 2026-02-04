@@ -790,6 +790,7 @@ requested_scenarios =
     .map(&:strip)
     .reject(&:empty?)
 requested_scenarios = nil if requested_scenarios.any? { |v| %w[all full *].include?(v.downcase) }
+requested_scenarios = nil if requested_scenarios&.empty?
 
 scenarios =
   if requested_scenarios
