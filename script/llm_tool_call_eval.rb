@@ -94,7 +94,17 @@ def provider_error_hint(report)
     when String
       begin
         parsed = JSON.parse(raw)
-        parsed.dig("error", "message") || parsed["message"] || raw
+        case parsed
+        when Hash
+          parsed.dig("error", "message") || parsed["message"] || raw
+        when String
+          parsed
+        when Array
+          first_hash = parsed.find { |v| v.is_a?(Hash) }
+          first_hash&.dig("error", "message") || first_hash&.fetch("message", nil) || raw
+        else
+          raw
+        end
       rescue JSON::ParserError
         raw
       end
@@ -108,6 +118,8 @@ def provider_error_hint(report)
   return nil if parts.empty?
 
   parts.join(": ")
+rescue StandardError
+  nil
 end
 
 system =
