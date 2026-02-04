@@ -19,6 +19,7 @@ Guidelines:
   - Add scenario-based OpenRouter eval suite (`OPENROUTER_SCENARIOS`) + failure sample paths in the report table: `d3f0aaf`
   - Make tool argument/output size limits runtime-configurable (`max_tool_args_bytes`, `max_tool_output_bytes`) and document them: `d3f0aaf`
   - Add test coverage for runtime denylist masking (tools not exposed + execution blocked): `a1fc3a0`
+  - Add runtime-injected request overrides + tool_choice (provider knobs without lower-layer hacks) and document/test them: `a2cb1dd`
 
 ## 2026-02-03
 
