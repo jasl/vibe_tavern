@@ -139,5 +139,9 @@ module LogicaRb
         resolved
       end
     end
+
+    # Zeitwerk expects `LogicaRb::Rails::ModelDsl` from `model_dsl.rb`.
+    # Keep the more idiomatic `DSL` acronym while providing a compatible alias.
+    ModelDsl = ModelDSL
   end
 end

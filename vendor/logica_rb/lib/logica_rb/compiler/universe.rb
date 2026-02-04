@@ -17,6 +17,12 @@ module LogicaRb
     PredicateInfo = Struct.new(:embeddable)
     Ground = Struct.new(:table_name, :overwrite, :copy_to_file)
 
+    # Zeitwerk expects `LogicaRb::Compiler::Universe` from this file based on the
+    # path (`logica_rb/compiler/universe.rb`). The compiler's public API
+    # historically lives directly under `LogicaRb::Compiler`, so keep the
+    # existing constant layout and provide an alias to satisfy Zeitwerk.
+    Universe = self
+
     def self.format_sql(s)
       "#{s};"
     end

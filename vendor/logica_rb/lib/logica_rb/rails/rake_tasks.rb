@@ -76,3 +76,12 @@ namespace :logica_rb do
     puts LogicaRb::Pipeline.show_signatures(File.read(path), dialect: dialect, import_root: catalog.import_roots.length == 1 ? catalog.import_roots.first : catalog.import_roots)
   end
 end
+
+module LogicaRb
+  module Rails
+    # Zeitwerk expects `LogicaRb::Rails::RakeTasks` from this file path.
+    # The actual task definitions above are loaded via Railtie#rake_tasks.
+    module RakeTasks
+    end
+  end
+end
