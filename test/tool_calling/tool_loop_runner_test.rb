@@ -382,6 +382,103 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_includes tool_result["content"], "TOOL_NOT_ALLOWED"
   end
 
+  def test_tool_denylist_hides_tools_from_prompt_and_blocks_execution
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_get",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                        {
+                          id: "call_patch",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                request_id: "r1",
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_use_mode: :relaxed,
+            tool_denylist: ["state_patch"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, runtime: runtime)
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req1 = JSON.parse(requests[0][:body])
+    tool_names = Array(req1["tools"]).map { |t| t.dig("function", "name") }.compact
+    assert_includes tool_names, "state_get"
+    refute_includes tool_names, "state_patch"
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_result = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" && m["tool_call_id"] == "call_patch" }
+    refute_nil tool_result
+    assert_includes tool_result["content"], "TOOL_NOT_ALLOWED"
+  end
+
   def test_system_prompt_is_included_as_a_system_message
     requests = []
 
