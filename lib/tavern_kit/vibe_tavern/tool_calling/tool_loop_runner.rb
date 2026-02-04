@@ -334,19 +334,6 @@ module TavernKit
           deny = runtime_setting_value(:tool_denylist)
           deny = runtime_setting_value(:disabled_tools) if deny.nil?
 
-          profile = runtime_setting_value(:tool_profile)
-          if allow.nil? && profile
-            allow =
-              case profile.to_s.strip.downcase
-              when "eval_minimal", "minimal"
-                %w[state_get state_patch]
-              when "eval_full", "full", "all"
-                nil
-              else
-                nil
-              end
-          end
-
           return registry if allow.nil? && deny.nil?
 
           FilteredToolRegistry.new(base: registry, allow: allow, deny: deny)

@@ -37,6 +37,17 @@ fallback_retry_count =
   end
 fallback_retry_count = 0 if fallback_retry_count < 0
 tool_profile = ENV.fetch("OPENROUTER_TOOL_PROFILE", "eval_minimal")
+tool_names =
+  case tool_profile.strip.downcase
+  when "eval_minimal", "minimal"
+    %w[state_get state_patch]
+  when "full", "all"
+    nil
+  else
+    # Treat unknown profiles as "full" in the eval harness; the app layer is
+    # expected to resolve profiles to allow/deny lists.
+    nil
+  end
 trials_per_model =
   begin
     Integer(ENV.fetch("OPENROUTER_TRIALS", "1"))
@@ -222,16 +233,16 @@ models.each do |model|
           TavernKit::Runtime::Base.build(
             {
               tool_calling: {
-                tool_use_mode: tool_use_mode,
-                fallback_retry_count: fallback_retry_count,
-                fix_empty_final: fix_empty_final,
-                tool_profile: tool_profile,
-              },
+              tool_use_mode: tool_use_mode,
+              fallback_retry_count: fallback_retry_count,
+              fix_empty_final: fix_empty_final,
+              tool_names: tool_names,
             },
-            type: :app,
-          ),
+          },
+          type: :app,
+        ),
         registry:
-          if tools_enabled && tool_profile == "eval_minimal"
+          if tools_enabled && tool_names
             TavernKit::VibeTavern::ToolCalling::EvalToolRegistry.new
           else
             nil
@@ -348,6 +359,7 @@ summary = {
   tool_use_mode: tool_use_mode,
   tool_calling_fallback_retry_count: fallback_retry_count,
   tool_profile: tool_profile,
+  tool_names: tool_names,
   trials_per_model: trials_per_model,
   output_dir: out_dir.to_s,
   models: reports,
@@ -367,6 +379,7 @@ puts "tool_use_mode: #{tool_use_mode}"
 puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_profile: #{tool_profile}"
+puts "tool_names: #{tool_names ? tool_names.join(",") : "(full)"}"
 puts "trials_per_model: #{trials_per_model}"
 puts "models: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
