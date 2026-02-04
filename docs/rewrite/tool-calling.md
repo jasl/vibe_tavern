@@ -135,6 +135,9 @@ Notes:
   - If you already set `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`, set `OPENROUTER_API_PREFIX=""`
 - You can disable sending `tools` entirely (chat-only mode) via:
   - `OPENROUTER_ENABLE_TOOL_USE=0`
+- By default, the eval script uses a minimal tool profile (only `state_get` and `state_patch`)
+  to reduce model variance. You can switch to the full tool registry via:
+  - `OPENROUTER_TOOL_PROFILE=full`
 
 ### Current offline coverage (regression guardrails)
 

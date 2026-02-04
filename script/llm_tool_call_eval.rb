@@ -26,6 +26,7 @@ base_url = ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api")
 api_prefix = ENV.fetch("OPENROUTER_API_PREFIX", "/v1")
 fix_empty_final = ENV["OPENROUTER_FIX_EMPTY_FINAL"].to_s == "1"
 enable_tool_use = ENV.fetch("OPENROUTER_ENABLE_TOOL_USE", "1") == "1"
+tool_profile = ENV.fetch("OPENROUTER_TOOL_PROFILE", "eval_minimal")
 
 DEFAULT_MODELS = [
   "deepseek/deepseek-v3.2",
@@ -173,6 +174,12 @@ models.each do |model|
       client: client,
       model: model,
       workspace: workspace,
+      registry:
+        if enable_tool_use && tool_profile == "eval_minimal"
+          TavernKit::VibeTavern::ToolCalling::EvalToolRegistry.new
+        else
+          nil
+        end,
       system: system,
       strict: false,
       fix_empty_final: fix_empty_final,
@@ -271,6 +278,7 @@ summary = {
   api_prefix: api_prefix,
   fix_empty_final: fix_empty_final,
   tool_use_enabled: enable_tool_use,
+  tool_profile: tool_profile,
   output_dir: out_dir.to_s,
   models: reports,
 }
@@ -286,6 +294,7 @@ puts "base_url: #{base_url}"
 puts "api_prefix: #{api_prefix}"
 puts "tool_use_enabled: #{enable_tool_use}"
 puts "fix_empty_final: #{fix_empty_final}"
+puts "tool_profile: #{tool_profile}"
 puts "models: #{reports.size} (ok=#{successes}, fail=#{failures})"
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
