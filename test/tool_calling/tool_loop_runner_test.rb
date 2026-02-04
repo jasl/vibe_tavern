@@ -1212,7 +1212,7 @@ class ToolLoopRunnerTest < Minitest::Test
         model: "test-model",
         workspace: workspace,
         tool_use_mode: :relaxed,
-        tool_use_retry_count: 1,
+        tool_calling_fallback_retry_count: 1,
         system: "SYSTEM",
       )
 

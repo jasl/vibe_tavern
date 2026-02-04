@@ -32,7 +32,7 @@ module TavernKit
           strict: false,
           fix_empty_final: nil,
           tool_use_mode: nil,
-          tool_use_retry_count: nil
+          tool_calling_fallback_retry_count: nil
         )
           @client = client
           @model = model.to_s
@@ -43,7 +43,8 @@ module TavernKit
           @system = system.to_s
           @strict = strict == true
           @tool_use_mode = resolve_tool_use_mode(explicit: tool_use_mode)
-          @tool_use_retry_count = resolve_tool_use_retry_count(explicit: tool_use_retry_count, default: 0)
+          @tool_calling_fallback_retry_count =
+            resolve_tool_calling_fallback_retry_count(explicit: tool_calling_fallback_retry_count, default: 0)
           @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
         end
 
@@ -68,7 +69,7 @@ module TavernKit
             system = @system
             strict = @strict
             tools = @registry.openai_tools(expose: :model)
-            request_attempts_left = @tool_use_mode == :relaxed ? @tool_use_retry_count : 0
+            request_attempts_left = @tool_use_mode == :relaxed ? @tool_calling_fallback_retry_count : 0
 
             response = nil
             plan = nil
@@ -287,7 +288,7 @@ module TavernKit
           return nil unless @runtime&.respond_to?(:[])
 
           # Prefer a dedicated namespace under runtime:
-          #   runtime[:tool_calling] => { tool_use_mode: :enforced, tool_use_retry_count: 0, fix_empty_final: true }
+          #   runtime[:tool_calling] => { tool_use_mode: :enforced, fallback_retry_count: 0, fix_empty_final: true }
           tool_calling = @runtime[:tool_calling]
           if tool_calling.is_a?(Hash)
             val = tool_calling[key]
@@ -345,10 +346,10 @@ module TavernKit
           end
         end
 
-        def resolve_tool_use_retry_count(explicit:, default:)
+        def resolve_tool_calling_fallback_retry_count(explicit:, default:)
           return normalize_non_negative_int(explicit, default: default) unless explicit.nil?
 
-          normalize_non_negative_int(runtime_setting_value(:tool_use_retry_count), default: default)
+          normalize_non_negative_int(runtime_setting_value(:fallback_retry_count), default: default)
         end
 
         def normalize_non_negative_int(value, default:)

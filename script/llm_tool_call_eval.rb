@@ -29,13 +29,13 @@ tool_use_mode =
   ENV.fetch("OPENROUTER_TOOL_USE_MODE", "enforced").strip.downcase
 tool_use_mode = "disabled" unless %w[enforced relaxed disabled].include?(tool_use_mode)
 tools_enabled = tool_use_mode != "disabled"
-tool_use_retry_count =
+fallback_retry_count =
   begin
-    Integer(ENV.fetch("OPENROUTER_TOOL_USE_RETRY_COUNT", "0"))
+    Integer(ENV.fetch("OPENROUTER_TOOL_CALLING_FALLBACK_RETRY_COUNT", "0"))
   rescue ArgumentError
     0
   end
-tool_use_retry_count = 0 if tool_use_retry_count < 0
+fallback_retry_count = 0 if fallback_retry_count < 0
 tool_profile = ENV.fetch("OPENROUTER_TOOL_PROFILE", "eval_minimal")
 
 DEFAULT_MODELS = [
@@ -209,7 +209,7 @@ models.each do |model|
           {
             tool_calling: {
               tool_use_mode: tool_use_mode,
-              tool_use_retry_count: tool_use_retry_count,
+              fallback_retry_count: fallback_retry_count,
               fix_empty_final: fix_empty_final,
             },
           },
@@ -320,7 +320,7 @@ summary = {
   api_prefix: api_prefix,
   fix_empty_final: fix_empty_final,
   tool_use_mode: tool_use_mode,
-  tool_use_retry_count: tool_use_retry_count,
+  tool_calling_fallback_retry_count: fallback_retry_count,
   tool_profile: tool_profile,
   output_dir: out_dir.to_s,
   models: reports,
@@ -336,7 +336,7 @@ puts "ts: #{summary[:ts]}"
 puts "base_url: #{base_url}"
 puts "api_prefix: #{api_prefix}"
 puts "tool_use_mode: #{tool_use_mode}"
-puts "tool_use_retry_count: #{tool_use_retry_count}"
+puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_profile: #{tool_profile}"
 puts "models: #{reports.size} (ok=#{successes}, fail=#{failures})"

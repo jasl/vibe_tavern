@@ -24,4 +24,3 @@ class WorkspaceTest < Minitest::Test
     assert_equal before_etag, workspace.draft_etag
   end
 end
-

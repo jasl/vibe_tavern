@@ -140,8 +140,8 @@ Notes:
     - `disabled`: never send tools (chat-only mode)
   - This is also a pipeline/runtime setting: `runtime[:tool_calling][:tool_use_mode]`
 - Optional retry budget (only used in `tool_use_mode=relaxed`):
-  - `OPENROUTER_TOOL_USE_RETRY_COUNT=0` (default; no automatic retries)
-  - Pipeline/runtime setting: `runtime[:tool_calling][:tool_use_retry_count]`
+  - `OPENROUTER_TOOL_CALLING_FALLBACK_RETRY_COUNT=0` (default; no automatic retries)
+  - Pipeline/runtime setting: `runtime[:tool_calling][:fallback_retry_count]`
 - By default, the eval script uses a minimal tool profile (only `state_get` and `state_patch`)
   to reduce model variance. You can switch to the full tool registry via:
   - `OPENROUTER_TOOL_PROFILE=full`

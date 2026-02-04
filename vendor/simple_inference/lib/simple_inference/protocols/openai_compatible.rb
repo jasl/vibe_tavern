@@ -778,4 +778,3 @@ module SimpleInference
     end
   end
 end
-

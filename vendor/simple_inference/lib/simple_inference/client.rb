@@ -8,4 +8,3 @@ module SimpleInference
   class Client < Protocols::OpenAICompatible
   end
 end
-
