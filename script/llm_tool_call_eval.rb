@@ -97,12 +97,30 @@ def provider_error_hint(report)
         parsed = JSON.parse(raw)
         case parsed
         when Hash
-          parsed.dig("error", "message") || parsed["message"] || raw
+          err = parsed["error"]
+          if err.is_a?(Hash)
+            err["message"] || parsed["message"] || raw
+          elsif err.is_a?(String)
+            err
+          else
+            parsed["message"] || raw
+          end
         when String
           parsed
         when Array
           first_hash = parsed.find { |v| v.is_a?(Hash) }
-          first_hash&.dig("error", "message") || first_hash&.fetch("message", nil) || raw
+          if first_hash
+            err = first_hash["error"]
+            if err.is_a?(Hash)
+              err["message"] || first_hash["message"] || raw
+            elsif err.is_a?(String)
+              err
+            else
+              first_hash["message"] || raw
+            end
+          else
+            raw
+          end
         else
           raw
         end
@@ -134,6 +152,7 @@ system =
         - Only change the `/draft/foo` path. Do not change other draft keys.
       - Do NOT ask the user for confirmation. The target value is always "bar", and it is already approved.
       - If a tool returns ok=false, read `errors[]`, fix your arguments, and call the tool again.
+      - Do NOT reply "Done." until AFTER you have received a successful (ok=true) tool result for `state_patch`.
       - Do NOT call `facts_commit` (it is not available).
       - After tools are done, reply with a single sentence: "Done."
 
