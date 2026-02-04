@@ -993,7 +993,7 @@ class ToolLoopRunnerTest < Minitest::Test
         client: client,
         model: "test-model",
         workspace: workspace,
-        tool_use: false,
+        tool_use_mode: :disabled,
       )
 
     result = runner.run(user_text: "hello")
@@ -1040,7 +1040,7 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    runtime = TavernKit::Runtime::Base.build({ tool_calling: { tool_use: false } }, type: :app)
+    runtime = TavernKit::Runtime::Base.build({ tool_calling: { tool_use_mode: :disabled } }, type: :app)
 
     workspace = TavernKit::VibeTavern::ToolCalling::Workspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
@@ -1212,6 +1212,7 @@ class ToolLoopRunnerTest < Minitest::Test
         model: "test-model",
         workspace: workspace,
         tool_use_mode: :relaxed,
+        tool_use_retry_count: 1,
         system: "SYSTEM",
       )
 

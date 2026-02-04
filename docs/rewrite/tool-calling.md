@@ -136,10 +136,12 @@ Notes:
 - Tool use mode:
   - `OPENROUTER_TOOL_USE_MODE=enforced|relaxed|disabled`
     - `enforced`: tool calls must succeed; otherwise fail the run (surface error to UI; user can retry)
-    - `relaxed`: best-effort; if provider rejects tool calling, the runner retries once without tools
+    - `relaxed`: best-effort; optional retry budget controls whether we retry without tools on provider errors
     - `disabled`: never send tools (chat-only mode)
   - This is also a pipeline/runtime setting: `runtime[:tool_calling][:tool_use_mode]`
-  - Back-compat (deprecated): `OPENROUTER_ENABLE_TOOL_USE=0` maps to `OPENROUTER_TOOL_USE_MODE=disabled`
+- Optional retry budget (only used in `tool_use_mode=relaxed`):
+  - `OPENROUTER_TOOL_USE_RETRY_COUNT=0` (default; no automatic retries)
+  - Pipeline/runtime setting: `runtime[:tool_calling][:tool_use_retry_count]`
 - By default, the eval script uses a minimal tool profile (only `state_get` and `state_patch`)
   to reduce model variance. You can switch to the full tool registry via:
   - `OPENROUTER_TOOL_PROFILE=full`

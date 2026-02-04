@@ -32,7 +32,7 @@ module TavernKit
           strict: false,
           fix_empty_final: nil,
           tool_use_mode: nil,
-          tool_use: nil
+          tool_use_retry_count: nil
         )
           @client = client
           @model = model.to_s
@@ -42,7 +42,8 @@ module TavernKit
           @registry = registry || ToolRegistry.new
           @system = system.to_s
           @strict = strict == true
-          @tool_use_mode = resolve_tool_use_mode(explicit: tool_use_mode, legacy_bool: tool_use)
+          @tool_use_mode = resolve_tool_use_mode(explicit: tool_use_mode)
+          @tool_use_retry_count = resolve_tool_use_retry_count(explicit: tool_use_retry_count, default: 0)
           @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
         end
 
@@ -60,7 +61,6 @@ module TavernKit
           empty_final_fixup_attempted = false
           any_tool_calls_seen = false
           last_tool_ok_by_name = {}
-          tool_use_fallback_attempted = false
 
           max_turns.times do |turn|
             runtime = @runtime
@@ -68,50 +68,52 @@ module TavernKit
             system = @system
             strict = @strict
             tools = @registry.openai_tools(expose: :model)
-            build_history =
-              if system.empty?
-                history
-              else
-                [TavernKit::Prompt::Message.new(role: :system, content: system)] + history
-              end
+            request_attempts_left = @tool_use_mode == :relaxed ? @tool_use_retry_count : 0
 
-            plan =
-              TavernKit::VibeTavern.build do
-                history build_history
-                runtime runtime if runtime
-                variables_store variables_store if variables_store
+            response = nil
+            plan = nil
+            messages = nil
+            options = nil
 
-                if tools_enabled
-                  llm_options(
-                    tools: tools,
-                    tool_choice: "auto",
-                  )
+            begin
+              build_history =
+                if system.empty?
+                  history
+                else
+                  [TavernKit::Prompt::Message.new(role: :system, content: system)] + history
                 end
 
-                strict strict
-                message pending_user_text if pending_user_text && !pending_user_text.empty?
-              end
+              plan =
+                TavernKit::VibeTavern.build do
+                  history build_history
+                  runtime runtime if runtime
+                  variables_store variables_store if variables_store
 
-            messages = plan.to_messages(dialect: :openai)
-            options = plan.llm_options || {}
+                  if tools_enabled
+                    llm_options(
+                      tools: tools,
+                      tool_choice: "auto",
+                    )
+                  end
 
-            request = { model: @model, messages: messages }.merge(options)
-
-            response =
-              begin
-                @client.chat_completions(**request)
-              rescue SimpleInference::Errors::HTTPError => e
-                # In relaxed mode, tool-calling is best-effort. If the provider
-                # rejects tools/tool_choice, retry once without tools to avoid
-                # blocking the whole flow.
-                if @tool_use_mode == :relaxed && tools_enabled && !tool_use_fallback_attempted
-                  tool_use_fallback_attempted = true
-                  tools_enabled = false
-                  redo
+                  strict strict
+                  message pending_user_text if pending_user_text && !pending_user_text.empty?
                 end
 
-                raise e
+              messages = plan.to_messages(dialect: :openai)
+              options = plan.llm_options || {}
+              request = { model: @model, messages: messages }.merge(options)
+
+              response = @client.chat_completions(**request)
+            rescue SimpleInference::Errors::HTTPError => e
+              if request_attempts_left > 0
+                request_attempts_left -= 1
+                tools_enabled = false
+                retry
               end
+
+              raise e
+            end
             body = response.body.is_a?(Hash) ? response.body : {}
 
             assistant_msg = body.dig("choices", 0, "message") || {}
@@ -285,7 +287,7 @@ module TavernKit
           return nil unless @runtime&.respond_to?(:[])
 
           # Prefer a dedicated namespace under runtime:
-          #   runtime[:tool_calling] => { tool_use: true, fix_empty_final: true }
+          #   runtime[:tool_calling] => { tool_use_mode: :enforced, tool_use_retry_count: 0, fix_empty_final: true }
           tool_calling = @runtime[:tool_calling]
           if tool_calling.is_a?(Hash)
             val = tool_calling[key]
@@ -307,19 +309,12 @@ module TavernKit
           nil
         end
 
-        def resolve_tool_use_mode(explicit:, legacy_bool:)
-          explicit_mode = normalize_tool_use_mode(explicit)
-          return explicit_mode if explicit_mode
-
-          unless legacy_bool.nil?
-            return legacy_bool == true ? :relaxed : :disabled
-          end
+        def resolve_tool_use_mode(explicit:)
+          mode = normalize_tool_use_mode(explicit)
+          return mode if mode
 
           mode = normalize_tool_use_mode(runtime_setting_value(:tool_use_mode))
           return mode if mode
-
-          legacy = runtime_setting_bool(:tool_use)
-          return legacy == true ? :relaxed : :disabled if legacy == false || legacy == true
 
           :relaxed
         end
@@ -328,10 +323,6 @@ module TavernKit
           case value
           when nil
             nil
-          when true
-            :relaxed
-          when false
-            :disabled
           else
             s = value.to_s.strip.downcase
             s = s.tr("-", "_")
@@ -352,6 +343,23 @@ module TavernKit
 
             nil
           end
+        end
+
+        def resolve_tool_use_retry_count(explicit:, default:)
+          return normalize_non_negative_int(explicit, default: default) unless explicit.nil?
+
+          normalize_non_negative_int(runtime_setting_value(:tool_use_retry_count), default: default)
+        end
+
+        def normalize_non_negative_int(value, default:)
+          return default if value.nil?
+
+          i = Integer(value)
+          return default if i < 0
+
+          i
+        rescue ArgumentError, TypeError
+          default
         end
 
         def tool_use_enabled?
