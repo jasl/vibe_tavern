@@ -20,12 +20,33 @@ module TavernKit
               function: {
                 name: name,
                 description: description,
-                parameters: parameters,
+                parameters: normalize_schema(parameters),
               },
             }
           end
 
           def exposed_to_model? = exposed_to_model == true
+
+          private
+
+          # Providers can be surprisingly strict about JSON schema.
+          #
+          # Example: some OpenAI-compatible backends reject `required: []`.
+          # Omitting the key is equivalent and more compatible.
+          def normalize_schema(value)
+            case value
+            when Hash
+              value.each_with_object({}) do |(k, v), out|
+                next if k.to_s == "required" && v.is_a?(Array) && v.empty?
+
+                out[k] = normalize_schema(v)
+              end
+            when Array
+              value.map { |v| normalize_schema(v) }
+            else
+              value
+            end
+          end
         end
 
       # A small registry that holds tool definitions.

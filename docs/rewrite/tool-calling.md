@@ -156,6 +156,10 @@ Notes:
     - If tool arguments exceed this size, the tool result is replaced with `{ ok:false, errors:[ARGUMENTS_TOO_LARGE] }`
   - `runtime[:tool_calling][:max_tool_output_bytes]` (default: 200_000)
     - If tool output exceeds this size, the tool message content is replaced with `{ ok:false, errors:[TOOL_OUTPUT_TOO_LARGE] }`
+- Tool choice (OpenAI-compatible):
+  - Default is `"auto"` (let the model decide).
+  - Override via `runtime[:tool_calling][:tool_choice]` (String/Symbol/Hash) when needed.
+    - Example: `"none"` to force chat-only even when tools are present.
 - Optional retry budget (only used in `tool_use_mode=relaxed`):
   - `OPENROUTER_TOOL_CALLING_FALLBACK_RETRY_COUNT=0` (default; no automatic retries)
   - Pipeline/runtime setting: `runtime[:tool_calling][:fallback_retry_count]`
@@ -178,11 +182,22 @@ Note:
 - A "tool profile" is an app-layer convenience that resolves to allow/deny lists.
   The tool loop runner only consumes allow/deny lists to keep responsibilities
   clean and avoid hidden coupling between profile names and lower-level code.
+- Optional sugar exists in `TavernKit::VibeTavern::ToolCalling::Presets` to build
+  `runtime[:tool_calling]` hashes, but the runtime hash remains the source of truth.
 - The tool loop can optionally do a "finalization retry" when a provider returns an empty
   final assistant message even after successful tool calls.
   - This is configured as a pipeline/runtime setting (`runtime[:tool_calling][:fix_empty_final]`)
   - Default: enabled
   - Eval override: `OPENROUTER_FIX_EMPTY_FINAL=0` to disable
+- Provider/request-level overrides (upper-layer injection):
+  - `runtime[:tool_calling][:request_overrides]` (Hash) is merged into the OpenAI-compatible request body.
+    - Intended for provider-specific knobs like OpenRouter routing (`route`, `provider`, `transforms`) or standard params (`temperature`).
+    - Reserved keys are ignored here (`model`, `messages`, `tools`, `tool_choice`) to keep ownership clear.
+  - Eval env helpers (optional):
+    - `OPENROUTER_ROUTE=fallback`
+    - `OPENROUTER_TRANSFORMS=middle-out` (comma-separated)
+    - `OPENROUTER_PROVIDER_ONLY=...`, `OPENROUTER_PROVIDER_ORDER=...`, `OPENROUTER_PROVIDER_IGNORE=...` (comma-separated)
+    - `OPENROUTER_REQUEST_OVERRIDES_JSON='{\"temperature\":0.2}'` (advanced; JSON object)
 
 ## Model reliability metadata (tool calling)
 

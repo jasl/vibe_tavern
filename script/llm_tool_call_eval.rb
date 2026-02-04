@@ -61,7 +61,7 @@ DEFAULT_MODELS = [
   "deepseek/deepseek-v3.2",
   "deepseek/deepseek-chat-v3-0324",
   "x-ai/grok-4.1-fast",
-  # "minimax/minimax-m2-her", # Not support tool use
+  "minimax/minimax-m2-her", # Not support tool use
   "google/gemini-2.5-flash",
   "google/gemini-3-flash-preview",
   "google/gemini-3-pro-preview",
@@ -82,6 +82,49 @@ models = DEFAULT_MODELS if models.empty?
 headers = {}
 headers["HTTP-Referer"] = ENV["OPENROUTER_HTTP_REFERER"] if ENV["OPENROUTER_HTTP_REFERER"]
 headers["X-Title"] = ENV["OPENROUTER_X_TITLE"] if ENV["OPENROUTER_X_TITLE"]
+
+# Optional OpenRouter request-level knobs (OpenAI-compatible).
+# These are injected via runtime[:tool_calling][:request_overrides] so the lower
+# layers (pipeline/client) stay provider-agnostic.
+request_overrides = {}
+
+if (route = ENV["OPENROUTER_ROUTE"].to_s.strip).length.positive?
+  request_overrides["route"] = route
+end
+
+if (raw = ENV["OPENROUTER_TRANSFORMS"])
+  transforms =
+    case raw.to_s.strip.downcase
+    when "", "auto"
+      nil
+    when "none", "off", "0", "false"
+      []
+    else
+      raw.split(",").map(&:strip).reject(&:empty?)
+    end
+
+  request_overrides["transforms"] = transforms if transforms
+end
+
+provider = {}
+%w[ONLY ORDER IGNORE].each do |key|
+  env_key = "OPENROUTER_PROVIDER_#{key}"
+  next unless ENV.key?(env_key)
+
+  raw = ENV[env_key].to_s
+  values = raw.split(",").map(&:strip).reject(&:empty?)
+  provider[key.downcase] = values if values.any?
+end
+request_overrides["provider"] = provider if provider.any?
+
+if (raw = ENV["OPENROUTER_REQUEST_OVERRIDES_JSON"].to_s.strip).length.positive?
+  begin
+    parsed = JSON.parse(raw)
+    request_overrides.merge!(parsed) if parsed.is_a?(Hash)
+  rescue JSON::ParserError
+    warn "Invalid OPENROUTER_REQUEST_OVERRIDES_JSON (must be a JSON object). Ignoring."
+  end
+end
 
 module ToolCallEval
   class Workspace
@@ -780,6 +823,7 @@ models.each_with_index do |model, model_index|
           fallback_retry_count: fallback_retry_count,
           fix_empty_final: fix_empty_final,
           tool_allowlist: tool_allowlist,
+          request_overrides: request_overrides,
         }.merge(scenario[:runtime_overrides] || {})
 
       runtime =
@@ -948,6 +992,7 @@ summary = {
   tool_use_mode: tool_use_mode,
   tool_calling_fallback_retry_count: fallback_retry_count,
   tool_allowlist: tool_allowlist,
+  request_overrides: request_overrides,
   trials_per_model: trials_per_model,
   scenarios: scenarios.map { |s| s[:id] },
   output_dir: out_dir.to_s,
@@ -968,6 +1013,7 @@ puts "tool_use_mode: #{tool_use_mode}"
 puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_allowlist: #{tool_allowlist ? tool_allowlist.join(",") : "(full)"}"
+puts "request_overrides: #{request_overrides.any? ? request_overrides.keys.join(",") : "(none)"}"
 puts "trials_per_model: #{trials_per_model}"
 puts "scenarios: #{scenarios.map { |s| s[:id] }.join(",")}"
 puts "models: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"

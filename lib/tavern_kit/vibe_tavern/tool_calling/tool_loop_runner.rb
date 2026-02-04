@@ -81,6 +81,8 @@ module TavernKit
             system = @system
             strict = @strict
             tools = @registry.openai_tools(expose: :model)
+            tool_choice = resolve_tool_choice(default: "auto")
+            request_overrides = resolve_request_overrides
             request_attempts_left = @tool_use_mode == :relaxed ? @tool_calling_fallback_retry_count : 0
 
             response = nil
@@ -102,12 +104,11 @@ module TavernKit
                   runtime runtime if runtime
                   variables_store variables_store if variables_store
 
+                  llm_options_hash = request_overrides
                   if tools_enabled
-                    llm_options(
-                      tools: tools,
-                      tool_choice: "auto",
-                    )
+                    llm_options_hash = llm_options_hash.merge(tools: tools, tool_choice: tool_choice)
                   end
+                  llm_options(llm_options_hash) unless llm_options_hash.empty?
 
                   strict strict
                   message pending_user_text if pending_user_text && !pending_user_text.empty?
@@ -305,6 +306,40 @@ module TavernKit
           i
         rescue ArgumentError, TypeError
           default
+        end
+
+        def resolve_tool_choice(default:)
+          raw = runtime_setting_value(:tool_choice)
+          raw = runtime_setting_value(:tool_choice_mode) if raw.nil?
+
+          case raw
+          when nil
+            default
+          when String
+            s = raw.strip
+            s.empty? ? default : s
+          when Symbol
+            raw.to_s
+          when Hash
+            raw
+          else
+            default
+          end
+        end
+
+        def resolve_request_overrides
+          raw = runtime_setting_value(:request_overrides)
+          raw = runtime_setting_value(:request_options) if raw.nil?
+          return {} unless raw.is_a?(Hash)
+
+          # Keep ownership clear: these keys are controlled by ToolLoopRunner.
+          reserved = %w[model messages tools tool_choice].freeze
+          raw.each_with_object({}) do |(k, v), out|
+            key = k.to_s
+            next if reserved.include?(key)
+
+            out[k] = v
+          end
         end
 
         def runtime_setting_value(key)

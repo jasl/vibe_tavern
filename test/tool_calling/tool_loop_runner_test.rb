@@ -302,6 +302,131 @@ class ToolLoopRunnerTest < Minitest::Test
     refute_nil tool_result
   end
 
+  def test_tool_definition_strips_empty_required_arrays_for_provider_compatibility
+    registry =
+      TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
+        definitions: [
+          TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+            name: "tool_with_empty_required",
+            description: "Test tool",
+            parameters: {
+              "type" => "object",
+              "required" => [],
+              "properties" => {
+                "nested" => {
+                  "type" => "object",
+                  "required" => [],
+                  "properties" => {},
+                },
+              },
+            },
+          ),
+        ],
+      )
+
+    tool = registry.openai_tools.first
+    params = tool.dig(:function, :parameters)
+
+    refute params.key?("required")
+    refute params.dig("properties", "nested").key?("required")
+  end
+
+  def test_runtime_request_overrides_are_merged_and_reserved_keys_are_ignored
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_use_mode: :relaxed,
+            request_overrides: {
+              "temperature" => 0.123,
+              "transforms" => ["middle-out"],
+              "model" => "evil-model",
+              "tool_choice" => "none",
+              "tools" => [
+                { type: "function", function: { name: "evil_tool", parameters: { type: "object" } } },
+              ],
+            },
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, runtime: runtime)
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req = JSON.parse(requests[0][:body])
+    assert_equal "test-model", req["model"]
+    assert_equal 0.123, req["temperature"]
+    assert_equal ["middle-out"], req["transforms"]
+
+    # request_overrides cannot override tool_choice/tools/model; those are owned by ToolLoopRunner.
+    assert_equal "auto", req["tool_choice"]
+    tool_names = Array(req["tools"]).map { |t| t.dig("function", "name") }.compact
+    assert_includes tool_names, "state_get"
+    refute_includes tool_names, "evil_tool"
+  end
+
+  def test_runtime_tool_choice_overrides_default
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            tool_use_mode: :relaxed,
+            tool_choice: "none",
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, runtime: runtime)
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req = JSON.parse(requests[0][:body])
+    assert_equal "none", req["tool_choice"]
+  end
+
   def test_facts_commit_is_not_exposed_to_the_model
     requests = []
 
