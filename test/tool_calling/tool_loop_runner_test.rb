@@ -56,7 +56,21 @@ class ToolCallEvalTestWorkspace
   private
 
   def deep_dup(obj)
-    Marshal.load(Marshal.dump(obj))
+    case obj
+    when Hash
+      obj.each_with_object({}) do |(k, v), out|
+        kk = k.is_a?(String) ? k.dup : k
+        out[kk] = deep_dup(v)
+      end
+    when Array
+      obj.map { |v| deep_dup(v) }
+    when String
+      obj.dup
+    else
+      obj.dup
+    end
+  rescue TypeError
+    obj
   end
 end
 
