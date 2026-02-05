@@ -154,6 +154,11 @@ Notes:
 - `SimpleInference` composes the final request URL as `base_url + api_prefix + endpoint`.
   - Recommended for OpenRouter: `OPENROUTER_BASE_URL=https://openrouter.ai/api` and `OPENROUTER_API_PREFIX=/v1`
   - If you already set `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`, set `OPENROUTER_API_PREFIX=""`
+- Client timeouts (eval-only; seconds):
+  - `OPENROUTER_CLIENT_TIMEOUT` (default: `120`; `0` disables)
+  - `OPENROUTER_OPEN_TIMEOUT` (default: `10`; `0` disables)
+  - `OPENROUTER_READ_TIMEOUT` (default: `OPENROUTER_CLIENT_TIMEOUT`; `0` disables)
+  - HTTP adapter: `OPENROUTER_HTTP_ADAPTER=httpx|default` (default: `httpx`)
 - Tool use mode:
   - `OPENROUTER_TOOL_USE_MODE=enforced|relaxed|disabled`
     - `enforced`: require at least one tool call; final failure behavior is controlled by `tool_failure_policy`

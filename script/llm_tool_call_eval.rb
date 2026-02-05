@@ -60,23 +60,63 @@ trials_per_model =
   end
 trials_per_model = 1 if trials_per_model < 1
 
+client_timeout =
+  begin
+    Float(ENV.fetch("OPENROUTER_CLIENT_TIMEOUT", "120"))
+  rescue ArgumentError, TypeError
+    120.0
+  end
+client_timeout = nil if client_timeout <= 0
+
+client_open_timeout =
+  begin
+    Float(ENV.fetch("OPENROUTER_OPEN_TIMEOUT", "10"))
+  rescue ArgumentError, TypeError
+    10.0
+  end
+client_open_timeout = nil if client_open_timeout <= 0
+
+client_read_timeout =
+  begin
+    raw = ENV.fetch("OPENROUTER_READ_TIMEOUT", "").to_s.strip
+    raw.empty? ? nil : Float(raw)
+  rescue ArgumentError, TypeError
+    nil
+  end
+client_read_timeout = nil if client_read_timeout && client_read_timeout <= 0
+client_read_timeout ||= client_timeout
+
+http_adapter_name = ENV.fetch("OPENROUTER_HTTP_ADAPTER", "httpx").to_s.strip.downcase.tr("-", "_")
+http_adapter =
+  case http_adapter_name
+  when "", "default", "net_http", "nethttp"
+    nil
+  when "httpx"
+    SimpleInference::HTTPAdapters::HTTPX.new(timeout: client_timeout)
+  else
+    warn "Unknown OPENROUTER_HTTP_ADAPTER=#{http_adapter_name.inspect}. Using httpx."
+    http_adapter_name = "httpx"
+    SimpleInference::HTTPAdapters::HTTPX.new(timeout: client_timeout)
+  end
+
 DEFAULT_MODELS = [
-  "deepseek/deepseek-v3.2",
-  "deepseek/deepseek-chat-v3-0324",
+  "deepseek/deepseek-v3.2:nitro",
+  "deepseek/deepseek-chat-v3-0324:nitro",
   "x-ai/grok-4.1-fast",
+  "google/gemini-2.5-flash:nitro",
+  "google/gemini-3-flash-preview:nitro",
+  "google/gemini-3-pro-preview:nitro",
+  "anthropic/claude-opus-4.5:nitro",
+  "openai/gpt-5.2-chat:nitro",
+  "openai/gpt-5.2:nitro",
   "minimax/minimax-m2-her",
-  "google/gemini-2.5-flash",
-  "google/gemini-3-flash-preview",
-  "google/gemini-3-pro-preview",
-  "anthropic/claude-opus-4.5",
-  "openai/gpt-5.2-chat",
-  "openai/gpt-5.2",
-  "qwen/qwen3-vl-30b-a3b-instruct",
-  "qwen/qwen3-next-80b-a3b-instruct",
-  "qwen/qwen3-vl-235b-a22b-instruct",
-  "z-ai/glm-4.7",
-  "z-ai/glm-4.7-flash",
-  "moonshotai/kimi-k2.5",
+  "minimax/minimax-m2.1:nitro",
+  "qwen/qwen3-vl-30b-a3b-instruct:nitro",
+  "qwen/qwen3-next-80b-a3b-instruct:nitro",
+  "qwen/qwen3-vl-235b-a22b-instruct:nitro",
+  "z-ai/glm-4.7:nitro",
+  "z-ai/glm-4.7-flash:nitro",
+  "moonshotai/kimi-k2.5:nitro",
 ].freeze
 
 models = ENV.fetch("OPENROUTER_MODELS", ENV["OPENROUTER_MODEL"].to_s).split(",").map(&:strip).reject(&:empty?)
@@ -482,6 +522,7 @@ def error_category(message, status: nil)
   return "NO_TOOL_CALLS" if msg.start_with?("NO_TOOL_CALLS:")
   return "TOOL_ERROR" if msg.start_with?("TOOL_ERROR:")
   return "NO_TOOL_USE_ENDPOINT" if msg.include?("No endpoints found that support tool use")
+  return "TIMEOUT" if msg.include?("TimeoutError")
 
   case status.to_i
   when 401 then "AUTH"
@@ -858,6 +899,10 @@ models.each_with_index do |model, model_index|
     api_key: api_key,
     headers: headers,
     api_prefix: api_prefix,
+    timeout: client_timeout,
+    open_timeout: client_open_timeout,
+    read_timeout: client_read_timeout,
+    adapter: http_adapter,
   )
 
   safe_model = model.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
@@ -1068,6 +1113,10 @@ summary = {
   ts: Time.now.utc.iso8601,
   base_url: base_url,
   api_prefix: api_prefix,
+  http_adapter: http_adapter_name,
+  client_timeout: client_timeout,
+  client_open_timeout: client_open_timeout,
+  client_read_timeout: client_read_timeout,
   fix_empty_final: fix_empty_final,
   tool_use_mode: tool_use_mode,
   tool_failure_policy: tool_failure_policy,
@@ -1090,6 +1139,10 @@ puts "LLM Tool Call Eval"
 puts "ts: #{summary[:ts]}"
 puts "base_url: #{base_url}"
 puts "api_prefix: #{api_prefix}"
+puts "http_adapter: #{http_adapter_name}"
+puts "client_timeout: #{client_timeout || "(none)"}"
+puts "client_open_timeout: #{client_open_timeout || "(none)"}"
+puts "client_read_timeout: #{client_read_timeout || "(none)"}"
 puts "tool_use_mode: #{tool_use_mode}"
 puts "tool_failure_policy: #{tool_failure_policy}"
 puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
