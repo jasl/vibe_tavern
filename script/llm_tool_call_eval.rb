@@ -1010,8 +1010,8 @@ models.each_with_index do |model, model_index|
           else
             lambda do |raw_event|
               event = raw_event.is_a?(Hash) ? raw_event : {}
-              type = (event[:type] || event["type"]).to_s
-              turn = event[:turn] || event["turn"]
+              type = event.fetch(:type, "").to_s
+              turn = event.fetch(:turn, nil)
 
               case type
               when "llm_request_start"
