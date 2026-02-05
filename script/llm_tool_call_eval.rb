@@ -60,6 +60,14 @@ trials_per_model =
   end
 trials_per_model = 1 if trials_per_model < 1
 
+verbose_level =
+  begin
+    Integer(ENV.fetch("VERBOSE", "1"))
+  rescue ArgumentError, TypeError
+    1
+  end
+verbose_level = 0 if verbose_level < 0
+
 client_timeout =
   begin
     Float(ENV.fetch("OPENROUTER_CLIENT_TIMEOUT", "120"))
@@ -996,7 +1004,82 @@ models.each_with_index do |model, model_index|
 
       begin
         user_text = scenario.fetch(:user_text).call(workspace).to_s
-        result = runner.run(user_text: user_text)
+        progress_printer =
+          if verbose_level <= 0
+            nil
+          else
+            lambda do |raw_event|
+              event = raw_event.is_a?(Hash) ? raw_event : {}
+              type = (event[:type] || event["type"]).to_s
+              turn = event[:turn] || event["turn"]
+
+              case type
+              when "llm_request_start"
+                tools_on = event[:tools_enabled] == true
+                msg = "  [t#{turn}] -> llm (tools=#{tools_on ? "on" : "off"})"
+                if verbose_level >= 2
+                  msg << " msgs=#{event[:messages_count]}"
+                  msg << " tools=#{event[:tools_count]}"
+                  msg << " choice=#{event[:tool_choice] || "auto"}"
+                  if event[:request_attempts_left].to_i.positive?
+                    msg << " retries_left=#{event[:request_attempts_left]}"
+                  end
+                end
+                $stderr.puts(msg)
+              when "llm_request_error"
+                msg = "  [t#{turn}] !! llm error"
+                msg << " status=#{event[:status]}" if event[:status]
+                msg << " #{truncate(event[:message].to_s, max_chars: 220)}" unless event[:message].to_s.strip.empty?
+                $stderr.puts(msg)
+              when "llm_request_retry"
+                $stderr.puts(
+                  "  [t#{turn}] .. retry (tools=off, attempts_left=#{event[:request_attempts_left]})",
+                )
+              when "llm_request_end"
+                ms = event[:elapsed_ms]
+                finish = event[:finish_reason]
+                tool_calls = Array(event[:tool_calls]).select { |v| v.is_a?(Hash) }
+                names = tool_calls.map { |tc| tc[:name] || tc["name"] }.map(&:to_s).map(&:strip).reject(&:empty?).uniq
+
+                msg = "  [t#{turn}] <- llm"
+                msg << " #{ms}ms" if ms
+                msg << " finish=#{finish}" if finish
+                msg << " tool_calls=#{names.join(",")}" if names.any?
+                $stderr.puts(msg)
+              when "tool_call_start"
+                msg = "  [t#{turn}] -> tool #{event[:name]}"
+                if verbose_level >= 2
+                  msg << " args=#{event[:arguments_bytes]}B"
+                end
+                if (parse = event[:parse_status]) && parse.to_s != "ok"
+                  msg << " parse=#{parse}"
+                end
+                $stderr.puts(msg)
+              when "tool_call_end"
+                msg = "  [t#{turn}] <- tool #{event[:name]} ok=#{event[:ok]}"
+                msg << " #{event[:elapsed_ms]}ms" if event[:elapsed_ms]
+                errors = Array(event[:error_codes]).map(&:to_s).map(&:strip).reject(&:empty?)
+                msg << " errors=#{errors.join(",")}" if errors.any?
+                if verbose_level >= 2
+                  msg << " out=#{event[:output_bytes]}B"
+                  msg << " replaced" if event[:output_replaced] == true
+                end
+                $stderr.puts(msg)
+              when "fix_empty_final"
+                $stderr.puts(
+                  "  [t#{turn}] .. empty final; retry finalization (disable_tools=#{event[:disable_tools]})",
+                )
+              when "final"
+                $stderr.puts("  [t#{turn}] <- final")
+              end
+
+              $stderr.flush
+            rescue StandardError
+              nil
+            end
+          end
+
+        result = runner.run(user_text: user_text, on_event: progress_printer)
 
         assistant_text = result[:assistant_text]
         trace = result[:trace]

@@ -71,8 +71,10 @@ module TavernKit
             end
         end
 
-        def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS)
+        def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS, on_event: nil)
           raise ArgumentError, "model is required" if @model.strip.empty?
+
+          event_handler = on_event.respond_to?(:call) ? on_event : nil
 
           history = Array(history).dup
           history = history.map { |m| normalize_history_message(m) }
@@ -111,6 +113,7 @@ module TavernKit
             plan = nil
             messages = nil
             options = nil
+            request_elapsed_ms = nil
 
             begin
               build_history =
@@ -141,11 +144,43 @@ module TavernKit
 
               MessageTransforms.apply!(request.fetch(:messages), message_transforms, strict: @strict) if message_transforms.any?
 
+              emit_event(
+                event_handler,
+                :llm_request_start,
+                turn: turn,
+                tool_use_mode: @tool_use_mode,
+                tool_failure_policy: @tool_failure_policy,
+                tools_enabled: tools_enabled,
+                messages_count: messages.size,
+                tools_count: Array(options.fetch(:tools, [])).size,
+                tool_choice: options.fetch(:tool_choice, nil),
+                request_attempts_left: request_attempts_left,
+              )
+
+              started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
               response = @client.chat_completions(**request)
+              request_elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
             rescue SimpleInference::Errors::HTTPError => e
+              emit_event(
+                event_handler,
+                :llm_request_error,
+                turn: turn,
+                tools_enabled: tools_enabled,
+                status: e.status,
+                error_class: e.class.name,
+                message: e.message.to_s,
+              )
+
               if request_attempts_left > 0
                 request_attempts_left -= 1
                 tools_enabled = false
+                emit_event(
+                  event_handler,
+                  :llm_request_retry,
+                  turn: turn,
+                  tools_enabled: tools_enabled,
+                  request_attempts_left: request_attempts_left,
+                )
                 retry
               end
 
@@ -177,6 +212,32 @@ module TavernKit
 
             any_tool_calls_seen ||= tool_calls.any?
 
+            tool_calls_summary =
+              tool_calls.map do |tc|
+                fn = tc.fetch(:function, {})
+                fn = {} unless fn.is_a?(Hash)
+                {
+                  id: tc.fetch(:id, "").to_s,
+                  name: fn.fetch(:name, "").to_s,
+                  arguments_bytes: fn.fetch(:arguments, "").to_s.bytesize,
+                }
+              end
+
+            emit_event(
+              event_handler,
+              :llm_request_end,
+              turn: turn,
+              tool_use_mode: @tool_use_mode,
+              tool_failure_policy: @tool_failure_policy,
+              tools_enabled: tools_enabled,
+              elapsed_ms: request_elapsed_ms,
+              finish_reason: body.dig("choices", 0, "finish_reason"),
+              assistant_content_bytes: assistant_content.bytesize,
+              tool_calls_count: tool_calls.size,
+              ignored_tool_calls_count: ignored_tool_calls,
+              tool_calls: tool_calls_summary,
+            )
+
             trace_entry = {
               turn: turn,
               request: {
@@ -197,15 +258,7 @@ module TavernKit
                 ignored_tool_calls_count: ignored_tool_calls,
                 finish_reason: body.dig("choices", 0, "finish_reason"),
               },
-              tool_calls: tool_calls.map do |tc|
-                fn = tc.fetch(:function, {})
-                fn = {} unless fn.is_a?(Hash)
-                {
-                  id: tc.fetch(:id, "").to_s,
-                  name: fn.fetch(:name, "").to_s,
-                  arguments_bytes: fn.fetch(:arguments, "").to_s.bytesize,
-                }
-              end,
+              tool_calls: tool_calls_summary,
             }
 
             history << TavernKit::Prompt::Message.new(
@@ -225,7 +278,16 @@ module TavernKit
                 empty_final_fixup_attempted = true
                 pending_user_text =
                   resolve_fix_empty_final_user_text(default: DEFAULT_FIX_EMPTY_FINAL_USER_TEXT)
-                tools_enabled = false if resolve_fix_empty_final_disable_tools(default: true)
+                disable_tools = resolve_fix_empty_final_disable_tools(default: true)
+                tools_enabled = false if disable_tools
+
+                emit_event(
+                  event_handler,
+                  :fix_empty_final,
+                  turn: turn,
+                  disable_tools: disable_tools,
+                  user_text_bytes: pending_user_text.to_s.bytesize,
+                )
                 next
               end
 
@@ -270,6 +332,15 @@ module TavernKit
                 end
               end
 
+              emit_event(
+                event_handler,
+                :final,
+                turn: turn,
+                assistant_content_bytes: assistant_content.bytesize,
+                any_tool_calls_seen: any_tool_calls_seen,
+                any_tool_success_seen: any_tool_success_seen,
+              )
+
               return { assistant_text: assistant_content, history: history, trace: trace }
             end
 
@@ -281,7 +352,32 @@ module TavernKit
               name = fn.fetch(:name, "").to_s.strip
               args_json = fn.fetch(:arguments, nil)
 
+              started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+              arguments_bytes =
+                case args_json
+                when String
+                  args_json.bytesize
+                when Hash, Array
+                  begin
+                    JSON.generate(args_json).bytesize
+                  rescue StandardError
+                    args_json.to_s.bytesize
+                  end
+                else
+                  args_json.to_s.bytesize
+                end
+
               args = parse_args(args_json)
+              parse_status = args.is_a?(Hash) ? :ok : args
+              emit_event(
+                event_handler,
+                :tool_call_start,
+                turn: turn,
+                tool_call_id: id,
+                name: name,
+                arguments_bytes: arguments_bytes,
+                parse_status: parse_status,
+              )
               result =
                 case args
                 when :invalid_json
@@ -312,6 +408,7 @@ module TavernKit
 
               tool_content = JSON.generate(result)
               if tool_content.bytesize > @max_tool_output_bytes
+                output_replaced = true
                 too_large_bytes = tool_content.bytesize
                 result =
                   tool_error_envelope(
@@ -336,23 +433,42 @@ module TavernKit
                   JSON.generate(
                     result
                   )
+              else
+                output_replaced = false
               end
 
               effective_tool_name = result.is_a?(Hash) ? result.fetch("tool_name", effective_tool_name).to_s : effective_tool_name
 
-              last_tool_ok_by_name[effective_tool_name] = result.is_a?(Hash) ? result["ok"] : nil
-              any_tool_success_seen ||= (result.is_a?(Hash) && result["ok"] == true)
+              tool_elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+              ok_value = result.is_a?(Hash) ? result["ok"] : nil
+              error_codes =
+                if result.is_a?(Hash) && result["errors"].is_a?(Array)
+                  result["errors"].filter_map { |e| e.is_a?(Hash) ? e["code"] : nil }
+                else
+                  []
+                end
+
+              last_tool_ok_by_name[effective_tool_name] = ok_value
+              any_tool_success_seen ||= (ok_value == true)
+
+              emit_event(
+                event_handler,
+                :tool_call_end,
+                turn: turn,
+                tool_call_id: id,
+                name: effective_tool_name,
+                ok: ok_value,
+                elapsed_ms: tool_elapsed_ms,
+                output_bytes: tool_content.bytesize,
+                output_replaced: output_replaced,
+                error_codes: error_codes,
+              )
 
               tool_results << {
                 id: id,
                 name: effective_tool_name,
-                ok: result.is_a?(Hash) ? result["ok"] : nil,
-                error_codes:
-                  if result.is_a?(Hash) && result["errors"].is_a?(Array)
-                    result["errors"].filter_map { |e| e.is_a?(Hash) ? e["code"] : nil }
-                  else
-                    []
-                  end,
+                ok: ok_value,
+                error_codes: error_codes,
               }
 
               history << TavernKit::Prompt::Message.new(
@@ -394,6 +510,14 @@ module TavernKit
           end
 
           TavernKit::Prompt::Message.new(role: :user, content: message.to_s)
+        end
+
+        def emit_event(handler, type, **data)
+          return unless handler
+
+          handler.call({ type: type }.merge(data))
+        rescue StandardError
+          nil
         end
 
         def resolve_bool_setting(key, explicit:, default:)

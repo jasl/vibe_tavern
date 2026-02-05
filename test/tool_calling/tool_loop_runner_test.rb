@@ -320,6 +320,148 @@ class ToolLoopRunnerTest < Minitest::Test
     refute_nil tool_result
   end
 
+  def test_tool_loop_emits_progress_events
+    requests = []
+    events = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: {
+                            name: "state_get",
+                            arguments: JSON.generate({ workspace_id: workspace_id }),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            elsif @call_count == 2
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_2",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                request_id: "r1",
+                                ops: [
+                                  { op: "set", path: "/draft/foo", value: "bar" },
+                                ],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
+
+    result =
+      runner.run(
+        user_text: "workspace_id=#{workspace.id}",
+        on_event: ->(e) { events << e },
+      )
+
+    assert_equal "Done.", result[:assistant_text]
+    assert_equal "bar", workspace.draft["foo"]
+
+    types = events.map { |e| e.fetch(:type) }
+    assert_includes types, :llm_request_start
+    assert_includes types, :llm_request_end
+    assert_includes types, :tool_call_start
+    assert_includes types, :tool_call_end
+    assert_includes types, :final
+
+    tool_end = events.find { |e| e[:type] == :tool_call_end && e[:name].to_s == "state_patch" }
+    refute_nil tool_end
+    assert_equal true, tool_end[:ok]
+    assert tool_end[:elapsed_ms].is_a?(Integer)
+    assert tool_end[:output_bytes].is_a?(Integer)
+  end
+
+  def test_tool_loop_ignores_on_event_callback_errors
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :disabled)
+
+    result = runner.run(user_text: "hello", on_event: ->(_e) { raise "boom" })
+    assert_equal "Done.", result[:assistant_text]
+  end
+
   def test_tool_call_names_with_whitespace_are_stripped
     requests = []
 

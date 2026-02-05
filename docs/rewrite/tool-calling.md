@@ -163,6 +163,10 @@ Notes:
   - `OPENROUTER_OPEN_TIMEOUT` (default: `10`; `0` disables)
   - `OPENROUTER_READ_TIMEOUT` (default: `OPENROUTER_CLIENT_TIMEOUT`; `0` disables)
   - HTTP adapter: `OPENROUTER_HTTP_ADAPTER=httpx|default` (default: `httpx`)
+- Progress output (eval-only):
+  - `VERBOSE=0` to disable per-turn progress lines
+  - `VERBOSE=1` (default) shows tool-loop progress for each run
+  - `VERBOSE=2` includes extra request/tool size info
 - Tool use mode:
   - `OPENROUTER_TOOL_USE_MODE=enforced|relaxed|disabled`
     - `enforced`: require at least one tool call; final failure behavior is controlled by `tool_failure_policy`

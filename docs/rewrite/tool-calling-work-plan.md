@@ -71,6 +71,7 @@ Acceptance:
   - `OPENROUTER_READ_TIMEOUT` (default: `OPENROUTER_CLIENT_TIMEOUT`; `0` disables)
   - Optional: `OPENROUTER_HTTP_ADAPTER=httpx|default`
 - [x] Add a chat-only control scenario (`chat_only`) even when tool use is enabled.
+- [x] Add per-turn tool-loop progress printing in the eval script (default on; `VERBOSE=0|1|2`).
 
 Acceptance:
 - Default scenario preset includes `chat_only`.
