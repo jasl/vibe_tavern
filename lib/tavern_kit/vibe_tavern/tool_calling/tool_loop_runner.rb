@@ -100,6 +100,11 @@ module TavernKit
             tool_result_transforms = resolve_tool_result_transforms
             request_attempts_left = @tool_use_mode == :relaxed ? @tool_calling_fallback_retry_count : 0
 
+            if pending_user_text && !pending_user_text.strip.empty?
+              history << TavernKit::Prompt::Message.new(role: :user, content: pending_user_text.to_s)
+              pending_user_text = nil
+            end
+
             tools = ToolTransforms.apply(tools, tool_transforms, strict: @strict) if tools_enabled && tool_transforms.any?
 
             response = nil
@@ -128,7 +133,6 @@ module TavernKit
                   llm_options(llm_options_hash) unless llm_options_hash.empty?
 
                   strict strict
-                  message pending_user_text if pending_user_text && !pending_user_text.empty?
                 end
 
               messages = plan.to_messages(dialect: :openai)
@@ -361,7 +365,7 @@ module TavernKit
             trace_entry[:tool_results] = tool_results
             trace << trace_entry
 
-            pending_user_text = "" # continue after tool results
+            pending_user_text = nil # continue after tool results
             tools_enabled = tool_use_enabled?
           end
 

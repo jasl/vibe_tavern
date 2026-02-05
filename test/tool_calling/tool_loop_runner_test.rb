@@ -309,6 +309,10 @@ class ToolLoopRunnerTest < Minitest::Test
     req2 = JSON.parse(requests[1][:body])
     msgs2 = req2["messages"]
 
+    user2 = msgs2.find { |m| m["role"] == "user" }
+    refute_nil user2
+    assert_includes user2["content"].to_s, "workspace_id="
+
     assistant_with_calls = msgs2.find { |m| m["role"] == "assistant" && m.key?("tool_calls") }
     refute_nil assistant_with_calls
 
@@ -1593,8 +1597,8 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_nil req3["tool_choice"]
     assert_nil req3["tools"]
 
-    user3 = Array(req3["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
-    assert_includes user3, "Please provide your final answer"
+    user_texts3 = Array(req3["messages"]).filter_map { |m| m.is_a?(Hash) && m["role"] == "user" ? m["content"].to_s : nil }
+    assert user_texts3.any? { |t| t.include?("Please provide your final answer") }
   end
 
   def test_fix_empty_final_retry_prompt_can_be_overridden_and_tools_can_be_kept
@@ -1689,8 +1693,8 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_equal "auto", req3["tool_choice"]
     assert req3["tools"].is_a?(Array)
 
-    user3 = Array(req3["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
-    assert_includes user3, "FINALIZE_IN_ENGLISH"
+    user_texts3 = Array(req3["messages"]).filter_map { |m| m.is_a?(Hash) && m["role"] == "user" ? m["content"].to_s : nil }
+    assert user_texts3.any? { |t| t.include?("FINALIZE_IN_ENGLISH") }
   end
 
   def test_message_transform_can_inject_reasoning_content_on_assistant_tool_call_messages
