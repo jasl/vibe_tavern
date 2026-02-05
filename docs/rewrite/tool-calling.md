@@ -167,6 +167,7 @@ Notes:
   - `VERBOSE=0` to disable per-turn progress lines
   - `VERBOSE=1` (default) shows tool-loop progress for each run
   - `VERBOSE=2` includes extra request/tool size info
+  - Long LLM requests print a periodic "waiting for llm" heartbeat (every ~15s)
 - Tool use mode:
   - `OPENROUTER_TOOL_USE_MODE=enforced|relaxed|disabled`
     - `enforced`: require at least one tool call; final failure behavior is controlled by `tool_failure_policy`

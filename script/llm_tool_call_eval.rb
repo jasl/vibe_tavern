@@ -1008,6 +1008,26 @@ models.each_with_index do |model, model_index|
           if verbose_level <= 0
             nil
           else
+            heartbeat_thread = nil
+            heartbeat_stop = nil
+
+            stop_heartbeat =
+              lambda do
+                heartbeat_stop&.call
+                heartbeat_stop = nil
+
+                t = heartbeat_thread
+                heartbeat_thread = nil
+                return unless t
+
+                t.wakeup rescue nil
+                t.join(0.2)
+                t.kill
+                t.join(0.1)
+              rescue StandardError
+                nil
+              end
+
             lambda do |raw_event|
               event = raw_event.is_a?(Hash) ? raw_event : {}
               type = event.fetch(:type, "").to_s
@@ -1015,6 +1035,36 @@ models.each_with_index do |model, model_index|
 
               case type
               when "llm_request_start"
+                stop_heartbeat.call
+
+                heartbeat_turn = turn
+                heartbeat_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+                stop = false
+                heartbeat_stop = -> { stop = true }
+                heartbeat_thread =
+                  Thread.new do
+                    after_s = 15.0
+                    every_s = 15.0
+                    last_print_s = 0.0
+
+                    loop do
+                      break if stop
+
+                      sleep 0.5
+                      break if stop
+
+                      elapsed_s = Process.clock_gettime(Process::CLOCK_MONOTONIC) - heartbeat_started
+                      next if elapsed_s < after_s
+                      next if (elapsed_s - last_print_s) < every_s
+
+                      last_print_s = elapsed_s
+                      $stderr.puts("  [t#{heartbeat_turn}] .. waiting for llm (#{elapsed_s.round}s)")
+                      $stderr.flush
+                    end
+                  rescue StandardError
+                    nil
+                  end
+
                 tools_on = event[:tools_enabled] == true
                 msg = "  [t#{turn}] -> llm (tools=#{tools_on ? "on" : "off"})"
                 if verbose_level >= 2
@@ -1027,19 +1077,26 @@ models.each_with_index do |model, model_index|
                 end
                 $stderr.puts(msg)
               when "llm_request_error"
+                stop_heartbeat.call
+
                 msg = "  [t#{turn}] !! llm error"
                 msg << " status=#{event[:status]}" if event[:status]
+                msg << " #{event[:elapsed_ms]}ms" if verbose_level >= 2 && event[:elapsed_ms]
                 msg << " #{truncate(event[:message].to_s, max_chars: 220)}" unless event[:message].to_s.strip.empty?
                 $stderr.puts(msg)
               when "llm_request_retry"
+                stop_heartbeat.call
+
                 $stderr.puts(
                   "  [t#{turn}] .. retry (tools=off, attempts_left=#{event[:request_attempts_left]})",
                 )
               when "llm_request_end"
+                stop_heartbeat.call
+
                 ms = event[:elapsed_ms]
                 finish = event[:finish_reason]
                 tool_calls = Array(event[:tool_calls]).select { |v| v.is_a?(Hash) }
-                names = tool_calls.map { |tc| tc[:name] || tc["name"] }.map(&:to_s).map(&:strip).reject(&:empty?).uniq
+                names = tool_calls.map { |tc| tc.fetch(:name, nil) }.map(&:to_s).map(&:strip).reject(&:empty?).uniq
 
                 msg = "  [t#{turn}] <- llm"
                 msg << " #{ms}ms" if ms
@@ -1048,9 +1105,7 @@ models.each_with_index do |model, model_index|
                 $stderr.puts(msg)
               when "tool_call_start"
                 msg = "  [t#{turn}] -> tool #{event[:name]}"
-                if verbose_level >= 2
-                  msg << " args=#{event[:arguments_bytes]}B"
-                end
+                msg << " args=#{event[:arguments_bytes]}B" if verbose_level >= 2
                 if (parse = event[:parse_status]) && parse.to_s != "ok"
                   msg << " parse=#{parse}"
                 end
@@ -1070,6 +1125,7 @@ models.each_with_index do |model, model_index|
                   "  [t#{turn}] .. empty final; retry finalization (disable_tools=#{event[:disable_tools]})",
                 )
               when "final"
+                stop_heartbeat.call
                 $stderr.puts("  [t#{turn}] <- final")
               end
 
