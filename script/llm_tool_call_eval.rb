@@ -747,8 +747,8 @@ SCENARIOS =
         },
       },
       {
-        id: "duplicate_tool_calls",
-        title: "Multiple tool calls in a single response (state_get + state_patch)",
+        id: "happy_path_parallel",
+        title: "Happy path (parallel tool calls: state_get + state_patch -> done)",
         runtime_overrides: { request_overrides: { parallel_tool_calls: true } },
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
@@ -859,13 +859,22 @@ requested_scenario_tokens =
     .reject(&:empty?)
 
 requested_scenarios =
-  if requested_scenario_tokens.empty? ||
-      requested_scenario_tokens.any? { |v| %w[default smoke].include?(v.downcase) }
-    default_scenario_ids
-  elsif requested_scenario_tokens.any? { |v| %w[all full *].include?(v.downcase) }
+  if requested_scenario_tokens.any? { |v| %w[all full *].include?(v.downcase) }
     nil
+  elsif requested_scenario_tokens.empty?
+    default_scenario_ids
   else
-    requested_scenario_tokens
+    expanded =
+      requested_scenario_tokens.flat_map do |tok|
+        case tok.downcase
+        when "default", "smoke"
+          default_scenario_ids
+        else
+          tok
+        end
+      end
+
+    expanded.map(&:to_s).map(&:strip).reject(&:empty?).uniq
   end
 
 scenarios =

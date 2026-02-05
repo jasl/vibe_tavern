@@ -135,6 +135,10 @@ OPENROUTER_SCENARIOS=all OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
 OPENROUTER_SCENARIOS="happy_path,missing_workspace_id" OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
   bundle exec ruby script/llm_tool_call_eval.rb
 
+# Run the smoke preset plus an extra scenario (e.g., to compare sequential vs parallel tool calls).
+OPENROUTER_SCENARIOS="default,happy_path_parallel" OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
 # Single model
 OPENROUTER_API_KEY=... OPENROUTER_MODEL="openai/gpt-4.1-mini" \
   bundle exec ruby script/llm_tool_call_eval.rb

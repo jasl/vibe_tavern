@@ -75,3 +75,11 @@ Acceptance:
 Acceptance:
 - Default scenario preset includes `chat_only`.
 - `chat_only` forces `tool_use_mode=disabled` for that scenario and only asserts `assistant_text == "Done."`.
+
+### 7) Latency comparison
+
+- [x] Add a parallel tool-call happy path scenario (`happy_path_parallel`) so we can compare run latency vs the sequential happy path.
+- [x] Allow `OPENROUTER_SCENARIOS=default,...` to expand the smoke preset and append extra scenarios.
+
+Acceptance:
+- `OPENROUTER_SCENARIOS="default,happy_path_parallel"` runs the smoke preset plus the parallel happy path.
