@@ -156,10 +156,12 @@ module TavernKit
             assistant_content = assistant_msg.fetch("content", "").to_s
             tool_calls = deep_symbolize_keys(assistant_msg.fetch("tool_calls", nil))
             tool_calls = Array(tool_calls).select { |tc| tc.is_a?(Hash) }
+            tool_calls = normalize_tool_calls(tool_calls)
             tool_calls = normalize_tool_call_ids(tool_calls)
 
             if tools_enabled && tool_call_transforms.any?
               tool_calls = ToolCallTransforms.apply(tool_calls, tool_call_transforms, strict: @strict)
+              tool_calls = normalize_tool_calls(tool_calls)
               tool_calls = normalize_tool_call_ids(tool_calls)
             end
             ignored_tool_calls = 0
@@ -225,7 +227,11 @@ module TavernKit
 
               if @tool_use_mode == :enforced
                 unless any_tool_calls_seen
-                  raise ToolUseError.new("NO_TOOL_CALLS", "Tool use is enforced but the assistant requested no tool calls")
+                  raise ToolUseError.new(
+                    "NO_TOOL_CALLS",
+                    "Tool use is enforced but the assistant requested no tool calls",
+                    details: { trace: trace, history: history },
+                  )
                 end
 
                 case @tool_failure_policy
@@ -235,7 +241,12 @@ module TavernKit
                     raise ToolUseError.new(
                       "TOOL_ERROR",
                       "Tool use is enforced but at least one tool call failed: #{failed_tools.join(", ")}",
-                      details: { failed_tools: failed_tools, tool_failure_policy: @tool_failure_policy.to_s },
+                      details: {
+                        failed_tools: failed_tools,
+                        tool_failure_policy: @tool_failure_policy.to_s,
+                        trace: trace,
+                        history: history,
+                      },
                     )
                   end
                 when :tolerated
@@ -243,14 +254,14 @@ module TavernKit
                     raise ToolUseError.new(
                       "TOOL_ERROR",
                       "Tool use is enforced but no tool call succeeded (tool_failure_policy=tolerated)",
-                      details: { tool_failure_policy: @tool_failure_policy.to_s },
+                      details: { tool_failure_policy: @tool_failure_policy.to_s, trace: trace, history: history },
                     )
                   end
                 else
                   raise ToolUseError.new(
                     "TOOL_ERROR",
                     "Unknown tool_failure_policy: #{@tool_failure_policy.inspect}",
-                    details: { tool_failure_policy: @tool_failure_policy.to_s },
+                    details: { tool_failure_policy: @tool_failure_policy.to_s, trace: trace, history: history },
                   )
                 end
               end
@@ -260,10 +271,10 @@ module TavernKit
 
             tool_results = []
             tool_calls.each do |tc|
-              id = tc.fetch(:id, "").to_s
+              id = tc.fetch(:id, "").to_s.strip
               fn = tc.fetch(:function, {})
               fn = {} unless fn.is_a?(Hash)
-              name = fn.fetch(:name, "").to_s
+              name = fn.fetch(:name, "").to_s.strip
               args_json = fn.fetch(:arguments, nil)
 
               args = parse_args(args_json)
@@ -282,12 +293,14 @@ module TavernKit
                   @dispatcher.execute(name: name, args: args)
                 end
 
+              effective_tool_name = result.is_a?(Hash) ? result.fetch("tool_name", name).to_s : name
+
               if tool_result_transforms.any?
                 result =
                   ToolResultTransforms.apply(
                     result,
                     tool_result_transforms,
-                    tool_name: name,
+                    tool_name: effective_tool_name,
                     tool_call_id: id,
                     strict: @strict,
                   )
@@ -298,7 +311,7 @@ module TavernKit
                 too_large_bytes = tool_content.bytesize
                 result =
                   tool_error_envelope(
-                    name,
+                    effective_tool_name,
                     code: "TOOL_OUTPUT_TOO_LARGE",
                     message: "Tool output exceeded size limit",
                     data: { "bytes" => too_large_bytes, "max_bytes" => @max_tool_output_bytes },
@@ -309,7 +322,7 @@ module TavernKit
                     ToolResultTransforms.apply(
                       result,
                       tool_result_transforms,
-                      tool_name: name,
+                      tool_name: effective_tool_name,
                       tool_call_id: id,
                       strict: @strict,
                     )
@@ -321,12 +334,14 @@ module TavernKit
                   )
               end
 
-              last_tool_ok_by_name[name] = result.is_a?(Hash) ? result["ok"] : nil
+              effective_tool_name = result.is_a?(Hash) ? result.fetch("tool_name", effective_tool_name).to_s : effective_tool_name
+
+              last_tool_ok_by_name[effective_tool_name] = result.is_a?(Hash) ? result["ok"] : nil
               any_tool_success_seen ||= (result.is_a?(Hash) && result["ok"] == true)
 
               tool_results << {
                 id: id,
-                name: name,
+                name: effective_tool_name,
                 ok: result.is_a?(Hash) ? result["ok"] : nil,
                 error_codes:
                   if result.is_a?(Hash) && result["errors"].is_a?(Array)
@@ -714,12 +729,30 @@ module TavernKit
         # Since we resend the assistant message back to the provider on the next turn,
         # we can normalize IDs locally as long as we keep assistant.tool_calls[] and
         # subsequent tool results consistent.
+        def normalize_tool_calls(tool_calls)
+          tool_calls.map do |tool_call|
+            normalized = tool_call.dup
+
+            id = normalized.fetch(:id, "").to_s.strip
+            normalized[:id] = id
+
+            fn = normalized.fetch(:function, nil)
+            fn = fn.dup if fn.is_a?(Hash)
+            fn = {} unless fn.is_a?(Hash)
+
+            fn[:name] = fn.fetch(:name, "").to_s.strip
+            normalized[:function] = fn
+
+            normalized
+          end
+        end
+
         def normalize_tool_call_ids(tool_calls)
           used = {}
 
           tool_calls.map.with_index do |tool_call, idx|
             normalized = tool_call.dup
-            base_id = normalized.fetch(:id, "").to_s
+            base_id = normalized.fetch(:id, "").to_s.strip
             base_id = "tc_#{idx + 1}" if base_id.empty?
 
             id = base_id

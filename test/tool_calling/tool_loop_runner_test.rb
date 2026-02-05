@@ -316,6 +316,93 @@ class ToolLoopRunnerTest < Minitest::Test
     refute_nil tool_result
   end
 
+  def test_tool_call_names_with_whitespace_are_stripped
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: {
+                            name: "state_get",
+                            arguments: JSON.generate({ workspace_id: workspace_id }),
+                          },
+                        },
+                        {
+                          id: "call_2",
+                          type: "function",
+                          function: {
+                            name: " state_patch ",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                request_id: "r1",
+                                ops: [
+                                  { op: "set", path: "/draft/foo", value: "bar" },
+                                ],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
+
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_equal "Done.", result[:assistant_text]
+    assert_equal "bar", workspace.draft["foo"]
+
+    t0 = result[:trace].find { |t| t[:turn] == 0 }
+    tool_names = Array(t0[:tool_calls]).map { |tc| tc[:name] }
+    assert_equal %w[state_get state_patch], tool_names
+  end
+
   def test_tool_definition_strips_empty_required_arrays_for_provider_compatibility
     registry =
       TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
@@ -2359,6 +2446,9 @@ class ToolLoopRunnerTest < Minitest::Test
     end
 
     assert_equal "NO_TOOL_CALLS", error.code
+    assert error.details.is_a?(Hash)
+    assert error.details.fetch(:trace, nil).is_a?(Array)
+    assert error.details.fetch(:history, nil).is_a?(Array)
 
     req1 = JSON.parse(requests[0][:body])
     assert req1["tools"].is_a?(Array), "expected tools to be sent in enforced mode"
@@ -2454,6 +2544,9 @@ class ToolLoopRunnerTest < Minitest::Test
 
     assert_equal "TOOL_ERROR", error.code
     assert_includes error.message, "state_get"
+    assert error.details.is_a?(Hash)
+    assert error.details.fetch(:trace, nil).is_a?(Array)
+    assert error.details.fetch(:history, nil).is_a?(Array)
   end
 
   def test_tool_use_mode_enforced_with_tolerated_policy_allows_failed_tool_if_any_tool_succeeds

@@ -14,7 +14,7 @@ module TavernKit
         end
 
         def execute(name:, args:)
-          name = normalize_tool_name(name.to_s)
+          name = normalize_tool_name(name.to_s.strip)
           args = args.is_a?(Hash) ? args : {}
 
           unless @registry.include?(name, expose: @expose)

@@ -64,7 +64,7 @@ DEFAULT_MODELS = [
   "deepseek/deepseek-v3.2",
   "deepseek/deepseek-chat-v3-0324",
   "x-ai/grok-4.1-fast",
-  "minimax/minimax-m2-her", # Not support tool use
+  "minimax/minimax-m2-her",
   "google/gemini-2.5-flash",
   "google/gemini-3-flash-preview",
   "google/gemini-3-pro-preview",
@@ -72,10 +72,10 @@ DEFAULT_MODELS = [
   "openai/gpt-5.2-chat",
   "openai/gpt-5.2",
   "qwen/qwen3-vl-30b-a3b-instruct",
-  "qwen/qwen3-next-80b-a3b-instruct", # Bugged
+  "qwen/qwen3-next-80b-a3b-instruct",
   "qwen/qwen3-vl-235b-a22b-instruct",
   "z-ai/glm-4.7",
-  "z-ai/glm-4.7-flash", # Bugged
+  "z-ai/glm-4.7-flash",
   "moonshotai/kimi-k2.5",
 ].freeze
 
@@ -969,6 +969,8 @@ models.each_with_index do |model, model_index|
       rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
         ok = false
         error = "#{e.code}: #{e.message}"
+        trace = e.details.is_a?(Hash) ? e.details.fetch(:trace, nil) : nil
+        raw_history = e.details.is_a?(Hash) ? Array(e.details.fetch(:history, nil)) : nil
       rescue SimpleInference::Errors::HTTPError => e
         ok = false
         error_status = e.status
