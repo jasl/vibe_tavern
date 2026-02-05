@@ -613,6 +613,22 @@ rescue StandardError
   nil
 end
 
+chat_only_scenario = {
+  id: "chat_only",
+  title: "Tool calling disabled (control)",
+  runtime_overrides: { tool_use_mode: :disabled },
+  prepare: ->(_workspace) { },
+  system: <<~SYS.strip,
+    Tool calling is disabled for this run.
+    Do not call any tools.
+    Reply with a single sentence: "Done."
+  SYS
+  user_text: ->(_workspace) { "hello" },
+  assert: lambda { |assistant_text:, **|
+    assistant_text.to_s.strip == "Done." ? [] : [%(assistant_text != "Done.")]
+  },
+}.freeze
+
 SCENARIOS =
   if tools_enabled
     [
@@ -814,23 +830,11 @@ SCENARIOS =
           reasons
         },
       },
+      chat_only_scenario,
     ]
   else
     [
-      {
-        id: "chat_only",
-        title: "Tool calling disabled",
-        runtime_overrides: {},
-        prepare: ->(_workspace) { },
-        system: <<~SYS.strip,
-          Tool calling is disabled for this run.
-          Reply with a single sentence: "Done."
-        SYS
-        user_text: ->(_workspace) { "hello" },
-        assert: lambda { |assistant_text:, **|
-          assistant_text.to_s.strip == "Done." ? [] : [%(assistant_text != "Done.")]
-        },
-      },
+      chat_only_scenario,
     ]
   end
 
@@ -841,6 +845,7 @@ default_scenario_ids =
       missing_workspace_id
       type_error_recovery
       long_arguments_guard
+      chat_only
     ]
   else
     %w[chat_only]

@@ -62,3 +62,16 @@ Acceptance:
 - [x] `bin/rubocop` passes.
 - [x] `bin/rails test test/tool_calling/` passes.
 - [x] `bin/brakeman --no-pager` remains clean (no new warnings in eval script).
+
+### 6) Eval harness guardrails
+
+- [x] Add configurable client timeouts to avoid long-tail runs.
+  - `OPENROUTER_CLIENT_TIMEOUT` (default: `120`; `0` disables)
+  - `OPENROUTER_OPEN_TIMEOUT` (default: `10`; `0` disables)
+  - `OPENROUTER_READ_TIMEOUT` (default: `OPENROUTER_CLIENT_TIMEOUT`; `0` disables)
+  - Optional: `OPENROUTER_HTTP_ADAPTER=httpx|default`
+- [x] Add a chat-only control scenario (`chat_only`) even when tool use is enabled.
+
+Acceptance:
+- Default scenario preset includes `chat_only`.
+- `chat_only` forces `tool_use_mode=disabled` for that scenario and only asserts `assistant_text == "Done."`.

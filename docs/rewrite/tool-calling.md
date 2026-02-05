@@ -123,7 +123,7 @@ Script:
 
 ```sh
 # Run the default scenario preset (smoke) for each model and compute success rate / latency percentiles.
-# Default preset: happy_path, missing_workspace_id, type_error_recovery, long_arguments_guard
+# Default preset: happy_path, missing_workspace_id, type_error_recovery, long_arguments_guard, chat_only
 OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
   bundle exec ruby script/llm_tool_call_eval.rb
 
