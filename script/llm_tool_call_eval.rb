@@ -530,7 +530,7 @@ def error_category(message, status: nil)
   return "NO_TOOL_CALLS" if msg.start_with?("NO_TOOL_CALLS:")
   return "TOOL_ERROR" if msg.start_with?("TOOL_ERROR:")
   return "NO_TOOL_USE_ENDPOINT" if msg.include?("No endpoints found that support tool use")
-  return "TIMEOUT" if msg.include?("TimeoutError")
+  return "TIMEOUT" if msg.include?("TimeoutError") || msg.include?("Net::ReadTimeout") || msg.match?(/Timed out after/i)
 
   case status.to_i
   when 401 then "AUTH"

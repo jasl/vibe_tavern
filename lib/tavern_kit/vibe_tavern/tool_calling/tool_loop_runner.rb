@@ -185,6 +185,26 @@ module TavernKit
               end
 
               raise e
+            rescue StandardError => e
+              elapsed_ms =
+                begin
+                  request_elapsed_ms || ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+                rescue StandardError
+                  nil
+                end
+
+              emit_event(
+                event_handler,
+                :llm_request_error,
+                turn: turn,
+                tools_enabled: tools_enabled,
+                status: e.respond_to?(:status) ? e.status : nil,
+                error_class: e.class.name,
+                message: e.message.to_s,
+                elapsed_ms: elapsed_ms,
+              )
+
+              raise e
             end
             body = response.body.is_a?(Hash) ? response.body : {}
 
