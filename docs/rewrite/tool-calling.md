@@ -182,12 +182,17 @@ Notes:
 
 The goal of `OPENROUTER_MODEL_FILTER=stable` is to keep a small, cheap, high-signal eval set for repeated runs.
 
-As of `tmp/llm_tool_call_eval_reports/20260206T145643Z` (smoke scenarios, 5 trials), the most stable models were:
-- `anthropic/claude-opus-4.6:nitro`
-- `google/gemini-2.5-flash:nitro`
-- `qwen/qwen3-next-80b-a3b-instruct:nitro`
-- `qwen/qwen3-30b-a3b-instruct-2507:nitro`
-- `qwen/qwen3-235b-a22b-2507:nitro` (best-effort enables the content-tag fallback)
+As of `tmp/llm_tool_call_eval_reports/20260206T160334Z` (full model catalog, smoke scenarios, 5 trials),
+the models with 100% end-to-end success were:
+
+| model | ok | p95_ms | notes |
+|---|---:|---:|---|
+| `qwen/qwen3-235b-a22b-2507:nitro` | 25/25 | 6413 | best-effort enables the content-tag fallback |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | 25/25 | 7302 | - |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | 25/25 | 10787 | - |
+| `openai/gpt-5.2:nitro` | 25/25 | 12074 | - |
+| `anthropic/claude-opus-4.6:nitro` | 25/25 | 15962 | - |
+| `google/gemini-2.5-flash:nitro` | 25/25 | 20079 | - |
 
 Models outside `stable` can be valuable, but tend to be noisier on at least one scenario (e.g. `long_arguments_guard`) or have more provider-side variability.
 - `SimpleInference` composes the final request URL as `base_url + api_prefix + endpoint`.

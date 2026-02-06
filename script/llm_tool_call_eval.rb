@@ -266,7 +266,7 @@ MODEL_CATALOG =
     model "google/gemini-3-pro-preview:nitro", workarounds: [:gemini_openrouter_compat], tags: %w[google gemini]
     model "anthropic/claude-opus-4.6:nitro", tags: %w[anthropic claude stable]
     model "openai/gpt-5.2-chat:nitro", tags: %w[openai gpt]
-    model "openai/gpt-5.2:nitro", tags: %w[openai gpt]
+    model "openai/gpt-5.2:nitro", tags: %w[openai gpt stable]
     model "minimax/minimax-m2-her", workarounds: [:tool_use_disabled], tags: %w[minimax]
     model "minimax/minimax-m2.1:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[minimax]
     model "qwen/qwen3-30b-a3b-instruct-2507:nitro", tags: %w[qwen stable]
