@@ -91,3 +91,25 @@ TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
   "assistant_tool_calls_reasoning_content_empty_if_missing",
   reasoning_content_empty,
 )
+
+TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
+  "assistant_tool_calls_signature_skip_validator_if_missing",
+  lambda do |messages|
+    messages.each do |msg|
+      next unless msg.is_a?(Hash)
+
+      role = msg.fetch(:role, "")
+      next unless role == "assistant"
+
+      tool_calls = msg.fetch(:tool_calls, nil)
+      next unless tool_calls.is_a?(Array) && tool_calls.any?
+
+      tool_calls.each do |tc|
+        next unless tc.is_a?(Hash)
+        next if tc.key?(:signature) || tc.key?("signature")
+
+        tc[:signature] = "skip_thought_signature_validator"
+      end
+    end
+  end,
+)

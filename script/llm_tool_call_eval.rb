@@ -4,6 +4,7 @@
 require "fileutils"
 require "json"
 require "securerandom"
+require "thread"
 require "time"
 
 # Default settings
@@ -11,6 +12,141 @@ ENV["RAILS_ENV"] ||= "development"
 
 # Load Rails environment
 require_relative "../config/environment"
+
+module ToolCallEval
+  class ModelCatalog
+    Entry = Struct.new(:id, :workarounds, :tags, keyword_init: true) do
+      def initialize(id:, workarounds: [], tags: [])
+        super(
+          id: id.to_s,
+          workarounds: normalize_workarounds(workarounds),
+          tags: normalize_tags(tags),
+        )
+      end
+
+      def base_id
+        id.split(":", 2).first.to_s
+      end
+
+      def provider
+        base_id.split("/", 2).first.to_s
+      end
+
+      def matches?(raw_token)
+        token = raw_token.to_s.strip.downcase
+        return false if token.empty?
+
+        candidates =
+          [
+            id,
+            base_id,
+            provider,
+            *tags,
+          ].map { |value| value.to_s.downcase }.uniq
+
+        if token.include?("*")
+          candidates.any? { |value| File.fnmatch(token, value) }
+        else
+          candidates.include?(token)
+        end
+      end
+
+      private
+
+      def normalize_workarounds(value)
+        Array(value).map { |item| item.to_s.strip.downcase.tr("-", "_").to_sym }.uniq
+      end
+
+      def normalize_tags(value)
+        Array(value).map { |item| item.to_s.strip.downcase }.reject(&:empty?).uniq
+      end
+    end
+
+    def self.build(&block)
+      catalog = new
+      catalog.instance_eval(&block) if block
+      catalog.freeze
+    end
+
+    def initialize
+      @entries = []
+    end
+
+    def model(id, workarounds: [], tags: [])
+      entry = Entry.new(id: id, workarounds: workarounds, tags: tags)
+      @entries << entry
+      entry
+    end
+
+    def entries
+      @entries.dup
+    end
+
+    def ids
+      @entries.map(&:id)
+    end
+
+    def filter(raw_filter)
+      tokens = raw_filter.to_s.split(",").map(&:strip).reject(&:empty?)
+      return entries if tokens.empty? || tokens.any? { |token| %w[all full *].include?(token.downcase) }
+
+      include_tokens = tokens.reject { |token| token.start_with?("!") }
+      exclude_tokens =
+        tokens
+          .select { |token| token.start_with?("!") }
+          .map { |token| token.delete_prefix("!") }
+          .reject(&:empty?)
+
+      selected =
+        if include_tokens.empty?
+          entries
+        else
+          entries.select { |entry| include_tokens.any? { |token| entry.matches?(token) } }
+        end
+
+      selected.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
+    end
+  end
+
+  module ModelWorkarounds
+    module_function
+
+    def presets_for(model_entry, exclude: [])
+      excluded =
+        Array(exclude)
+          .map { |name| canonical_workaround_name(name) }
+          .reject(&:empty?)
+          .to_h { |name| [name, true] }
+
+      Array(model_entry&.workarounds).filter_map do |name|
+        canonical = canonical_workaround_name(name)
+        next if canonical.empty?
+        next if excluded.key?(canonical)
+
+        preset_for(canonical)
+      end
+    end
+
+    def preset_for(name)
+      case canonical_workaround_name(name)
+      when "deepseek_openrouter_compat", "deepseek_compat"
+        TavernKit::VibeTavern::ToolCalling::Presets.deepseek_openrouter_compat
+      when "gemini_openrouter_compat", "gemini_compat"
+        TavernKit::VibeTavern::ToolCalling::Presets.gemini_openrouter_compat
+      when "content_tag_tool_call_fallback", "content_tag_fallback"
+        TavernKit::VibeTavern::ToolCalling::Presets.content_tag_tool_call_fallback
+      when "tool_use_disabled", "disable_tool_use", "tools_disabled"
+        TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(tool_use_mode: :disabled)
+      else
+        {}
+      end
+    end
+
+    def canonical_workaround_name(name)
+      name.to_s.strip.downcase.tr("-", "_")
+    end
+  end
+end
 
 api_key = ENV["OPENROUTER_API_KEY"].to_s
 if api_key.empty?
@@ -60,6 +196,14 @@ trials_per_model =
   end
 trials_per_model = 1 if trials_per_model < 1
 
+parallel_jobs =
+  begin
+    Integer(ENV.fetch("OPENROUTER_JOBS", "1"))
+  rescue ArgumentError, TypeError
+    1
+  end
+parallel_jobs = 1 if parallel_jobs < 1
+
 verbose_level =
   begin
     Integer(ENV.fetch("VERBOSE", "1"))
@@ -67,6 +211,8 @@ verbose_level =
     1
   end
 verbose_level = 0 if verbose_level < 0
+enable_content_tag_tool_call_fallback = ENV.fetch("OPENROUTER_ENABLE_CONTENT_TAG_TOOL_CALL_FALLBACK", "0") == "1"
+fallback_matrix = ENV.fetch("OPENROUTER_FALLBACK_MATRIX", "0") == "1"
 
 client_timeout =
   begin
@@ -95,40 +241,52 @@ client_read_timeout = nil if client_read_timeout && client_read_timeout <= 0
 client_read_timeout ||= client_timeout
 
 http_adapter_name = ENV.fetch("OPENROUTER_HTTP_ADAPTER", "httpx").to_s.strip.downcase.tr("-", "_")
-http_adapter =
-  case http_adapter_name
-  when "", "default", "net_http", "nethttp"
-    nil
-  when "httpx"
-    SimpleInference::HTTPAdapters::HTTPX.new(timeout: client_timeout)
-  else
-    warn "Unknown OPENROUTER_HTTP_ADAPTER=#{http_adapter_name.inspect}. Using httpx."
-    http_adapter_name = "httpx"
-    SimpleInference::HTTPAdapters::HTTPX.new(timeout: client_timeout)
+unless ["", "default", "net_http", "nethttp", "httpx"].include?(http_adapter_name)
+  warn "Unknown OPENROUTER_HTTP_ADAPTER=#{http_adapter_name.inspect}. Using httpx."
+  http_adapter_name = "httpx"
+end
+
+build_http_adapter =
+  lambda do
+    case http_adapter_name
+    when "", "default", "net_http", "nethttp"
+      nil
+    when "httpx"
+      SimpleInference::HTTPAdapters::HTTPX.new(timeout: client_timeout)
+    end
   end
 
-DEFAULT_MODELS = [
-  "deepseek/deepseek-v3.2:nitro",
-  "deepseek/deepseek-chat-v3-0324:nitro",
-  "x-ai/grok-4.1-fast",
-  "google/gemini-2.5-flash:nitro",
-  "google/gemini-3-flash-preview:nitro",
-  "google/gemini-3-pro-preview:nitro",
-  "anthropic/claude-opus-4.5:nitro",
-  "openai/gpt-5.2-chat:nitro",
-  "openai/gpt-5.2:nitro",
-  "minimax/minimax-m2-her",
-  "minimax/minimax-m2.1:nitro",
-  "qwen/qwen3-vl-30b-a3b-instruct:nitro",
-  "qwen/qwen3-next-80b-a3b-instruct:nitro",
-  "qwen/qwen3-vl-235b-a22b-instruct:nitro",
-  "z-ai/glm-4.7:nitro",
-  "z-ai/glm-4.7-flash:nitro",
-  "moonshotai/kimi-k2.5:nitro",
-].freeze
+MODEL_CATALOG =
+  ToolCallEval::ModelCatalog.build do
+    model "deepseek/deepseek-v3.2:nitro", workarounds: [:deepseek_openrouter_compat], tags: %w[deepseek ds]
+    model "deepseek/deepseek-chat-v3-0324:nitro", workarounds: [:deepseek_openrouter_compat], tags: %w[deepseek ds chat]
+    model "x-ai/grok-4.1-fast", tags: %w[x_ai grok]
+    model "google/gemini-2.5-flash:nitro", workarounds: [:gemini_openrouter_compat], tags: %w[google gemini stable]
+    model "google/gemini-3-flash-preview:nitro", workarounds: [:gemini_openrouter_compat], tags: %w[google gemini]
+    model "google/gemini-3-pro-preview:nitro", workarounds: [:gemini_openrouter_compat], tags: %w[google gemini]
+    model "anthropic/claude-opus-4.6:nitro", tags: %w[anthropic claude stable]
+    model "openai/gpt-5.2-chat:nitro", tags: %w[openai gpt]
+    model "openai/gpt-5.2:nitro", tags: %w[openai gpt]
+    model "minimax/minimax-m2-her", workarounds: [:tool_use_disabled], tags: %w[minimax]
+    model "minimax/minimax-m2.1:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[minimax]
+    model "qwen/qwen3-30b-a3b-instruct-2507:nitro", tags: %w[qwen stable]
+    model "qwen/qwen3-next-80b-a3b-instruct:nitro", tags: %w[qwen stable]
+    model "qwen/qwen3-235b-a22b-2507:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[qwen stable]
+    model "z-ai/glm-4.7:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[z_ai glm]
+    model "z-ai/glm-4.7-flash:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[z_ai glm]
+    model "moonshotai/kimi-k2.5:nitro", tags: %w[moonshot kimi]
+  end
 
-models = ENV.fetch("OPENROUTER_MODELS", ENV["OPENROUTER_MODEL"].to_s).split(",").map(&:strip).reject(&:empty?)
-models = DEFAULT_MODELS if models.empty?
+DEFAULT_MODELS = MODEL_CATALOG.ids.freeze
+
+model_filter = ENV.fetch("OPENROUTER_MODEL_FILTER", "stable")
+selected_model_entries = MODEL_CATALOG.filter(model_filter)
+
+if selected_model_entries.empty?
+  warn "No models matched OPENROUTER_MODEL_FILTER=#{model_filter.inspect}."
+  warn "Available model ids: #{DEFAULT_MODELS.join(", ")}"
+  exit 2
+end
 
 headers = {}
 headers["HTTP-Referer"] = ENV["OPENROUTER_HTTP_REFERER"] if ENV["OPENROUTER_HTTP_REFERER"]
@@ -183,6 +341,29 @@ if tools_enabled && !request_overrides.key?("parallel_tool_calls")
   request_overrides["parallel_tool_calls"] = false
 end
 
+build_provider_tool_calling_preset =
+  lambda do |enable_tag_fallback:|
+    preset = TavernKit::VibeTavern::ToolCalling::Presets.provider_defaults("openrouter")
+    return preset unless enable_tag_fallback
+
+    TavernKit::VibeTavern::ToolCalling::Presets.merge(
+      preset,
+      TavernKit::VibeTavern::ToolCalling::Presets.content_tag_tool_call_fallback,
+    )
+  end
+
+strategy_profiles =
+  if fallback_matrix
+    [
+      { id: "fallback_off", content_tag_tool_call_fallback: false },
+      { id: "fallback_on", content_tag_tool_call_fallback: true },
+    ]
+  else
+    [
+      { id: "best_effort", content_tag_tool_call_fallback: enable_content_tag_tool_call_fallback },
+    ]
+  end
+
 module ToolCallEval
   class Workspace
     attr_reader :id, :facts, :draft, :locks, :ui_state
@@ -214,7 +395,7 @@ module ToolCallEval
 
       paths.each_with_object({}) do |pointer, out|
         out[pointer] = read_pointer(full, pointer)
-      rescue ArgumentError
+      rescue ArgumentError, KeyError, IndexError
         out[pointer] = nil
       end
     end
@@ -427,21 +608,21 @@ module ToolCallEval
 
     def ok_envelope(name, data)
       {
-        "ok" => true,
-        "tool_name" => name,
-        "data" => data.is_a?(Hash) ? data : { "value" => data },
-        "warnings" => [],
-        "errors" => [],
+        ok: true,
+        tool_name: name,
+        data: data.is_a?(Hash) ? data : { value: data },
+        warnings: [],
+        errors: [],
       }
     end
 
     def error_envelope(name, code:, message:)
       {
-        "ok" => false,
-        "tool_name" => name,
-        "data" => {},
-        "warnings" => [],
-        "errors" => [{ "code" => code, "message" => message.to_s }],
+        ok: false,
+        tool_name: name,
+        data: {},
+        warnings: [],
+        errors: [{ code: code, message: message.to_s }],
       }
     end
 
@@ -522,6 +703,12 @@ def truncate(str, max_chars: 220)
   return s if s.length <= max_chars
 
   "#{s[0, max_chars]}…"
+end
+
+def done_text?(text)
+  normalized = text.to_s.strip
+  normalized = normalized.sub(/\A["'`]+\s*/, "").sub(/\s*["'`]+\z/, "")
+  normalized.match?(/\Adone[.!]?\z/i)
 end
 
 def error_category(message, status: nil)
@@ -624,16 +811,16 @@ end
 chat_only_scenario = {
   id: "chat_only",
   title: "Tool calling disabled (control)",
-  runtime_overrides: { tool_use_mode: :disabled },
+  runtime_overrides: { tool_use_mode: :disabled, request_overrides: { max_tokens: 32 } },
   prepare: ->(_workspace) { },
   system: <<~SYS.strip,
     Tool calling is disabled for this run.
     Do not call any tools.
-    Reply with a single sentence: "Done."
+    Reply exactly with: Done.
   SYS
-  user_text: ->(_workspace) { "hello" },
+  user_text: ->(_workspace) { "Reply exactly with: Done." },
   assert: lambda { |assistant_text:, **|
-    assistant_text.to_s.strip == "Done." ? [] : [%(assistant_text != "Done.")]
+    done_text?(assistant_text) ? [] : [%(assistant_text != "Done.")]
   },
 }.freeze
 
@@ -665,7 +852,7 @@ SCENARIOS =
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
         assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
           reasons
         },
@@ -688,7 +875,7 @@ SCENARIOS =
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
         assert: lambda { |assistant_text:, workspace:, tools_enabled:, trace:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
           saw_mixed =
@@ -715,6 +902,7 @@ SCENARIOS =
           - Then call `state_patch` to set `/draft/foo` to string value "bar".
             - Do NOT pass `workspace_id` in tool arguments.
             - Only change the `/draft/foo` path. Do not change other draft keys.
+            - The value must be exactly "bar". Never copy `workspace_id` into `/draft/foo`.
           - If a tool returns ok=false, read `errors[]`, fix your arguments, and call the tool again.
           - After tools are done, reply with a single sentence: "Done."
 
@@ -725,7 +913,7 @@ SCENARIOS =
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
         assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
           reasons
         },
@@ -749,7 +937,7 @@ SCENARIOS =
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
         assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
           reasons
         },
@@ -770,7 +958,7 @@ SCENARIOS =
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
         assert: lambda { |assistant_text:, workspace:, tools_enabled:, trace:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
           multi =
@@ -785,21 +973,25 @@ SCENARIOS =
       {
         id: "long_arguments_guard",
         title: "Long arguments guardrail (ARGUMENTS_TOO_LARGE) + recovery",
-        runtime_overrides: { max_tool_args_bytes: 1_500 },
+        runtime_overrides: { max_tool_args_bytes: 300, request_overrides: { max_tokens: 256 } },
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
           Rules:
           - Always call `state_get` first.
-          - Then call `state_patch` to set `/draft/foo` to a string value.
-            - IMPORTANT: First, try a LONG value (>= 2500 'x' characters).
+          - IMPORTANT: Call at most ONE tool per assistant message.
+          - Then call `state_patch` to set `/draft/foo`.
+            - Use request_id "r1".
+            - First, try a LONG value (>= 300 'x' characters).
             - If the tool returns ok=false with ARGUMENTS_TOO_LARGE, retry with the short value "bar".
-          - After a successful `state_patch`, reply with a single sentence: "Done."
+            - If the LONG call unexpectedly succeeds (ok=true), still call `state_patch` again with the short value "bar" so the final state is correct.
+          - Do NOT reply "Done." until AFTER you have received a successful (ok=true) tool result for `state_patch` with value "bar".
+          - After tools are done, reply with a single sentence: "Done."
         SYS
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
         assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
           reasons
         },
@@ -823,7 +1015,7 @@ SCENARIOS =
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
         assert: lambda { |assistant_text:, workspace:, tools_enabled:, raw_history:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless assistant_text.to_s.strip == "Done."
+          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
           saw_truncation =
@@ -912,355 +1104,393 @@ FileUtils.mkdir_p(out_dir)
 
 reports = []
 
-models.each_with_index do |model, model_index|
-  model_idx = model_index + 1
-  model_total = models.length
-
-  client = SimpleInference::Client.new(
-    base_url: base_url,
-    api_key: api_key,
-    headers: headers,
-    api_prefix: api_prefix,
-    timeout: client_timeout,
-    open_timeout: client_open_timeout,
-    read_timeout: client_read_timeout,
-    adapter: http_adapter,
-  )
-
-  safe_model = model.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
-
-  runs = []
-  failures = []
-
-  trials_per_model.times do |trial_idx|
-    scenarios.each_with_index do |scenario, scenario_index|
-      scenario_idx = scenario_index + 1
-      scenario_total = scenarios.length
-      scenario_id = scenario.fetch(:id).to_s
-      safe_scenario = scenario_id.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
-
-      $stderr.puts(
-        "[#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] testing #{model} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
-      )
-      $stderr.flush
-
-      workspace = ToolCallEval::Workspace.new
-      scenario[:prepare].call(workspace) if scenario[:prepare]
-
-      tool_executor = ToolCallEval::Executor.new(workspace: workspace)
-      registry =
-        TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
-          definitions: ToolCallEval.tool_definitions,
-        )
-
-      tool_calling =
-        TavernKit::VibeTavern::ToolCalling::Presets.merge(
-          TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling,
-          TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(
-            tool_use_mode: tool_use_mode,
-            tool_failure_policy: tool_failure_policy,
-            fallback_retry_count: fallback_retry_count,
-            fix_empty_final: fix_empty_final,
-            tool_allowlist: tool_allowlist,
-            request_overrides: request_overrides,
-          ),
-          TavernKit::VibeTavern::ToolCalling::Presets.model_defaults(model),
-          scenario[:runtime_overrides] || {},
-        )
-
-      effective_tool_use_mode = normalize_tool_use_mode(tool_calling.fetch(:tool_use_mode, tool_use_mode))
-      effective_tools_enabled = effective_tool_use_mode != "disabled"
-
-      runtime =
-        TavernKit::Runtime::Base.build(
-          {
-            tool_calling: tool_calling,
-          },
-          type: :app,
-        )
-
-      runner =
-        TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-          client: client,
-          model: model,
-          tool_executor: tool_executor,
-          runtime: runtime,
-          registry: registry,
-          system: scenario.fetch(:system).to_s,
-          strict: false,
-        )
-
-      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-
-      ok = true
-      error = nil
-      error_hint = nil
-      error_status = nil
-      error_body = nil
-      error_raw_body = nil
-      assistant_text = nil
-      trace = nil
-      raw_history = nil
-
-      begin
-        user_text = scenario.fetch(:user_text).call(workspace).to_s
-        progress_printer =
-          if verbose_level <= 0
-            nil
-          else
-            heartbeat_thread = nil
-            heartbeat_stop = nil
-
-            stop_heartbeat =
-              lambda do
-                heartbeat_stop&.call
-                heartbeat_stop = nil
-
-                t = heartbeat_thread
-                heartbeat_thread = nil
-                return unless t
-
-                t.wakeup rescue nil
-                t.join(0.2)
-                t.kill
-                t.join(0.1)
-              rescue StandardError
-                nil
-              end
-
-            lambda do |raw_event|
-              event = raw_event.is_a?(Hash) ? raw_event : {}
-              type = event.fetch(:type, "").to_s
-              turn = event.fetch(:turn, nil)
-
-              case type
-              when "llm_request_start"
-                stop_heartbeat.call
-
-                heartbeat_turn = turn
-                heartbeat_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-                stop = false
-                heartbeat_stop = -> { stop = true }
-                heartbeat_thread =
-                  Thread.new do
-                    after_s = 15.0
-                    every_s = 15.0
-                    last_print_s = 0.0
-
-                    loop do
-                      break if stop
-
-                      sleep 0.5
-                      break if stop
-
-                      elapsed_s = Process.clock_gettime(Process::CLOCK_MONOTONIC) - heartbeat_started
-                      next if elapsed_s < after_s
-                      next if (elapsed_s - last_print_s) < every_s
-
-                      last_print_s = elapsed_s
-                      $stderr.puts("  [t#{heartbeat_turn}] .. waiting for llm (#{elapsed_s.round}s)")
-                      $stderr.flush
-                    end
-                  rescue StandardError
-                    nil
-                  end
-
-                tools_on = event[:tools_enabled] == true
-                msg = "  [t#{turn}] -> llm (tools=#{tools_on ? "on" : "off"})"
-                if verbose_level >= 2
-                  msg << " msgs=#{event[:messages_count]}"
-                  msg << " tools=#{event[:tools_count]}"
-                  msg << " choice=#{event[:tool_choice] || "auto"}"
-                  if event[:request_attempts_left].to_i.positive?
-                    msg << " retries_left=#{event[:request_attempts_left]}"
-                  end
-                end
-                $stderr.puts(msg)
-              when "llm_request_error"
-                stop_heartbeat.call
-
-                msg = "  [t#{turn}] !! llm error"
-                msg << " status=#{event[:status]}" if event[:status]
-                msg << " #{event[:elapsed_ms]}ms" if verbose_level >= 2 && event[:elapsed_ms]
-                msg << " #{truncate(event[:message].to_s, max_chars: 220)}" unless event[:message].to_s.strip.empty?
-                $stderr.puts(msg)
-              when "llm_request_retry"
-                stop_heartbeat.call
-
-                $stderr.puts(
-                  "  [t#{turn}] .. retry (tools=off, attempts_left=#{event[:request_attempts_left]})",
-                )
-              when "llm_request_end"
-                stop_heartbeat.call
-
-                ms = event[:elapsed_ms]
-                finish = event[:finish_reason]
-                tool_calls = Array(event[:tool_calls]).select { |v| v.is_a?(Hash) }
-                names = tool_calls.map { |tc| tc.fetch(:name, nil) }.map(&:to_s).map(&:strip).reject(&:empty?).uniq
-
-                msg = "  [t#{turn}] <- llm"
-                msg << " #{ms}ms" if ms
-                msg << " finish=#{finish}" if finish
-                msg << " tool_calls=#{names.join(",")}" if names.any?
-                $stderr.puts(msg)
-              when "tool_call_start"
-                msg = "  [t#{turn}] -> tool #{event[:name]}"
-                msg << " args=#{event[:arguments_bytes]}B" if verbose_level >= 2
-                if (parse = event[:parse_status]) && parse.to_s != "ok"
-                  msg << " parse=#{parse}"
-                end
-                $stderr.puts(msg)
-              when "tool_call_end"
-                msg = "  [t#{turn}] <- tool #{event[:name]} ok=#{event[:ok]}"
-                msg << " #{event[:elapsed_ms]}ms" if event[:elapsed_ms]
-                errors = Array(event[:error_codes]).map(&:to_s).map(&:strip).reject(&:empty?)
-                msg << " errors=#{errors.join(",")}" if errors.any?
-                if verbose_level >= 2
-                  msg << " out=#{event[:output_bytes]}B"
-                  msg << " replaced" if event[:output_replaced] == true
-                end
-                $stderr.puts(msg)
-              when "fix_empty_final"
-                $stderr.puts(
-                  "  [t#{turn}] .. empty final; retry finalization (disable_tools=#{event[:disable_tools]})",
-                )
-              when "final"
-                stop_heartbeat.call
-                $stderr.puts("  [t#{turn}] <- final")
-              end
-
-              $stderr.flush
-            rescue StandardError
-              nil
-            end
-          end
-
-        result = runner.run(user_text: user_text, on_event: progress_printer)
-
-        assistant_text = result[:assistant_text]
-        trace = result[:trace]
-        raw_history = Array(result[:history])
-
-        fail_reasons =
-          Array(
-              scenario.fetch(:assert).call(
-                assistant_text: assistant_text,
-                workspace: workspace,
-                tools_enabled: effective_tools_enabled,
-                trace: trace,
-                raw_history: raw_history,
-              )
-            )
-
-          unless fail_reasons.empty?
-            tool_calls_seen =
-              effective_tools_enabled &&
-                Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
-
-            if effective_tools_enabled && !tool_calls_seen
-              error = "NO_TOOL_CALLS: assistant did not request any tool calls"
-            else
-              error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
-            end
-            ok = false
-          end
-      rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
-        ok = false
-        error = "#{e.code}: #{e.message}"
-        trace = e.details.is_a?(Hash) ? e.details.fetch(:trace, nil) : nil
-        raw_history = e.details.is_a?(Hash) ? Array(e.details.fetch(:history, nil)) : nil
-      rescue SimpleInference::Errors::HTTPError => e
-        ok = false
-        error_status = e.status
-        error = truncate(e.message, max_chars: 400)
-        error_body = e.body.is_a?(Hash) ? e.body : nil
-        error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
-      rescue StandardError => e
-        ok = false
-        error = truncate("#{e.class}: #{e.message}", max_chars: 400)
-      end
-
-      elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
-
-      report = {
-        model: model,
-        scenario: scenario_id,
-        trial: trial_idx + 1,
-        ok: ok,
-        elapsed_ms: elapsed_ms,
-        tool_use_mode: effective_tool_use_mode,
-        tools_enabled: effective_tools_enabled,
-        runtime_tool_calling: tool_calling,
-        assistant_text: assistant_text,
-        draft: workspace.draft,
-        error: error,
-        error_status: error_status,
-        error_body: error_body,
-        error_raw_body: error_raw_body,
-        error_category: ok ? nil : error_category(error, status: error_status),
-        history:
-          raw_history&.map do |m|
-            if m.respond_to?(:to_serializable_hash)
-              m.to_serializable_hash
-            else
-              { role: m.respond_to?(:role) ? m.role : nil, content: m.respond_to?(:content) ? m.content : m.to_s }
-            end
-          end,
-        trace: trace,
+task_list =
+  selected_model_entries.each_with_index.flat_map do |model_entry, model_index|
+    strategy_profiles.map do |profile|
+      {
+        model_entry: model_entry,
+        model_index: model_index,
+        profile: profile,
       }
+    end
+  end
 
-      error_hint = provider_error_hint(report)
-      report[:error_hint] = error_hint if error_hint
+parallel_jobs = [parallel_jobs, task_list.length].min
 
-      file_name = "#{safe_model}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
-      report_path = out_dir.join(file_name)
-      File.write(report_path, JSON.pretty_generate(report))
-
-      run_meta = {
-        model: model,
-        scenario: scenario_id,
-        trial: trial_idx + 1,
-        ok: ok,
-        elapsed_ms: elapsed_ms,
-        error: error,
-        error_hint: error_hint,
-        error_status: error_status,
-        error_category: report[:error_category],
-        report_path: report_path.relative_path_from(Rails.root).to_s,
-      }
-
-      runs << run_meta
-      failures << run_meta unless ok
-
-      status_str = ok ? "OK" : "FAIL"
-      $stderr.puts(
-        "[#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] #{status_str} #{model} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model}, #{elapsed_ms}ms)",
-      )
+log_mutex = Mutex.new
+log_line =
+  lambda do |line|
+    log_mutex.synchronize do
+      $stderr.puts(line)
       $stderr.flush
     end
   end
 
-  ok_count = runs.count { |t| t[:ok] }
-  rate = ok_count.fdiv(runs.size)
-  elapsed = runs.map { |t| t[:elapsed_ms].to_i }.sort
-  p50 = elapsed[(elapsed.size * 0.50).floor] || 0
-  p95 = elapsed[(elapsed.size * 0.95).floor] || 0
+matrix_enabled = strategy_profiles.length > 1
 
-  # Keep a small set of failure samples for quick debugging.
-  failure_samples = failures.first(3)
+process_task =
+  lambda do |task, task_index, task_total|
+    model_entry = task.fetch(:model_entry)
+    model = model_entry.id
+    excluded_workarounds = fallback_matrix ? ["content_tag_tool_call_fallback", "content_tag_fallback"] : []
+    model_workaround_presets = ToolCallEval::ModelWorkarounds.presets_for(model_entry, exclude: excluded_workarounds)
+    model_index = task.fetch(:model_index)
+    profile = task.fetch(:profile)
+    profile_id = profile.fetch(:id).to_s
+    enable_tag_fallback = profile.fetch(:content_tag_tool_call_fallback) == true
 
-  reports << {
-    model: model,
-    runs: runs.size,
-    ok: ok_count,
-    ok_rate: rate,
-    ms_p50: p50,
-    ms_p95: p95,
-    scenarios: scenarios.map { |s| s[:id] },
-    run_results: runs,
-    failure_samples: failure_samples,
-  }
+    model_idx = model_index + 1
+    model_total = selected_model_entries.length
+    task_idx = task_index + 1
+
+    client = SimpleInference::Client.new(
+      base_url: base_url,
+      api_key: api_key,
+      headers: headers,
+      api_prefix: api_prefix,
+      timeout: client_timeout,
+      open_timeout: client_open_timeout,
+      read_timeout: client_read_timeout,
+      adapter: build_http_adapter.call,
+    )
+
+    model_label = matrix_enabled ? "#{model}:#{profile_id}" : model
+    safe_model = model_label.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
+    provider_tool_calling_preset = build_provider_tool_calling_preset.call(enable_tag_fallback: enable_tag_fallback)
+
+    runs = []
+    failures = []
+    task_effective_tag_fallback = nil
+
+    trials_per_model.times do |trial_idx|
+      scenarios.each_with_index do |scenario, scenario_index|
+        scenario_idx = scenario_index + 1
+        scenario_total = scenarios.length
+        scenario_id = scenario.fetch(:id).to_s
+        safe_scenario = scenario_id.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
+
+        log_line.call(
+          "[#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] testing #{model_label} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
+        )
+
+        workspace = ToolCallEval::Workspace.new
+        scenario[:prepare].call(workspace) if scenario[:prepare]
+
+        tool_executor = ToolCallEval::Executor.new(workspace: workspace)
+        registry =
+          TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
+            definitions: ToolCallEval.tool_definitions,
+          )
+
+        tool_calling =
+          TavernKit::VibeTavern::ToolCalling::Presets.merge(
+            TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling,
+            provider_tool_calling_preset,
+            TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(
+              tool_use_mode: tool_use_mode,
+              tool_failure_policy: tool_failure_policy,
+              fallback_retry_count: fallback_retry_count,
+              fix_empty_final: fix_empty_final,
+              tool_allowlist: tool_allowlist,
+              request_overrides: request_overrides,
+            ),
+            *model_workaround_presets,
+            scenario[:runtime_overrides] || {},
+          )
+
+        effective_tag_fallback =
+          Array(tool_calling[:response_transforms])
+            .map { |t| t.to_s.strip }
+            .include?("assistant_content_tool_call_tags_to_tool_calls")
+        task_effective_tag_fallback = effective_tag_fallback if task_effective_tag_fallback.nil?
+
+        effective_tool_use_mode = normalize_tool_use_mode(tool_calling.fetch(:tool_use_mode, tool_use_mode))
+        effective_tools_enabled = effective_tool_use_mode != "disabled"
+
+        runtime =
+          TavernKit::Runtime::Base.build(
+            {
+              tool_calling: tool_calling,
+            },
+            type: :app,
+          )
+
+        runner =
+          TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+            client: client,
+            model: model,
+            tool_executor: tool_executor,
+            runtime: runtime,
+            registry: registry,
+            system: scenario.fetch(:system).to_s,
+            strict: false,
+          )
+
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+        ok = true
+        error = nil
+        error_hint = nil
+        error_status = nil
+        error_body = nil
+        error_raw_body = nil
+        assistant_text = nil
+        trace = nil
+        raw_history = nil
+
+        begin
+          user_text = scenario.fetch(:user_text).call(workspace).to_s
+          result =
+            if verbose_level <= 0
+              runner.run(user_text: user_text)
+            else
+              runner.run user_text: user_text do |raw_event|
+                event = raw_event.is_a?(Hash) ? raw_event : {}
+                type = event.fetch(:type, "").to_s
+                turn = event.fetch(:turn, nil)
+
+                case type
+                when "llm_request_start"
+                  tools_on = event[:tools_enabled] == true
+                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] -> llm (tools=#{tools_on ? "on" : "off"})"
+                  if verbose_level >= 2
+                    msg << " msgs=#{event[:messages_count]}"
+                    msg << " tools=#{event[:tools_count]}"
+                    msg << " choice=#{event[:tool_choice] || "auto"}"
+                    if event[:request_attempts_left].to_i.positive?
+                      msg << " retries_left=#{event[:request_attempts_left]}"
+                    end
+                  end
+                  log_line.call(msg)
+                when "llm_request_error"
+                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] !! llm error"
+                  msg << " status=#{event[:status]}" if event[:status]
+                  msg << " #{event[:elapsed_ms]}ms" if verbose_level >= 2 && event[:elapsed_ms]
+                  msg << " #{truncate(event[:message].to_s, max_chars: 220)}" unless event[:message].to_s.strip.empty?
+                  log_line.call(msg)
+                when "llm_request_retry"
+                  log_line.call(
+                    "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] .. retry (tools=off, attempts_left=#{event[:request_attempts_left]})",
+                  )
+                when "llm_request_end"
+                  ms = event[:elapsed_ms]
+                  finish = event[:finish_reason]
+                  tool_calls = Array(event[:tool_calls]).select { |v| v.is_a?(Hash) }
+                  names = tool_calls.map { |tc| tc.fetch(:name, nil) }.map(&:to_s).map(&:strip).reject(&:empty?).uniq
+
+                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- llm"
+                  msg << " #{ms}ms" if ms
+                  msg << " finish=#{finish}" if finish
+                  msg << " tool_calls=#{names.join(",")}" if names.any?
+                  log_line.call(msg)
+                when "tool_call_start"
+                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] -> tool #{event[:name]}"
+                  msg << " args=#{event[:arguments_bytes]}B" if verbose_level >= 2
+                  if (parse = event[:parse_status]) && parse.to_s != "ok"
+                    msg << " parse=#{parse}"
+                  end
+                  log_line.call(msg)
+                when "tool_call_end"
+                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- tool #{event[:name]} ok=#{event[:ok]}"
+                  msg << " #{event[:elapsed_ms]}ms" if event[:elapsed_ms]
+                  errors = Array(event[:error_codes]).map(&:to_s).map(&:strip).reject(&:empty?)
+                  msg << " errors=#{errors.join(",")}" if errors.any?
+                  if verbose_level >= 2
+                    msg << " out=#{event[:output_bytes]}B"
+                    msg << " replaced" if event[:output_replaced] == true
+                  end
+                  log_line.call(msg)
+                when "fix_empty_final"
+                  log_line.call(
+                    "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] .. empty final; retry finalization (disable_tools=#{event[:disable_tools]})",
+                  )
+                when "final"
+                  log_line.call("  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- final")
+                end
+              rescue StandardError
+                nil
+              end
+            end
+
+          assistant_text = result[:assistant_text]
+          trace = result[:trace]
+          raw_history = Array(result[:history])
+
+          fail_reasons =
+            Array(
+                scenario.fetch(:assert).call(
+                  assistant_text: assistant_text,
+                  workspace: workspace,
+                  tools_enabled: effective_tools_enabled,
+                  trace: trace,
+                  raw_history: raw_history,
+                )
+              )
+
+            unless fail_reasons.empty?
+              tool_calls_seen =
+                effective_tools_enabled &&
+                  Array(trace).any? { |t| t.is_a?(Hash) && t.dig(:response_summary, :has_tool_calls) == true }
+
+              if effective_tools_enabled && !tool_calls_seen
+                error = "NO_TOOL_CALLS: assistant did not request any tool calls"
+              else
+                error = "ASSERTION_FAILED: #{fail_reasons.join("; ")}"
+              end
+              ok = false
+            end
+        rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
+          ok = false
+          error = "#{e.code}: #{e.message}"
+          trace = e.details.is_a?(Hash) ? e.details.fetch(:trace, nil) : nil
+          raw_history = e.details.is_a?(Hash) ? Array(e.details.fetch(:history, nil)) : nil
+        rescue SimpleInference::Errors::HTTPError => e
+          ok = false
+          error_status = e.status
+          error = truncate(e.message, max_chars: 400)
+          error_body = e.body.is_a?(Hash) ? e.body : nil
+          error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
+        rescue StandardError => e
+          ok = false
+          error = truncate("#{e.class}: #{e.message}", max_chars: 400)
+        end
+
+        elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+
+        report = {
+          model: model_label,
+          model_base: model,
+          strategy: profile_id,
+          content_tag_tool_call_fallback: effective_tag_fallback,
+          scenario: scenario_id,
+          trial: trial_idx + 1,
+          ok: ok,
+          elapsed_ms: elapsed_ms,
+          tool_use_mode: effective_tool_use_mode,
+          tools_enabled: effective_tools_enabled,
+          runtime_tool_calling: tool_calling,
+          assistant_text: assistant_text,
+          draft: workspace.draft,
+          error: error,
+          error_status: error_status,
+          error_body: error_body,
+          error_raw_body: error_raw_body,
+          error_category: ok ? nil : error_category(error, status: error_status),
+          history:
+            raw_history&.map do |m|
+              if m.respond_to?(:to_serializable_hash)
+                m.to_serializable_hash
+              else
+                { role: m.respond_to?(:role) ? m.role : nil, content: m.respond_to?(:content) ? m.content : m.to_s }
+              end
+            end,
+          trace: trace,
+        }
+
+        error_hint = provider_error_hint(report)
+        report[:error_hint] = error_hint if error_hint
+
+        file_name = "#{safe_model}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
+        report_path = out_dir.join(file_name)
+        File.write(report_path, JSON.pretty_generate(report))
+
+        run_meta = {
+          model: model_label,
+          model_base: model,
+          strategy: profile_id,
+          content_tag_tool_call_fallback: effective_tag_fallback,
+          scenario: scenario_id,
+          trial: trial_idx + 1,
+          ok: ok,
+          elapsed_ms: elapsed_ms,
+          error: error,
+          error_hint: error_hint,
+          error_status: error_status,
+          error_category: report[:error_category],
+          report_path: report_path.relative_path_from(Rails.root).to_s,
+        }
+
+        runs << run_meta
+        failures << run_meta unless ok
+
+        status_str = ok ? "OK" : "FAIL"
+        log_line.call(
+          "[#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] #{status_str} #{model_label} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model}, #{elapsed_ms}ms)",
+        )
+      end
+    end
+
+    ok_count = runs.count { |t| t[:ok] }
+    rate = ok_count.fdiv(runs.size)
+    elapsed = runs.map { |t| t[:elapsed_ms].to_i }.sort
+    p50 = elapsed[(elapsed.size * 0.50).floor] || 0
+    p95 = elapsed[(elapsed.size * 0.95).floor] || 0
+
+    failure_samples = failures.first(3)
+
+    {
+      model: model_label,
+      model_base: model,
+      strategy: profile_id,
+      content_tag_tool_call_fallback: task_effective_tag_fallback == true,
+      runs: runs.size,
+      ok: ok_count,
+      ok_rate: rate,
+      ms_p50: p50,
+      ms_p95: p95,
+      scenarios: scenarios.map { |s| s[:id] },
+      run_results: runs,
+      failure_samples: failure_samples,
+    }
+  end
+
+if parallel_jobs == 1
+  reports = task_list.each_with_index.map { |task, task_index| process_task.call(task, task_index, task_list.length) }
+else
+  queue = Queue.new
+  task_list.each_with_index { |task, task_index| queue << [task, task_index] }
+
+  reports_by_index = Array.new(task_list.length)
+  worker_errors = Queue.new
+
+  workers =
+    Array.new(parallel_jobs) do
+      Thread.new do
+        loop do
+          item =
+            begin
+              queue.pop(true)
+            rescue ThreadError
+              break
+            end
+
+          task, task_index = item
+          reports_by_index[task_index] = process_task.call(task, task_index, task_list.length)
+        rescue StandardError => e
+          worker_errors << [item, e]
+          break
+        end
+      end
+    end
+
+  workers.each(&:join)
+
+  unless worker_errors.empty?
+    item, e = worker_errors.pop
+    task = item.is_a?(Array) ? item.fetch(0, nil) : nil
+    model_entry = task.is_a?(Hash) ? task.fetch(:model_entry, nil) : nil
+    model = model_entry.respond_to?(:id) ? model_entry.id : nil
+    profile_id = task.is_a?(Hash) ? task.dig(:profile, :id) : nil
+    raise "#{e.class}: worker failed for model=#{model.inspect} strategy=#{profile_id.inspect}: #{e.message}"
+  end
+
+  reports = reports_by_index.compact
 end
+
+best_effort_content_tag_tool_call_fallback_models =
+  selected_model_entries
+    .select { |e| Array(e.workarounds).include?(:content_tag_tool_call_fallback) }
+    .map(&:id)
 
 summary = {
   ts: Time.now.utc.iso8601,
@@ -1276,6 +1506,13 @@ summary = {
   tool_calling_fallback_retry_count: fallback_retry_count,
   tool_allowlist: tool_allowlist,
   request_overrides: request_overrides,
+  model_filter: model_filter,
+  selected_models: selected_model_entries.map(&:id),
+  content_tag_tool_call_fallback_global_override: enable_content_tag_tool_call_fallback,
+  best_effort_content_tag_tool_call_fallback_models: best_effort_content_tag_tool_call_fallback_models,
+  fallback_matrix: fallback_matrix,
+  profiles: strategy_profiles.map { |p| p.fetch(:id) },
+  jobs: parallel_jobs,
   trials_per_model: trials_per_model,
   scenarios: scenarios.map { |s| s[:id] },
   output_dir: out_dir.to_s,
@@ -1302,10 +1539,18 @@ puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_allowlist: #{tool_allowlist ? tool_allowlist.join(",") : "(full)"}"
 puts "request_overrides: #{request_overrides.any? ? request_overrides.keys.join(",") : "(none)"}"
+puts "model_filter: #{model_filter}"
+puts "selected_models: #{selected_model_entries.map(&:id).join(",")}"
 puts "parallel_tool_calls(default): #{request_overrides.fetch("parallel_tool_calls", "(provider default)")}"
+puts "content_tag_tool_call_fallback_global_override: #{enable_content_tag_tool_call_fallback}"
+if best_effort_content_tag_tool_call_fallback_models.any?
+  puts "best_effort_content_tag_tool_call_fallback_models: #{best_effort_content_tag_tool_call_fallback_models.join(",")}"
+end
+puts "fallback_matrix: #{fallback_matrix} (profiles=#{strategy_profiles.map { |p| p.fetch(:id) }.join(",")})"
+puts "jobs: #{parallel_jobs}"
 puts "trials_per_model: #{trials_per_model}"
 puts "scenarios: #{scenarios.map { |s| s[:id] }.join(",")}"
-puts "models: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"
+puts "model_profiles: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
 

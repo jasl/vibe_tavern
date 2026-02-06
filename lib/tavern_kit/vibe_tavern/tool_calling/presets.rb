@@ -23,6 +23,12 @@ module TavernKit
             tool_use_mode: :relaxed,
             fix_empty_final: true,
             fix_empty_final_disable_tools: true,
+            response_transforms: [
+              "assistant_function_call_to_tool_calls",
+              "assistant_tool_calls_object_to_array",
+              "assistant_tool_calls_arguments_json_string_if_hash",
+            ],
+            tool_call_transforms: ["assistant_tool_calls_arguments_blank_to_empty_object"],
             fallback_retry_count: 0,
           )
         end
@@ -110,11 +116,14 @@ module TavernKit
         def provider_defaults(provider, **kwargs)
           case provider.to_s.strip.downcase.tr("-", "_")
           when "openrouter"
-            openrouter_tool_calling(**kwargs)
+            merge(
+              openai_compatible_reliability(parallel_tool_calls: false),
+              openrouter_tool_calling(**kwargs),
+            )
           when "openai"
-            {}
+            openai_compatible_reliability
           when "volcanoengine", "volcano_engine", "volcano"
-            {}
+            openai_compatible_reliability
           else
             {}
           end
@@ -127,16 +136,22 @@ module TavernKit
           m = model.to_s.strip
           return {} if m.empty?
 
+          presets = []
+
           # Known: does not support tool use in our eval harness.
-          return tool_calling(tool_use_mode: :disabled) if m == "minimax/minimax-m2-her"
+          presets << tool_calling(tool_use_mode: :disabled) if m == "minimax/minimax-m2-her"
 
           # Some OpenAI-compatible routes/models require a dummy reasoning field
-          # on assistant messages that contain tool calls (opt-in).
-          if m.downcase.include?("reasoner")
-            return tool_calling(message_transforms: ["assistant_tool_calls_reasoning_content_empty_if_missing"])
-          end
+          # on assistant messages that contain tool calls.
+          presets << deepseek_openrouter_compat if m.start_with?("deepseek/")
 
-          {}
+          # Gemini routes can be stricter around function-call tracing.
+          presets << gemini_openrouter_compat if m.start_with?("google/gemini-")
+
+          # Keep compatibility with generic "reasoner" model names.
+          presets << tool_calling(message_transforms: ["assistant_tool_calls_reasoning_content_empty_if_missing"]) if m.downcase.include?("reasoner")
+
+          merge(*presets)
         end
 
         # Convenience helper to build a baseline tool-calling config for a given
@@ -182,6 +197,68 @@ module TavernKit
 
           tool_calling(
             request_overrides: merged_overrides,
+          )
+        end
+
+        # Conservative reliability helpers for OpenAI-compatible tool calling.
+        #
+        # - Keep argument normalization in both inbound response and parsed tool calls
+        # - Optionally force sequential tool calls (`parallel_tool_calls: false`)
+        # - Keep optional text-tag fallback disabled unless explicitly requested
+        #
+        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        def openai_compatible_reliability(parallel_tool_calls: nil, enable_content_tag_fallback: false)
+          response_transforms = [
+            "assistant_function_call_to_tool_calls",
+            "assistant_tool_calls_object_to_array",
+            "assistant_tool_calls_arguments_json_string_if_hash",
+          ]
+
+          if enable_content_tag_fallback
+            response_transforms += ["assistant_content_tool_call_tags_to_tool_calls"]
+          end
+
+          cfg =
+            tool_calling(
+              response_transforms: response_transforms,
+              tool_call_transforms: ["assistant_tool_calls_arguments_blank_to_empty_object"],
+            )
+
+          return cfg if parallel_tool_calls.nil?
+
+          merge(
+            cfg,
+            request_overrides(parallel_tool_calls: parallel_tool_calls),
+          )
+        end
+
+        # Optional fallback for weaker models/routes that emit textual
+        # `<tool_call>...</tool_call>` tags instead of structured tool_calls.
+        #
+        # Keep this opt-in to avoid affecting normal OpenAI-compatible paths.
+        #
+        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        def content_tag_tool_call_fallback
+          tool_calling(
+            response_transforms: ["assistant_content_tool_call_tags_to_tool_calls"],
+          )
+        end
+
+        # DeepSeek-compatible compatibility defaults observed in practice.
+        #
+        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        def deepseek_openrouter_compat
+          tool_calling(
+            message_transforms: ["assistant_tool_calls_reasoning_content_empty_if_missing"],
+          )
+        end
+
+        # Gemini-compatible compatibility defaults observed in practice.
+        #
+        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        def gemini_openrouter_compat
+          tool_calling(
+            message_transforms: ["assistant_tool_calls_signature_skip_validator_if_missing"],
           )
         end
 

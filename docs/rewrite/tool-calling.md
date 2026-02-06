@@ -77,9 +77,14 @@ Rationale:
    - executes tool
    - returns a normalized envelope `{ ok, data, warnings, errors }`
 
-3) `ToolLoopRunner`
+3) `PromptRunner`
    - builds prompt via `TavernKit::VibeTavern` (dialect: `:openai`)
-   - sends `messages + llm_options(tools, tool_choice, ...)` via `SimpleInference`
+   - applies outbound `MessageTransforms` and inbound `ResponseTransforms`
+   - sends `messages + llm_options(...)` via `SimpleInference`
+   - returns `assistant_message` + `finish_reason` (OpenAI-compatible shape)
+
+4) `ToolLoopRunner`
+   - delegates the per-turn LLM request to `PromptRunner`
    - parses `tool_calls`
    - executes tools, appends tool result messages, loops until final assistant
    - emits a trace (for debugging / replay / tests)
@@ -109,7 +114,7 @@ Purpose:
 
 - A separate runner that can test multiple models via OpenRouter (OpenAI
   compatible).
-- Gate behind env vars (e.g., `OPENROUTER_API_KEY`, `OPENROUTER_MODEL=...`) so
+- Gate behind env vars (e.g., `OPENROUTER_API_KEY`, `OPENROUTER_MODEL_FILTER=...`) so
   CI stays deterministic.
 
 Purpose:
@@ -122,13 +127,22 @@ Note:
 Script:
 
 ```sh
-# Run the default scenario preset (smoke) for each model and compute success rate / latency percentiles.
+# Run the default scenario preset (smoke) for the stable model set (default) and compute success rate / latency percentiles.
 # Default preset: happy_path, missing_workspace_id, type_error_recovery, long_arguments_guard, chat_only
 OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
   bundle exec ruby script/llm_tool_call_eval.rb
 
 # Run all scenarios.
 OPENROUTER_SCENARIOS=all OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
+# Run models in parallel workers (default: 1).
+# Tip: start with 2-4 to avoid provider-side rate-limit noise.
+OPENROUTER_JOBS=3 OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
+# Run fallback on/off A/B in a single script run.
+OPENROUTER_FALLBACK_MATRIX=1 OPENROUTER_JOBS=3 OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
   bundle exec ruby script/llm_tool_call_eval.rb
 
 # Run a subset of scenarios (comma-separated). Use `default` (or empty) to run the smoke preset.
@@ -139,22 +153,43 @@ OPENROUTER_SCENARIOS="happy_path,missing_workspace_id" OPENROUTER_TRIALS=10 OPEN
 OPENROUTER_SCENARIOS="default,happy_path_parallel" OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
   bundle exec ruby script/llm_tool_call_eval.rb
 
-# Single model
-OPENROUTER_API_KEY=... OPENROUTER_MODEL="openai/gpt-4.1-mini" \
+# Single model (exact model id)
+OPENROUTER_API_KEY=... OPENROUTER_MODEL_FILTER="openai/gpt-5.2:nitro" \
   bundle exec ruby script/llm_tool_call_eval.rb
 
-# Multiple models
-OPENROUTER_API_KEY=... OPENROUTER_MODELS="openai/gpt-4.1-mini,anthropic/claude-3.5-sonnet" \
+# Multiple models by provider/tags (match against model id, base id, provider, and DSL tags)
+OPENROUTER_API_KEY=... OPENROUTER_MODEL_FILTER="openai,anthropic" \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
+# Exclude one model from a provider subset (`!` means exclude; `*` wildcard is supported)
+OPENROUTER_API_KEY=... OPENROUTER_MODEL_FILTER="google,!google/gemini-3-pro-preview:*" \
   bundle exec ruby script/llm_tool_call_eval.rb
 
 # Some models/providers occasionally return an empty final assistant message
 # even after successful tool calls. The PoC runner can optionally do a
 # "finalization" retry prompt that asks the model to return a final answer.
-OPENROUTER_FIX_EMPTY_FINAL=1 OPENROUTER_API_KEY=... OPENROUTER_MODEL="qwen/qwen3-next-80b-a3b-instruct" \
+OPENROUTER_FIX_EMPTY_FINAL=1 OPENROUTER_API_KEY=... OPENROUTER_MODEL_FILTER="qwen/qwen3-next-80b-a3b-instruct:nitro" \
   bundle exec ruby script/llm_tool_call_eval.rb
 ```
 
 Notes:
+- Models are registered in `script/llm_tool_call_eval.rb` via a small DSL (`MODEL_CATALOG`).
+  - Default (`OPENROUTER_MODEL_FILTER=stable`) runs a curated stable set (cheap to run repeatedly).
+  - Use `OPENROUTER_MODEL_FILTER=all` to run the full catalog.
+  - `OPENROUTER_MODEL_FILTER` is the only model-selection env knob.
+
+### Recommended models (tool use)
+
+The goal of `OPENROUTER_MODEL_FILTER=stable` is to keep a small, cheap, high-signal eval set for repeated runs.
+
+As of `tmp/llm_tool_call_eval_reports/20260206T145643Z` (smoke scenarios, 5 trials), the most stable models were:
+- `anthropic/claude-opus-4.6:nitro`
+- `google/gemini-2.5-flash:nitro`
+- `qwen/qwen3-next-80b-a3b-instruct:nitro`
+- `qwen/qwen3-30b-a3b-instruct-2507:nitro`
+- `qwen/qwen3-235b-a22b-2507:nitro` (best-effort enables the content-tag fallback)
+
+Models outside `stable` can be valuable, but tend to be noisier on at least one scenario (e.g. `long_arguments_guard`) or have more provider-side variability.
 - `SimpleInference` composes the final request URL as `base_url + api_prefix + endpoint`.
   - Recommended for OpenRouter: `OPENROUTER_BASE_URL=https://openrouter.ai/api` and `OPENROUTER_API_PREFIX=/v1`
   - If you already set `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`, set `OPENROUTER_API_PREFIX=""`
@@ -167,7 +202,11 @@ Notes:
   - `VERBOSE=0` to disable per-turn progress lines
   - `VERBOSE=1` (default) shows tool-loop progress for each run
   - `VERBOSE=2` includes extra request/tool size info
-  - Long LLM requests print a periodic "waiting for llm" heartbeat (every ~15s)
+  - `OPENROUTER_JOBS` controls model-level parallel workers (default: `1`)
+  - `OPENROUTER_FALLBACK_MATRIX=1` runs both `fallback_off` and `fallback_on` profiles in one pass
+  - Best-effort defaults:
+    - The script may enable some compatibility presets per model (registered in `MODEL_CATALOG`) to improve tool calling reliability.
+    - `OPENROUTER_ENABLE_CONTENT_TAG_TOOL_CALL_FALLBACK=1` forces the content-tag fallback on for all models (override).
 - Tool use mode:
   - `OPENROUTER_TOOL_USE_MODE=enforced|relaxed|disabled`
     - `enforced`: require at least one tool call; final failure behavior is controlled by `tool_failure_policy`
@@ -231,19 +270,24 @@ Note:
     - `OPENROUTER_REQUEST_OVERRIDES_JSON='{\"temperature\":0.2}'` (advanced; JSON object)
 - Provider/model message transforms (upper-layer injection):
   - `runtime[:tool_calling][:message_transforms]` (Array or comma-separated String) applies opt-in transforms to outbound messages before dispatch.
-  - Built-ins: `assistant_tool_calls_content_null_if_blank`, `assistant_tool_calls_reasoning_content_empty_if_missing`
+  - Built-ins: `assistant_tool_calls_content_null_if_blank`, `assistant_tool_calls_reasoning_content_empty_if_missing`, `assistant_tool_calls_signature_skip_validator_if_missing`
 - Provider/model tool transforms (upper-layer injection):
   - `runtime[:tool_calling][:tool_transforms]` (Array or comma-separated String) applies opt-in transforms to the outbound `tools:` list before dispatch.
   - Built-ins: `openai_tools_strip_function_descriptions`
 - Provider/model response transforms (upper-layer injection):
   - `runtime[:tool_calling][:response_transforms]` (Array or comma-separated String) applies opt-in transforms to the inbound assistant message (`choices[0].message`) before parsing tool calls.
-  - Built-ins: `assistant_function_call_to_tool_calls`, `assistant_tool_calls_arguments_json_string_if_hash`
+  - Built-ins: `assistant_function_call_to_tool_calls`, `assistant_tool_calls_object_to_array`, `assistant_tool_calls_arguments_json_string_if_hash`, `assistant_content_tool_call_tags_to_tool_calls` (opt-in fallback)
 - Provider/model tool call transforms (upper-layer injection):
   - `runtime[:tool_calling][:tool_call_transforms]` (Array or comma-separated String) applies opt-in transforms to parsed `tool_calls` before execution.
   - Built-ins: `assistant_tool_calls_arguments_blank_to_empty_object`
 - Provider/model tool result transforms (upper-layer injection):
   - `runtime[:tool_calling][:tool_result_transforms]` (Array or comma-separated String) applies opt-in transforms to tool result envelopes before serializing them into tool messages.
   - Built-ins: `tool_result_compact_envelope`
+- Optional preset helpers (`TavernKit::VibeTavern::ToolCalling::Presets`):
+  - `openai_compatible_reliability(...)`: conservative defaults for OpenAI-compatible tool calling.
+  - `content_tag_tool_call_fallback`: opt-in fallback for models/routes that emit textual `<tool_call>...</tool_call>` tags instead of structured `tool_calls`.
+  - `deepseek_openrouter_compat`: DeepSeek-friendly outbound message shim.
+  - `gemini_openrouter_compat`: Gemini-friendly outbound message shim.
 
 ## Model reliability metadata (tool calling)
 

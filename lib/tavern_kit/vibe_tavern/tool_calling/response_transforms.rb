@@ -80,6 +80,16 @@ TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
 )
 
 TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
+  "assistant_tool_calls_object_to_array",
+  lambda do |msg|
+    tool_calls = msg.fetch("tool_calls", nil)
+    return unless tool_calls.is_a?(Hash)
+
+    msg["tool_calls"] = [tool_calls]
+  end,
+)
+
+TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
   "assistant_tool_calls_arguments_json_string_if_hash",
   lambda do |msg|
     tool_calls = msg.fetch("tool_calls", nil)
@@ -96,5 +106,85 @@ TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
 
       fn["arguments"] = JSON.generate(args)
     end
+  end,
+)
+
+extract_tool_call_from_tag_payload =
+  lambda do |payload, index|
+    raw = payload.to_s.strip
+    return nil if raw.empty?
+
+    name = nil
+    args = nil
+
+    begin
+      parsed = JSON.parse(raw)
+      if parsed.is_a?(Hash)
+        if parsed["function"].is_a?(Hash)
+          fn = parsed["function"]
+          name = fn["name"].to_s.strip
+          args = fn.key?("arguments") ? fn["arguments"] : nil
+        else
+          name = parsed["name"].to_s.strip
+          args = parsed.key?("arguments") ? parsed["arguments"] : parsed["args"]
+        end
+      end
+    rescue JSON::ParserError
+      # Fallback: allow `tool_name {json}` / `tool_name` forms.
+      if (m = raw.match(/\A([a-zA-Z0-9_.-]+)\s+(\{.*\})\z/m))
+        name = m.fetch(1).to_s.strip
+        args = m.fetch(2).to_s
+      else
+        name = raw if raw.match?(/\A[a-zA-Z0-9_.-]+\z/)
+      end
+    end
+
+    return nil if name.to_s.empty?
+
+    arguments =
+      case args
+      when nil
+        "{}"
+      when String
+        args
+      when Hash, Array
+        JSON.generate(args)
+      else
+        "{}"
+      end
+
+    {
+      "id" => "tag_call_#{index}",
+      "type" => "function",
+      "function" => {
+        "name" => name,
+        "arguments" => arguments,
+      },
+    }
+  end
+
+TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
+  "assistant_content_tool_call_tags_to_tool_calls",
+  lambda do |msg|
+    tool_calls = msg.fetch("tool_calls", nil)
+    return if tool_calls.is_a?(Array) && tool_calls.any?
+
+    content = msg.fetch("content", nil)
+    return unless content.is_a?(String)
+    return unless content.include?("<tool_call>")
+
+    tagged = content.scan(/<tool_call>(.*?)<\/tool_call>/m).flatten
+    return if tagged.empty?
+
+    parsed =
+      tagged.each_with_index.filter_map do |payload, idx|
+        extract_tool_call_from_tag_payload.call(payload, idx + 1)
+      end
+    return if parsed.empty?
+
+    msg["tool_calls"] = parsed
+
+    cleaned = content.gsub(/<tool_call>.*?<\/tool_call>/m, "").strip
+    msg["content"] = cleaned
   end,
 )

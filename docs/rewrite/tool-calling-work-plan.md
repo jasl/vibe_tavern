@@ -84,3 +84,68 @@ Acceptance:
 
 Acceptance:
 - `OPENROUTER_SCENARIOS="default,happy_path_parallel"` runs the smoke preset plus the parallel happy path.
+
+### 8) Extract `VibeTavern::PromptRunner` (single request boundary)
+
+- [x] Add `TavernKit::VibeTavern::PromptRunner` to build a `Prompt::Plan`, apply outbound/inbound transforms, and perform one OpenAI-compatible request.
+- [x] Refactor `ToolCalling::ToolLoopRunner` to delegate its per-turn LLM request to `PromptRunner` (tool orchestration remains in `ToolLoopRunner`).
+- [x] Keep event emission contract stable (eval progress printer should not need changes).
+- [x] Add tests for `PromptRunner` and ensure existing tool loop tests still pass.
+
+Acceptance:
+- `ToolLoopRunner` no longer constructs the `Prompt::Plan` directly.
+- `PromptRunner` can be used for a tool-disabled single-turn request (chat-only).
+
+### 9) Improve baseline tolerance (without json repair)
+
+- [x] Normalize blank tool-call arguments to `{}` via a default tool-call transform.
+  - Motivation: some models emit `arguments: ""` which is not valid JSON.
+  - Goal: avoid extra turns caused by `ARGUMENTS_JSON_PARSE_ERROR` when an empty object would be equivalent.
+- [x] Make eval workspace `state_get` more forgiving for missing JSON pointers.
+  - Missing keys/indices should return `nil` in snapshots (not `INTERNAL_ERROR`).
+- [x] Add a ToolLoopRunner regression test proving that blank `arguments` can still execute a tool call under the default preset.
+
+Acceptance:
+- In eval traces, `arguments: ""` no longer produces `ARGUMENTS_JSON_PARSE_ERROR` when tools accept empty args.
+- `state_get` on missing select pointers returns `null` in the snapshot payload (not `INTERNAL_ERROR`).
+
+### 10) Borrow proven robustness patterns (ST/Risu-inspired)
+
+- [x] Normalize single-object `tool_calls` payloads (`Hash`) the same as `Array` payloads in runner parsing.
+- [x] Expand lightweight arg parsing tolerance:
+  - blank/whitespace arguments => `{}`
+  - fenced JSON payloads (```json ... ```) are unwrapped before parse
+- [x] Add an optional response-transform fallback for textual tool-call tags:
+  - `assistant_content_tool_call_tags_to_tool_calls`
+  - exposed as an opt-in preset (`content_tag_tool_call_fallback`)
+- [x] Add an OpenAI-compatible reliability preset for upper-layer composition:
+  - `openai_compatible_reliability(...)`
+
+Acceptance:
+- Tool-call runs no longer fail when a provider emits `tool_calls` as an object.
+- Tool calls with blank/fenced argument text can execute without external JSON repair libraries.
+- Text-tag fallback remains opt-in (default off) and does not affect standard OpenAI-compatible runs.
+
+### 11) Eval parallelization
+
+- [x] Add model-level parallel workers via `OPENROUTER_JOBS` (default: `1`).
+- [x] Keep deterministic output ordering in `summary.json` (same order as the model catalog after `OPENROUTER_MODEL_FILTER` selection).
+- [x] Keep report paths/summary shape backward-compatible.
+
+Acceptance:
+- `OPENROUTER_JOBS=1` behaves like previous serial execution.
+- `OPENROUTER_JOBS>1` runs models concurrently and produces one summary/report set.
+
+### 12) Single-run fallback A/B + model-specific compatibility presets
+
+- [x] Add eval profile matrix mode:
+  - `OPENROUTER_FALLBACK_MATRIX=1` runs `fallback_off` and `fallback_on` in one run.
+  - Report rows are labeled as `model:profile`.
+- [x] Add model-specific compatibility defaults in presets:
+  - DeepSeek models -> `assistant_tool_calls_reasoning_content_empty_if_missing`
+  - Gemini models -> `assistant_tool_calls_signature_skip_validator_if_missing`
+- [x] Add regression tests for the new model defaults and signature transform behavior.
+
+Acceptance:
+- One eval execution can compare fallback on/off for the same model/scenario set.
+- DS/Gemini compatibility behavior is implemented via presets/transforms, not hardcoded in runner flow.
