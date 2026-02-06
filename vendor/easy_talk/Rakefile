@@ -19,7 +19,7 @@ namespace :docs do
   task api: :yard
 
   desc 'Serve Jekyll documentation locally'
-  task serve: :environment do
+  task :serve do
     Dir.chdir('docs') do
       sh 'bundle install --quiet'
       sh 'bundle exec jekyll serve'

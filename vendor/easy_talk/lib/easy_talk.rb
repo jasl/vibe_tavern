@@ -3,7 +3,6 @@
 # The EasyTalk module is the main namespace for the gem.
 module EasyTalk
   require 'sorbet-runtime'
-  require 'active_support/core_ext/module/delegation'
   require 'easy_talk/sorbet_extension'
   require 'easy_talk/errors'
   require 'easy_talk/type_introspection'

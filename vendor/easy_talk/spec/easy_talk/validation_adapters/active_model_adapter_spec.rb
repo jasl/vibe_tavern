@@ -122,9 +122,13 @@ RSpec.describe EasyTalk::ValidationAdapters::ActiveModelAdapter do
       end
 
       around do |example|
-        next example.run unless Time.respond_to?(:use_zone)
+        next example.run unless Time.respond_to?(:zone=)
 
-        Time.use_zone(nil) { example.run }
+        original_zone = Time.zone
+        Time.zone = nil
+        example.run
+      ensure
+        Time.zone = original_zone
       end
 
       it 'does not raise when Time.zone is nil' do

@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/rails/rails.git
-  revision: cf83ddabb5d850e75625fc38a5c52e573e32d48f
+  revision: 282bfc6ee44e9bf5a36bdbbfafb5218d648cda1d
   specs:
     actioncable (8.2.0.alpha)
       actionpack (= 8.2.0.alpha)
@@ -102,7 +102,7 @@ GIT
 PATH
   remote: vendor/easy_talk
   specs:
-    easy_talk (3.3.0)
+    easy_talk (3.3.1)
       activemodel (>= 7.0, < 9.0)
       activesupport (>= 7.0, < 9.0)
       js_regex (~> 3.0)
@@ -194,7 +194,7 @@ GEM
       addressable (>= 2.5.0)
     globalid (1.3.0)
       activesupport (>= 6.1)
-    http-2 (1.1.1)
+    http-2 (1.1.2)
     httpx (1.7.2)
       http-2 (>= 1.0.0)
     i18n (1.14.8)
@@ -405,7 +405,7 @@ GEM
       fugit (~> 1.11)
       railties (>= 7.1)
       thor (>= 1.3.1)
-    sorbet-runtime (0.6.12914)
+    sorbet-runtime (0.6.12925)
     sshkit (1.25.0)
       base64
       logger
@@ -545,7 +545,7 @@ CHECKSUMS
   docile (1.4.1) sha256=96159be799bfa73cdb721b840e9802126e4e03dfc26863db73647204c727f21e
   dotenv (3.2.0) sha256=e375b83121ea7ca4ce20f214740076129ab8514cd81378161f11c03853fe619d
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
-  easy_talk (3.3.0)
+  easy_talk (3.3.1)
   ed25519 (1.4.0) sha256=16e97f5198689a154247169f3453ef4cfd3f7a47481fde0ae33206cdfdcac506
   erb (6.0.1) sha256=28ecdd99c5472aebd5674d6061e3c6b0a45c049578b071e5a52c2a7f13c197e5
   erubi (1.13.1) sha256=a082103b0885dbc5ecf1172fede897f9ebdb745a4b97a5e8dc63953db1ee4ad9
@@ -561,7 +561,7 @@ CHECKSUMS
   fugit (1.12.1) sha256=5898f478ede9b415f0804e42b8f3fd53f814bd85eebffceebdbc34e1107aaf68
   geared_pagination (1.2.0) sha256=16dc25b28e9d6945df27e9bcc6ed298d66eb9493ba45bf987037010724120cc7
   globalid (1.3.0) sha256=05c639ad6eb4594522a0b07983022f04aa7254626ab69445a0e493aa3786ff11
-  http-2 (1.1.1) sha256=1141a5a03c2f4e6b8d2fa62394de581e1ff6387711cd7ed577212e9d95562bba
+  http-2 (1.1.2) sha256=8c1cb40203fc60b521c491509fee96c7b08092975eb30036465992433715ed40
   httpx (1.7.2) sha256=10cdcd5b03794de743bec87e8cdba2ca93e2124084b6cdb1ad01b00c192a51f7
   i18n (1.14.8) sha256=285778639134865c5e0f6269e0b818256017e8cde89993fdfcbfb64d088824a5
   image_processing (1.14.0) sha256=754cc169c9c262980889bec6bfd325ed1dafad34f85242b5a07b60af004742fb
@@ -656,7 +656,7 @@ CHECKSUMS
   solid_cable (3.0.12) sha256=a168a54731a455d5627af48d8441ea3b554b8c1f6e6cd6074109de493e6b0460
   solid_cache (1.0.10) sha256=bc05a2fb3ac78a6f43cbb5946679cf9db67dd30d22939ededc385cb93e120d41
   solid_queue (1.3.1) sha256=d9580111180c339804ff1a810a7768f69f5dc694d31e86cf1535ff2cd7a87428
-  sorbet-runtime (0.6.12914) sha256=6d3c985d671dab9ab8ea244b51888b6e8e8e65e881e5bf816d1ac0950479dce6
+  sorbet-runtime (0.6.12925) sha256=ddd6fb1d8aaf6bc19119ffadbc4b96536f3d6766fa82059112dacb90977c6eca
   sshkit (1.25.0) sha256=c8c6543cdb60f91f1d277306d585dd11b6a064cb44eab0972827e4311ff96744
   stimulus-rails (1.3.4) sha256=765676ffa1f33af64ce026d26b48e8ffb2e0b94e0f50e9119e11d6107d67cb06
   stringio (3.2.0) sha256=c37cb2e58b4ffbd33fe5cd948c05934af997b36e0b6ca6fdf43afa234cf222e1

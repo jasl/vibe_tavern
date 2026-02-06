@@ -84,7 +84,7 @@ RSpec.describe 'validing json' do
     jim = user.new(name: 'Jim', age: 30, height: 5.9, email: email)
     is_valid = jim.valid?
     # Print validation errors if the object is invalid to help debugging
-    Rails.logger.debug { "\nValidation Errors: #{jim.errors.full_messages.join(', ')}\n" } unless is_valid
+    puts "\nValidation Errors: #{jim.errors.full_messages.join(', ')}\n" unless is_valid
     expect(is_valid).to be true
     # The expectation below is redundant if is_valid is true, but kept for clarity
     expect(jim.errors.size).to eq(0)

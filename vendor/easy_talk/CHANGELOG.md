@@ -1,3 +1,19 @@
+## [3.3.1] - 2026-02-03
+
+### Added
+
+- **RubyLLM Compatibility Extension**: Seamless integration between EasyTalk models and RubyLLM's tool and structured output features (#122)
+  - New `RubyLLMCompatibility` module adds class method `to_json_schema` for `with_schema` support
+  - New `RubyLLMToolOverrides` module for classes inheriting from `RubyLLM::Tool`
+  - Overrides `description` and `params_schema` methods to use EasyTalk schema definitions
+  - Automatically included when using `EasyTalk::Model`
+  - Tools inherit from `RubyLLM::Tool` directly, gaining full access to features like `halt`, `call`, `provider_params`
+  - New example files: `examples/ruby_llm/tools_integration.rb`, `examples/ruby_llm/structured_output.rb`
+
+### Changed
+
+- **Documentation**: Updated README with improved examples and documentation
+
 ## [3.3.0] - 2026-01-12
 
 ### Added

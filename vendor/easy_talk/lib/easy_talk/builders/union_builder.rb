@@ -32,7 +32,10 @@ module EasyTalk
         end
       end
 
-      delegate :types, to: :@type
+      sig { returns(T.untyped) }
+      def types
+        @type.types
+      end
     end
   end
 end

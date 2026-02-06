@@ -52,10 +52,40 @@ EasyTalk makes the schema definition the single source of truth, so you can:
   - **RFC 7807** problem details
   - **JSON:API** error objects
 
-- **LLM tool/function schemas without a second schema layer**  
-  Use the same contract to generate JSON Schema for function/tool calling.
+- **LLM tool/function schemas without a second schema layer**
+  Use the same contract to generate JSON Schema for function/tool calling. See [RubyLLM Integration](#rubyllm-integration).
 
 EasyTalk is for teams who want their data contracts to be **correct, reusable, and boring** (the good kind of boring).
+
+---
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Property constraints](#property-constraints)
+- [Core concepts](#core-concepts)
+  - [Required vs optional vs nullable](#required-vs-optional-vs-nullable-dont-get-tricked)
+  - [Nested models](#nested-models-and-automatic-instantiation)
+  - [Tuple arrays](#tuple-arrays-fixed-position-types)
+  - [Composition (AnyOf / OneOf / AllOf)](#composition-anyof--oneof--allof)
+- [Validations](#validations)
+  - [Automatic validations](#automatic-validations-default)
+  - [Per-model validation control](#per-model-validation-control)
+  - [Per-property validation control](#per-property-validation-control)
+  - [Validation adapters](#validation-adapters)
+- [Error formatting](#error-formatting)
+- [Schema-only mode](#schema-only-mode)
+- [RubyLLM Integration](#rubyllm-integration)
+- [Configuration highlights](#configuration-highlights)
+- [Advanced topics](#advanced-topics)
+  - [JSON Schema drafts, `$id`, and `$ref`](#json-schema-drafts-id-and-ref)
+  - [Additional properties with types](#additional-properties-with-types)
+  - [Object-level constraints](#object-level-constraints)
+  - [Custom type builders](#custom-type-builders)
+- [Known limitations](#known-limitations)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
@@ -510,6 +540,66 @@ contract = ApiContract.new(name: "Test", age: 25)
 ```
 
 Use this for documentation, OpenAPI generation, or when validation happens elsewhere.
+
+---
+
+## RubyLLM Integration
+
+EasyTalk integrates seamlessly with [RubyLLM](https://github.com/crmne/ruby_llm) for structured outputs and tool definitions.
+
+### Structured Outputs
+
+Use any EasyTalk model with RubyLLM's `with_schema` to get structured JSON responses:
+
+```ruby
+class Recipe
+  include EasyTalk::Model
+
+  define_schema do
+    description "A cooking recipe"
+    property :name, String, description: "Name of the dish"
+    property :ingredients, T::Array[String], description: "List of ingredients"
+    property :prep_time_minutes, Integer, description: "Preparation time in minutes"
+  end
+end
+
+chat = RubyLLM.chat.with_schema(Recipe)
+response = chat.ask("Give me a simple pasta recipe")
+
+# RubyLLM returns parsed JSON - instantiate with EasyTalk model
+recipe = Recipe.new(response.content)
+recipe.name           # => "Spaghetti Aglio e Olio"
+recipe.ingredients    # => ["spaghetti", "garlic", "olive oil", ...]
+```
+
+### Tools
+
+Create LLM tools by inheriting from `RubyLLM::Tool` and including `EasyTalk::Model`:
+
+```ruby
+class Weather < RubyLLM::Tool
+  include EasyTalk::Model
+
+  define_schema do
+    description 'Gets current weather for a location'
+    property :latitude, String, description: 'Latitude (e.g., 52.5200)'
+    property :longitude, String, description: 'Longitude (e.g., 13.4050)'
+  end
+
+  def execute(latitude:, longitude:)
+    # Fetch weather data from API...
+    { temperature: 22, conditions: "sunny" }
+  end
+end
+
+chat = RubyLLM.chat.with_tool(Weather)
+response = chat.ask("What's the weather in Berlin?")
+```
+
+This pattern gives you:
+- Full access to `RubyLLM::Tool` features (`halt`, `call`, etc.)
+- EasyTalk's schema DSL for parameter definitions
+- Automatic JSON Schema generation for the LLM
 
 ---
 

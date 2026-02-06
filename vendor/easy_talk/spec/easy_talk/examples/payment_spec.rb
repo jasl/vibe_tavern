@@ -3,12 +3,6 @@
 require 'spec_helper'
 
 RSpec.describe 'Payment object example' do
-  around do |example|
-    next example.run unless Time.respond_to?(:use_zone)
-
-    Time.use_zone("UTC") { example.run }
-  end
-
   let(:credit_card) do
     Class.new do
       include EasyTalk::Model
@@ -21,7 +15,7 @@ RSpec.describe 'Payment object example' do
         property :CardNumber, String
         property :CardType, String, enum: %w[Visa MasterCard AmericanExpress]
         property :CardExpMonth, Integer, minimum: 1, maximum: 12
-        property :CardExpYear, Integer, minimum: Time.zone.today.year, maximum: Time.zone.today.year + 10
+        property :CardExpYear, Integer, minimum: Date.today.year, maximum: Date.today.year + 10
         property :CardCVV, String, pattern: '\A(?:\d{3}|\d{4})\z'
         additional_properties false
       end
@@ -109,8 +103,8 @@ RSpec.describe 'Payment object example' do
                 },
                 CardExpYear: {
                   type: 'integer',
-                  minimum: Time.zone.today.year,
-                  maximum: Time.zone.today.year + 10
+                  minimum: Date.today.year,
+                  maximum: Date.today.year + 10
                 },
                 CardCVV: {
                   type: 'string',

@@ -12,9 +12,13 @@ module EasyTalk
       end
 
       # Returns the name of the composition type.
-      delegate :name, to: :class
+      def name
+        self.class.name
+      end
 
-      delegate :to_s, to: :name
+      def to_s
+        name.to_s
+      end
 
       # Represents a composition type that allows all of the specified types.
       class AllOf < Composer

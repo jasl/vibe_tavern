@@ -70,7 +70,10 @@ module EasyTalk
       # Returns the items of the type.
       #
       # @return [T.untyped] The items of the type.
-      delegate :items, to: :@type
+      sig { returns(T.untyped) }
+      def items
+        @type.items
+      end
 
       # Builder class for AllOf composition.
       class AllOfBuilder < CompositionBuilder
