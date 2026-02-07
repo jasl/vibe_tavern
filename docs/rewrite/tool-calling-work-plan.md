@@ -152,7 +152,7 @@ Acceptance:
 
 ## Directives (Structured Outputs)
 
-Design doc: `docs/rewrite/directives.md`
+Design doc: `docs/research/vibe_tavern/directives.md`
 
 ### 13) Add Directives v1 protocol module
 
