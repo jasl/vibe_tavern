@@ -259,14 +259,14 @@ module DirectivesEval
       end
     end
 
-    NAKED =
+    RAW =
       Entry.new(
-        id: "naked",
+        id: "raw",
         semantic_repair: false,
         apply_provider_defaults: false,
         apply_model_workarounds: false,
         repair_retry_count: 0,
-        tags: %w[naked raw unoptimized],
+        tags: %w[raw naked unoptimized],
       ).freeze
 
     BASELINE =
@@ -288,7 +288,7 @@ module DirectivesEval
       ).freeze
 
     MATRIX_CATALOG = [BASELINE, PRODUCTION].freeze
-    ALL = [NAKED, BASELINE, PRODUCTION].freeze
+    ALL = [RAW, BASELINE, PRODUCTION].freeze
 
     module_function
 

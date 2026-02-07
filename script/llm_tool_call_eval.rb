@@ -198,14 +198,14 @@ module ToolCallEval
       end
     end
 
-    NAKED =
+    RAW =
       Entry.new(
-        id: "naked",
+        id: "raw",
         apply_model_workarounds: false,
         apply_infra_defaults: false,
         apply_provider_defaults: false,
         default_parallel_tool_calls: nil,
-        tags: %w[naked raw unoptimized],
+        tags: %w[raw naked unoptimized],
       ).freeze
 
     BASELINE =
@@ -229,7 +229,7 @@ module ToolCallEval
       ).freeze
 
     MATRIX_CATALOG = [BASELINE, PRODUCTION].freeze
-    ALL = [NAKED, BASELINE, PRODUCTION].freeze
+    ALL = [RAW, BASELINE, PRODUCTION].freeze
 
     module_function
 

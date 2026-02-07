@@ -248,7 +248,7 @@ The harness supports three strategies:
   content-tag fallback for weaker tool-call emitters.
 - `baseline`: disables model-specific workarounds (provider defaults + generic
   normalization only), to quantify how much the workarounds matter.
-- `naked`: disables **both** model-specific workarounds and infra/provider
+- `raw`: disables **both** model-specific workarounds and infra/provider
   presets (no response/tool-call transforms; no provider defaults). This is a
   “raw tool calling” control group to estimate how much reliability comes from
   the runner/presets themselves.
@@ -256,7 +256,7 @@ The harness supports three strategies:
 Env:
 - `OPENROUTER_STRATEGY_FILTER=production` (default), or `baseline,production`
 - `OPENROUTER_STRATEGY_MATRIX=1` (baseline + production)
-- For the full set (incl. naked): `OPENROUTER_STRATEGY_FILTER=naked,baseline,production`
+- For the full set (incl. raw): `OPENROUTER_STRATEGY_FILTER=raw,baseline,production`
 
 Eval note:
 - some scenarios enforce a deterministic final assistant sentence (e.g. `"Done."`)

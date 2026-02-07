@@ -310,8 +310,8 @@ Live eval (optional):
       - `OPENROUTER_SCENARIOS=simple|typical|extreme` (predefined groups)
 	    - Strategy selection:
 	      - Baseline vs production-tuned in one run: `OPENROUTER_STRATEGY_FILTER=baseline,production` (or `OPENROUTER_STRATEGY_MATRIX=1`)
-	      - “Naked” control group (no provider defaults, no model workarounds, no repair retries): `OPENROUTER_STRATEGY_FILTER=naked`
-	      - Full set (incl. naked): `OPENROUTER_STRATEGY_FILTER=naked,baseline,production`
+	      - “Raw” control group (no provider defaults, no model workarounds, no repair retries): `OPENROUTER_STRATEGY_FILTER=raw`
+	      - Full set (incl. raw): `OPENROUTER_STRATEGY_FILTER=raw,baseline,production`
 	      - Shorthand (single strategy): `OPENROUTER_SEMANTIC_REPAIR=1` (production)
     - Sampling params are driven by **sampling profiles** (matrix-friendly).
       - By default, the script uses `OPENROUTER_SAMPLING_PROFILE_FILTER=default` (no temperature/top_p override).
