@@ -7,6 +7,8 @@ require "securerandom"
 require "thread"
 require "time"
 
+require_relative "openrouter_sampling_profiles"
+
 # Default settings
 ENV["RAILS_ENV"] ||= "development"
 
@@ -286,6 +288,65 @@ if selected_model_entries.empty?
   warn "No models matched OPENROUTER_MODEL_FILTER=#{model_filter.inspect}."
   warn "Available model ids: #{DEFAULT_MODELS.join(", ")}"
   exit 2
+end
+
+sampling_profile_filter =
+  ENV.fetch("OPENROUTER_SAMPLING_PROFILE_FILTER", OpenRouterSamplingProfiles::DEFAULT_PROFILE_ID)
+enforce_sampling_profile_applicability =
+  ENV.fetch("OPENROUTER_SAMPLING_PROFILE_ENFORCE_APPLICABILITY", "1") == "1"
+
+selected_sampling_profiles = OpenRouterSamplingProfiles::CATALOG.filter(sampling_profile_filter)
+default_sampling_profile = OpenRouterSamplingProfiles::CATALOG.find(OpenRouterSamplingProfiles::DEFAULT_PROFILE_ID)
+default_sampling_profile ||= OpenRouterSamplingProfiles::Entry.new(id: OpenRouterSamplingProfiles::DEFAULT_PROFILE_ID, llm_options_defaults: {})
+
+if selected_sampling_profiles.empty?
+  warn(
+    "No sampling profiles matched OPENROUTER_SAMPLING_PROFILE_FILTER=#{sampling_profile_filter.inspect}. " \
+    "Falling back to #{default_sampling_profile.id.inspect}.",
+  )
+  selected_sampling_profiles = [default_sampling_profile]
+end
+
+llm_options_defaults_overrides = {}
+if (raw = ENV.fetch("OPENROUTER_LLM_OPTIONS_DEFAULTS_JSON", "").to_s.strip).length.positive?
+  begin
+    parsed = JSON.parse(raw)
+    llm_options_defaults_overrides.merge!(parsed) if parsed.is_a?(Hash)
+  rescue JSON::ParserError
+    warn "Invalid OPENROUTER_LLM_OPTIONS_DEFAULTS_JSON (must be a JSON object). Ignoring."
+  end
+end
+
+if (raw = ENV.fetch("OPENROUTER_TEMPERATURE", "").to_s.strip).length.positive?
+  begin
+    llm_options_defaults_overrides[:temperature] = Float(raw)
+  rescue ArgumentError, TypeError
+    nil
+  end
+end
+
+if (raw = ENV.fetch("OPENROUTER_TOP_P", "").to_s.strip).length.positive?
+  begin
+    llm_options_defaults_overrides[:top_p] = Float(raw)
+  rescue ArgumentError, TypeError
+    nil
+  end
+end
+
+if (raw = ENV.fetch("OPENROUTER_TOP_K", "").to_s.strip).length.positive?
+  begin
+    llm_options_defaults_overrides[:top_k] = Integer(raw)
+  rescue ArgumentError, TypeError
+    nil
+  end
+end
+
+if (raw = ENV.fetch("OPENROUTER_MIN_P", "").to_s.strip).length.positive?
+  begin
+    llm_options_defaults_overrides[:min_p] = Float(raw)
+  rescue ArgumentError, TypeError
+    nil
+  end
 end
 
 headers = {}
@@ -578,7 +639,8 @@ module ToolCallEval
 
       case name
       when "state_get"
-        ok_envelope(name, "snapshot" => @workspace.snapshot(select: args["select"]))
+        select = normalize_state_get_select(args["select"])
+        ok_envelope(name, "snapshot" => @workspace.snapshot(select: select))
       when "state_patch"
         ops = args["ops"]
         unless ops.is_a?(Array) && ops.any?
@@ -626,6 +688,21 @@ module ToolCallEval
       }
     end
 
+    def normalize_state_get_select(value)
+      list = Array(value).map { |v| v.to_s.strip }.reject(&:empty?)
+      return nil if list.empty?
+
+      list
+        .map do |item|
+          s = item.to_s.strip
+          s = s.sub(/\A["'`]+\s*/, "").sub(/\s*["'`]+\z/, "")
+          s = s.delete_prefix("#") if s.start_with?("#/")
+          s.start_with?("/") ? s : "/#{s}"
+        end
+        .reject(&:empty?)
+        .uniq
+    end
+
     def model_allowed_state_patch_ops?(ops)
       ops.all? do |op|
         op.is_a?(Hash) &&
@@ -639,13 +716,19 @@ module ToolCallEval
     [
       TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
         name: "state_get",
-        description: "Read workspace state (facts/draft/locks/ui_state/versions).",
+        description:
+          "Read workspace state (facts/draft/locks/ui_state/versions). " \
+          "`select` is optional and may include JSON pointers like `/draft` or `/draft/foo`.",
         parameters: {
           type: "object",
           additionalProperties: false,
           properties: {
             workspace_id: { type: "string" },
-            select: { type: "array", items: { type: "string" } },
+            select: {
+              type: "array",
+              description: "Optional JSON pointers to select (e.g. `/facts`, `/draft`, `/ui_state`).",
+              items: { type: "string" },
+            },
           },
           required: [],
         },
@@ -696,6 +779,32 @@ module ToolCallEval
       ),
     ]
   end
+end
+
+def deep_symbolize_keys(value)
+  case value
+  when Hash
+    value.each_with_object({}) do |(k, v), out|
+      key = k.is_a?(Symbol) ? k : k.to_s.to_sym
+      out[key] = deep_symbolize_keys(v) unless out.key?(key)
+    end
+  when Array
+    value.map { |v| deep_symbolize_keys(v) }
+  else
+    value
+  end
+end
+
+def deep_merge_hashes(left, right)
+  out = (left.is_a?(Hash) ? left : {}).dup
+  (right.is_a?(Hash) ? right : {}).each do |k, v|
+    if out[k].is_a?(Hash) && v.is_a?(Hash)
+      out[k] = deep_merge_hashes(out[k], v)
+    else
+      out[k] = v
+    end
+  end
+  out
 end
 
 def truncate(str, max_chars: 220)
@@ -1106,12 +1215,24 @@ reports = []
 
 task_list =
   selected_model_entries.each_with_index.flat_map do |model_entry, model_index|
-    strategy_profiles.map do |profile|
-      {
-        model_entry: model_entry,
-        model_index: model_index,
-        profile: profile,
-      }
+    profiles =
+      if enforce_sampling_profile_applicability
+        selected_sampling_profiles.select { |p| p.applies_to_model?(model_entry.id) }
+      else
+        selected_sampling_profiles
+      end
+
+    profiles = [default_sampling_profile] if profiles.empty?
+
+    profiles.flat_map do |sampling_profile|
+      strategy_profiles.map do |strategy_profile|
+        {
+          model_entry: model_entry,
+          model_index: model_index,
+          strategy_profile: strategy_profile,
+          sampling_profile: sampling_profile,
+        }
+      end
     end
   end
 
@@ -1126,7 +1247,11 @@ log_line =
     end
   end
 
-matrix_enabled = strategy_profiles.length > 1
+sampling_matrix_enabled =
+  selected_sampling_profiles.length > 1 ||
+    selected_sampling_profiles.any? { |p| p.id != OpenRouterSamplingProfiles::DEFAULT_PROFILE_ID }
+
+matrix_enabled = strategy_profiles.length > 1 || sampling_matrix_enabled
 
 process_task =
   lambda do |task, task_index, task_total|
@@ -1135,9 +1260,17 @@ process_task =
     excluded_workarounds = fallback_matrix ? ["content_tag_tool_call_fallback", "content_tag_fallback"] : []
     model_workaround_presets = ToolCallEval::ModelWorkarounds.presets_for(model_entry, exclude: excluded_workarounds)
     model_index = task.fetch(:model_index)
-    profile = task.fetch(:profile)
-    profile_id = profile.fetch(:id).to_s
-    enable_tag_fallback = profile.fetch(:content_tag_tool_call_fallback) == true
+    strategy_profile = task.fetch(:strategy_profile)
+    strategy_profile_id = strategy_profile.fetch(:id).to_s
+    enable_tag_fallback = strategy_profile.fetch(:content_tag_tool_call_fallback) == true
+    sampling_profile = task.fetch(:sampling_profile)
+    sampling_profile_id = sampling_profile.id.to_s
+
+    llm_options_defaults =
+      deep_merge_hashes(
+        sampling_profile.llm_options_defaults,
+        deep_symbolize_keys(llm_options_defaults_overrides),
+      )
 
     model_idx = model_index + 1
     model_total = selected_model_entries.length
@@ -1154,7 +1287,10 @@ process_task =
       adapter: build_http_adapter.call,
     )
 
-    model_label = matrix_enabled ? "#{model}:#{profile_id}" : model
+    model_label_parts = [model]
+    model_label_parts << strategy_profile_id if strategy_profiles.length > 1
+    model_label_parts << sampling_profile_id if sampling_matrix_enabled
+    model_label = matrix_enabled ? model_label_parts.join(":") : model
     safe_model = model_label.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
     provider_tool_calling_preset = build_provider_tool_calling_preset.call(enable_tag_fallback: enable_tag_fallback)
 
@@ -1224,6 +1360,7 @@ process_task =
             registry: registry,
             system: scenario.fetch(:system).to_s,
             strict: false,
+            llm_options_defaults: llm_options_defaults,
           )
 
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -1360,7 +1497,9 @@ process_task =
         report = {
           model: model_label,
           model_base: model,
-          strategy: profile_id,
+          strategy: strategy_profile_id,
+          sampling_profile: sampling_profile_id,
+          llm_options_defaults: llm_options_defaults,
           content_tag_tool_call_fallback: effective_tag_fallback,
           scenario: scenario_id,
           trial: trial_idx + 1,
@@ -1397,7 +1536,8 @@ process_task =
         run_meta = {
           model: model_label,
           model_base: model,
-          strategy: profile_id,
+          strategy: strategy_profile_id,
+          sampling_profile: sampling_profile_id,
           content_tag_tool_call_fallback: effective_tag_fallback,
           scenario: scenario_id,
           trial: trial_idx + 1,
@@ -1431,7 +1571,8 @@ process_task =
     {
       model: model_label,
       model_base: model,
-      strategy: profile_id,
+      strategy: strategy_profile_id,
+      sampling_profile: sampling_profile_id,
       content_tag_tool_call_fallback: task_effective_tag_fallback == true,
       runs: runs.size,
       ok: ok_count,
@@ -1480,8 +1621,11 @@ else
     task = item.is_a?(Array) ? item.fetch(0, nil) : nil
     model_entry = task.is_a?(Hash) ? task.fetch(:model_entry, nil) : nil
     model = model_entry.respond_to?(:id) ? model_entry.id : nil
-    profile_id = task.is_a?(Hash) ? task.dig(:profile, :id) : nil
-    raise "#{e.class}: worker failed for model=#{model.inspect} strategy=#{profile_id.inspect}: #{e.message}"
+    strategy_profile_id = task.is_a?(Hash) ? task.dig(:strategy_profile, :id) : nil
+    sampling_profile_id = task.is_a?(Hash) ? task.fetch(:sampling_profile, nil)&.id : nil
+    raise(
+      "#{e.class}: worker failed for model=#{model.inspect} strategy=#{strategy_profile_id.inspect} sampling_profile=#{sampling_profile_id.inspect}: #{e.message}",
+    )
   end
 
   reports = reports_by_index.compact
@@ -1506,6 +1650,10 @@ summary = {
   tool_calling_fallback_retry_count: fallback_retry_count,
   tool_allowlist: tool_allowlist,
   request_overrides: request_overrides,
+  sampling_profile_filter: sampling_profile_filter,
+  sampling_profiles: selected_sampling_profiles.map(&:id),
+  sampling_profile_enforce_applicability: enforce_sampling_profile_applicability,
+  llm_options_defaults_overrides: llm_options_defaults_overrides,
   model_filter: model_filter,
   selected_models: selected_model_entries.map(&:id),
   content_tag_tool_call_fallback_global_override: enable_content_tag_tool_call_fallback,
@@ -1520,6 +1668,23 @@ summary = {
 }
 
 File.write(out_dir.join("summary.json"), JSON.pretty_generate(summary))
+
+all_runs = reports.flat_map { |r| Array(r[:run_results]) }
+
+summary_by_scenario =
+  all_runs.each_with_object({}) do |run, out|
+    sid = run[:scenario].to_s
+    out[sid] ||= { "runs" => 0, "ok" => 0, "errors" => Hash.new(0) }
+    out[sid]["runs"] += 1
+    out[sid]["ok"] += 1 if run[:ok] == true
+    unless run[:ok] == true
+      cat = run[:error_category].to_s
+      cat = "unknown" if cat.empty?
+      out[sid]["errors"][cat] += 1
+    end
+  end
+summary_by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
+File.write(out_dir.join("summary_by_scenario.json"), JSON.pretty_generate(summary_by_scenario))
 
 successes = reports.sum { |r| r[:ok].to_i }
 total_runs = reports.sum { |r| r[:runs].to_i }
@@ -1539,6 +1704,8 @@ puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_allowlist: #{tool_allowlist ? tool_allowlist.join(",") : "(full)"}"
 puts "request_overrides: #{request_overrides.any? ? request_overrides.keys.join(",") : "(none)"}"
+puts "sampling_profile_filter: #{sampling_profile_filter}"
+puts "sampling_profiles: #{selected_sampling_profiles.map(&:id).join(",")}"
 puts "model_filter: #{model_filter}"
 puts "selected_models: #{selected_model_entries.map(&:id).join(",")}"
 puts "parallel_tool_calls(default): #{request_overrides.fetch("parallel_tool_calls", "(provider default)")}"
@@ -1554,7 +1721,7 @@ puts "model_profiles: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
 
-header = ["model", "runs", "ok", "rate", "p50_ms", "p95_ms", "status", "category", "sample", "error"]
+header = ["model", "profile", "runs", "ok", "rate", "p50_ms", "p95_ms", "status", "category", "sample", "error"]
 rows =
   reports.map do |r|
     sample = Array(r[:failure_samples]).first
@@ -1562,6 +1729,7 @@ rows =
     err = sample ? truncate(sample[:error_hint] || sample[:error].to_s, max_chars: 120) : "-"
     [
       r[:model].to_s,
+      r[:sampling_profile].to_s,
       r[:runs].to_s,
       r[:ok].to_s,
       format("%.0f%%", r[:ok_rate].to_f * 100),

@@ -149,3 +149,80 @@ Acceptance:
 Acceptance:
 - One eval execution can compare fallback on/off for the same model/scenario set.
 - DS/Gemini compatibility behavior is implemented via presets/transforms, not hardcoded in runner flow.
+
+## Directives (Structured Outputs)
+
+Design doc: `docs/rewrite/directives.md`
+
+### 13) Add Directives v1 protocol module
+
+- [x] Add `VibeTavern::Directives::Schema` (simple JSON schema + `response_format` helper).
+- [x] Add `VibeTavern::Directives::Parser`:
+  - robust JSON extraction (code fences / surrounding text)
+  - size guardrails with categorized errors
+- [x] Add `VibeTavern::Directives::Validator`:
+  - required fields (`assistant_text`, `directives`)
+  - directive allowlist + canonical type normalization (fallback modes)
+  - patch op validation helper (for app-injected payload validators; `/draft/` + `/ui_state/` by default)
+
+Acceptance:
+- Parser/validator never raise on malformed model output (they return categorized errors).
+- Valid envelopes are normalized to canonical directive types and stable shapes.
+
+### 14) Extend `PromptRunner` to support structured directives (single request)
+
+- [x] Add optional `structured_output: :directives_v1` to `PromptRunner.build_request(...)`.
+- [x] Inject `response_format` (json_schema) when `structured_output` is enabled.
+- [x] Add parse/validate behavior to `PromptRunner.perform(...)`:
+  - parse directives only when this turn has no `tool_calls`
+  - return `structured_output` or `structured_output_error` (no exceptions)
+
+Acceptance:
+- Existing tool-calling behavior remains unchanged.
+- `bin/rails test test/tool_calling/prompt_runner_test.rb` covers ok/invalid/missing/tool_calls-skipped/too_large cases.
+
+### 15) Add a Directives runner with fallback + repair retry
+
+- [x] Add `VibeTavern::Directives::Runner`:
+  - primary: `json_schema` (strict) structured outputs
+  - fallback: `json_object` mode (if supported)
+  - fallback: prompt-only JSON (no response_format)
+  - optional: single repair retry when parsing/validation fails
+  - returns a result object with `assistant_text`, `directives`, and error metadata
+- [x] Add deterministic tests for fallback behavior using fake HTTP adapters:
+  - unsupported `response_format` => falls back to json_object/prompt-only
+  - invalid JSON => repair retry path
+
+Acceptance:
+- Runner can produce a usable envelope without crashing, even when the provider does not support `json_schema`.
+- Error categories are preserved for evaluation/reporting.
+
+### 16) Add live eval harness for directives (OpenRouter, optional)
+
+- [x] Add `script/llm_directives_eval.rb` (modeled after `llm_tool_call_eval.rb`):
+  - scenario set focused on protocol correctness (not business logic)
+  - metrics: parse_ok/schema_ok, error categories, latency percentiles
+  - default `provider.require_parameters=true` for structured-output requests
+
+Acceptance:
+- Script runs with `OPENROUTER_API_KEY=...` and produces `tmp/llm_directives_eval_reports/...`.
+- Summary includes per-model success rate + a sample failure report path.
+
+### 17) Tool loop guardrails (small, opt-in)
+
+- [x] Add `runtime[:tool_calling][:max_tool_calls_per_turn]` (Integer, optional).
+  - If set, limit tool execution to the first N tool calls per assistant response.
+  - Emit `ignored_tool_calls_count` in events/trace when limiting occurs.
+- [x] If `request_overrides[:parallel_tool_calls] == false` and no explicit max is set:
+  - default `max_tool_calls_per_turn = 1` (stability-first behavior).
+- [x] Include response `usage` (when present) in `llm_request_end` events and trace entries.
+
+Acceptance:
+- Existing `ToolLoopRunner` tests still pass.
+- Eval runs with `parallel_tool_calls=false` no longer get polluted by occasional multi-tool turns (ignored tool calls are visible in traces).
+
+### 18) Sampling parameter matrix (eval scripts)
+
+- [x] Add `script/openrouter_sampling_profiles.rb` (sampling profiles catalog + recommended params).
+- [x] Update `script/llm_directives_eval.rb` and `script/llm_tool_call_eval.rb` to run `models × sampling_profiles` (and tool eval also `× fallback` profiles).
+- [x] Update docs to cover new env knobs: `OPENROUTER_SAMPLING_PROFILE_FILTER` and `OPENROUTER_LLM_OPTIONS_DEFAULTS_JSON`.

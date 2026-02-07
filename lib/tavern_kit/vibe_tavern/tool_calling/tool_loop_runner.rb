@@ -40,7 +40,8 @@ module TavernKit
           fix_empty_final: nil,
           tool_use_mode: nil,
           tool_failure_policy: nil,
-          tool_calling_fallback_retry_count: nil
+          tool_calling_fallback_retry_count: nil,
+          llm_options_defaults: nil
         )
           @client = client
           @model = model.to_s
@@ -50,7 +51,12 @@ module TavernKit
           @registry = registry || ToolRegistry.new
           @system = system.to_s
           @strict = strict == true
-          @prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: @client, model: @model)
+          @prompt_runner =
+            TavernKit::VibeTavern::PromptRunner.new(
+              client: @client,
+              model: @model,
+              llm_options_defaults: llm_options_defaults,
+            )
           @tool_use_mode = resolve_tool_use_mode(explicit: tool_use_mode)
           @tool_failure_policy = resolve_tool_failure_policy(explicit: tool_failure_policy)
           @tool_calling_fallback_retry_count =
@@ -209,6 +215,9 @@ module TavernKit
             assistant_msg = prompt_result.assistant_message
             finish_reason = prompt_result.finish_reason
 
+            usage = body.fetch("usage", nil)
+            usage = nil unless usage.is_a?(Hash)
+
             assistant_content = assistant_msg.fetch("content", "").to_s
             tool_calls = normalize_tool_calls_payload(assistant_msg.fetch("tool_calls", nil))
             tool_calls = normalize_tool_calls(tool_calls)
@@ -221,7 +230,17 @@ module TavernKit
             end
             ignored_tool_calls = 0
 
-            unless tools_enabled
+            if tools_enabled
+              max_tool_calls_per_turn = resolve_max_tool_calls_per_turn(default: nil)
+              if max_tool_calls_per_turn.nil? && request_overrides[:parallel_tool_calls] == false
+                max_tool_calls_per_turn = 1
+              end
+
+              if max_tool_calls_per_turn && tool_calls.size > max_tool_calls_per_turn
+                ignored_tool_calls = tool_calls.size - max_tool_calls_per_turn
+                tool_calls = tool_calls.first(max_tool_calls_per_turn)
+              end
+            else
               ignored_tool_calls = tool_calls.size
               tool_calls = []
             end
@@ -249,6 +268,7 @@ module TavernKit
               elapsed_ms: request_elapsed_ms,
               finish_reason: finish_reason,
               assistant_content_bytes: assistant_content.bytesize,
+              usage: usage,
               tool_calls_count: tool_calls.size,
               ignored_tool_calls_count: ignored_tool_calls,
               tool_calls: tool_calls_summary,
@@ -272,6 +292,7 @@ module TavernKit
                 has_tool_calls: !tool_calls.empty?,
                 tool_calls_count: tool_calls.size,
                 ignored_tool_calls_count: ignored_tool_calls,
+                usage: usage,
                 finish_reason: finish_reason,
               },
               tool_calls: tool_calls_summary,
@@ -557,6 +578,18 @@ module TavernKit
           default
         end
 
+        def resolve_max_tool_calls_per_turn(default:)
+          val = runtime_setting_value(:max_tool_calls_per_turn)
+          return default if val.nil?
+
+          i = Integer(val)
+          return default if i <= 0
+
+          i
+        rescue ArgumentError, TypeError
+          default
+        end
+
         def resolve_tool_choice(default:)
           raw = runtime_setting_value(:tool_choice)
 
@@ -582,7 +615,7 @@ module TavernKit
           raw = deep_symbolize_keys(raw)
 
           # Keep ownership clear: these keys are controlled by ToolLoopRunner.
-          reserved = %i[model messages tools tool_choice].freeze
+          reserved = %i[model messages tools tool_choice response_format].freeze
           raw.each_with_object({}) do |(k, v), out|
             key = k.to_s.to_sym
             next if reserved.include?(key)

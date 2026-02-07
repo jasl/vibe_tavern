@@ -174,7 +174,19 @@ class ToolLoopRunnerTest < Minitest::Test
     TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(definitions: defs)
   end
 
-  def build_runner(client:, model:, workspace:, registry: build_registry, tool_use_mode: nil, runtime: nil, fix_empty_final: nil, tool_calling_fallback_retry_count: nil, strict: false, system: nil)
+  def build_runner(
+    client:,
+    model:,
+    workspace:,
+    registry: build_registry,
+    tool_use_mode: nil,
+    runtime: nil,
+    fix_empty_final: nil,
+    tool_calling_fallback_retry_count: nil,
+    llm_options_defaults: nil,
+    strict: false,
+    system: nil
+  )
     TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
       client: client,
       model: model,
@@ -186,6 +198,7 @@ class ToolLoopRunnerTest < Minitest::Test
       fix_empty_final: fix_empty_final,
       tool_use_mode: tool_use_mode,
       tool_calling_fallback_retry_count: tool_calling_fallback_retry_count,
+      llm_options_defaults: llm_options_defaults,
     )
   end
 
@@ -462,6 +475,177 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_equal "Done.", result[:assistant_text]
   end
 
+  def test_tool_loop_limits_tool_calls_per_turn_when_parallel_tool_calls_disabled
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                        {
+                          id: "call_2",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                request_id: "r1",
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            elsif @call_count == 2
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_3",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                request_id: "r1",
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runtime = { tool_calling: { request_overrides: { parallel_tool_calls: false } } }
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_equal "Done.", result[:assistant_text]
+    assert_equal "bar", workspace.draft["foo"]
+
+    t0 = result[:trace].find { |t| t[:turn] == 0 }
+    refute_nil t0
+    assert_equal 1, t0.dig(:response_summary, :tool_calls_count)
+    assert_equal 1, t0.dig(:response_summary, :ignored_tool_calls_count)
+    assert_equal ["state_get"], Array(t0[:tool_calls]).map { |tc| tc[:name] }
+  end
+
+  def test_tool_loop_includes_usage_in_trace_when_present
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          if @call_count == 1
+            response_body = {
+              choices: [
+                {
+                  message: {
+                    role: "assistant",
+                    content: "",
+                    tool_calls: [
+                      { id: "call_1", type: "function", function: { name: "state_get", arguments: "{}" } },
+                    ],
+                  },
+                  finish_reason: "tool_calls",
+                },
+              ],
+              usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+            }
+          else
+            response_body = {
+              choices: [
+                { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+              ],
+              usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 },
+            }
+          end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
+
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    t0 = result[:trace].find { |t| t[:turn] == 0 }
+    refute_nil t0
+    assert_equal 15, t0.dig(:response_summary, :usage, "total_tokens")
+  end
+
   def test_tool_call_names_with_whitespace_are_stripped
     requests = []
 
@@ -608,6 +792,7 @@ class ToolLoopRunnerTest < Minitest::Test
             request_overrides: {
               "temperature" => 0.123,
               "transforms" => ["middle-out"],
+              "response_format" => { "type" => "json_object" },
               "model" => "evil-model",
               "tool_choice" => "none",
               "tools" => [
@@ -628,10 +813,48 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_equal ["middle-out"], req["transforms"]
 
     # request_overrides cannot override tool_choice/tools/model; those are owned by ToolLoopRunner.
+    assert_nil req["response_format"]
     assert_equal "auto", req["tool_choice"]
     tool_names = Array(req["tools"]).map { |t| t.dig("function", "name") }.compact
     assert_includes tool_names, "state_get"
     refute_includes tool_names, "evil_tool"
+  end
+
+  def test_tool_loop_runner_propagates_prompt_runner_llm_options_defaults
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        tool_use_mode: :relaxed,
+        llm_options_defaults: { temperature: 0.7 },
+      )
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req = JSON.parse(requests[0][:body])
+    assert_in_delta 0.7, req.fetch("temperature"), 0.0001
   end
 
   def test_runtime_tool_choice_overrides_default

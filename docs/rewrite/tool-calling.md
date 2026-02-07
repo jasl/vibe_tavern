@@ -12,6 +12,9 @@ Non-goals (for now):
 - UI implementation
 - full CCv3 editor/exporter product logic
 
+Related (separate protocol):
+- Structured Directives (pseudo tool calling): `docs/rewrite/directives.md`
+
 ## Decisions (Locked In)
 
 These are the current source-of-truth decisions for the PoC and early product
@@ -88,6 +91,12 @@ Rationale:
    - parses `tool_calls`
    - executes tools, appends tool result messages, loops until final assistant
    - emits a trace (for debugging / replay / tests)
+
+5) Structured Directives (single-turn UI/state instructions)
+   - modeled as structured assistant content (JSON envelope)
+   - parsed/validated by the app (no side effects)
+   - designed to be used alongside tool calling, not mixed into the same command set
+   - see `docs/rewrite/directives.md`
 
 ### State: in-memory first
 
@@ -170,6 +179,16 @@ OPENROUTER_API_KEY=... OPENROUTER_MODEL_FILTER="google,!google/gemini-3-pro-prev
 # "finalization" retry prompt that asks the model to return a final answer.
 OPENROUTER_FIX_EMPTY_FINAL=1 OPENROUTER_API_KEY=... OPENROUTER_MODEL_FILTER="qwen/qwen3-next-80b-a3b-instruct:nitro" \
   bundle exec ruby script/llm_tool_call_eval.rb
+
+# Run a sampling-parameter matrix (temperature/top_p/top_k/min_p) using predefined profiles.
+# Profiles are defined in script/openrouter_sampling_profiles.rb.
+# Applicability is enforced by default: profiles only run on matching models.
+OPENROUTER_SAMPLING_PROFILE_FILTER=recommended OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
+  bundle exec ruby script/llm_tool_call_eval.rb
+
+# Include additional non-default profiles (e.g. creative/conversation/tool_calling).
+OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,creative,conversation,tool_calling" OPENROUTER_TRIALS=10 OPENROUTER_API_KEY=... \
+  bundle exec ruby script/llm_tool_call_eval.rb
 ```
 
 Notes:
@@ -182,19 +201,53 @@ Notes:
 
 The goal of `OPENROUTER_MODEL_FILTER=stable` is to keep a small, cheap, high-signal eval set for repeated runs.
 
-As of `tmp/llm_tool_call_eval_reports/20260206T160334Z` (full model catalog, smoke scenarios, 5 trials),
-the models with 100% end-to-end success were:
+As of `tmp/llm_tool_call_eval_reports/20260207T123628Z` (full model catalog, smoke scenarios, 10 trials, sampling profile matrix),
+the strict end-to-end success rate was:
 
-| model | ok | p95_ms | notes |
-|---|---:|---:|---|
-| `qwen/qwen3-235b-a22b-2507:nitro` | 25/25 | 6413 | best-effort enables the content-tag fallback |
-| `qwen/qwen3-next-80b-a3b-instruct:nitro` | 25/25 | 7302 | - |
-| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | 25/25 | 10787 | - |
-| `openai/gpt-5.2:nitro` | 25/25 | 12074 | - |
-| `anthropic/claude-opus-4.6:nitro` | 25/25 | 15962 | - |
-| `google/gemini-2.5-flash:nitro` | 25/25 | 20079 | - |
+- Overall: `1198/1450` ok (`82.62%`)
+- Tool scenarios only (excluding `chat_only`): `1002/1160` ok (`86.38%`)
+- By scenario (ok / runs):
+  - `happy_path`: `274/290` (`94.48%`)
+  - `missing_workspace_id`: `272/290` (`93.79%`)
+  - `type_error_recovery`: `253/290` (`87.24%`)
+  - `long_arguments_guard`: `203/290` (`70.00%`) (hardest)
+  - `chat_only`: `196/290` (`67.59%`)
 
-Models outside `stable` can be valuable, but tend to be noisier on at least one scenario (e.g. `long_arguments_guard`) or have more provider-side variability.
+Command:
+
+```sh
+OPENROUTER_TRIALS=10 OPENROUTER_MODEL_FILTER=all \
+  OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
+  bundle exec ruby script/llm_tool_call_eval.rb
+```
+
+100% model/profile combos in this snapshot (50/50):
+
+| model | sampling_profile | ok | p95_ms | notes |
+|---|---|---:|---:|---|
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `qwen_recommended` | 50/50 | 8718 | - |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `default` | 50/50 | 9131 | best-effort enables the content-tag fallback |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `qwen_recommended` | 50/50 | 12059 | - |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `default` | 50/50 | 12179 | - |
+| `google/gemini-2.5-flash:nitro` | `gemini_2_5_flash_creative` | 50/50 | 12633 | - |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `default` | 50/50 | 13206 | - |
+| `anthropic/claude-opus-4.6:nitro` | `default` | 50/50 | 18392 | - |
+
+Near-perfect (>= 96%) combos in this snapshot:
+- `openai/gpt-5.2:nitro` + `default`: `49/50` (`98%`)
+- `google/gemini-2.5-flash:nitro` + `default`: `49/50` (`98%`)
+- `google/gemini-3-flash-preview:nitro` + `default`: `48/50` (`96%`)
+
+Notable observations:
+- The most frequent failure reason was the strict final text constraint (`assistant_text == "Done."`). This is an eval-only constraint used to keep assertions stable.
+- `long_arguments_guard` is the main reliability bottleneck in this run (70%). It exercises `max_tool_args_bytes` (`ARGUMENTS_TOO_LARGE`) and requires the model to retry with a shorter payload.
+- Provider quirks: `x-ai/grok-4.1-fast` returned HTTP 403 for `chat_only` in this run (OpenRouter/xAI safety false-positive: `SAFETY_CHECK_TYPE_BIO`).
+- Sampling profile impact (high-level):
+  - DeepSeek V3.2: `deepseek_v3_2_creative_writing` was the worst profile (78%); `default` / `deepseek_v3_2_local_recommended` were best (92%).
+  - Gemini 2.5 Flash: `gemini_2_5_flash_creative` was 100%; `default` was 98%.
+  - Qwen 3 235B: `default` was 100%, but `qwen_recommended` dropped to 80% (all misses in `long_arguments_guard`).
+
+Models outside `stable` can be valuable, but tend to be noisier on at least one scenario (most commonly `long_arguments_guard`) or have more provider-side variability.
 - `SimpleInference` composes the final request URL as `base_url + api_prefix + endpoint`.
   - Recommended for OpenRouter: `OPENROUTER_BASE_URL=https://openrouter.ai/api` and `OPENROUTER_API_PREFIX=/v1`
   - If you already set `OPENROUTER_BASE_URL=https://openrouter.ai/api/v1`, set `OPENROUTER_API_PREFIX=""`
@@ -209,6 +262,10 @@ Models outside `stable` can be valuable, but tend to be noisier on at least one 
   - `VERBOSE=2` includes extra request/tool size info
   - `OPENROUTER_JOBS` controls model-level parallel workers (default: `1`)
   - `OPENROUTER_FALLBACK_MATRIX=1` runs both `fallback_off` and `fallback_on` profiles in one pass
+  - Sampling-parameter matrix (temperature/top_p/top_k/min_p):
+    - `OPENROUTER_SAMPLING_PROFILE_FILTER` (default: `default`; matches id/tags in `script/openrouter_sampling_profiles.rb`)
+    - `OPENROUTER_SAMPLING_PROFILE_ENFORCE_APPLICABILITY=1` (default) applies profiles only to matching models
+    - Optional global overrides: `OPENROUTER_LLM_OPTIONS_DEFAULTS_JSON`, `OPENROUTER_TEMPERATURE`, `OPENROUTER_TOP_P`, `OPENROUTER_TOP_K`, `OPENROUTER_MIN_P`
   - Best-effort defaults:
     - The script may enable some compatibility presets per model (registered in `MODEL_CATALOG`) to improve tool calling reliability.
     - `OPENROUTER_ENABLE_CONTENT_TAG_TOOL_CALL_FALLBACK=1` forces the content-tag fallback on for all models (override).
@@ -267,7 +324,8 @@ Note:
 - Provider/request-level overrides (upper-layer injection):
   - `runtime[:tool_calling][:request_overrides]` (Hash) is merged into the OpenAI-compatible request body.
     - Intended for provider-specific knobs like OpenRouter routing (`route`, `provider`, `transforms`) or standard params (`temperature`).
-    - Reserved keys are ignored here (`model`, `messages`, `tools`, `tool_choice`) to keep ownership clear.
+    - Reserved keys are ignored here (`model`, `messages`, `tools`, `tool_choice`, `response_format`) to keep ownership clear.
+    - For provider-wide defaults shared across protocols (e.g. `temperature`), prefer storing them on the LLM provider config and injecting them via `PromptRunner` `llm_options_defaults`.
   - Eval env helpers (optional):
     - `OPENROUTER_ROUTE=fallback`
     - `OPENROUTER_TRANSFORMS=middle-out` (comma-separated)
