@@ -15,8 +15,8 @@ Audience:
 3) `docs/research/vibe_tavern/tool-calling.md`
 4) `docs/research/vibe_tavern/directives.md`
 
-Deferred product goals (intentionally not locked in yet):
-- `docs/research/vibe_tavern/deferred-agentic-generation.md`
+Product backlog (not research, intentionally not locked in yet):
+- `docs/todo/vibe_tavern/deferred-agentic-generation.md`
 
 ## Evaluation harnesses
 
@@ -28,4 +28,3 @@ model×sampling-profile capability matrix:
 - Shared sampling profiles: `script/openrouter_sampling_profiles.rb`
 
 Deterministic (CI) coverage is under `test/tool_calling/`.
-

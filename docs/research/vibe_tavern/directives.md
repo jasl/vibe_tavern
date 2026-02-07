@@ -12,7 +12,7 @@ the model as structured output, intended to be:
 
 Out of scope (for now):
 - agent-driven character / lorebook generation workflows (deferred; no final tech route yet)
-  - see `docs/research/vibe_tavern/deferred-agentic-generation.md`
+  - see `docs/todo/vibe_tavern/deferred-agentic-generation.md`
 
 Scope:
 - OpenAI-compatible APIs (OpenAI / OpenRouter / VolcanoEngine)
@@ -26,6 +26,19 @@ Non-goals (for now):
 Related (separate protocol):
 - Tool calling (multi-turn, side effects): `docs/research/vibe_tavern/tool-calling.md`
 - Architecture overview: `docs/research/vibe_tavern/architecture.md`
+
+## Conclusions (current)
+
+- Prefer `json_schema` (then `json_object`) for reliability; treat `prompt_only` as a last resort.
+- The most common “real” failure mode is **valid JSON but wrong directive semantics**
+  (e.g. missing a required `ui.request_upload`), not JSON parsing.
+- Production strategy: enable **semantic repair** when a specific directive is required.
+  This trades a small number of extra round-trips for a large reliability gain.
+- Provider routing matters (especially on OpenRouter): some model + parameter sets can
+  yield **HTTP 404 for structured modes** (“no endpoints support the requested parameters”).
+  When this happens, either:
+  - keep structured-mode sampling params minimal (avoid exotic knobs), or
+  - start from `json_object` / `prompt_only` for that path to avoid repeated 404s.
 
 ## Failure modes (what we see in practice)
 
@@ -291,10 +304,13 @@ CI tests:
 Live eval (optional):
   - `script/llm_directives_eval.rb` (OpenRouter) to build a model/provider capability matrix
     and track parse/schema success rate + latency percentiles.
-    - Outputs `summary.json` and `summary_by_scenario.json` under `tmp/llm_directives_eval_reports/<timestamp>/`.
+    - Outputs `summary.json`, `summary_by_scenario.json`, and `summary_by_scenario_and_strategy.json` under `tmp/llm_directives_eval_reports/<timestamp>/`.
     - Scenario selection:
       - `OPENROUTER_SCENARIOS=default` (all scenarios)
       - `OPENROUTER_SCENARIOS=simple|typical|extreme` (predefined groups)
+    - Strategy selection:
+      - Baseline vs production-tuned in one run: `OPENROUTER_STRATEGY_FILTER=baseline,production` (or `OPENROUTER_STRATEGY_MATRIX=1`)
+      - Shorthand (single strategy): `OPENROUTER_SEMANTIC_REPAIR=1` (production)
     - Sampling params are driven by **sampling profiles** (matrix-friendly).
       - By default, the script uses `OPENROUTER_SAMPLING_PROFILE_FILTER=default` (no temperature/top_p override).
       - Profiles are defined in `script/openrouter_sampling_profiles.rb`.
@@ -307,7 +323,8 @@ Live eval (optional):
 
 ### Eval snapshot (OpenRouter, all models, sampling matrix)
 
-Run: `tmp/llm_directives_eval_reports/20260207T180246Z`
+Raw report JSON files are written under `tmp/llm_directives_eval_reports/<timestamp>/`
+and are not committed. The tables below are a captured snapshot for reference.
 
 Command:
 
@@ -338,11 +355,133 @@ Notable observations:
   - MiniMax M2.x (prompt-only): `minimax_m2_1_recommended` improved over `default`, but both remained < 100% on `request_upload`.
   - GLM: `z-ai/glm-4.7` was 100% on `glm_4_7_recommended` but not on `default` (one truncated `request_upload` response dropped as invalid). `z-ai/glm-4.7-flash` was 100% on `glm_4_7_flash_tool_calling` but not on `default`.
 
-Non-100% model/profile combos in this run:
-- `deepseek/deepseek-v3.2:nitro` + `deepseek_v3_2_creative_writing`: `39/40` (missing `ui.toast` x1; returned empty directives)
-- `minimax/minimax-m2-her` + `default` (prompt-only): `37/40` (missing `ui.request_upload` x3; returned `ui.show_form`)
-- `minimax/minimax-m2.1:nitro` (prompt-only):
-  - `default`: `37/40` (missing `ui.request_upload` x3; returned `ui.show_form`)
-  - `minimax_m2_1_recommended`: `39/40` (missing `ui.request_upload` x1; returned `ui.show_form`)
-- `z-ai/glm-4.7:nitro` + `default`: `39/40` (missing `ui.request_upload` x1; one truncated response dropped as invalid)
-- `z-ai/glm-4.7-flash:nitro` + `default`: `38/40` (missing `ui.request_upload` x2; returned `[]` or `ui.toast`)
+Model/profile matrix (baseline):
+
+| model | profile | ok | ok_rate | modes (final) | failures |
+|---|---|---:|---:|---|---|
+| `anthropic/claude-opus-4.6:nitro` | `default` | 40/40 | 100.0% | json_object:40 | - |
+| `deepseek/deepseek-chat-v3-0324:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_creative_writing` | 39/40 | 97.5% | json_schema:40 | toast: ASSERTION_FAILED: missing ui.toast |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_general_conversation` | 40/40 | 100.0% | json_schema:40 | - |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_local_recommended` | 40/40 | 100.0% | json_schema:40 | - |
+| `deepseek/deepseek-v3.2:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `google/gemini-2.5-flash:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `google/gemini-2.5-flash:nitro` | `gemini_2_5_flash_creative` | 40/40 | 100.0% | json_schema:40 | - |
+| `google/gemini-3-flash-preview:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `google/gemini-3-pro-preview:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `minimax/minimax-m2-her` | `default` | 37/40 | 92.5% | prompt_only:40 | request_upload: ASSERTION_FAILED: missing ui.request_upload x3 |
+| `minimax/minimax-m2.1:nitro` | `default` | 37/40 | 92.5% | prompt_only:40 | request_upload: ASSERTION_FAILED: missing ui.request_upload x3 |
+| `minimax/minimax-m2.1:nitro` | `minimax_m2_1_recommended` | 39/40 | 97.5% | prompt_only:40 | request_upload: ASSERTION_FAILED: missing ui.request_upload |
+| `moonshotai/kimi-k2.5:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `moonshotai/kimi-k2.5:nitro` | `kimi_k2_5_instant` | 40/40 | 100.0% | json_schema:39 json_object:1 | - |
+| `openai/gpt-5.2-chat:nitro` | `default` | 40/40 | 100.0% | prompt_only:40 | - |
+| `openai/gpt-5.2:nitro` | `default` | 40/40 | 100.0% | prompt_only:40 | - |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `qwen_recommended` | 40/40 | 100.0% | json_schema:40 | - |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `qwen_recommended` | 40/40 | 100.0% | prompt_only:40 | - |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `qwen_recommended` | 40/40 | 100.0% | json_object:40 | - |
+| `x-ai/grok-4.1-fast` | `default` | 40/40 | 100.0% | json_schema:40 | - |
+| `x-ai/grok-4.1-fast` | `grok_default` | 40/40 | 100.0% | json_schema:40 | - |
+| `z-ai/glm-4.7-flash:nitro` | `default` | 38/40 | 95.0% | json_schema:40 | request_upload: ASSERTION_FAILED: missing ui.request_upload x2 |
+| `z-ai/glm-4.7-flash:nitro` | `glm_4_7_flash_tool_calling` | 40/40 | 100.0% | json_schema:40 | - |
+| `z-ai/glm-4.7:nitro` | `default` | 39/40 | 97.5% | json_schema:40 | request_upload: ASSERTION_FAILED: missing ui.request_upload |
+| `z-ai/glm-4.7:nitro` | `glm_4_7_recommended` | 40/40 | 100.0% | json_schema:40 | - |
+
+### Eval snapshot (OpenRouter, all models, sampling matrix, semantic repair enabled)
+
+Raw report JSON files are written under `tmp/llm_directives_eval_reports/<timestamp>/`
+and are not committed. The tables below are a captured snapshot for reference.
+
+Command:
+
+```sh
+OPENROUTER_TRIALS=10 OPENROUTER_MODEL_FILTER=all \
+  OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
+  OPENROUTER_SEMANTIC_REPAIR=1 \
+  bundle exec ruby script/llm_directives_eval.rb
+```
+
+Summary:
+- Overall: `1160/1160` ok (`100%`)
+- By scenario (ok / runs): all `290/290` (`100%`)
+- By final mode (runs):
+  - `json_schema`: `838`
+  - `json_object`: `82`
+  - `prompt_only`: `240`
+- Repair/overhead signals (runs):
+  - `109/1160` (`9.4%`) had more than one attempt (repair retry and/or fallback).
+  - `80/1160` (`6.9%`) included an OpenRouter `HTTP 404` in a structured mode (provider routing: “no endpoints found that can handle the requested parameters”).
+  - `14/1160` (`1.2%`) required semantic repair (valid envelope, but missing a required directive type; fixed by a retry with explicit feedback).
+
+Notable observations:
+- This snapshot reflects a **production-tuned** strategy: when a specific directive is required, semantic repair can recover from “valid JSON, wrong directive” in one additional round-trip.
+- “All green” does not mean “all models support json_schema”: some models still rely on `prompt_only` (e.g. OpenAI models on OpenRouter routes) and some profiles can trigger structured routing failures (e.g. Qwen recommended profiles with extra sampling knobs leading to `json_schema` 404 and a fallback).
+
+Model/profile matrix (production strategy):
+
+| model | profile | ok | modes (final) | multi-attempt | http404 | semantic_repair |
+|---|---|---:|---|---:|---:|---:|
+| `anthropic/claude-opus-4.6:nitro` | `default` | 40/40 | json_object:40 | 0 | 0 | 0 |
+| `deepseek/deepseek-chat-v3-0324:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_creative_writing` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_general_conversation` | 40/40 | json_schema:40 | 1 | 0 | 1 |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_local_recommended` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `deepseek/deepseek-v3.2:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `google/gemini-2.5-flash:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `google/gemini-2.5-flash:nitro` | `gemini_2_5_flash_creative` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `google/gemini-3-flash-preview:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `google/gemini-3-pro-preview:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `minimax/minimax-m2-her` | `default` | 40/40 | prompt_only:40 | 15 | 0 | 3 |
+| `minimax/minimax-m2.1:nitro` | `default` | 40/40 | prompt_only:40 | 4 | 0 | 4 |
+| `minimax/minimax-m2.1:nitro` | `minimax_m2_1_recommended` | 40/40 | prompt_only:40 | 3 | 0 | 2 |
+| `moonshotai/kimi-k2.5:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `moonshotai/kimi-k2.5:nitro` | `kimi_k2_5_instant` | 40/40 | json_schema:40 | 1 | 0 | 0 |
+| `openai/gpt-5.2-chat:nitro` | `default` | 40/40 | prompt_only:40 | 0 | 0 | 0 |
+| `openai/gpt-5.2:nitro` | `default` | 40/40 | prompt_only:40 | 0 | 0 | 0 |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `qwen_recommended` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `qwen_recommended` | 40/40 | prompt_only:40 | 40 | 40 | 0 |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `qwen_recommended` | 40/40 | json_object:40 | 40 | 40 | 0 |
+| `x-ai/grok-4.1-fast` | `default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `x-ai/grok-4.1-fast` | `grok_default` | 40/40 | json_schema:40 | 0 | 0 | 0 |
+| `z-ai/glm-4.7-flash:nitro` | `default` | 40/40 | json_schema:39 json_object:1 | 1 | 0 | 0 |
+| `z-ai/glm-4.7-flash:nitro` | `glm_4_7_flash_tool_calling` | 40/40 | json_schema:40 | 1 | 0 | 1 |
+| `z-ai/glm-4.7:nitro` | `default` | 40/40 | json_schema:39 json_object:1 | 2 | 0 | 2 |
+| `z-ai/glm-4.7:nitro` | `glm_4_7_recommended` | 40/40 | json_schema:40 | 1 | 0 | 1 |
+
+## Production config (directives) and model recommendations
+
+This table is **only** about the directives protocol (not tool calling).
+
+Legend:
+- “Preset/workaround” refers to additional `Directives::Presets.directives(...)` overlays.
+- Base preset for OpenRouter: `Directives::Presets.provider_defaults("openrouter")`
+  (structured modes use `provider.require_parameters=true`, prompt-only uses `false`).
+- “-” means “no extra workaround” (keep `Directives::Presets.default_directives`, i.e. `json_schema → json_object → prompt_only`).
+- `json_object_first`: `Directives::Presets.directives(modes: %i[json_object prompt_only])`
+- `prompt_only`: `Directives::Presets.directives(modes: [:prompt_only])`
+- “Semantic repair” refers to the production strategy of supplying a `result_validator` to the directives runner.
+
+| model | recommended sampling profile(s) | preset/workaround | semantic repair | recommended? | notes |
+|---|---|---|---|---|---|
+| `anthropic/claude-opus-4.6:nitro` | `default` (no overrides) | `json_object_first` | Yes (when required) | Yes | OpenRouter structured routing is more stable starting at `json_object`. |
+| `deepseek/deepseek-chat-v3-0324:nitro` | `default` | - | Yes (when required) | Yes | Stable on `json_schema` in this snapshot. |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_local_recommended` (t=1.0 top_p=0.95) / `deepseek_v3_2_general_conversation` (t=1.3 top_p=0.95) | - | Yes (when required) | Yes | `deepseek_v3_2_creative_writing` had one miss without semantic repair. |
+| `google/gemini-2.5-flash:nitro` | `default` (no overrides) / `gemini_2_5_flash_creative` (t=1.5) | - | Yes (when required) | Yes | Stable on `json_schema` across profiles. |
+| `google/gemini-3-flash-preview:nitro` | `default` (no overrides) | - | Yes (when required) | Yes | Stable on `json_schema` in this snapshot. |
+| `google/gemini-3-pro-preview:nitro` | `default` (no overrides) | - | Yes (when required) | Yes | Stable on `json_schema` in this snapshot. |
+| `moonshotai/kimi-k2.5:nitro` | `kimi_k2_5_instant` (t=0.6 top_p=0.95) | - | Yes (when required) | Yes | Mostly `json_schema`; rare fallback in baseline. |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `qwen_recommended` (t=0.7 top_p=0.8 top_k=20 min_p=0) | - | Yes (when required) | Yes | `qwen_recommended` remained compatible with `json_schema` here. |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `default` (no overrides) | - | Yes (when required) | Yes (conditional) | On OpenRouter, `qwen_recommended` (t=0.7 top_p=0.8 top_k=20 min_p=0) caused structured-mode HTTP 404 and fell back to `prompt_only` in 100% of runs. Prefer `default` for directives or strip exotic knobs for structured modes. |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `default` (no overrides) | - | Yes (when required) | Yes (conditional) | On OpenRouter, `qwen_recommended` (t=0.7 top_p=0.8 top_k=20 min_p=0) forced `json_object` via `json_schema` 404 in 100% of runs. Prefer `default` for directives (or start at `json_object` for that path). |
+| `x-ai/grok-4.1-fast` | `grok_default` (t=0.3) | - | Yes (when required) | Yes | Stable on `json_schema` in this snapshot. |
+| `z-ai/glm-4.7:nitro` | `glm_4_7_recommended` (t=1.0 top_p=0.95) | - | Yes (when required) | Yes | `default` had `request_upload` misses without repair. |
+| `z-ai/glm-4.7-flash:nitro` | `glm_4_7_flash_tool_calling` (t=0.7 top_p=1.0) | - | Yes (when required) | Yes (conditional) | `default` had `request_upload` misses without repair; prefer the tuned profile. |
+| `openai/gpt-5.2:nitro` | `default` (no overrides) | `prompt_only` (OpenRouter) | Yes (when required) | Yes (conditional) | On OpenRouter, structured modes were routed via `prompt_only`. Prefer direct OpenAI API for `json_schema`. |
+| `openai/gpt-5.2-chat:nitro` | `default` (no overrides) | `prompt_only` (OpenRouter) | Yes (when required) | Yes (conditional) | Same as above. |
+| `minimax/minimax-m2.1:nitro` | `minimax_m2_1_recommended` (t=1.0 top_p=0.95 top_k=40) | `prompt_only` | Yes (when required) | Conditional | Prompt-only + semantic repair can hit 100%, but it costs retries and is inherently less strict than structured modes. |
+| `minimax/minimax-m2-her` | `default` (no overrides) | `prompt_only` | Yes (when required) | Conditional | Same caveat as above. |

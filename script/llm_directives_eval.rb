@@ -181,6 +181,91 @@ module DirectivesEval
 
       msg.strip.empty? ? "" : "UNKNOWN"
     end
+
+    def attempts_count(attempts)
+      Array(attempts).length
+    end
+
+    def attempts_include_http_404?(attempts)
+      Array(attempts).any? do |attempt|
+        next false unless attempt.is_a?(Hash)
+
+        http_error = attempt[:http_error]
+        http_error = attempt["http_error"] if http_error.nil?
+        next false unless http_error == true
+
+        status = attempt[:http_status]
+        status = attempt["http_status"] if status.nil?
+        status.to_i == 404
+      end
+    end
+
+    def attempts_include_semantic_error?(attempts)
+      Array(attempts).any? do |attempt|
+        next false unless attempt.is_a?(Hash)
+
+        semantic = attempt[:semantic_error]
+        semantic = attempt["semantic_error"] if semantic.nil?
+        semantic.is_a?(Hash)
+      end
+    end
+  end
+
+  module Strategies
+    Entry = Struct.new(:id, :semantic_repair, :tags, keyword_init: true) do
+      def initialize(id:, semantic_repair:, tags: [])
+        super(
+          id: id.to_s,
+          semantic_repair: semantic_repair == true,
+          tags: normalize_tags(tags),
+        )
+      end
+
+      def matches?(raw_token)
+        token = raw_token.to_s.strip.downcase
+        return false if token.empty?
+
+        candidates = ([id] + tags).map(&:to_s).map(&:downcase).uniq
+
+        if token.include?("*")
+          candidates.any? { |value| File.fnmatch(token, value) }
+        else
+          candidates.include?(token)
+        end
+      end
+
+      private
+
+      def normalize_tags(value)
+        Array(value).map { |item| item.to_s.strip.downcase }.reject(&:empty?).uniq
+      end
+    end
+
+    BASELINE = Entry.new(id: "baseline", semantic_repair: false, tags: %w[default off semantic_repair_off]).freeze
+    PRODUCTION = Entry.new(id: "production", semantic_repair: true, tags: %w[prod on semantic_repair_on]).freeze
+
+    CATALOG = [BASELINE, PRODUCTION].freeze
+
+    module_function
+
+    def filter(raw_filter, fallback_semantic_repair:)
+      tokens = raw_filter.to_s.split(",").map(&:strip).reject(&:empty?)
+      return [fallback_semantic_repair == true ? PRODUCTION : BASELINE] if tokens.empty?
+
+      return CATALOG.dup if tokens.any? { |token| %w[all full *].include?(token.downcase) }
+
+      include_tokens = tokens.reject { |token| token.start_with?("!") }
+      exclude_tokens = tokens.select { |token| token.start_with?("!") }.map { |t| t.delete_prefix("!") }.reject(&:empty?)
+
+      selected =
+        if include_tokens.empty?
+          CATALOG
+        else
+          CATALOG.select { |entry| include_tokens.any? { |token| entry.matches?(token) } }
+        end
+
+      selected.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
+    end
   end
 end
 
@@ -319,7 +404,27 @@ sampling_profile_filter =
 enforce_sampling_profile_applicability =
   ENV.fetch("OPENROUTER_SAMPLING_PROFILE_ENFORCE_APPLICABILITY", "1") == "1"
 
-semantic_repair = ENV.fetch("OPENROUTER_SEMANTIC_REPAIR", "0") == "1"
+strategy_matrix = ENV.fetch("OPENROUTER_STRATEGY_MATRIX", "0") == "1"
+raw_strategy_filter = ENV.fetch("OPENROUTER_STRATEGY_FILTER", "").to_s.strip
+fallback_semantic_repair = ENV.fetch("OPENROUTER_SEMANTIC_REPAIR", "0") == "1"
+
+requested_strategies =
+  if strategy_matrix
+    DirectivesEval::Strategies::CATALOG.dup
+  else
+    DirectivesEval::Strategies.filter(
+      raw_strategy_filter,
+      fallback_semantic_repair: fallback_semantic_repair,
+    )
+  end
+
+if requested_strategies.empty?
+  warn(
+    "No strategies selected from OPENROUTER_STRATEGY_FILTER=#{raw_strategy_filter.inspect}. " \
+    "Falling back to #{DirectivesEval::Strategies::BASELINE.id.inspect}.",
+  )
+  requested_strategies = [DirectivesEval::Strategies::BASELINE]
+end
 
 selected_sampling_profiles = OpenRouterSamplingProfiles::CATALOG.filter(sampling_profile_filter)
 default_sampling_profile = OpenRouterSamplingProfiles::CATALOG.find(OpenRouterSamplingProfiles::DEFAULT_PROFILE_ID)
@@ -452,10 +557,13 @@ run_task =
     model_entry = task.fetch(:model_entry)
     model_index = task.fetch(:model_index)
     sampling_profile = task.fetch(:sampling_profile)
+    strategy = task.fetch(:strategy)
 
     model = model_entry.id
     sampling_profile_id = sampling_profile.id
     model_workaround_presets = DirectivesEval::ModelWorkarounds.presets_for(model_entry)
+    strategy_id = strategy.id.to_s
+    semantic_repair = strategy.semantic_repair == true
 
     directives_preset =
       TavernKit::VibeTavern::Directives::Presets.merge(
@@ -557,7 +665,7 @@ run_task =
         model_idx = model_index + 1
 
         log_line.call(
-          "[#{task_idx}/#{task_total}] [#{model_idx}/#{selected_models.length}] testing #{model} profile=#{sampling_profile_id} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
+          "[#{task_idx}/#{task_total}] [#{model_idx}/#{selected_models.length}] testing #{model} profile=#{sampling_profile_id} strategy=#{strategy_id} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
         )
 
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -612,6 +720,8 @@ run_task =
         report = {
           model: model,
           sampling_profile: sampling_profile_id,
+          strategy: strategy_id,
+          semantic_repair: semantic_repair,
           llm_options_defaults: llm_options_defaults,
           scenario: scenario_id,
           trial: trial_idx + 1,
@@ -627,18 +737,28 @@ run_task =
 
         safe_model = DirectivesEval::Util.safe_filename(model)
         safe_profile = DirectivesEval::Util.safe_filename(sampling_profile_id)
+        safe_strategy = DirectivesEval::Util.safe_filename(strategy_id)
         safe_scenario = DirectivesEval::Util.safe_filename(scenario_id)
-        file_name = "#{safe_model}__#{safe_profile}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
+        file_name = "#{safe_model}__#{safe_profile}__#{safe_strategy}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
         File.write(out_dir.join(file_name), JSON.pretty_generate(report))
+
+        attempts = report[:attempts]
+        attempts_count = DirectivesEval::Util.attempts_count(attempts)
+        had_http_404 = DirectivesEval::Util.attempts_include_http_404?(attempts)
+        had_semantic_error = DirectivesEval::Util.attempts_include_semantic_error?(attempts)
 
         run_meta = {
           model: model,
           sampling_profile: sampling_profile_id,
+          strategy: strategy_id,
           scenario: scenario_id,
           trial: trial_idx + 1,
           ok: ok,
           elapsed_ms: elapsed_ms,
           mode: report[:mode],
+          attempts_count: attempts_count,
+          had_http_404: had_http_404,
+          had_semantic_error: had_semantic_error,
           error: error,
           report: file_name,
         }
@@ -648,7 +768,7 @@ run_task =
 
         status_str = ok ? "OK" : "FAIL"
         log_line.call(
-          "[#{task_idx}/#{task_total}] #{status_str} #{model} profile=#{sampling_profile_id} scenario=#{scenario_id} (trial #{trial_idx + 1}, #{elapsed_ms}ms)",
+          "[#{task_idx}/#{task_total}] #{status_str} #{model} profile=#{sampling_profile_id} strategy=#{strategy_id} scenario=#{scenario_id} (trial #{trial_idx + 1}, #{elapsed_ms}ms)",
         )
       end
     end
@@ -656,13 +776,31 @@ run_task =
     ok_count = runs.count { |t| t[:ok] }
     rate = ok_count.fdiv(runs.size)
     elapsed = runs.map { |t| t[:elapsed_ms].to_i }.sort
+    multi_attempt_runs = runs.count { |t| t[:attempts_count].to_i > 1 }
+    http_404_runs = runs.count { |t| t[:had_http_404] == true }
+    semantic_error_runs = runs.count { |t| t[:had_semantic_error] == true }
+    modes =
+      runs.each_with_object(Hash.new(0)) do |t, out|
+        mode = t[:mode].to_s
+        next if mode.empty?
+
+        out[mode] += 1
+      end
 
     {
       model: model,
       sampling_profile: sampling_profile_id,
+      strategy: strategy_id,
       runs: runs.size,
       ok: ok_count,
       ok_rate: rate,
+      multi_attempt_runs: multi_attempt_runs,
+      multi_attempt_rate: multi_attempt_runs.fdiv(runs.size),
+      http_404_runs: http_404_runs,
+      http_404_rate: http_404_runs.fdiv(runs.size),
+      semantic_error_runs: semantic_error_runs,
+      semantic_error_rate: semantic_error_runs.fdiv(runs.size),
+      modes: modes,
       ms_p50: DirectivesEval::Util.percentile(elapsed, 0.50),
       ms_p95: DirectivesEval::Util.percentile(elapsed, 0.95),
       run_results: runs,
@@ -681,12 +819,15 @@ task_list =
 
     profiles = [default_sampling_profile] if profiles.empty?
 
-    profiles.map do |profile|
-      {
-        model_entry: model_entry,
-        model_index: model_index,
-        sampling_profile: profile,
-      }
+    profiles.flat_map do |profile|
+      requested_strategies.map do |strategy|
+        {
+          model_entry: model_entry,
+          model_index: model_index,
+          sampling_profile: profile,
+          strategy: strategy,
+        }
+      end
     end
   end
 
@@ -726,7 +867,10 @@ summary = {
   sampling_profile_filter: sampling_profile_filter,
   sampling_profiles: selected_sampling_profiles.map(&:id),
   sampling_profile_enforce_applicability: enforce_sampling_profile_applicability,
-  semantic_repair: semantic_repair,
+  strategy_filter: raw_strategy_filter,
+  strategy_matrix: strategy_matrix,
+  strategies: requested_strategies.map(&:id),
+  semantic_repair: requested_strategies.length == 1 ? requested_strategies.first.semantic_repair : nil,
   llm_options_defaults_overrides: llm_options_defaults_overrides,
   trials_per_model: trials_per_model,
   jobs: parallel_jobs,
@@ -753,19 +897,49 @@ summary_by_scenario =
 summary_by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
 File.write(out_dir.join("summary_by_scenario.json"), JSON.pretty_generate(summary_by_scenario))
 
+summary_by_scenario_and_strategy =
+  all_runs.each_with_object({}) do |run, out|
+    strategy = run[:strategy].to_s
+    strategy = DirectivesEval::Strategies::BASELINE.id if strategy.empty?
+    sid = run[:scenario].to_s
+
+    out[strategy] ||= {}
+    out[strategy][sid] ||= { "runs" => 0, "ok" => 0, "errors" => Hash.new(0) }
+    out[strategy][sid]["runs"] += 1
+    out[strategy][sid]["ok"] += 1 if run[:ok] == true
+
+    unless run[:ok] == true
+      cat = DirectivesEval::Util.error_category(run[:error])
+      cat = "unknown" if cat.empty?
+      out[strategy][sid]["errors"][cat] += 1
+    end
+  end
+summary_by_scenario_and_strategy.each_value do |by_scenario|
+  by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
+end
+File.write(
+  out_dir.join("summary_by_scenario_and_strategy.json"),
+  JSON.pretty_generate(summary_by_scenario_and_strategy),
+)
+
 puts "LLM Directives Eval"
 puts "ts: #{summary[:ts]}"
-puts "models: #{reports.size}"
+puts "models: #{selected_models.length}"
+puts "tasks: #{reports.size}"
 puts "scenarios: #{summary[:scenarios].join(",")}"
 puts "trials_per_model: #{trials_per_model}"
 puts "jobs: #{parallel_jobs}"
 puts "require_parameters: #{require_parameters_default}"
 puts "sampling_profile_filter: #{sampling_profile_filter}"
 puts "sampling_profiles: #{selected_sampling_profiles.map(&:id).join(",")}"
+puts "strategy_filter: #{raw_strategy_filter}" unless raw_strategy_filter.empty?
+puts "strategy_matrix: #{strategy_matrix}" if strategy_matrix
+puts "strategies: #{requested_strategies.map(&:id).join(",")}"
+puts "semantic_repair: #{summary[:semantic_repair]}" unless summary[:semantic_repair].nil?
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
 
-header = ["model", "profile", "runs", "ok", "rate", "p50_ms", "p95_ms", "sample"]
+header = ["model", "profile", "strategy", "runs", "ok", "rate", "p50_ms", "p95_ms", "sample"]
 rows =
   reports.map do |r|
     sample = Array(r[:failure_samples]).first
@@ -773,6 +947,7 @@ rows =
     [
       r[:model].to_s,
       r[:sampling_profile].to_s,
+      r[:strategy].to_s,
       r[:runs].to_s,
       r[:ok].to_s,
       format("%.0f%%", r[:ok_rate].to_f * 100),

@@ -10,7 +10,7 @@ Goal:
 
 Non-goal:
 - shipping product workflows (agentic character/lorebook generation is deferred)
-  - see `docs/research/vibe_tavern/deferred-agentic-generation.md`
+  - see `docs/todo/vibe_tavern/deferred-agentic-generation.md`
 
 ## The core idea: keep protocols separable
 
@@ -115,4 +115,3 @@ These build model/provider capability matrices and surface:
 - success rate by scenario/profile/mode
 - latency percentiles
 - common failure categories and vendor quirks
-

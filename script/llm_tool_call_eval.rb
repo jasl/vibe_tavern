@@ -148,6 +148,63 @@ module ToolCallEval
       name.to_s.strip.downcase.tr("-", "_")
     end
   end
+
+  module Strategies
+    Entry = Struct.new(:id, :apply_model_workarounds, :tags, keyword_init: true) do
+      def initialize(id:, apply_model_workarounds:, tags: [])
+        super(
+          id: id.to_s,
+          apply_model_workarounds: apply_model_workarounds == true,
+          tags: normalize_tags(tags),
+        )
+      end
+
+      def matches?(raw_token)
+        token = raw_token.to_s.strip.downcase
+        return false if token.empty?
+
+        candidates = ([id] + tags).map(&:to_s).map(&:downcase).uniq
+
+        if token.include?("*")
+          candidates.any? { |value| File.fnmatch(token, value) }
+        else
+          candidates.include?(token)
+        end
+      end
+
+      private
+
+      def normalize_tags(value)
+        Array(value).map { |item| item.to_s.strip.downcase }.reject(&:empty?).uniq
+      end
+    end
+
+    BASELINE = Entry.new(id: "baseline", apply_model_workarounds: false, tags: %w[base]).freeze
+    PRODUCTION = Entry.new(id: "production", apply_model_workarounds: true, tags: %w[prod recommended]).freeze
+
+    CATALOG = [BASELINE, PRODUCTION].freeze
+
+    module_function
+
+    def filter(raw_filter)
+      tokens = raw_filter.to_s.split(",").map(&:strip).reject(&:empty?)
+      return [PRODUCTION] if tokens.empty?
+
+      return CATALOG.dup if tokens.any? { |token| %w[all full *].include?(token.downcase) }
+
+      include_tokens = tokens.reject { |token| token.start_with?("!") }
+      exclude_tokens = tokens.select { |token| token.start_with?("!") }.map { |t| t.delete_prefix("!") }.reject(&:empty?)
+
+      selected =
+        if include_tokens.empty?
+          CATALOG
+        else
+          CATALOG.select { |entry| include_tokens.any? { |token| entry.matches?(token) } }
+        end
+
+      selected.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
+    end
+  end
 end
 
 api_key = ENV["OPENROUTER_API_KEY"].to_s
@@ -215,6 +272,24 @@ verbose_level =
 verbose_level = 0 if verbose_level < 0
 enable_content_tag_tool_call_fallback = ENV.fetch("OPENROUTER_ENABLE_CONTENT_TAG_TOOL_CALL_FALLBACK", "0") == "1"
 fallback_matrix = ENV.fetch("OPENROUTER_FALLBACK_MATRIX", "0") == "1"
+
+strategy_matrix = ENV.fetch("OPENROUTER_STRATEGY_MATRIX", "0") == "1"
+raw_strategy_filter = ENV.fetch("OPENROUTER_STRATEGY_FILTER", "").to_s.strip
+
+requested_strategies =
+  if strategy_matrix
+    ToolCallEval::Strategies::CATALOG.dup
+  else
+    ToolCallEval::Strategies.filter(raw_strategy_filter)
+  end
+
+if requested_strategies.empty?
+  warn(
+    "No strategies selected from OPENROUTER_STRATEGY_FILTER=#{raw_strategy_filter.inspect}. " \
+    "Falling back to #{ToolCallEval::Strategies::PRODUCTION.id.inspect}.",
+  )
+  requested_strategies = [ToolCallEval::Strategies::PRODUCTION]
+end
 
 client_timeout =
   begin
@@ -413,7 +488,7 @@ build_provider_tool_calling_preset =
     )
   end
 
-strategy_profiles =
+fallback_profiles =
   if fallback_matrix
     [
       { id: "fallback_off", content_tag_tool_call_fallback: false },
@@ -1258,13 +1333,16 @@ task_list =
     profiles = [default_sampling_profile] if profiles.empty?
 
     profiles.flat_map do |sampling_profile|
-      strategy_profiles.map do |strategy_profile|
-        {
-          model_entry: model_entry,
-          model_index: model_index,
-          strategy_profile: strategy_profile,
-          sampling_profile: sampling_profile,
-        }
+      requested_strategies.flat_map do |strategy|
+        fallback_profiles.map do |fallback_profile|
+          {
+            model_entry: model_entry,
+            model_index: model_index,
+            strategy: strategy,
+            fallback_profile: fallback_profile,
+            sampling_profile: sampling_profile,
+          }
+        end
       end
     end
   end
@@ -1284,18 +1362,27 @@ sampling_matrix_enabled =
   selected_sampling_profiles.length > 1 ||
     selected_sampling_profiles.any? { |p| p.id != OpenRouterSamplingProfiles::DEFAULT_PROFILE_ID }
 
-matrix_enabled = strategy_profiles.length > 1 || sampling_matrix_enabled
+matrix_enabled = fallback_profiles.length > 1 || sampling_matrix_enabled || requested_strategies.length > 1
 
 process_task =
   lambda do |task, task_index, task_total|
     model_entry = task.fetch(:model_entry)
     model = model_entry.id
     excluded_workarounds = fallback_matrix ? ["content_tag_tool_call_fallback", "content_tag_fallback"] : []
-    model_workaround_presets = ToolCallEval::ModelWorkarounds.presets_for(model_entry, exclude: excluded_workarounds)
     model_index = task.fetch(:model_index)
-    strategy_profile = task.fetch(:strategy_profile)
-    strategy_profile_id = strategy_profile.fetch(:id).to_s
-    enable_tag_fallback = strategy_profile.fetch(:content_tag_tool_call_fallback) == true
+    strategy = task.fetch(:strategy)
+    strategy_id = strategy.id.to_s
+    apply_model_workarounds = strategy.apply_model_workarounds == true
+    model_workaround_presets =
+      if apply_model_workarounds
+        ToolCallEval::ModelWorkarounds.presets_for(model_entry, exclude: excluded_workarounds)
+      else
+        []
+      end
+
+    fallback_profile = task.fetch(:fallback_profile)
+    fallback_profile_id = fallback_profile.fetch(:id).to_s
+    enable_tag_fallback = fallback_profile.fetch(:content_tag_tool_call_fallback) == true
     sampling_profile = task.fetch(:sampling_profile)
     sampling_profile_id = sampling_profile.id.to_s
 
@@ -1321,8 +1408,9 @@ process_task =
     )
 
     model_label_parts = [model]
-    model_label_parts << strategy_profile_id if strategy_profiles.length > 1
     model_label_parts << sampling_profile_id if sampling_matrix_enabled
+    model_label_parts << strategy_id if requested_strategies.length > 1
+    model_label_parts << fallback_profile_id if fallback_profiles.length > 1
     model_label = matrix_enabled ? model_label_parts.join(":") : model
     safe_model = model_label.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
     provider_tool_calling_preset = build_provider_tool_calling_preset.call(enable_tag_fallback: enable_tag_fallback)
@@ -1530,7 +1618,8 @@ process_task =
         report = {
           model: model_label,
           model_base: model,
-          strategy: strategy_profile_id,
+          strategy: strategy_id,
+          fallback_profile: fallback_profile_id,
           sampling_profile: sampling_profile_id,
           llm_options_defaults: llm_options_defaults,
           content_tag_tool_call_fallback: effective_tag_fallback,
@@ -1569,7 +1658,8 @@ process_task =
         run_meta = {
           model: model_label,
           model_base: model,
-          strategy: strategy_profile_id,
+          strategy: strategy_id,
+          fallback_profile: fallback_profile_id,
           sampling_profile: sampling_profile_id,
           content_tag_tool_call_fallback: effective_tag_fallback,
           scenario: scenario_id,
@@ -1604,7 +1694,8 @@ process_task =
     {
       model: model_label,
       model_base: model,
-      strategy: strategy_profile_id,
+      strategy: strategy_id,
+      fallback_profile: fallback_profile_id,
       sampling_profile: sampling_profile_id,
       content_tag_tool_call_fallback: task_effective_tag_fallback == true,
       runs: runs.size,
@@ -1654,10 +1745,11 @@ else
     task = item.is_a?(Array) ? item.fetch(0, nil) : nil
     model_entry = task.is_a?(Hash) ? task.fetch(:model_entry, nil) : nil
     model = model_entry.respond_to?(:id) ? model_entry.id : nil
-    strategy_profile_id = task.is_a?(Hash) ? task.dig(:strategy_profile, :id) : nil
+    strategy_id = task.is_a?(Hash) ? task.fetch(:strategy, nil)&.id : nil
+    fallback_profile_id = task.is_a?(Hash) ? task.dig(:fallback_profile, :id) : nil
     sampling_profile_id = task.is_a?(Hash) ? task.fetch(:sampling_profile, nil)&.id : nil
     raise(
-      "#{e.class}: worker failed for model=#{model.inspect} strategy=#{strategy_profile_id.inspect} sampling_profile=#{sampling_profile_id.inspect}: #{e.message}",
+      "#{e.class}: worker failed for model=#{model.inspect} strategy=#{strategy_id.inspect} fallback_profile=#{fallback_profile_id.inspect} sampling_profile=#{sampling_profile_id.inspect}: #{e.message}",
     )
   end
 
@@ -1689,10 +1781,13 @@ summary = {
   llm_options_defaults_overrides: llm_options_defaults_overrides,
   model_filter: model_filter,
   selected_models: selected_model_entries.map(&:id),
+  strategy_filter: raw_strategy_filter,
+  strategy_matrix: strategy_matrix,
+  strategies: requested_strategies.map(&:id),
   content_tag_tool_call_fallback_global_override: enable_content_tag_tool_call_fallback,
   best_effort_content_tag_tool_call_fallback_models: best_effort_content_tag_tool_call_fallback_models,
   fallback_matrix: fallback_matrix,
-  profiles: strategy_profiles.map { |p| p.fetch(:id) },
+  fallback_profiles: fallback_profiles.map { |p| p.fetch(:id) },
   jobs: parallel_jobs,
   trials_per_model: trials_per_model,
   scenarios: scenarios.map { |s| s[:id] },
@@ -1719,6 +1814,32 @@ summary_by_scenario =
 summary_by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
 File.write(out_dir.join("summary_by_scenario.json"), JSON.pretty_generate(summary_by_scenario))
 
+summary_by_scenario_and_strategy =
+  all_runs.each_with_object({}) do |run, out|
+    strategy = run[:strategy].to_s
+    strategy = ToolCallEval::Strategies::PRODUCTION.id if strategy.empty?
+    sid = run[:scenario].to_s
+
+    out[strategy] ||= {}
+    out[strategy][sid] ||= { "runs" => 0, "ok" => 0, "errors" => Hash.new(0) }
+    out[strategy][sid]["runs"] += 1
+    out[strategy][sid]["ok"] += 1 if run[:ok] == true
+    unless run[:ok] == true
+      cat = run[:error_category].to_s
+      cat = "unknown" if cat.empty?
+      out[strategy][sid]["errors"][cat] += 1
+    end
+  end
+
+summary_by_scenario_and_strategy.each_value do |by_scenario|
+  by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
+end
+
+File.write(
+  out_dir.join("summary_by_scenario_and_strategy.json"),
+  JSON.pretty_generate(summary_by_scenario_and_strategy),
+)
+
 successes = reports.sum { |r| r[:ok].to_i }
 total_runs = reports.sum { |r| r[:runs].to_i }
 failures = total_runs - successes
@@ -1741,12 +1862,15 @@ puts "sampling_profile_filter: #{sampling_profile_filter}"
 puts "sampling_profiles: #{selected_sampling_profiles.map(&:id).join(",")}"
 puts "model_filter: #{model_filter}"
 puts "selected_models: #{selected_model_entries.map(&:id).join(",")}"
+puts "strategy_filter: #{raw_strategy_filter}" unless raw_strategy_filter.empty?
+puts "strategy_matrix: #{strategy_matrix}" if strategy_matrix
+puts "strategies: #{requested_strategies.map(&:id).join(",")}"
 puts "parallel_tool_calls(default): #{request_overrides.fetch("parallel_tool_calls", "(provider default)")}"
 puts "content_tag_tool_call_fallback_global_override: #{enable_content_tag_tool_call_fallback}"
 if best_effort_content_tag_tool_call_fallback_models.any?
   puts "best_effort_content_tag_tool_call_fallback_models: #{best_effort_content_tag_tool_call_fallback_models.join(",")}"
 end
-puts "fallback_matrix: #{fallback_matrix} (profiles=#{strategy_profiles.map { |p| p.fetch(:id) }.join(",")})"
+puts "fallback_matrix: #{fallback_matrix} (profiles=#{fallback_profiles.map { |p| p.fetch(:id) }.join(",")})"
 puts "jobs: #{parallel_jobs}"
 puts "trials_per_model: #{trials_per_model}"
 puts "scenarios: #{scenarios.map { |s| s[:id] }.join(",")}"
@@ -1754,15 +1878,17 @@ puts "model_profiles: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
 
-header = ["model", "profile", "runs", "ok", "rate", "p50_ms", "p95_ms", "status", "category", "sample", "error"]
+header = ["model", "profile", "strategy", "fallback_profile", "runs", "ok", "rate", "p50_ms", "p95_ms", "status", "category", "sample", "error"]
 rows =
   reports.map do |r|
     sample = Array(r[:failure_samples]).first
     sample_path = sample ? sample[:report_path].to_s : "-"
     err = sample ? truncate(sample[:error_hint] || sample[:error].to_s, max_chars: 120) : "-"
     [
-      r[:model].to_s,
+      r[:model_base].to_s,
       r[:sampling_profile].to_s,
+      r[:strategy].to_s,
+      r[:fallback_profile].to_s,
       r[:runs].to_s,
       r[:ok].to_s,
       format("%.0f%%", r[:ok_rate].to_f * 100),

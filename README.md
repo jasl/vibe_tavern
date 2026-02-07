@@ -41,6 +41,7 @@ cd vendor/tavern_kit && bundle exec rake test
 
 - Rails rewrite docs: `docs/rewrite/README.md`
 - VibeTavern research / case study docs: `docs/research/vibe_tavern/README.md`
+- Product TODO / backlog docs: `docs/todo/README.md`
 - TavernKit gem docs: `vendor/tavern_kit/docs/README.md`
 - TavernKit gem README: `vendor/tavern_kit/README.md`
 
