@@ -377,6 +377,63 @@ SCENARIOS = [
   },
 ].freeze
 
+default_scenario_ids = %w[show_form toast patch_draft request_upload]
+simple_scenario_ids = %w[show_form toast]
+typical_scenario_ids = default_scenario_ids
+extreme_scenario_ids = %w[patch_draft request_upload]
+
+raw_requested_scenarios = ENV.fetch("OPENROUTER_SCENARIOS", "").to_s
+requested_scenario_tokens =
+  raw_requested_scenarios
+    .split(",")
+    .map(&:strip)
+    .reject(&:empty?)
+
+requested_scenarios =
+  if requested_scenario_tokens.any? { |v| %w[all full *].include?(v.downcase) }
+    nil
+  elsif requested_scenario_tokens.empty?
+    default_scenario_ids
+  else
+    expanded =
+      requested_scenario_tokens.flat_map do |tok|
+        case tok.downcase
+        when "default", "smoke"
+          default_scenario_ids
+        when "simple"
+          simple_scenario_ids
+        when "typical"
+          typical_scenario_ids
+        when "extreme"
+          extreme_scenario_ids
+        else
+          tok
+        end
+      end
+
+    expanded.map(&:to_s).map(&:strip).reject(&:empty?).uniq
+  end
+
+scenarios =
+  if requested_scenarios
+    SCENARIOS.select { |s| requested_scenarios.include?(s[:id]) }
+  else
+    SCENARIOS
+  end
+
+if scenarios.empty?
+  warn(
+    "No scenarios selected from OPENROUTER_SCENARIOS=#{raw_requested_scenarios.inspect}. " \
+    "Falling back to default: #{default_scenario_ids.join(", ")}",
+  )
+  scenarios = SCENARIOS.select { |s| default_scenario_ids.include?(s[:id]) }
+end
+
+if scenarios.empty?
+  warn "No scenarios selected. Available: #{SCENARIOS.map { |s| s[:id] }.join(", ")}"
+  exit 2
+end
+
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
 out_dir = Rails.root.join("tmp", "llm_directives_eval_reports", timestamp)
 FileUtils.mkdir_p(out_dir)
@@ -494,7 +551,7 @@ run_task =
     failures = []
 
     trials_per_model.times do |trial_idx|
-      SCENARIOS.each do |scenario|
+      scenarios.each do |scenario|
         scenario_id = scenario[:id]
         task_idx = task_index + 1
         model_idx = model_index + 1
@@ -673,7 +730,7 @@ summary = {
   llm_options_defaults_overrides: llm_options_defaults_overrides,
   trials_per_model: trials_per_model,
   jobs: parallel_jobs,
-  scenarios: SCENARIOS.map { |s| s[:id] },
+  scenarios: scenarios.map { |s| s[:id] },
   models: reports,
   output_dir: out_dir.to_s,
 }

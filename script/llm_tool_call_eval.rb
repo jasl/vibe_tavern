@@ -1160,6 +1160,33 @@ default_scenario_ids =
     %w[chat_only]
   end
 
+simple_scenario_ids =
+  if tools_enabled
+    %w[
+      happy_path
+      chat_only
+    ]
+  else
+    %w[chat_only]
+  end
+
+typical_scenario_ids = default_scenario_ids
+
+extreme_scenario_ids =
+  if tools_enabled
+    %w[
+      happy_path
+      partial_success_failure
+      missing_workspace_id
+      type_error_recovery
+      long_arguments_guard
+      tool_output_truncation
+      chat_only
+    ]
+  else
+    %w[chat_only]
+  end
+
 raw_requested_scenarios = ENV.fetch("OPENROUTER_SCENARIOS", "").to_s
 requested_scenario_tokens =
   raw_requested_scenarios
@@ -1178,6 +1205,12 @@ requested_scenarios =
         case tok.downcase
         when "default", "smoke"
           default_scenario_ids
+        when "simple"
+          simple_scenario_ids
+        when "typical"
+          typical_scenario_ids
+        when "extreme"
+          extreme_scenario_ids
         else
           tok
         end
