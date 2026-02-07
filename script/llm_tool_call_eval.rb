@@ -150,11 +150,30 @@ module ToolCallEval
   end
 
   module Strategies
-    Entry = Struct.new(:id, :apply_model_workarounds, :tags, keyword_init: true) do
-      def initialize(id:, apply_model_workarounds:, tags: [])
+    Entry =
+      Struct.new(
+        :id,
+        :apply_model_workarounds,
+        :apply_infra_defaults,
+        :apply_provider_defaults,
+        :default_parallel_tool_calls,
+        :tags,
+        keyword_init: true,
+      ) do
+      def initialize(
+        id:,
+        apply_model_workarounds:,
+        apply_infra_defaults:,
+        apply_provider_defaults:,
+        default_parallel_tool_calls:,
+        tags: []
+      )
         super(
           id: id.to_s,
           apply_model_workarounds: apply_model_workarounds == true,
+          apply_infra_defaults: apply_infra_defaults == true,
+          apply_provider_defaults: apply_provider_defaults == true,
+          default_parallel_tool_calls: default_parallel_tool_calls,
           tags: normalize_tags(tags),
         )
       end
@@ -179,10 +198,38 @@ module ToolCallEval
       end
     end
 
-    BASELINE = Entry.new(id: "baseline", apply_model_workarounds: false, tags: %w[base]).freeze
-    PRODUCTION = Entry.new(id: "production", apply_model_workarounds: true, tags: %w[prod recommended]).freeze
+    NAKED =
+      Entry.new(
+        id: "naked",
+        apply_model_workarounds: false,
+        apply_infra_defaults: false,
+        apply_provider_defaults: false,
+        default_parallel_tool_calls: nil,
+        tags: %w[naked raw unoptimized],
+      ).freeze
 
-    CATALOG = [BASELINE, PRODUCTION].freeze
+    BASELINE =
+      Entry.new(
+        id: "baseline",
+        apply_model_workarounds: false,
+        apply_infra_defaults: true,
+        apply_provider_defaults: true,
+        default_parallel_tool_calls: false,
+        tags: %w[base],
+      ).freeze
+
+    PRODUCTION =
+      Entry.new(
+        id: "production",
+        apply_model_workarounds: true,
+        apply_infra_defaults: true,
+        apply_provider_defaults: true,
+        default_parallel_tool_calls: false,
+        tags: %w[prod recommended],
+      ).freeze
+
+    MATRIX_CATALOG = [BASELINE, PRODUCTION].freeze
+    ALL = [NAKED, BASELINE, PRODUCTION].freeze
 
     module_function
 
@@ -190,16 +237,16 @@ module ToolCallEval
       tokens = raw_filter.to_s.split(",").map(&:strip).reject(&:empty?)
       return [PRODUCTION] if tokens.empty?
 
-      return CATALOG.dup if tokens.any? { |token| %w[all full *].include?(token.downcase) }
+      return ALL.dup if tokens.any? { |token| %w[all full *].include?(token.downcase) }
 
       include_tokens = tokens.reject { |token| token.start_with?("!") }
       exclude_tokens = tokens.select { |token| token.start_with?("!") }.map { |t| t.delete_prefix("!") }.reject(&:empty?)
 
       selected =
         if include_tokens.empty?
-          CATALOG
+          ALL
         else
-          CATALOG.select { |entry| include_tokens.any? { |token| entry.matches?(token) } }
+          ALL.select { |entry| include_tokens.any? { |token| entry.matches?(token) } }
         end
 
       selected.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
@@ -278,7 +325,7 @@ raw_strategy_filter = ENV.fetch("OPENROUTER_STRATEGY_FILTER", "").to_s.strip
 
 requested_strategies =
   if strategy_matrix
-    ToolCallEval::Strategies::CATALOG.dup
+    ToolCallEval::Strategies::MATRIX_CATALOG.dup
   else
     ToolCallEval::Strategies.filter(raw_strategy_filter)
   end
@@ -431,10 +478,10 @@ headers["X-Title"] = ENV["OPENROUTER_X_TITLE"] if ENV["OPENROUTER_X_TITLE"]
 # Optional OpenRouter request-level knobs (OpenAI-compatible).
 # These are injected via runtime[:tool_calling][:request_overrides] so the lower
 # layers (pipeline/client) stay provider-agnostic.
-request_overrides = {}
+base_request_overrides = {}
 
 if (route = ENV["OPENROUTER_ROUTE"].to_s.strip).length.positive?
-  request_overrides["route"] = route
+  base_request_overrides["route"] = route
 end
 
 if (raw = ENV["OPENROUTER_TRANSFORMS"])
@@ -448,7 +495,7 @@ if (raw = ENV["OPENROUTER_TRANSFORMS"])
       raw.split(",").map(&:strip).reject(&:empty?)
     end
 
-  request_overrides["transforms"] = transforms if transforms
+  base_request_overrides["transforms"] = transforms if transforms
 end
 
 provider = {}
@@ -460,27 +507,23 @@ provider = {}
   values = raw.split(",").map(&:strip).reject(&:empty?)
   provider[key.downcase] = values if values.any?
 end
-request_overrides["provider"] = provider if provider.any?
+base_request_overrides["provider"] = provider if provider.any?
 
 if (raw = ENV["OPENROUTER_REQUEST_OVERRIDES_JSON"].to_s.strip).length.positive?
   begin
     parsed = JSON.parse(raw)
-    request_overrides.merge!(parsed) if parsed.is_a?(Hash)
+    base_request_overrides.merge!(parsed) if parsed.is_a?(Hash)
   rescue JSON::ParserError
     warn "Invalid OPENROUTER_REQUEST_OVERRIDES_JSON (must be a JSON object). Ignoring."
   end
 end
 
-# Stabilize eval runs across models: prefer sequential tool calls unless a
-# scenario opts in (e.g. multi-tool call cases).
-if tools_enabled && !request_overrides.key?("parallel_tool_calls")
-  request_overrides["parallel_tool_calls"] = false
-end
-
 build_provider_tool_calling_preset =
-  lambda do |enable_tag_fallback:|
+  lambda do |apply_provider_defaults:, enable_tag_fallback:|
+    return {} unless apply_provider_defaults == true
+
     preset = TavernKit::VibeTavern::ToolCalling::Presets.provider_defaults("openrouter")
-    return preset unless enable_tag_fallback
+    return preset unless enable_tag_fallback == true
 
     TavernKit::VibeTavern::ToolCalling::Presets.merge(
       preset,
@@ -1373,6 +1416,8 @@ process_task =
     strategy = task.fetch(:strategy)
     strategy_id = strategy.id.to_s
     apply_model_workarounds = strategy.apply_model_workarounds == true
+    apply_infra_defaults = strategy.apply_infra_defaults == true
+    apply_provider_defaults = strategy.apply_provider_defaults == true
     model_workaround_presets =
       if apply_model_workarounds
         ToolCallEval::ModelWorkarounds.presets_for(model_entry, exclude: excluded_workarounds)
@@ -1413,7 +1458,11 @@ process_task =
     model_label_parts << fallback_profile_id if fallback_profiles.length > 1
     model_label = matrix_enabled ? model_label_parts.join(":") : model
     safe_model = model_label.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
-    provider_tool_calling_preset = build_provider_tool_calling_preset.call(enable_tag_fallback: enable_tag_fallback)
+    provider_tool_calling_preset =
+      build_provider_tool_calling_preset.call(
+        apply_provider_defaults: apply_provider_defaults,
+        enable_tag_fallback: enable_tag_fallback,
+      )
 
     runs = []
     failures = []
@@ -1439,9 +1488,20 @@ process_task =
             definitions: ToolCallEval.tool_definitions,
           )
 
+        effective_request_overrides = deep_merge_hashes(base_request_overrides, {})
+
+        # Default to sequential tool calls for stability unless the request
+        # already specifies parallel_tool_calls or a scenario opts in.
+        if tools_enabled &&
+            !effective_request_overrides.key?("parallel_tool_calls") &&
+            !effective_request_overrides.key?(:parallel_tool_calls) &&
+            !strategy.default_parallel_tool_calls.nil?
+          effective_request_overrides["parallel_tool_calls"] = strategy.default_parallel_tool_calls
+        end
+
         tool_calling =
           TavernKit::VibeTavern::ToolCalling::Presets.merge(
-            TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling,
+            (apply_infra_defaults ? TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling : {}),
             provider_tool_calling_preset,
             TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(
               tool_use_mode: tool_use_mode,
@@ -1449,7 +1509,7 @@ process_task =
               fallback_retry_count: fallback_retry_count,
               fix_empty_final: fix_empty_final,
               tool_allowlist: tool_allowlist,
-              request_overrides: request_overrides,
+              request_overrides: effective_request_overrides,
             ),
             *model_workaround_presets,
             scenario[:runtime_overrides] || {},

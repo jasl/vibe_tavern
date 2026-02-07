@@ -212,11 +212,29 @@ module DirectivesEval
   end
 
   module Strategies
-    Entry = Struct.new(:id, :semantic_repair, :tags, keyword_init: true) do
-      def initialize(id:, semantic_repair:, tags: [])
+    Entry = Struct.new(
+      :id,
+      :semantic_repair,
+      :apply_provider_defaults,
+      :apply_model_workarounds,
+      :repair_retry_count,
+      :tags,
+      keyword_init: true,
+    ) do
+      def initialize(
+        id:,
+        semantic_repair:,
+        apply_provider_defaults:,
+        apply_model_workarounds:,
+        repair_retry_count: nil,
+        tags: []
+      )
         super(
           id: id.to_s,
           semantic_repair: semantic_repair == true,
+          apply_provider_defaults: apply_provider_defaults == true,
+          apply_model_workarounds: apply_model_workarounds == true,
+          repair_retry_count: repair_retry_count,
           tags: normalize_tags(tags),
         )
       end
@@ -241,10 +259,36 @@ module DirectivesEval
       end
     end
 
-    BASELINE = Entry.new(id: "baseline", semantic_repair: false, tags: %w[default off semantic_repair_off]).freeze
-    PRODUCTION = Entry.new(id: "production", semantic_repair: true, tags: %w[prod on semantic_repair_on]).freeze
+    NAKED =
+      Entry.new(
+        id: "naked",
+        semantic_repair: false,
+        apply_provider_defaults: false,
+        apply_model_workarounds: false,
+        repair_retry_count: 0,
+        tags: %w[naked raw unoptimized],
+      ).freeze
 
-    CATALOG = [BASELINE, PRODUCTION].freeze
+    BASELINE =
+      Entry.new(
+        id: "baseline",
+        semantic_repair: false,
+        apply_provider_defaults: true,
+        apply_model_workarounds: true,
+        tags: %w[default off semantic_repair_off],
+      ).freeze
+
+    PRODUCTION =
+      Entry.new(
+        id: "production",
+        semantic_repair: true,
+        apply_provider_defaults: true,
+        apply_model_workarounds: true,
+        tags: %w[prod on semantic_repair_on],
+      ).freeze
+
+    MATRIX_CATALOG = [BASELINE, PRODUCTION].freeze
+    ALL = [NAKED, BASELINE, PRODUCTION].freeze
 
     module_function
 
@@ -252,16 +296,16 @@ module DirectivesEval
       tokens = raw_filter.to_s.split(",").map(&:strip).reject(&:empty?)
       return [fallback_semantic_repair == true ? PRODUCTION : BASELINE] if tokens.empty?
 
-      return CATALOG.dup if tokens.any? { |token| %w[all full *].include?(token.downcase) }
+      return ALL.dup if tokens.any? { |token| %w[all full *].include?(token.downcase) }
 
       include_tokens = tokens.reject { |token| token.start_with?("!") }
       exclude_tokens = tokens.select { |token| token.start_with?("!") }.map { |t| t.delete_prefix("!") }.reject(&:empty?)
 
       selected =
         if include_tokens.empty?
-          CATALOG
+          ALL
         else
-          CATALOG.select { |entry| include_tokens.any? { |token| entry.matches?(token) } }
+          ALL.select { |entry| include_tokens.any? { |token| entry.matches?(token) } }
         end
 
       selected.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
@@ -410,7 +454,7 @@ fallback_semantic_repair = ENV.fetch("OPENROUTER_SEMANTIC_REPAIR", "0") == "1"
 
 requested_strategies =
   if strategy_matrix
-    DirectivesEval::Strategies::CATALOG.dup
+    DirectivesEval::Strategies::MATRIX_CATALOG.dup
   else
     DirectivesEval::Strategies.filter(
       raw_strategy_filter,
@@ -561,17 +605,27 @@ run_task =
 
     model = model_entry.id
     sampling_profile_id = sampling_profile.id
-    model_workaround_presets = DirectivesEval::ModelWorkarounds.presets_for(model_entry)
     strategy_id = strategy.id.to_s
     semantic_repair = strategy.semantic_repair == true
+    apply_provider_defaults = strategy.apply_provider_defaults == true
+    apply_model_workarounds = strategy.apply_model_workarounds == true
+    repair_retry_count = strategy.repair_retry_count
+
+    model_workaround_presets =
+      if apply_model_workarounds
+        DirectivesEval::ModelWorkarounds.presets_for(model_entry)
+      else
+        []
+      end
 
     directives_preset =
       TavernKit::VibeTavern::Directives::Presets.merge(
         TavernKit::VibeTavern::Directives::Presets.default_directives,
-        provider_directives_preset,
+        (apply_provider_defaults ? provider_directives_preset : {}),
         TavernKit::VibeTavern::Directives::Presets.directives(
           request_overrides: directives_request_overrides,
         ),
+        (repair_retry_count.nil? ? {} : TavernKit::VibeTavern::Directives::Presets.directives(repair_retry_count: repair_retry_count)),
         *model_workaround_presets,
       )
 
@@ -722,6 +776,9 @@ run_task =
           sampling_profile: sampling_profile_id,
           strategy: strategy_id,
           semantic_repair: semantic_repair,
+          apply_provider_defaults: apply_provider_defaults,
+          apply_model_workarounds: apply_model_workarounds,
+          repair_retry_count: repair_retry_count,
           llm_options_defaults: llm_options_defaults,
           scenario: scenario_id,
           trial: trial_idx + 1,
