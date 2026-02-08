@@ -1,15 +1,24 @@
 # frozen_string_literal: true
 
+require_relative "../json_schema"
+
 module TavernKit
   module VibeTavern
     module ToolCalling
       ToolDefinition =
         Data.define(:name, :description, :parameters, :exposed_to_model) do
           def initialize(name:, description:, parameters:, exposed_to_model: true)
+            parameters_hash =
+              if parameters.nil? || parameters.is_a?(Hash)
+                parameters
+              else
+                TavernKit::VibeTavern::JsonSchema.coerce(parameters)
+              end
+
             super(
               name: name.to_s,
               description: description.to_s,
-              parameters: parameters.is_a?(Hash) ? parameters : {},
+              parameters: parameters_hash.is_a?(Hash) ? parameters_hash : {},
               exposed_to_model: exposed_to_model == true,
             )
           end

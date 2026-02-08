@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "directives/parser"
+require_relative "directives/payload_validators"
 require_relative "directives/presets"
 require_relative "directives/registry"
 require_relative "directives/schema"

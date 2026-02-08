@@ -102,6 +102,32 @@ Tool injection/execution:
 - `lib/tavern_kit/vibe_tavern/tool_calling/tool_dispatcher.rb`
   - validates tool name + args, executes tool, returns a normalized result envelope
 
+### Optional: EasyTalk for tool parameter schemas
+
+Tool parameter schemas are app-owned and can be provided either as raw JSON
+Schema hashes, or via a schema provider (e.g. an EasyTalk model) as long as it
+responds to `json_schema` (or `to_json_schema` in RubyLLM-style metadata form).
+
+Example (EasyTalk schema-only model):
+
+```ruby
+class StateGetParams
+  include EasyTalk::Schema
+
+  define_schema do
+    property :workspace_id, String, optional: true
+    property :select, T::Array[String], optional: true
+  end
+end
+
+tool =
+  TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+    name: "state_get",
+    description: "Read workspace state",
+    parameters: StateGetParams, # uses `.json_schema`
+  )
+```
+
 Compatibility hooks (opt-in):
 
 - `lib/tavern_kit/vibe_tavern/tool_calling/message_transforms.rb`

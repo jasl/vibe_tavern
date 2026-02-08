@@ -231,6 +231,21 @@ payload_validator =
     end
   end
 
+# Optional: use EasyTalk models for payload validation (more maintainable).
+#
+# This keeps the payload contract in one place and provides structured errors.
+#
+# class ShowFormPayload
+#   include EasyTalk::Model
+#   define_schema { property :form_id, String, min_length: 1 }
+# end
+#
+# payload_validator =
+#   TavernKit::VibeTavern::Directives::PayloadValidators.easy_talk(
+#     "ui.show_form" => ShowFormPayload,
+#     error_format: :json_pointer,
+#   )
+
 structured_output_options = {
   registry: registry,
   allowed_types: registry.types,
