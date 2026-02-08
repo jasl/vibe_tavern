@@ -243,6 +243,11 @@ These are current product preferences (can change later):
   - Default to **strict** (spec-compliant).
   - Add an explicit **extended** mode only when we intentionally diverge from
     A2UI to support our own renderer needs (and keep it opt-in + versioned).
+- Rails UI Builder API:
+  - Start simple: render **UI IR → HTML directly** (via a dedicated builder/helper).
+  - If/when complexity grows, introduce an intermediate view model (UI IR → VM → HTML).
+- Rails host incremental updates:
+  - Use **Turbo Frames/Streams**.
 
 ### Phase 1 — Ruby infra: A2UI v0.8 primitives (no UI templates yet)
 
@@ -305,8 +310,8 @@ This keeps LLM evaluation focused on directives (not on producing A2UI).
 
 ## Open questions (remaining)
 
-- What should the Rails **UI Builder** public API look like (inputs/outputs)?
-  - Should it render UI IR → HTML directly, or UI IR → “view model” → HTML?
-  - How do we keep rendering deterministic and testable (no hidden state)?
-- For the Rails host, how do we deliver incremental updates?
-  - full-page reload vs Turbo Frames/Streams vs JSON endpoint + client hydration
+- How do we map “surfaces” / UI regions to Turbo constructs?
+  - one surface = one Turbo Frame?
+  - how do modals fit (separate frames, or a single modal frame + swap)?
+- How do we keep UI Builder rendering deterministic and testable?
+  - input-only (no hidden state), stable ordering, snapshot tests where useful
