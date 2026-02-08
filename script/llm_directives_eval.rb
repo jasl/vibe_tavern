@@ -178,6 +178,7 @@ module DirectivesEval
       return "ASSERTION_FAILED" if msg.start_with?("ASSERTION_FAILED:")
       return "DIRECTIVES_RUN_FAILED" if msg.start_with?("DIRECTIVES_RUN_FAILED")
       return "HTTP_ERROR" if msg.start_with?("HTTP_ERROR:")
+      return "TIMEOUT" if msg.downcase.include?("timeout")
 
       msg.strip.empty? ? "" : "UNKNOWN"
     end

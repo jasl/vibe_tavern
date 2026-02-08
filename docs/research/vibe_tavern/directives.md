@@ -40,8 +40,60 @@ Related (separate protocol):
   - keep structured-mode sampling params minimal (avoid exotic knobs), or
   - start from `json_object` / `prompt_only` for that path to avoid repeated 404s.
 - Compared to multi-turn tool calling, directives are easier to make reliable (fewer round-trips).
-  In our current sampling-matrix snapshots, tool-calling “tool scenarios” were ~87–88% across strategies
-  (`raw`/`baseline`/`production`), while directives were ~99% overall.
+  In our current sampling-matrix snapshots, tool-calling “tool scenarios” were ~84–87% across strategies
+  (`raw`/`baseline`/`production`), while directives were ~98–99% overall.
+
+## Eval snapshot (OpenRouter, all models, sampling matrix)
+
+Snapshot: 2026-02-08 (OpenRouter), 17 models, 4 scenarios, 5 trials per model/profile/strategy.
+
+Command:
+
+```sh
+OPENROUTER_API_KEY=... OPENROUTER_JOBS=2 OPENROUTER_TRIALS=5 OPENROUTER_MODEL_FILTER=all \
+  OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
+  OPENROUTER_STRATEGY_FILTER="raw,baseline,production" \
+  bundle exec ruby script/llm_directives_eval.rb
+```
+
+Strategy summary:
+
+| strategy | ok | p50_ms | p95_ms | multi-attempt | had_http_404 | had_semantic_error |
+|---|---:|---:|---:|---:|---:|---:|
+| `raw` | 567/580 (98%) | 2700 | 6928 | 11% | 0% | 0% |
+| `baseline` | 572/580 (99%) | 2654 | 7962 | 9% | 7% | 0% |
+| `production` | 575/580 (99%) | 2752 | 7222 | 9% | 7% | 2% |
+
+By scenario (ok / runs):
+
+| scenario | `raw` | `baseline` | `production` |
+|---|---:|---:|---:|
+| `show_form` | 144/145 (99%) | 145/145 (100%) | 144/145 (99%) |
+| `toast` | 140/145 (97%) | 142/145 (98%) | 144/145 (99%) |
+| `patch_draft` | 143/145 (99%) | 145/145 (100%) | 144/145 (99%) |
+| `request_upload` | 140/145 (97%) | 140/145 (97%) | 143/145 (99%) |
+
+Production best-per-model (choose best sampling profile per model):
+
+| model | profile | mode | ok (prod) | p95_ms | recommended? | notes |
+|---|---|---|---:|---:|---|---|
+| `anthropic/claude-opus-4.6:nitro` | `default` | `json_object` | 20/20 (100%) | 3645 | Yes | `json_schema` is unreliable on OpenRouter for this route. |
+| `deepseek/deepseek-chat-v3-0324:nitro` | `default` | `json_schema` | 20/20 (100%) | 2859 | Yes | - |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_local_recommended` | `json_schema` | 20/20 (100%) | 5691 | Yes | Avoid creative/conversation profiles for directives (slow in this snapshot). |
+| `google/gemini-2.5-flash:nitro` | `gemini_2_5_flash_creative` | `json_schema` | 20/20 (100%) | 2903 | Yes | `default` was also 20/20. |
+| `google/gemini-3-flash-preview:nitro` | `default` | `json_schema` | 20/20 (100%) | 2641 | Yes | - |
+| `google/gemini-3-pro-preview:nitro` | `default` | `json_schema` | 20/20 (100%) | 5768 | Yes | - |
+| `minimax/minimax-m2-her` | `default` | `prompt_only` | 17/20 (85%) | 16845 | No | Weak semantics adherence in this harness. |
+| `minimax/minimax-m2.1:nitro` | `minimax_m2_1_recommended` | `prompt_only` | 20/20 (100%) | 10375 | Yes | - |
+| `moonshotai/kimi-k2.5:nitro` | `default` | `json_schema` | 20/20 (100%) | 6048 | Yes | - |
+| `openai/gpt-5.2-chat:nitro` | `default` | `prompt_only` | 20/20 (100%) | 3972 | Yes | OpenRouter structured modes were not stable here. |
+| `openai/gpt-5.2:nitro` | `default` | `prompt_only` | 20/20 (100%) | 3296 | Yes | OpenRouter structured modes were not stable here. |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `default` | `json_schema` | 20/20 (100%) | 2082 | Yes | - |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `default` | `json_schema` | 20/20 (100%) | 2709 | Yes | `qwen_recommended` triggered consistent OpenRouter 404s in structured modes. |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `default` | `json_schema` | 20/20 (100%) | 3118 | Yes | `qwen_recommended` triggered consistent OpenRouter 404s in structured modes. |
+| `x-ai/grok-4.1-fast` | `grok_default` | `json_schema` | 20/20 (100%) | 5078 | Yes | - |
+| `z-ai/glm-4.7-flash:nitro` | `default` | `json_schema` | 20/20 (100%) | 10415 | Yes | - |
+| `z-ai/glm-4.7:nitro` | `glm_4_7_recommended` | `json_schema` | 20/20 (100%) | 13582 | Yes | - |
 
 ## Benchmark: Tool calling (raw/baseline/production)
 
@@ -61,11 +113,11 @@ Tool calling summary (tool scenarios only):
 
 | strategy | tool scenarios only | tool p50_ms | tool p95_ms |
 |---|---:|---:|---:|
-| `raw` | 510/580 (88%) | 10019 | 22268 |
-| `baseline` | 503/580 (87%) | 10030 | 24474 |
-| `production` | 506/580 (87%) | 10385 | 22969 |
+| `raw` | 496/580 (86%) | 8605 | 20366 |
+| `baseline` | 487/580 (84%) | 8113 | 19592 |
+| `production` | 503/580 (87%) | 8241 | 20636 |
 
-Hardest tool-calling scenario in this snapshot was `long_arguments_guard` (~72% across strategies).
+Hardest tool-calling scenario in this snapshot was `long_arguments_guard` (~70–74% across strategies).
 
 ## Failure modes (what we see in practice)
 
