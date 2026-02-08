@@ -17,14 +17,6 @@ class JsonSchemaTest < Minitest::Test
     end
   end
 
-  class ExampleModel
-    include EasyTalk::Model
-
-    define_schema do
-      property :name, String, min_length: 1
-    end
-  end
-
   def test_coerce_returns_hash_for_hash
     h = { type: "object", properties: {} }
     assert_equal h, TavernKit::VibeTavern::JsonSchema.coerce(h)
@@ -34,14 +26,6 @@ class JsonSchemaTest < Minitest::Test
     schema = TavernKit::VibeTavern::JsonSchema.coerce(ExampleSchema)
     assert_equal "object", schema.fetch("type")
     refute schema.key?("required")
-  end
-
-  def test_coerce_supports_objects_with_to_json_schema
-    meta = ExampleModel.new(name: "ok").to_json_schema
-    assert meta.is_a?(Hash)
-
-    schema = TavernKit::VibeTavern::JsonSchema.coerce(ExampleModel.new(name: "ok"))
-    assert_equal meta.fetch(:schema), schema
   end
 
   def test_coerce_raises_for_unknown_provider

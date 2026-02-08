@@ -106,7 +106,7 @@ Tool injection/execution:
 
 Tool parameter schemas are app-owned and can be provided either as raw JSON
 Schema hashes, or via a schema provider (e.g. an EasyTalk model) as long as it
-responds to `json_schema` (or `to_json_schema` in RubyLLM-style metadata form).
+responds to `json_schema`.
 
 Example (EasyTalk schema-only model):
 

@@ -10,8 +10,7 @@ module TavernKit
     #
     # This module allows passing either:
     # - a plain Hash, or
-    # - an object/class that responds to `json_schema`, or
-    # - an object/class that responds to `to_json_schema` (RubyLLM-style metadata Hash).
+    # - an object/class that responds to `json_schema`.
     module JsonSchema
       module_function
 
@@ -23,15 +22,6 @@ module TavernKit
           return schema if schema.is_a?(Hash)
 
           raise ArgumentError, "json_schema must return a Hash (got #{schema.class})"
-        end
-
-        if value.respond_to?(:to_json_schema)
-          meta = value.to_json_schema
-          meta = meta.is_a?(Hash) ? meta : {}
-          schema = meta[:schema] || meta["schema"]
-          return schema if schema.is_a?(Hash)
-
-          raise ArgumentError, "to_json_schema must return a Hash with :schema (got #{meta.inspect})"
         end
 
         raise ArgumentError, "Unsupported schema provider: #{value.inspect}"

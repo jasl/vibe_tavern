@@ -14,6 +14,7 @@ Audience:
 2) `docs/research/vibe_tavern/macros.md`
 3) `docs/research/vibe_tavern/tool-calling.md`
 4) `docs/research/vibe_tavern/directives.md`
+5) (Optional) `docs/research/vibe_tavern/ruby-llm.md`
 
 Product backlog (not research, intentionally not locked in yet):
 - `docs/todo/vibe_tavern/deferred-agentic-generation.md`
