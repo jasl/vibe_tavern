@@ -248,6 +248,8 @@ These are current product preferences (can change later):
   - If/when complexity grows, introduce an intermediate view model (UI IR → VM → HTML).
 - Rails host incremental updates:
   - Use **Turbo Frames/Streams**.
+- Turbo mapping (initial):
+  - one surface = one Turbo Frame
 
 ### Phase 1 — Ruby infra: A2UI v0.8 primitives (no UI templates yet)
 
@@ -311,7 +313,9 @@ This keeps LLM evaluation focused on directives (not on producing A2UI).
 ## Open questions (remaining)
 
 - How do we map “surfaces” / UI regions to Turbo constructs?
-  - one surface = one Turbo Frame?
   - how do modals fit (separate frames, or a single modal frame + swap)?
 - How do we keep UI Builder rendering deterministic and testable?
   - input-only (no hidden state), stable ordering, snapshot tests where useful
+  - if direct UI IR → HTML becomes hard to test, do we introduce:
+    - ViewComponent (or similar), or
+    - a view model layer (UI IR → VM → HTML)
