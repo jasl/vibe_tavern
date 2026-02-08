@@ -99,7 +99,7 @@ These become hard validation rules (not “best effort”):
     each entry has `key` + exactly one of:
     `valueString`, `valueNumber`, `valueBoolean`, `valueMap`
   - arrays are not first-class in `contents` in v0.8, so list-like UI needs an
-    explicit strategy (see “Edge cases”)
+    explicit strategy (see “Data model arrays”)
 
 All of these rules are described in the A2UI repo:
 
@@ -109,7 +109,47 @@ All of these rules are described in the A2UI repo:
 
 ## Hard problems / risks (and how to de-risk them)
 
-### 1) Safety: “data not code” is necessary but not sufficient
+### 1) Input binding (draft vs committed) and “who owns the data model”
+
+A2UI’s interactive components use **data binding**. In typical A2UI renderers,
+user input can update the client-side data model *before* any message is sent
+back to the server (until an action is triggered).
+
+This creates a classic “draft vs committed” conflict:
+
+- server may push a `dataModelUpdate` while the user is editing
+- client may implicitly mutate state via bound inputs
+- naive “replace root data model” updates can clobber user edits
+
+Recommended hard rules (P0):
+
+- Treat the server as the **source of truth** for committed state.
+- Reserve a draft namespace for in-flight user edits.
+  - Example namespaces:
+    - `/draft/...` — user-editable, not authoritative until submit
+    - `/committed/...` — authoritative domain state
+- Avoid sending root-replacing `dataModelUpdate` while a surface is “editing”.
+  - Prefer narrow patches or action-driven updates (submit/next).
+
+This rule also helps our non-A2UI Rails host: it keeps “what the user is
+editing” separate from “what the system believes is true”.
+
+### 2) Default values: avoid `path + literal*` implicit writes
+
+A2UI allows a BoundValue to include both a `path` and a `literal*` value. Many
+renderers treat this as “initialize this path with the literal, then bind”.
+
+This is hostile to “strong-fact state” because the mutation happens on the
+client, not the server.
+
+Recommended hard rules (P0):
+
+- Compiler must **not** emit BoundValue shorthands that include both `path` and
+  `literal*`.
+- All defaults must be applied via explicit `dataModelUpdate` sent by the server
+  (auditable/replayable).
+
+### 3) Safety: “data not code” is necessary but not sufficient
 
 Even as pure data, A2UI can DoS a client if we allow unbounded output.
 
@@ -122,7 +162,7 @@ Guardrails to implement in the compiler (and validate again at the boundary):
 - strict allowlist of component types (catalog-driven)
 - strict allowlist of allowed actions (button/event names) and context keys
 
-### 2) Version drift (A2UI evolves)
+### 4) Version drift (A2UI evolves)
 
 The A2UI repo includes v0.8 (stable) and newer draft specs (v0.9+).
 
@@ -136,17 +176,41 @@ Decision (recommended):
 - Pin to A2UI v0.8 first (stable), and only add v0.9+ once we have a concrete
   renderer and a migration reason.
 
-### 3) Data model arrays (v0.8 typed adjacency list)
+### 5) Path canonicalization (pointer vs segment)
+
+The A2UI docs and examples are inconsistent about whether paths are full JSON
+Pointers (`/draft/name`) or relative/segment paths (`draft` / `user`).
+
+If we do not canonicalize, different renderers (or future backends) will
+interpret the same “path” differently, causing silent state drift.
+
+Recommended hard rules (P0):
+
+- UI IR uses **JSON Pointer** everywhere.
+  - Always starts with `/`
+  - Escape rules follow RFC 6901 (`~` / `/` encoding)
+- Compiler accepts both pointer and segment paths at the boundary, but
+  canonicalizes to pointer internally.
+- Event ingress (client → server) applies the same canonicalization rules.
+
+### 6) Data model arrays (v0.8 typed adjacency list)
 
 `dataModelUpdate.contents` supports strings/numbers/booleans/maps, not arrays.
 
 Strategies (choose one explicitly; don’t let this drift):
 
 - **No arrays (initial)**: represent lists as fixed UI components (explicit children)
-- **Encode arrays as maps**: keys `"0"`, `"1"`, ... and define renderer semantics
-- **Custom catalog component**: e.g. `Repeater` that expects a map-like structure
+- **Encode arrays as maps**: keys `"0"`, `"1"`, ... and define stable ordering semantics
+- **Custom catalog component**: e.g. `Repeater`/`TagList` that expects a map-like structure
 
-### 4) Event handling / round-trips
+Array roadmap (recommended):
+
+- P0: UI collects list-ish input as strings (tags input / comma-separated),
+  server normalizes to JSON arrays in domain state on submit.
+- P1: introduce a compiler-supported list encoding (map-indexed list or a custom
+  component) for dynamic lists and multi-select patterns.
+
+### 7) Event handling / round-trips (client → server)
 
 A2UI defines `userAction` (client → server) as the primary interaction message.
 
@@ -164,7 +228,91 @@ This should be treated like tool calling:
 - strict validation of action names/context
 - bounded payload sizes
 
-### 5) “Streaming” confusion
+Recommended implementation details (P0):
+
+- Accept only A2UI-style event envelopes:
+  - exactly one of: `userAction` or `error`
+- `userAction` must be validated:
+  - action name allowlist
+  - surfaceId and sourceComponentId format (bounded length, safe charset)
+  - context size/depth limits (DoS defense)
+- `error` events should be treated as signals to trigger recovery policies
+  (see next sections).
+
+### 8) Failure & recovery policy (don’t leave stale UI behind)
+
+If a surface compilation/validation fails and we silently drop updates, the
+client may keep rendering an old surface, and the user might keep interacting
+with stale UI.
+
+We need explicit recovery strategies:
+
+1) **Soft fail**: fall back to plain text (does not modify existing surfaces)
+2) **Surface fail**: emit `deleteSurface(surfaceId)` then fall back (prevents
+   further interaction with stale UI)
+3) **Epoch reset**: rotate surfaceId epoch/version (e.g. `main#e=2`) and re-send
+   a full initialization (most robust)
+
+### 9) Renderer compatibility: “reset escape hatch”
+
+Some A2UI renderers in the wild do not correctly apply incremental updates to
+existing surfaces.
+
+We should plan for a “reset escape hatch”:
+
+- Each surface has a lifecycle and an epoch/version.
+- Triggers for epoch reset:
+  - client sends `error`
+  - semantic validator detects a severe invariant violation
+  - production monitoring detects “updates not applied” (optional: ack/hash)
+
+### 10) Semantic validator checklist (beyond schema shape)
+
+Shape validation (JSON schema) is necessary but not sufficient. The compiler
+must also enforce semantic invariants:
+
+- `beginRendering` must come after root components for that surface exist.
+- Component wrapper contains **exactly one** component key.
+- All referenced child IDs must exist.
+- Detect and reject cycles in component references.
+- Template/dynamic list invariants:
+  - template has required fields (binding + componentId)
+  - scoped/relative binding paths are interpreted consistently
+
+### 11) Testing strategy: ClientSim + replay tests
+
+Add a minimal “client state machine simulator” (no UI) to regression-test
+compiler correctness:
+
+- Apply message streams and assert final per-surface state hash.
+- Metamorphic tests:
+  - optimizer/coalescing on vs off yields the same final state
+- Replay/disconnect tests:
+  - partial init (no `beginRendering`) then reconnect and re-init
+  - assert deterministic recovery and no “stuck buffering”
+
+### 12) Catalog/capabilities security
+
+Treat catalogs as a security boundary:
+
+- Default to pinned catalog ID (single renderer).
+- Default-disable inline catalogs (unless explicitly in dev mode).
+- All component types/actions must be allowlisted by the catalog registry.
+
+### 13) Cross-provider LLM constraints (structured outputs)
+
+This compiler plan relies on structured directives being reliable across
+providers. Keep these constraints explicit:
+
+- Do not combine tool calling with structured outputs in the same LLM request.
+- Do not stream LLM responses when using `response_format` or tool calling
+  (already enforced in `PromptRunner`).
+- Keep structured directives runs tools-free (no `tools`/`tool_choice` alongside
+  `response_format`).
+- Tool calling runs should default to sequential tool calls
+  (`parallel_tool_calls: false`); do not rely on provider defaults.
+
+### 14) “Streaming” confusion
 
 A2UI itself is typically streamed (JSONL over SSE/WS).
 
@@ -209,7 +357,49 @@ Implementation detail:
 - validator already supports aliases and patch-op normalization:
   `Directives::Validator.validate_patch_ops(...)`
 
-## Development plan (deferred)
+## Development plan (deferred, but ordered)
+
+P0 (foundation):
+
+1) Define a minimal **UI IR** with explicit:
+   - surface IDs + epoch/version
+   - strong-fact data model namespaces (`/draft`, `/committed`)
+   - canonical JSON Pointer paths
+2) Define compiler guardrails (size limits, allowlists, action validation).
+3) Define failure/recovery policy and make it testable (soft/surface/epoch).
+
+P1 (Rails host integration, first UI host):
+
+1) Server-rendered UI builder for Rails (UI IR → HTML, Turbo Frames).
+2) Event ingress endpoint:
+   - validate `userAction`/`error` envelopes
+   - map action → directives/tool loop
+3) Use full rebuild/replace updates (Turbo Frame refresh) before attempting diffs.
+
+P2 (A2UI backend, optional renderer target):
+
+1) Add protocol-level infra modules (no app templates):
+   - `TavernKit::VibeTavern::A2UI::V0_8::TypedContents`
+   - `TavernKit::VibeTavern::A2UI::V0_8::Validator`
+   - (optional) `TavernKit::VibeTavern::A2UI::JSONL`
+2) Implement an app-owned compiler: UI IR → A2UI message stream (JSON objects).
+3) Add deterministic tests for typed contents + validator (CI).
+
+P3 (ClientSim + eval/hardening):
+
+1) ClientSim state machine for A2UI messages.
+2) Replay/disconnect/resume tests.
+3) (Optional) Extend eval scripts:
+   directives OK → executor → compiler → A2UI validator (compile OK)
+
+P4 (Renderer integration, optional / later):
+
+1) Decide delivery format:
+   - JSON array (debug/dev)
+   - JSONL over SSE/WS (production)
+2) Choose renderer approach:
+   - embed an existing A2UI renderer (Lit/Angular/Flutter), or
+   - implement a minimal renderer for the subset of components we use.
 
 ## Decisions (current)
 
@@ -220,34 +410,74 @@ These are current product preferences (can change later):
   - We want a dedicated **UI Builder** module/helper that assembles UI from our
     strong-fact UI IR (instead of scattering rendering logic across controllers/views).
   - A future SPA/native client can still consume the compiled UI spec and render it.
+- UI IR minimal shape:
+  - Start with **forms / prebuilt UI templates** + a small set of generic controls.
+  - Keep the UI IR **A2UI-agnostic** (no “A2UI component trees” in the IR).
 - First production API uses **Pattern A (semantic UI directives)**.
   We expect some directives to map to **prebuilt, interactive forms** that are
   coupled to product flows (example: uploading a Character Card JSON so an agent
   can read it). This remains app-owned (injected directive registry + templates).
+- State store boundary and replay:
+  - We likely introduce a conversation-level state store, but allow task/app code
+    to be deeply coupled when needed.
+  - “Replay” is **best-effort**:
+    - UI-level compilation (directives → UI IR → A2UI/HTML) should be deterministic
+      given the same inputs.
+    - App-coupled side effects may not be reproducible purely from chat logs.
+  - Prefer storing user submissions + state snapshots to support recovery/debugging.
 - v0.8 `dataModelUpdate.contents` **array strategy**: keep the A2UI data model
   array-free initially and let the UI control + submission handler normalize to
   JSON arrays in domain state. Two preferred UX approaches:
   - tags-style input control, normalized to JSON array on submit
   - comma-separated input with UX guardrails, normalized to JSON array on submit
+- Default values: do not rely on client-side implicit data model writes.
+  - Compiler must not emit BoundValue `path + literal*` shorthands.
+  - Defaults are applied via explicit `dataModelUpdate`.
+- Path canonicalization:
+  - UI IR uses JSON Pointer paths (leading `/`) consistently.
+  - Compiler accepts and canonicalizes segment paths at the boundary.
+  - Non-`/` paths are treated as relative to the draft namespace (e.g. `/draft/`)
+    and should emit warnings in logs/trace.
+- Action allowlist (v0):
+  - Use an app-owned allowlist registry for actions (names + context schema).
+  - The compiler only emits allowlisted actions, and the server rejects any
+    non-allowlisted action on ingress.
+  - Model this similar to tool calling “masking”: hide/disable actions that are
+    not valid for the current flow.
 - Catalog negotiation: start **pinned** to a single app-selected catalog.
   Negotiation via client-reported `supportedCatalogIds` only matters once we
   have multiple client renderers. This belongs to the app layer (config/injected
   registries), not the infra.
+- Catalog versioning:
+  - Do not implement catalog version negotiation initially.
+  - Prefer app-owned UI snapshots for “completed” UIs:
+    - lock editing/interaction when a snapshot is no longer compatible
+    - render an “expired UI” stub with a safe explanation
+    - provide “regenerate” as the primary self-recovery UX
 - Compiler strictness in production: **best-effort**.
   - Never emit invalid A2UI messages.
   - If compilation/validation fails for a surface, drop that surface’s messages
-    and fall back to safe output (e.g., plain `assistant_text`, or a minimal
-    error UI that cannot mislead).
+    and fall back to safe output (e.g., plain `assistant_text` that explicitly
+    says the UI could not be rendered and offers “regenerate”).
+  - If failure risks leaving stale UI behind, prefer `deleteSurface` or epoch
+    reset over silent drops.
   - Use strict mode in dev/test to catch template/compiler bugs early.
 - A2UI protocol mode:
   - Default to **strict** (spec-compliant).
   - Add an explicit **extended** mode only when we intentionally diverge from
-    A2UI to support our own renderer needs (and keep it opt-in + versioned).
+  A2UI to support our own renderer needs (and keep it opt-in + versioned).
+- IDs and epochs:
+  - IDs are stably derived from UI IR.
+  - Epoch/version only changes on recovery/reset; it is not a normal update mechanism.
 - Rails UI Builder API:
   - Start simple: render **UI IR → HTML directly** (via a dedicated builder/helper).
   - If/when complexity grows, introduce an intermediate view model (UI IR → VM → HTML).
 - Rails host incremental updates:
   - Use **Turbo Frames/Streams**.
+- Update strategy (initial):
+  - Prefer **full rebuild/replace** of a surface (Turbo Frame refresh, or A2UI
+    re-init) over incremental diffs.
+  - Add optimizations only after ClientSim tests prove semantic equivalence.
 - Turbo mapping (initial):
   - one surface = one Turbo Frame
 - Modals (initial):
@@ -260,65 +490,19 @@ These are current product preferences (can change later):
   - Stable ordering for lists; stable IDs derived from UI IR.
   - Prefer structural assertions in tests (parse HTML / selector-based), and only
     use string snapshots if we can normalize output reliably.
-
-### Phase 1 — Ruby infra: A2UI v0.8 primitives (no UI templates yet)
-
-Add protocol-level modules (still infra, not product-specific):
-
-- `TavernKit::VibeTavern::A2UI::V0_8::TypedContents`
-  - Ruby Hash → typed adjacency list (`dataModelUpdate.contents`)
-  - hard limits: depth, entry count, string bytes
-  - explicit strategy for arrays and nils
-- `TavernKit::VibeTavern::A2UI::V0_8::Validator`
-  - validates envelope shape, one-of message keys, ordering, typed contents shape
-  - returns structured errors with JSON pointer-ish paths (for logs/eval)
-- (optional) `TavernKit::VibeTavern::A2UI::JSONL`
-  - messages array → JSONL (one object per line)
-
-Deterministic tests (Minitest):
-
-- typed contents: depth/entry/string limits, array strategy, nil strategy
-- validator: one-of keys, beginRendering ordering, wrapper “one key only”
-
-### Phase 2 — App layer: UI IR + compiler + a minimal template
-
-App-owned code (NOT infra):
-
-- `UiIR` (strong-fact UI state)
-  - surfaces, active surface, per-surface data model
-- directive executor (update `UiIR` deterministically)
-- compiler: `UiIR` → A2UI messages
-  - stable component IDs
-  - stable surface ID strategy
-  - message grouping per surface
-
-Start with one template:
-
-- “character form” or “upload request”
-
-### Phase 3 — Transport + renderer integration
-
-Decide delivery format:
-
-- JSON array (debug/dev) then JSONL over SSE (production)
-
-Renderer:
-
-- either embed an existing A2UI renderer (Lit/Angular/Flutter), or
-- implement a minimal renderer for the subset of components we use
-
-### Phase 4 — Evaluation + hardening
-
-Extend existing eval scripts (optional):
-
-- directives eval: after directives success, run:
-  executor → compiler → A2UI validator
-  and report:
-  - “directives OK”
-  - “A2UI compile OK”
-  - message counts / bytes / per-surface component counts
-
-This keeps LLM evaluation focused on directives (not on producing A2UI).
+- `userAction` idempotency keys (recommended):
+  - Require an idempotency key (event ID) for client → server submissions.
+  - Server should deduplicate within a bounded TTL (per conversation/surface).
+  - This prevents double-submit bugs and makes retries/disconnect replays safer.
+- A2UI renderer ACK/hash mechanism:
+  - Do **not** implement ACK/hash in the first production iteration.
+  - Rely on:
+    - client-reported `error` events, and
+    - a manual “regenerate” UX for self-recovery
+  - Future extension (optional):
+    - client can report an “applied surface hash” (or epoch/version) so the
+      server can detect “updates not applied” and trigger epoch reset.
+    - keep it opt-in and versioned, since not all renderers will support it.
 
 ## Open questions (remaining)
 
