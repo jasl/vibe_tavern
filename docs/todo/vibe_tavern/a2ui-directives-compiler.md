@@ -250,6 +250,16 @@ These are current product preferences (can change later):
   - Use **Turbo Frames/Streams**.
 - Turbo mapping (initial):
   - one surface = one Turbo Frame
+- Modals (initial):
+  - Do not support a “modal surface” initially.
+  - Prefer inline UI flows (normal surfaces / frames).
+  - If a modal UX is needed, trigger it from normal UI (e.g., a button) and
+    implement it at the Rails UI layer (Turbo/Stimulus), not as a new protocol layer.
+- UI Builder determinism/testing:
+  - Keep the builder input-only (no hidden state, no DB reads, no time/randomness).
+  - Stable ordering for lists; stable IDs derived from UI IR.
+  - Prefer structural assertions in tests (parse HTML / selector-based), and only
+    use string snapshots if we can normalize output reliably.
 
 ### Phase 1 — Ruby infra: A2UI v0.8 primitives (no UI templates yet)
 
@@ -312,10 +322,6 @@ This keeps LLM evaluation focused on directives (not on producing A2UI).
 
 ## Open questions (remaining)
 
-- How do we map “surfaces” / UI regions to Turbo constructs?
-  - how do modals fit (separate frames, or a single modal frame + swap)?
-- How do we keep UI Builder rendering deterministic and testable?
-  - input-only (no hidden state), stable ordering, snapshot tests where useful
-  - if direct UI IR → HTML becomes hard to test, do we introduce:
-    - ViewComponent (or similar), or
-    - a view model layer (UI IR → VM → HTML)
+- When (if ever) do we introduce modal-specific patterns beyond the Rails UI layer?
+  - If we do, do we model it as a separate Turbo Frame, or as a UI state flag that
+    changes CSS/behavior for an existing frame?
