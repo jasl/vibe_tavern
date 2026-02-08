@@ -420,6 +420,16 @@ Treat catalogs as a security boundary:
 This compiler plan relies on structured directives being reliable across
 providers. Keep these constraints explicit:
 
+- OpenAI-compatible does not mean request-parameter-compatible:
+  - Some providers will reject unknown request keys (400/422).
+  - Some routers (OpenRouter) may return HTTP 404 (“no endpoints support the requested parameters”)
+    when a parameter combination is unsupported.
+  - Treat provider/model capability differences as normal. Do not bury them in prompts.
+- Add an explicit **request parameter filter/sanitizer** at the LLM boundary (P0 recommendation):
+  - Define provider/model capabilities in app config (what request keys are allowed).
+  - Before sending a request, drop unsupported keys and record warnings in trace/events.
+  - In strict mode (dev/test), raise when a request contains unsupported keys to catch drift early.
+  - This should be infra-level (shared by tool calling and directives), but app-owned capabilities.
 - Do not combine tool calling with structured outputs in the same LLM request.
 - Do not stream LLM responses when using `response_format` or tool calling
   (already enforced in `PromptRunner`).
@@ -553,6 +563,8 @@ P0 (foundation):
    - canonical JSON Pointer paths
 2) Define compiler guardrails (size limits, allowlists, action validation).
 3) Define failure/recovery policy and make it testable (soft/surface/epoch).
+4) Add an LLM boundary request sanitizer (provider capabilities + dropped-key trace)
+   so cross-provider parameter drift does not leak into the compiler layer.
 
 P0 DoD (exit criteria):
 
@@ -561,6 +573,8 @@ P0 DoD (exit criteria):
 - Guardrails are implemented and tested (bytes/limits/allowlists/actions).
 - Recovery strategies are implemented and testable (soft fail, surface fail,
   epoch reset).
+- LLM request parameter filtering is implemented (drop unsupported keys in best-effort,
+  raise in strict mode) and is covered by unit tests.
 - Trace/error code contracts are implemented at the boundary (enough to replay
   and explain failures in CI artifacts/logs).
 
@@ -634,6 +648,13 @@ These are current product preferences (can change later):
 - UI IR minimal shape:
   - Start with **forms / prebuilt UI templates** + a small set of generic controls.
   - Keep the UI IR **A2UI-agnostic** (no “A2UI component trees” in the IR).
+- UI IR surface routing (P0):
+  - Start with a single surface ID: `main`.
+  - Keep `assistant_text` as the primary chat transcript; UI surfaces are optional
+    companions (side panel / frame), not the only user-visible output.
+  - Add additional surfaces only once we have a concrete UI host need (e.g.
+    `sidebar`, `wizard:<flow_id>`), and ensure surface IDs are stable (derived
+    from UI IR structure, not random).
 - First production API uses **Pattern A (semantic UI directives)**.
   We expect some directives to map to **prebuilt, interactive forms** that are
   coupled to product flows (example: uploading a Character Card JSON so an agent
