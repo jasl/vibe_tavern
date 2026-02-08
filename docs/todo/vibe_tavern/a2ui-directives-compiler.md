@@ -216,9 +216,10 @@ Implementation detail:
 These are current product preferences (can change later):
 
 - Target UI is a **dedicated UI for a new product**, not a SillyTavern plugin.
-  For now we focus on the **server/backend** pieces (directives → UI IR → A2UI
-  compilation + validation). A future SPA/native client can consume the compiled
-  UI spec and render it.
+- First dedicated UI host is **server-rendered HTML in the Rails app**.
+  - We want a dedicated **UI Builder** module/helper that assembles UI from our
+    strong-fact UI IR (instead of scattering rendering logic across controllers/views).
+  - A future SPA/native client can still consume the compiled UI spec and render it.
 - First production API uses **Pattern A (semantic UI directives)**.
   We expect some directives to map to **prebuilt, interactive forms** that are
   coupled to product flows (example: uploading a Character Card JSON so an agent
@@ -238,6 +239,10 @@ These are current product preferences (can change later):
     and fall back to safe output (e.g., plain `assistant_text`, or a minimal
     error UI that cannot mislead).
   - Use strict mode in dev/test to catch template/compiler bugs early.
+- A2UI protocol mode:
+  - Default to **strict** (spec-compliant).
+  - Add an explicit **extended** mode only when we intentionally diverge from
+    A2UI to support our own renderer needs (and keep it opt-in + versioned).
 
 ### Phase 1 — Ruby infra: A2UI v0.8 primitives (no UI templates yet)
 
@@ -300,10 +305,8 @@ This keeps LLM evaluation focused on directives (not on producing A2UI).
 
 ## Open questions (remaining)
 
-- What is the first **dedicated UI host** for compiled UI?
-  - server-rendered HTML for a Rails app, or
-  - a thin web client that renders A2UI (e.g., Lit), or
-  - something else
-- Do we want an explicit “A2UI strict vs extended” mode?
-  - strict: spec-compliant messages only (max compatibility)
-  - extended: allow controlled `vt_*` fields for our own renderer only
+- What should the Rails **UI Builder** public API look like (inputs/outputs)?
+  - Should it render UI IR → HTML directly, or UI IR → “view model” → HTML?
+  - How do we keep rendering deterministic and testable (no hidden state)?
+- For the Rails host, how do we deliver incremental updates?
+  - full-page reload vs Turbo Frames/Streams vs JSON endpoint + client hydration
