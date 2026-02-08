@@ -134,8 +134,8 @@ Treat `zh-CN` vs `zh-TW` as distinct (not “same-lang”).
 
 Supported tiers (current preference):
 
-- Tier 1: `zh-CN`, `zh-TW`, `en-US`
-- Tier 2: `ko-KR`, `ja-JP`
+- Tier 1: `en-US`
+- Tier 2: `zh-CN`, `zh-TW`, `ko-KR`, `ja-JP`
 - Tier 3: `yue-HK`
 
 Policy (P0 recommendation):
@@ -143,6 +143,15 @@ Policy (P0 recommendation):
   and emit a warning/trace event at the app boundary (do not guess).
 - Canonicalize common case variants (`zh-cn` → `zh-CN`) **before** allowlist
   checks (app-side preferred).
+- Tier 2 enforcement is “language-shape” best-effort:
+  - do not require semantic correctness (we don't need to "know the language")
+  - allow only high-confidence checks (script/character distribution), otherwise warn
+  - if a non-streaming post-pass rewrite/translate fallback is enabled, use it
+    when output clearly drifts from `target_lang`
+- Tier 3 enforcement is **best-effort**:
+  - allow `yue-HK` as a target language (so prompts can request it)
+  - do not hard-fail runs based on “is the content truly Cantonese” checks
+  - still enforce all protocol/verbatim invariants (tools/directives/JSON/tags/URLs)
 
 ## Verbatim zones (must-preserve contract)
 
@@ -320,11 +329,13 @@ Add “language policy on/off” as an explicit eval dimension for both protocol
   - assert tool calls remain valid (tool name/args JSON untouched)
   - assert final assistant text is in `target_lang`
   - assert verbatim preservation (URLs/Markdown links/special tags) in the final answer
+  - `yue-HK` note: treat “language correctness” as non-fatal; only require protocol/verbatim invariants
 - Directives harness: `script/llm_directives_eval.rb`
   - assert envelope shape remains valid JSON
   - assert directive `type` strings remain canonical
   - assert `assistant_text` is in `target_lang`
   - (when app validators are enabled) assert user-visible payload strings are in `target_lang`
+  - `yue-HK` note: treat “language correctness” as non-fatal; only require protocol/verbatim invariants
 
 This is intentionally separate from any “Translate both” post-translation work:
 we are measuring the **impact of the language policy prompt** on protocol
@@ -347,6 +358,9 @@ reliability.
 
 - Config naming: use `runtime[:language_policy]`.
 - Language codes: strict BCP-47 allowlist (Tier 1–3 list above).
+- Tier 2: best-effort “language-shape” validation (script/character distribution),
+  not semantic correctness; prefer non-streaming post-pass fallback over hard fail.
+- Tier 3 (`yue-HK`): include in allowlist, but only best-effort language validation (non-fatal).
 - Group chat/multi-user: precedence is app-owned (membership > space); TavernKit
   receives only a single `target_lang` per run.
 - Tool-call turns: enforce empty assistant content when `tool_calls` are present
