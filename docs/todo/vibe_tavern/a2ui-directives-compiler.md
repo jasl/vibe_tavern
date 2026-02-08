@@ -211,6 +211,34 @@ Implementation detail:
 
 ## Development plan (deferred)
 
+## Decisions (current)
+
+These are current product preferences (can change later):
+
+- Target UI is a **dedicated UI for a new product**, not a SillyTavern plugin.
+  For now we focus on the **server/backend** pieces (directives → UI IR → A2UI
+  compilation + validation). A future SPA/native client can consume the compiled
+  UI spec and render it.
+- First production API uses **Pattern A (semantic UI directives)**.
+  We expect some directives to map to **prebuilt, interactive forms** that are
+  coupled to product flows (example: uploading a Character Card JSON so an agent
+  can read it). This remains app-owned (injected directive registry + templates).
+- v0.8 `dataModelUpdate.contents` **array strategy**: keep the A2UI data model
+  array-free initially and let the UI control + submission handler normalize to
+  JSON arrays in domain state. Two preferred UX approaches:
+  - tags-style input control, normalized to JSON array on submit
+  - comma-separated input with UX guardrails, normalized to JSON array on submit
+- Catalog negotiation: start **pinned** to a single app-selected catalog.
+  Negotiation via client-reported `supportedCatalogIds` only matters once we
+  have multiple client renderers. This belongs to the app layer (config/injected
+  registries), not the infra.
+- Compiler strictness in production: **best-effort**.
+  - Never emit invalid A2UI messages.
+  - If compilation/validation fails for a surface, drop that surface’s messages
+    and fall back to safe output (e.g., plain `assistant_text`, or a minimal
+    error UI that cannot mislead).
+  - Use strict mode in dev/test to catch template/compiler bugs early.
+
 ### Phase 1 — Ruby infra: A2UI v0.8 primitives (no UI templates yet)
 
 Add protocol-level modules (still infra, not product-specific):
@@ -270,10 +298,12 @@ Extend existing eval scripts (optional):
 
 This keeps LLM evaluation focused on directives (not on producing A2UI).
 
-## Open questions
+## Open questions (remaining)
 
-- Which front-end renderer are we targeting first (SillyTavern plugin vs a dedicated UI)?
-- Which directive pattern should be our first production API (Pattern A vs B)?
-- What’s the array strategy for v0.8 `dataModelUpdate.contents`?
-- Do we want catalog negotiation up-front (client reports `supportedCatalogIds`) or pin to one catalog?
-- Should the compiler run in strict mode in production, or drop invalid surfaces and fall back to text?
+- What is the first **dedicated UI host** for compiled UI?
+  - server-rendered HTML for a Rails app, or
+  - a thin web client that renders A2UI (e.g., Lit), or
+  - something else
+- Do we want an explicit “A2UI strict vs extended” mode?
+  - strict: spec-compliant messages only (max compatibility)
+  - extended: allow controlled `vt_*` fields for our own renderer only
