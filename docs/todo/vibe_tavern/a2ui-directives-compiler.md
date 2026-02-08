@@ -98,6 +98,8 @@ These become hard validation rules (not “best effort”):
   - `dataModelUpdate.contents` is a typed adjacency list:
     each entry has `key` + exactly one of:
     `valueString`, `valueNumber`, `valueBoolean`, `valueMap`
+  - If `dataModelUpdate.path` is omitted (or `/`), `contents` replaces the
+    entire surface data model (root replace).
   - arrays are not first-class in `contents` in v0.8, so list-like UI needs an
     explicit strategy (see “Data model arrays”)
 
@@ -161,6 +163,10 @@ Guardrails to implement in the compiler (and validate again at the boundary):
 - max data model depth / entry count / string bytes
 - strict allowlist of component types (catalog-driven)
 - strict allowlist of allowed actions (button/event names) and context keys
+- rich text / URLs:
+  - P0: treat all user-visible strings as plain text (no HTML/Markdown execution)
+  - if/when we render rich text or links: sanitize output and restrict URL schemes
+    (e.g. http/https only; never `javascript:`)
 
 ### 4) Version drift (A2UI evolves)
 
@@ -303,6 +309,24 @@ Recommended implementation details (P0):
 - `error` events should be treated as signals to trigger recovery policies
   (see next sections).
 
+Renderer contract (our product, P0):
+
+- User input updates client-local draft state only (`/draft/...`).
+- Do not emit “per-keystroke” server events. Only explicit actions (submit/next)
+  send a `userAction` back to the server.
+- `userAction.context` should contain only the minimal submitted payload needed
+  for the action (scalar-first; avoid arbitrary objects).
+- This contract should be consistent across hosts:
+  - Rails HTML host: normal forms update local DOM state; submit posts once.
+  - A2UI host: draft binding updates local client model; submit sends `userAction`.
+
+Optional future extension (P1): optimistic concurrency (`surface_rev`)
+
+- Track a monotonically increasing `surface_rev` per surface (separate from
+  epoch/version used for resets).
+- Include `surface_rev` in the UI (hidden field / bound value) and require it
+  on ingress; reject stale revs with a recoverable “UI out of date” response.
+
 ### 9) Failure & recovery policy (don’t leave stale UI behind)
 
 If a surface compilation/validation fails and we silently drop updates, the
@@ -316,6 +340,15 @@ We need explicit recovery strategies:
    further interaction with stale UI)
 3) **Epoch reset**: rotate surfaceId epoch/version (e.g. `main#e=2`) and re-send
    a full initialization (most robust)
+
+Strict vs best-effort (recommended):
+
+| Dimension | Strict (dev/test) | Best-effort (production) |
+| --- | --- | --- |
+| Primary goal | Catch compiler/validator bugs early | Keep the conversation moving safely |
+| Coercions | Reject non-canonical/ambiguous inputs | Coerce where safe (canonicalize paths, normalize patch ops) and log warnings |
+| Invalid A2UI | Fail the surface/turn (raise) | Never emit invalid A2UI; surface fail (`deleteSurface`) then safe fallback |
+| Stale UI risk | Prefer loud failures | Prefer delete/reset over silent drops |
 
 ### 10) Renderer compatibility: “reset escape hatch”
 
@@ -378,6 +411,9 @@ Treat catalogs as a security boundary:
 - Default to pinned catalog ID (single renderer).
 - Default-disable inline catalogs (unless explicitly in dev mode).
 - All component types/actions must be allowlisted by the catalog registry.
+- If a future client renderer cannot support the pinned catalog/components,
+  treat it as a renderer capability error and fall back to a safe path
+  (Rails HTML host or plain text), rather than negotiating catalogs in infra.
 
 ### 14) Cross-provider LLM constraints (structured outputs)
 
@@ -422,6 +458,59 @@ P0 rule:
 This is compatible with JSONL/SSE (still streamed), but prevents half-initialized
 surfaces from being emitted.
 
+### 17) Error codes and trace (contract)
+
+To keep “best-effort production” deterministic and debuggable, define two small
+contracts up-front:
+
+1) A stable error code namespace with default recovery actions
+2) A trace JSON contract for eval/observability
+
+Error code namespaces (suggested):
+
+- `A2UI_S2C_*`: compile/validate errors on server → client message streams
+- `A2UI_C2S_*`: ingress validation errors on client → server events
+- `LLM_*`: LLM adapter preflight / protocol incompatibilities
+
+S2C (server → client) recovery mapping (default):
+
+| Code family | Typical issue | Default recovery |
+| --- | --- | --- |
+| `A2UI_S2C_ENVELOPE_*` | invalid JSONL / not exactly-one-key | **FATAL**: do not flush; safe fallback only |
+| `A2UI_S2C_BEGIN_*` | beginRendering gate violated / root missing | **SURFACE_FAIL**: `deleteSurface` then fallback |
+| `A2UI_S2C_COMPONENT_*` | missing IDs / wrapper invalid / cycles | **SURFACE_FAIL**: `deleteSurface` then fallback |
+| `A2UI_S2C_LIMIT_*` | size/depth/entries guardrail exceeded | **SURFACE_FAIL**: `deleteSurface` then fallback |
+
+C2S (client → server) HTTP mapping (default):
+
+| Code | HTTP | User-facing guidance |
+| --- | ---: | --- |
+| `A2UI_C2S_ENVELOPE_INVALID` | 400 | “Invalid submission. Please refresh and retry.” |
+| `A2UI_C2S_ACTION_FORBIDDEN` | 403 | “This action is not available.” |
+| `A2UI_C2S_SURFACE_STALE` | 409 | “UI is out of date. Please regenerate.” |
+| `A2UI_C2S_CONTEXT_TOO_LARGE` | 413 | “Submission is too large. Please submit less at once.” |
+
+LLM preflight hard errors (fail fast):
+
+- `LLM_STREAMING_WITH_TOOL_CALLING_FORBIDDEN`
+- `LLM_STREAMING_WITH_RESPONSE_FORMAT_FORBIDDEN`
+- `LLM_STRUCTURED_OUTPUTS_PARALLEL_TOOL_CALLS_FORBIDDEN`
+
+Trace contract v1 (recommended fields):
+
+- Identity: `trace_version`, `request_id`, `conversation_id`, `turn_index`, timestamps
+- Run mode: `mode` (`directives`/`tool_loop`/`hybrid`), `strict_mode`
+- LLM config: provider/model, `stream`, `response_format` mode, `parallel_tool_calls`,
+  sampling params (temperature/top_p/top_k), routing/provider (OpenRouter)
+- Compiler stats (per surface): `surface_id`, epoch/version, optional `surface_rev`,
+  message counts, byte counts, component counts, data model entry counts
+- Validation: schema/semantic/guardrail status, warnings, error codes
+- Recovery: `soft_fail` / `deleteSurface` / `epoch_reset` / fallback reason
+- Timing: llm_ms, directives_ms, tool_loop_ms, compile_ms, total_ms
+
+The implementation should centralize codes and default actions in an app-owned
+`ErrorRegistry` so infra stays business-agnostic.
+
 ## Proposed directive surface (LLM-facing)
 
 Directives should stay high-level. Two viable patterns:
@@ -465,6 +554,16 @@ P0 (foundation):
 2) Define compiler guardrails (size limits, allowlists, action validation).
 3) Define failure/recovery policy and make it testable (soft/surface/epoch).
 
+P0 DoD (exit criteria):
+
+- UI IR v0 is frozen (documented shape + fixtures) and path canonicalization is
+  deterministic (tests).
+- Guardrails are implemented and tested (bytes/limits/allowlists/actions).
+- Recovery strategies are implemented and testable (soft fail, surface fail,
+  epoch reset).
+- Trace/error code contracts are implemented at the boundary (enough to replay
+  and explain failures in CI artifacts/logs).
+
 P1 (Rails host integration, first UI host):
 
 1) Server-rendered UI builder for Rails (UI IR → HTML, Turbo Frames).
@@ -472,6 +571,12 @@ P1 (Rails host integration, first UI host):
    - validate `userAction`/`error` envelopes
    - map action → directives/tool loop
 3) Use full rebuild/replace updates (Turbo Frame refresh) before attempting diffs.
+
+P1 DoD (exit criteria):
+
+- Rails UI Builder renders UI IR deterministically (tests cover key templates).
+- Ingress endpoint validates envelopes + allowlists + nonce + epoch (tests).
+- Full rebuild/replace update flow works end-to-end via Turbo Frames.
 
 P2 (A2UI backend, optional renderer target):
 
@@ -482,12 +587,25 @@ P2 (A2UI backend, optional renderer target):
 2) Implement an app-owned compiler: UI IR → A2UI message stream (JSON objects).
 3) Add deterministic tests for typed contents + validator (CI).
 
+P2 DoD (exit criteria):
+
+- Compiler emits spec-valid v0.8 message streams for a minimal surface
+  (validated + size-guarded).
+- Per-surface atomic emission is enforced (no partial flush on failure).
+- TypedContents/validator have deterministic unit tests (CI).
+
 P3 (ClientSim + eval/hardening):
 
 1) ClientSim state machine for A2UI messages.
 2) Replay/disconnect/resume tests.
 3) (Optional) Extend eval scripts:
    directives OK → executor → compiler → A2UI validator (compile OK)
+
+P3 DoD (exit criteria):
+
+- ClientSim applies message streams and produces stable per-surface state hashes.
+- Metamorphic tests prove optimizer/coalescing does not change semantics.
+- Replay/disconnect cases are covered (no “stuck buffering” regressions).
 
 P4 (Renderer integration, optional / later):
 
@@ -497,6 +615,12 @@ P4 (Renderer integration, optional / later):
 2) Choose renderer approach:
    - embed an existing A2UI renderer (Lit/Angular/Flutter), or
    - implement a minimal renderer for the subset of components we use.
+
+P4 DoD (exit criteria):
+
+- Production transport is defined and tested (JSONL over SSE/WS).
+- Renderer can display the supported subset and report `error` events for
+  recovery testing (epoch reset/deleteSurface).
 
 ## Decisions (current)
 
