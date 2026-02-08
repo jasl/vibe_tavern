@@ -18,6 +18,7 @@ Audience:
 Product backlog (not research, intentionally not locked in yet):
 - `docs/todo/vibe_tavern/deferred-agentic-generation.md`
 - `docs/todo/vibe_tavern/local-openai-compatible-providers.md`
+- `docs/todo/vibe_tavern/a2ui-directives-compiler.md`
 
 ## Evaluation harnesses
 
