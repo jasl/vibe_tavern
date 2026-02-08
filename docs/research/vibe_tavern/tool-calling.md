@@ -213,6 +213,12 @@ Eval harness note:
 ### Running
 
 ```sh
+# One command: run both tool calling + directives (full preset).
+OPENROUTER_API_KEY=... bundle exec ruby script/llm_vibe_tavern_eval.rb
+
+# Full matrix (tool calling only): all models + sampling profiles + scenarios + strategies.
+OPENROUTER_API_KEY=... OPENROUTER_EVAL_PRESET=full bundle exec ruby script/llm_tool_call_eval.rb
+
 # Stable subset (cheap)
 OPENROUTER_API_KEY=... bundle exec ruby script/llm_tool_call_eval.rb
 

@@ -304,6 +304,9 @@ CI tests:
 Live eval (optional):
   - `script/llm_directives_eval.rb` (OpenRouter) to build a model/provider capability matrix
     and track parse/schema success rate + latency percentiles.
+    - Quick start (full preset, runs both tool calling + directives):
+      - `OPENROUTER_API_KEY=... bundle exec ruby script/llm_vibe_tavern_eval.rb`
+    - Full matrix (directives only): `OPENROUTER_API_KEY=... OPENROUTER_EVAL_PRESET=full bundle exec ruby script/llm_directives_eval.rb`
     - Outputs `summary.json`, `summary_by_scenario.json`, and `summary_by_scenario_and_strategy.json` under `tmp/llm_directives_eval_reports/<timestamp>/`.
     - Scenario selection:
       - `OPENROUTER_SCENARIOS=default` (all scenarios)

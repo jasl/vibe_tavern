@@ -25,6 +25,7 @@ model×sampling-profile capability matrix:
 
 - Tool calling: `script/llm_tool_call_eval.rb`
 - Directives: `script/llm_directives_eval.rb`
+- Full preset (runs both): `script/llm_vibe_tavern_eval.rb`
 - Shared sampling profiles: `script/openrouter_sampling_profiles.rb`
 
 Deterministic (CI) coverage is under `test/tool_calling/`.

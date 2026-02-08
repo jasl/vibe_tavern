@@ -313,6 +313,28 @@ module DirectivesEval
   end
 end
 
+env_blank =
+  lambda do |key|
+    !ENV.key?(key) || ENV.fetch(key, "").to_s.strip.empty?
+  end
+
+eval_preset = ENV.fetch("OPENROUTER_EVAL_PRESET", "").to_s.strip.downcase
+eval_preset = "full" if eval_preset.empty? && ENV.fetch("OPENROUTER_FULL", "0") == "1"
+
+if %w[full all].include?(eval_preset)
+  ENV["OPENROUTER_JOBS"] = "2" if env_blank.call("OPENROUTER_JOBS")
+  ENV["OPENROUTER_TRIALS"] = "10" if env_blank.call("OPENROUTER_TRIALS")
+  ENV["OPENROUTER_MODEL_FILTER"] = "all" if env_blank.call("OPENROUTER_MODEL_FILTER")
+  ENV["OPENROUTER_SAMPLING_PROFILE_FILTER"] = "default,recommended,conversation,creative,tool_calling" if env_blank.call("OPENROUTER_SAMPLING_PROFILE_FILTER")
+  ENV["OPENROUTER_SCENARIOS"] = "all" if env_blank.call("OPENROUTER_SCENARIOS")
+
+  # Full preset includes the raw control group + baseline + production.
+  ENV["OPENROUTER_STRATEGY_FILTER"] = "raw,baseline,production" if env_blank.call("OPENROUTER_STRATEGY_FILTER")
+
+  # Keep matrix off: it would override the filter and drop the raw control group.
+  ENV["OPENROUTER_STRATEGY_MATRIX"] = "0"
+end
+
 api_key = ENV["OPENROUTER_API_KEY"].to_s
 if api_key.empty?
   warn "Missing OPENROUTER_API_KEY (this script is for live eval via OpenRouter)."
