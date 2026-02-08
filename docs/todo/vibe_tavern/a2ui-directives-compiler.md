@@ -176,6 +176,15 @@ Decision (recommended):
 - Pin to A2UI v0.8 first (stable), and only add v0.9+ once we have a concrete
   renderer and a migration reason.
 
+Migration triggers (make this an explicit checklist, not a vibe):
+
+- We need first-class nil/delete semantics in the UI data model.
+- We need true JSON arrays/lists in the A2UI data model (not map-encoded lists).
+- We want simpler server→client data model updates (v0.9 moves away from typed
+  adjacency lists toward more standard JSON object updates).
+- We have a renderer/client that commits to v0.9 and we can validate end-to-end
+  (ClientSim + replay + production canary).
+
 ### 5) Path canonicalization (pointer vs segment)
 
 The A2UI docs and examples are inconsistent about whether paths are full JSON
@@ -193,6 +202,16 @@ Recommended hard rules (P0):
   canonicalizes to pointer internally.
 - Event ingress (client → server) applies the same canonicalization rules.
 
+Important exception (template scopes):
+
+- A2UI data binding supports “scoped paths” inside templates/dynamic lists.
+  In that context, `/name` is relative to the current item scope (not the
+  surface root).
+- Canonicalization should therefore be **syntax-only** (RFC 6901), while path
+  **resolution** must be scope-aware.
+- P0 recommendation: do not enable dynamic list templates until we implement a
+  scope-aware resolver. Prefer `explicitList` children for initial templates.
+
 ### 6) Data model arrays (v0.8 typed adjacency list)
 
 `dataModelUpdate.contents` supports strings/numbers/booleans/maps, not arrays.
@@ -203,6 +222,13 @@ Strategies (choose one explicitly; don’t let this drift):
 - **Encode arrays as maps**: keys `"0"`, `"1"`, ... and define stable ordering semantics
 - **Custom catalog component**: e.g. `Repeater`/`TagList` that expects a map-like structure
 
+If we use “map-encoded lists”, the ordering semantics must be part of the contract:
+
+- keys must be decimal integer strings (`"0"`, `"1"`, ...)
+- iteration order is numeric ascending
+- define whether sparse indexes are allowed (recommended: disallow in P1)
+- define insertion/deletion semantics (otherwise you only safely support append)
+
 Array roadmap (recommended):
 
 - P0: UI collects list-ish input as strings (tags input / comma-separated),
@@ -210,7 +236,37 @@ Array roadmap (recommended):
 - P1: introduce a compiler-supported list encoding (map-indexed list or a custom
   component) for dynamic lists and multi-select patterns.
 
-### 7) Event handling / round-trips (client → server)
+### 7) Nil/deletion semantics (v0.8)
+
+Typed adjacency lists in v0.8 do not provide a clean, standard “delete key /
+set null / rollback” story.
+
+We must define a deterministic contract for:
+
+- user clears a field (non-empty → empty)
+- user re-fills a cleared field
+- optional fields omitted vs intentionally cleared
+
+Recommended strategy:
+
+- P0 (most compatible): do not attempt “delete” in the v0.8 data model.
+  - Normalize cleared values in draft UI state (e.g. empty string).
+  - Convert empty-string/empty-value back to nil/deletion at the domain boundary
+    on submit (app-specific).
+  - Prefer full surface rebuild/re-init when we must remove fields from the
+    client data model.
+- P1 (stronger): implement deletions via surface reset.
+  - Represent deletions in UI IR (e.g. tombstones), and when detected:
+    `deleteSurface(surfaceId)` + full rebuild to guarantee keys disappear.
+- Future: revisit once we target v0.9+ (remove semantics are clearer).
+
+Minimum tests to add (CI):
+
+- field transitions: value → cleared → value (submit payload consistent)
+- nil strategy: UI IR with nil values compiles deterministically (warnings ok)
+- surface reset path: tombstone triggers deleteSurface + rebuild (P1)
+
+### 8) Event handling / round-trips (client → server)
 
 A2UI defines `userAction` (client → server) as the primary interaction message.
 
@@ -236,10 +292,18 @@ Recommended implementation details (P0):
   - action name allowlist
   - surfaceId and sourceComponentId format (bounded length, safe charset)
   - context size/depth limits (DoS defense)
+- Stale event protection:
+  - validate `surfaceId` epoch/version is still current
+  - reject stale surface actions with a recoverable message (“UI expired, regenerate”)
+- Web security (Rails host):
+  - normal Rails session/CSRF checks still apply
+  - include a per-surface nonce (stored in UI IR and rendered into the UI);
+    require it on ingress to reduce action spoofing
+  - keep action contexts small and scalar-first; avoid accepting arbitrary objects
 - `error` events should be treated as signals to trigger recovery policies
   (see next sections).
 
-### 8) Failure & recovery policy (don’t leave stale UI behind)
+### 9) Failure & recovery policy (don’t leave stale UI behind)
 
 If a surface compilation/validation fails and we silently drop updates, the
 client may keep rendering an old surface, and the user might keep interacting
@@ -253,7 +317,7 @@ We need explicit recovery strategies:
 3) **Epoch reset**: rotate surfaceId epoch/version (e.g. `main#e=2`) and re-send
    a full initialization (most robust)
 
-### 9) Renderer compatibility: “reset escape hatch”
+### 10) Renderer compatibility: “reset escape hatch”
 
 Some A2UI renderers in the wild do not correctly apply incremental updates to
 existing surfaces.
@@ -266,7 +330,7 @@ We should plan for a “reset escape hatch”:
   - semantic validator detects a severe invariant violation
   - production monitoring detects “updates not applied” (optional: ack/hash)
 
-### 10) Semantic validator checklist (beyond schema shape)
+### 11) Semantic validator checklist (beyond schema shape)
 
 Shape validation (JSON schema) is necessary but not sufficient. The compiler
 must also enforce semantic invariants:
@@ -275,11 +339,16 @@ must also enforce semantic invariants:
 - Component wrapper contains **exactly one** component key.
 - All referenced child IDs must exist.
 - Detect and reject cycles in component references.
+- Component ID stability:
+  - IDs must not change type across updates (e.g. `name_input` cannot switch
+    from TextField → Column).
+  - ID generation must include enough structure (UI IR path + component type)
+    to avoid collisions when templates/repeated fields are introduced.
 - Template/dynamic list invariants:
   - template has required fields (binding + componentId)
   - scoped/relative binding paths are interpreted consistently
 
-### 11) Testing strategy: ClientSim + replay tests
+### 12) Testing strategy: ClientSim + replay tests
 
 Add a minimal “client state machine simulator” (no UI) to regression-test
 compiler correctness:
@@ -291,7 +360,18 @@ compiler correctness:
   - partial init (no `beginRendering`) then reconnect and re-init
   - assert deterministic recovery and no “stuck buffering”
 
-### 12) Catalog/capabilities security
+Minimum “must-pass” edge cases (P0):
+
+1) beginRendering gate (buffered until beginRendering)
+2) root missing (fail fast with a clear error)
+3) cycle detection (fail fast)
+4) deleteSurface idempotency (double delete is OK)
+5) BoundValue `path + literal*` never emitted (compile-time guard)
+6) stale userAction rejected (epoch/version check)
+7) context DoS rejected (size/depth guard)
+8) structured directives enforce `parallel_tool_calls: false` (don’t rely on provider defaults)
+
+### 13) Catalog/capabilities security
 
 Treat catalogs as a security boundary:
 
@@ -299,7 +379,7 @@ Treat catalogs as a security boundary:
 - Default-disable inline catalogs (unless explicitly in dev mode).
 - All component types/actions must be allowlisted by the catalog registry.
 
-### 13) Cross-provider LLM constraints (structured outputs)
+### 14) Cross-provider LLM constraints (structured outputs)
 
 This compiler plan relies on structured directives being reliable across
 providers. Keep these constraints explicit:
@@ -311,8 +391,11 @@ providers. Keep these constraints explicit:
   `response_format`).
 - Tool calling runs should default to sequential tool calls
   (`parallel_tool_calls: false`); do not rely on provider defaults.
+- Any run that enables `response_format` should explicitly set
+  `parallel_tool_calls: false` to avoid provider-default drift (OpenRouter’s
+  default is true).
 
-### 14) “Streaming” confusion
+### 15) “Streaming” confusion
 
 A2UI itself is typically streamed (JSONL over SSE/WS).
 
@@ -324,6 +407,20 @@ Our current infra decision is:
   (enforced in `PromptRunner#perform_stream`)
 - A2UI streaming is an app transport decision (we can stream compiled messages
   even when the LLM call itself is non-streaming)
+
+### 16) Per-surface atomic emission (avoid half-applied UI)
+
+If we stream A2UI messages and fail mid-stream (guardrail trip, compiler error),
+we can leave the client buffering partial updates without `beginRendering`,
+which looks like a UI freeze.
+
+P0 rule:
+
+- Compile + validate + size-guard messages **per surface** in memory first.
+- Only flush a surface’s message batch once it is complete and valid.
+
+This is compatible with JSONL/SSE (still streamed), but prevents half-initialized
+surfaces from being emitted.
 
 ## Proposed directive surface (LLM-facing)
 
