@@ -418,13 +418,17 @@ module TavernKit
               result =
                 case args
                 when :invalid_json
-                  tool_error_envelope(name, code: "ARGUMENTS_JSON_PARSE_ERROR", message: "Invalid JSON in tool call arguments")
+                  tool_error_envelope(
+                    name,
+                    code: "ARGUMENTS_JSON_PARSE_ERROR",
+                    message: "Invalid JSON in tool call arguments. Retry with arguments as a JSON object only.",
+                  )
                 when :too_large
                   tool_error_envelope(
                     name,
                     code: "ARGUMENTS_TOO_LARGE",
-                    message: "Tool call arguments are too large",
-                    data: { max_bytes: @max_tool_args_bytes },
+                    message: "Tool call arguments are too large. Retry with smaller arguments (avoid long strings and unnecessary fields).",
+                    data: { bytes: arguments_bytes, max_bytes: @max_tool_args_bytes },
                   )
                 else
                   @dispatcher.execute(name: name, args: args)

@@ -245,6 +245,14 @@ OPENROUTER_API_KEY=... OPENROUTER_TRIALS=10 \
   bundle exec ruby script/llm_tool_call_eval.rb
 ```
 
+Troubleshooting:
+
+```sh
+# If a run wrote per-run JSON files but crashed before writing the summary files,
+# regenerate summaries from an existing report directory (no network calls).
+bundle exec ruby script/llm_tool_call_eval_summarize.rb tmp/llm_tool_call_eval_reports/<timestamp>
+```
+
 ### Eval strategies (baseline vs production)
 
 The harness supports three strategies:
@@ -281,76 +289,95 @@ and are not committed. The tables below are a captured snapshot for reference.
 Command:
 
 ```sh
-OPENROUTER_TRIALS=10 OPENROUTER_MODEL_FILTER=all \
+OPENROUTER_TRIALS=5 OPENROUTER_MODEL_FILTER=all \
   OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
+  OPENROUTER_STRATEGY_FILTER="raw,baseline,production" \
   bundle exec ruby script/llm_tool_call_eval.rb
 ```
 
-Summary:
-- Overall: `1207/1450` ok (`83.24%`)
-- Tool scenarios only (excluding `chat_only`): `1000/1160` ok (`86.21%`)
-- By scenario (ok / runs):
-  - `happy_path`: `271/290` (`93.45%`)
-  - `missing_workspace_id`: `271/290` (`93.45%`)
-  - `type_error_recovery`: `257/290` (`88.62%`)
-  - `long_arguments_guard`: `201/290` (`69.31%`) (hardest)
-  - `chat_only`: `207/290` (`71.38%`)
-
-Model/profile matrix (tool scenarios only):
-
 Note:
-- Each model/profile has 50 runs total: 40 “tool scenarios” + 10 control runs (`chat_only`).
-- Use `tool_ok_rate` for tool-calling reliability; `chat_only` is a strict prompt-adherence control.
+- This is a strategy matrix run: `raw` vs `baseline` vs `production`.
+- Each model/profile has 25 runs per strategy: 20 “tool scenario” runs + 5 control runs (`chat_only`).
+- Use “tool scenarios only” for tool-calling reliability; `chat_only` is a strict prompt-adherence control.
 
-| model | sampling_profile | tool_ok | tool_ok_rate | control_ok (chat_only) | p95_ms | top tool failures |
-|---|---|---:|---:|---:|---:|---|
-| `anthropic/claude-opus-4.6:nitro` | `default` | 40/40 | 100.0% | 10/10 | 18881 | - |
-| `deepseek/deepseek-chat-v3-0324:nitro` | `default` | 38/40 | 95.0% | 10/10 | 19370 | happy_path x1; type_error_recovery x1; ASSERTION_FAILED x1; EXCEPTION x1 |
-| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_creative_writing` | 31/40 | 77.5% | 10/10 | 17815 | long_arguments_guard x9; TOOL_ERROR x8; ASSERTION_FAILED x1 |
-| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_general_conversation` | 32/40 | 80.0% | 10/10 | 20211 | long_arguments_guard x8; TOOL_ERROR x7; ASSERTION_FAILED x1 |
-| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_local_recommended` | 32/40 | 80.0% | 10/10 | 20139 | long_arguments_guard x8; TOOL_ERROR x8 |
-| `deepseek/deepseek-v3.2:nitro` | `default` | 33/40 | 82.5% | 10/10 | 19586 | long_arguments_guard x7; TOOL_ERROR x7 |
-| `google/gemini-2.5-flash:nitro` | `default` | 40/40 | 100.0% | 10/10 | 11722 | - |
-| `google/gemini-2.5-flash:nitro` | `gemini_2_5_flash_creative` | 40/40 | 100.0% | 10/10 | 11664 | - |
-| `google/gemini-3-flash-preview:nitro` | `default` | 39/40 | 97.5% | 10/10 | 11426 | long_arguments_guard x1; ASSERTION_FAILED x1 |
-| `google/gemini-3-pro-preview:nitro` | `default` | 32/40 | 80.0% | 6/10 | 25291 | long_arguments_guard x8; ASSERTION_FAILED x5; NO_TOOL_CALLS x3 |
-| `minimax/minimax-m2-her` | `default` | 0/40 | 0.0% | 6/10 | 19099 | happy_path x10; long_arguments_guard x10; ASSERTION_FAILED x40 |
-| `minimax/minimax-m2.1:nitro` | `default` | 30/40 | 75.0% | 7/10 | 24059 | long_arguments_guard x7; happy_path x2; NO_TOOL_CALLS x8; ASSERTION_FAILED x1 |
-| `minimax/minimax-m2.1:nitro` | `minimax_m2_1_recommended` | 34/40 | 85.0% | 8/10 | 27047 | long_arguments_guard x6; NO_TOOL_CALLS x5; ASSERTION_FAILED x1 |
-| `moonshotai/kimi-k2.5:nitro` | `default` | 40/40 | 100.0% | 1/10 | 35351 | - |
-| `moonshotai/kimi-k2.5:nitro` | `kimi_k2_5_instant` | 37/40 | 92.5% | 1/10 | 26589 | missing_workspace_id x2; long_arguments_guard x1; ASSERTION_FAILED x3 |
-| `openai/gpt-5.2-chat:nitro` | `default` | 38/40 | 95.0% | 1/10 | 15324 | long_arguments_guard x2; NO_TOOL_CALLS x2 |
-| `openai/gpt-5.2:nitro` | `default` | 40/40 | 100.0% | 10/10 | 15118 | - |
-| `qwen/qwen3-235b-a22b-2507:nitro` | `default` | 39/40 | 97.5% | 10/10 | 10167 | type_error_recovery x1; TOOL_ERROR x1 |
-| `qwen/qwen3-235b-a22b-2507:nitro` | `qwen_recommended` | 34/40 | 85.0% | 10/10 | 18514 | long_arguments_guard x3; happy_path x2; TOOL_ERROR x5; ASSERTION_FAILED x1 |
-| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `default` | 40/40 | 100.0% | 10/10 | 13496 | - |
-| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `qwen_recommended` | 40/40 | 100.0% | 10/10 | 12258 | - |
-| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `default` | 40/40 | 100.0% | 10/10 | 9921 | - |
-| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `qwen_recommended` | 40/40 | 100.0% | 10/10 | 9060 | - |
-| `x-ai/grok-4.1-fast` | `default` | 39/40 | 97.5% | 9/10 | 30080 | long_arguments_guard x1; TIMEOUT x1 |
-| `x-ai/grok-4.1-fast` | `grok_default` | 38/40 | 95.0% | 4/10 | 33806 | long_arguments_guard x2; TIMEOUT x2 |
-| `z-ai/glm-4.7-flash:nitro` | `default` | 18/40 | 45.0% | 3/10 | 25458 | type_error_recovery x10; long_arguments_guard x7; ASSERTION_FAILED x20; TOOL_ERROR x2 |
-| `z-ai/glm-4.7-flash:nitro` | `glm_4_7_flash_tool_calling` | 17/40 | 42.5% | 0/10 | 20324 | type_error_recovery x9; long_arguments_guard x8; ASSERTION_FAILED x23 |
-| `z-ai/glm-4.7:nitro` | `default` | 39/40 | 97.5% | 0/10 | 18531 | long_arguments_guard x1; ASSERTION_FAILED x1 |
-| `z-ai/glm-4.7:nitro` | `glm_4_7_recommended` | 40/40 | 100.0% | 1/10 | 16080 | - |
+Strategy summary:
+
+| strategy | overall | tool scenarios only | control (`chat_only`) | tool p50_ms | tool p95_ms | top error categories |
+|---|---:|---:|---:|---:|---:|---|
+| `raw` | 618/725 (85%) | 510/580 (88%) | 108/145 (74%) | 10019 | 22268 | `ASSERTION_FAILED`(76), `NO_TOOL_USE_ENDPOINT`(20), `NO_TOOL_CALLS`(7), `TIMEOUT`(4) |
+| `baseline` | 605/725 (83%) | 503/580 (87%) | 102/145 (70%) | 10030 | 24474 | `ASSERTION_FAILED`(88), `NO_TOOL_USE_ENDPOINT`(20), `NO_TOOL_CALLS`(8), `TIMEOUT`(2), `UPSTREAM_5XX`(2) |
+| `production` | 607/725 (84%) | 506/580 (87%) | 101/145 (70%) | 10385 | 22969 | `ASSERTION_FAILED`(106), `NO_TOOL_CALLS`(8), `FORBIDDEN`(3), `TOOL_ERROR`(1) |
+
+By scenario (ok / runs):
+
+| scenario | raw | baseline | production | notes |
+|---|---:|---:|---:|---|
+| `happy_path` | 138/145 (95%) | 140/145 (97%) | 138/145 (95%) | - |
+| `missing_workspace_id` | 137/145 (94%) | 134/145 (92%) | 136/145 (94%) | - |
+| `type_error_recovery` | 130/145 (90%) | 125/145 (86%) | 128/145 (88%) | - |
+| `long_arguments_guard` | 105/145 (72%) | 104/145 (72%) | 104/145 (72%) | hardest |
+| `chat_only` | 108/145 (74%) | 102/145 (70%) | 101/145 (70%) | strict eval-only control |
+
+Model/profile matrix (tool scenarios only; raw vs baseline vs production):
+
+| model | profile | raw (tool) | baseline (tool) | production (tool) | production p95_ms |
+|---|---|---:|---:|---:|---:|
+| `anthropic/claude-opus-4.6:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 21336 |
+| `deepseek/deepseek-chat-v3-0324:nitro` | `default` | 20/20 (100%) | 19/20 (95%) | 19/20 (95%) | 12023 |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_creative_writing` | 15/20 (75%) | 15/20 (75%) | 15/20 (75%) | 24537 |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_general_conversation` | 16/20 (80%) | 18/20 (90%) | 17/20 (85%) | 23058 |
+| `deepseek/deepseek-v3.2:nitro` | `deepseek_v3_2_local_recommended` | 16/20 (80%) | 16/20 (80%) | 19/20 (95%) | 22161 |
+| `deepseek/deepseek-v3.2:nitro` | `default` | 19/20 (95%) | 18/20 (90%) | 19/20 (95%) | 20359 |
+| `google/gemini-2.5-flash:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 19/20 (95%) | 11423 |
+| `google/gemini-2.5-flash:nitro` | `gemini_2_5_flash_creative` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 11262 |
+| `google/gemini-3-flash-preview:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 19/20 (95%) | 10261 |
+| `google/gemini-3-pro-preview:nitro` | `default` | 15/20 (75%) | 15/20 (75%) | 16/20 (80%) | 26139 |
+| `minimax/minimax-m2-her` | `default` | 0/20 (0%) | 0/20 (0%) | 0/20 (0%) | 20703 |
+| `minimax/minimax-m2.1:nitro` | `default` | 19/20 (95%) | 16/20 (80%) | 17/20 (85%) | 35266 |
+| `minimax/minimax-m2.1:nitro` | `minimax_m2_1_recommended` | 15/20 (75%) | 17/20 (85%) | 17/20 (85%) | 29315 |
+| `moonshotai/kimi-k2.5:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 13302 |
+| `moonshotai/kimi-k2.5:nitro` | `kimi_k2_5_instant` | 19/20 (95%) | 20/20 (100%) | 20/20 (100%) | 27417 |
+| `openai/gpt-5.2-chat:nitro` | `default` | 20/20 (100%) | 19/20 (95%) | 20/20 (100%) | 15345 |
+| `openai/gpt-5.2:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 12960 |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 12159 |
+| `qwen/qwen3-235b-a22b-2507:nitro` | `qwen_recommended` | 18/20 (90%) | 17/20 (85%) | 17/20 (85%) | 7772 |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 13077 |
+| `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `qwen_recommended` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 13239 |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 12606 |
+| `qwen/qwen3-next-80b-a3b-instruct:nitro` | `qwen_recommended` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 10089 |
+| `x-ai/grok-4.1-fast` | `default` | 18/20 (90%) | 20/20 (100%) | 19/20 (95%) | 32858 |
+| `x-ai/grok-4.1-fast` | `grok_default` | 18/20 (90%) | 18/20 (90%) | 20/20 (100%) | 20310 |
+| `z-ai/glm-4.7-flash:nitro` | `default` | 9/20 (45%) | 7/20 (35%) | 8/20 (40%) | 12939 |
+| `z-ai/glm-4.7-flash:nitro` | `glm_4_7_flash_tool_calling` | 13/20 (65%) | 8/20 (40%) | 8/20 (40%) | 14786 |
+| `z-ai/glm-4.7:nitro` | `default` | 20/20 (100%) | 20/20 (100%) | 20/20 (100%) | 15228 |
+| `z-ai/glm-4.7:nitro` | `glm_4_7_recommended` | 20/20 (100%) | 20/20 (100%) | 17/20 (85%) | 19204 |
 
 Notable observations:
-- The most frequent failure reason was the strict final text constraint (`assistant_text == "Done."`). This is an eval-only constraint used to keep assertions stable.
-- `long_arguments_guard` is the main reliability bottleneck in this run (~69%). It exercises `max_tool_args_bytes` (`ARGUMENTS_TOO_LARGE`) and requires the model to retry with a shorter payload.
-- Provider quirks: `x-ai/grok-4.1-fast` returned HTTP 403 for `chat_only` in this run (OpenRouter/xAI safety false-positive: `SAFETY_CHECK_TYPE_BIO`).
-- Sampling profile impact (high-level):
-  - DeepSeek V3.2: all misses were in `long_arguments_guard`; `default` was best (82.5%), `deepseek_v3_2_creative_writing` worst (77.5%).
-  - Gemini 2.5 Flash: `default` and `gemini_2_5_flash_creative` were both 100%.
-  - Qwen 3 235B: `default` was 97.5%, while `qwen_recommended` dropped to 85%.
-  - Moonshot Kimi K2.5: `default` was 100%, while `kimi_k2_5_instant` dropped to 92.5%.
+- `long_arguments_guard` is the main reliability bottleneck in this snapshot (~72% across strategies).
+  It exercises `max_tool_args_bytes` (`ARGUMENTS_TOO_LARGE`) and requires the model to retry with a shorter payload.
+- “Raw” vs “production” deltas were smaller than expected on tool scenarios (~88% vs ~87%).
+  - Production removed `NO_TOOL_USE_ENDPOINT` errors (provider capability mismatches), but had more `ASSERTION_FAILED`.
+  - Treat these strategy differences as a prompt/harness signal; real production flows do not require final text to be exactly `"Done."`.
+- Model-level notes:
+  - Avoid `minimax/minimax-m2-her` for tool calling in this harness (0% tool scenario success).
+  - `z-ai/glm-4.7-flash` remained weak for tool calling (40–65% depending on profile).
 
-## Open questions (tool calling only)
+## Decisions (tool calling only)
 
-These remain intentionally experimental:
+We treat these as **production defaults** (reliability > latency).
 
-- parallel tool calls: do we want to support true multi-tool turns in production?
-- streaming: do we want streaming for tool-call runs, or keep non-streaming?
-- tool result envelope shape: how strict can we make it while keeping it small?
+- Parallel tool calls:
+  - Default: sequential tool use only (`parallel_tool_calls=false` + `max_tool_calls_per_turn=1`).
+  - When a model still emits multiple tool calls in one turn, we execute only the first N (default 1) and record the rest as ignored.
+  - True parallel execution is treated as an explicit optimization for independent, read-only tools (future work, opt-in).
+- Streaming:
+  - Default: **no streaming** during tool-call turns (arguments must be complete and provider delta shapes vary too much).
+  - If/when we add streaming, scope it to:
+    - chat-only runs (no tools), and
+    - the final assistant turn after tools (tools disabled / tool_choice none).
+- Tool result envelope shape:
+  - Fixed contract: keep tool results small and uniform (see `ToolDispatcher` envelope: `ok/tool_name/data/warnings/errors`).
+  - Keep debugging details out-of-band (trace/events), not inside tool results.
 
 ## Production config (tool calling) and model recommendations
 
@@ -368,18 +395,18 @@ Legend:
 |---|---|---|---|---|
 | `anthropic/claude-opus-4.6:nitro` | `default` (no overrides) | - | Yes | 100% tool scenarios in this snapshot. |
 | `deepseek/deepseek-chat-v3-0324:nitro` | `default` (no overrides) | `deepseek_openrouter_compat` | Yes | 95% tool success in this snapshot. |
-| `deepseek/deepseek-v3.2:nitro` | `default` (no overrides) | `deepseek_openrouter_compat` | Conditional | ~80% tool success; misses were concentrated in `long_arguments_guard`. |
-| `google/gemini-2.5-flash:nitro` | `gemini_2_5_flash_creative` (t=1.5) | `gemini_openrouter_compat` | Yes | 100% tool scenarios in this snapshot (both `default` and `gemini_2_5_flash_creative`). |
-| `google/gemini-3-flash-preview:nitro` | `default` (no overrides) | `gemini_openrouter_compat` | Yes | 97.5% tool success in this snapshot. |
+| `deepseek/deepseek-v3.2:nitro` | `default` / `deepseek_v3_2_local_recommended` | `deepseek_openrouter_compat` | Conditional | Tool success varied by sampling profile (75–95%); misses were concentrated in `long_arguments_guard`. |
+| `google/gemini-2.5-flash:nitro` | `gemini_2_5_flash_creative` (t=1.5) | `gemini_openrouter_compat` | Yes | `gemini_2_5_flash_creative` was 100%; `default` had one tool-scenario miss (95%) in this snapshot. |
+| `google/gemini-3-flash-preview:nitro` | `default` (no overrides) | `gemini_openrouter_compat` | Yes | 95% tool success in this snapshot. |
 | `google/gemini-3-pro-preview:nitro` | `default` (no overrides) | `gemini_openrouter_compat` | Conditional | 80% tool success in this snapshot; misses were concentrated in `long_arguments_guard`. |
 | `moonshotai/kimi-k2.5:nitro` | `default` (no overrides) | - | Yes (tool scenarios) | Tool scenarios were 100%, but the strict `chat_only` control prompt was brittle. |
 | `openai/gpt-5.2:nitro` | `default` (no overrides) | - | Yes | 100% tool scenarios in this snapshot. |
-| `openai/gpt-5.2-chat:nitro` | `default` (no overrides) | - | Yes (tool scenarios) | Tool scenarios were 95%, but the strict `chat_only` control prompt was brittle. |
+| `openai/gpt-5.2-chat:nitro` | `default` (no overrides) | - | Yes (tool scenarios) | 100% tool scenarios in this snapshot (control prompt still brittle on some routes). |
 | `qwen/qwen3-235b-a22b-2507:nitro` | `default` (no overrides) | `content_tag_tool_call_fallback` | Yes | `qwen_recommended` hurt tool calling here; prefer `default`. |
 | `qwen/qwen3-30b-a3b-instruct-2507:nitro` | `qwen_recommended` (t=0.7 top_p=0.8 top_k=20 min_p=0) | - | Yes | 100% tool scenarios across both profiles in this snapshot. |
 | `qwen/qwen3-next-80b-a3b-instruct:nitro` | `qwen_recommended` (t=0.7 top_p=0.8 top_k=20 min_p=0) | - | Yes | 100% tool scenarios across both profiles in this snapshot. |
-| `x-ai/grok-4.1-fast` | `default` (no overrides) | - | Conditional | Tool scenarios were 97.5%, but timeouts and strict `chat_only` brittleness were still present. |
-| `z-ai/glm-4.7:nitro` | `glm_4_7_recommended` (t=1.0 top_p=0.95) | `content_tag_tool_call_fallback` | Yes (tool scenarios) | Tool scenarios were 100%, but the strict `chat_only` control prompt was brittle. |
-| `z-ai/glm-4.7-flash:nitro` | `glm_4_7_flash_tool_calling` (t=0.7 top_p=1.0) | `content_tag_tool_call_fallback` | No (for tool calling) | ~45% tool success in this snapshot. |
+| `x-ai/grok-4.1-fast` | `grok_default` (t=0.3) | - | Conditional | Tool scenarios were strong (up to 100% depending on profile), but provider-level 403s and strict control brittleness still appeared. |
+| `z-ai/glm-4.7:nitro` | `default` (no overrides) | `content_tag_tool_call_fallback` | Yes | `default` was 100%; `glm_4_7_recommended` regressed under production workarounds in this snapshot (85%). |
+| `z-ai/glm-4.7-flash:nitro` | `glm_4_7_flash_tool_calling` (t=0.7 top_p=1.0) | `content_tag_tool_call_fallback` | No (for tool calling) | ~40% tool success in this snapshot. |
 | `minimax/minimax-m2.1:nitro` | `minimax_m2_1_recommended` (t=1.0 top_p=0.95 top_k=40) | `content_tag_tool_call_fallback` | No (for tool calling) | `NO_TOOL_CALLS` + `long_arguments_guard` failures dominated in this snapshot. |
 | `minimax/minimax-m2-her` | `default` (no overrides) | `tool_use_disabled` | No (for tool calling) | Tool use disabled (capability mismatch for this harness). |

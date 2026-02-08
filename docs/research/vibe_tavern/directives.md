@@ -39,6 +39,33 @@ Related (separate protocol):
   When this happens, either:
   - keep structured-mode sampling params minimal (avoid exotic knobs), or
   - start from `json_object` / `prompt_only` for that path to avoid repeated 404s.
+- Compared to multi-turn tool calling, directives are easier to make reliable (fewer round-trips).
+  In our current sampling-matrix snapshots, tool-calling “tool scenarios” were ~87–88% across strategies
+  (`raw`/`baseline`/`production`), while directives were ~99% overall.
+
+## Benchmark: Tool calling (raw/baseline/production)
+
+This is not an apples-to-apples comparison (different scenarios), but it is a useful baseline:
+multi-turn tool calling tends to have more failure points than single-turn directives.
+
+Tool calling snapshot command:
+
+```sh
+OPENROUTER_TRIALS=5 OPENROUTER_MODEL_FILTER=all \
+  OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
+  OPENROUTER_STRATEGY_FILTER="raw,baseline,production" \
+  bundle exec ruby script/llm_tool_call_eval.rb
+```
+
+Tool calling summary (tool scenarios only):
+
+| strategy | tool scenarios only | tool p50_ms | tool p95_ms |
+|---|---:|---:|---:|
+| `raw` | 510/580 (88%) | 10019 | 22268 |
+| `baseline` | 503/580 (87%) | 10030 | 24474 |
+| `production` | 506/580 (87%) | 10385 | 22969 |
+
+Hardest tool-calling scenario in this snapshot was `long_arguments_guard` (~72% across strategies).
 
 ## Failure modes (what we see in practice)
 

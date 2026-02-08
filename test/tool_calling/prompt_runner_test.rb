@@ -69,6 +69,27 @@ class PromptRunnerTest < Minitest::Test
     refute req.key?(:response_format)
   end
 
+  def test_prompt_runner_rejects_streaming_in_llm_options_defaults
+    assert_raises(ArgumentError) do
+      TavernKit::VibeTavern::PromptRunner.new(
+        client: Object.new,
+        model: "test-model",
+        llm_options_defaults: { stream: true },
+      )
+    end
+  end
+
+  def test_prompt_runner_rejects_streaming_in_llm_options
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new, model: "test-model")
+
+    assert_raises(ArgumentError) do
+      runner.build_request(
+        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        llm_options: { stream: true },
+      )
+    end
+  end
+
   def test_prompt_runner_perform_applies_response_transforms
     requests = []
 
@@ -440,5 +461,101 @@ class PromptRunnerTest < Minitest::Test
     warnings = result.structured_output_warnings
     assert_equal 1, warnings.size
     assert_equal "PAYLOAD_VALIDATOR_ERROR", warnings[0].fetch(:code)
+  end
+
+  def test_prompt_runner_perform_stream_yields_deltas_and_returns_full_content
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:call) do |_env|
+          chunks = []
+
+          chunks << JSON.generate(
+            {
+              "id" => "evt_1",
+              "object" => "chat.completion.chunk",
+              "created" => 1,
+              "model" => "test-model",
+              "choices" => [
+                { "index" => 0, "delta" => { "role" => "assistant", "content" => "Hel" }, "finish_reason" => nil },
+              ],
+            },
+          )
+          chunks << JSON.generate(
+            {
+              "id" => "evt_2",
+              "object" => "chat.completion.chunk",
+              "created" => 1,
+              "model" => "test-model",
+              "choices" => [
+                { "index" => 0, "delta" => { "content" => "lo" }, "finish_reason" => nil },
+              ],
+            },
+          )
+          chunks << JSON.generate(
+            {
+              "id" => "evt_3",
+              "object" => "chat.completion.chunk",
+              "created" => 1,
+              "model" => "test-model",
+              "choices" => [
+                { "index" => 0, "delta" => {}, "finish_reason" => "stop" },
+              ],
+              "usage" => { "prompt_tokens" => 1, "completion_tokens" => 2, "total_tokens" => 3 },
+            },
+          )
+
+          sse = chunks.map { |json| "data: #{json}\n\n" }.join
+          sse << "data: [DONE]\n\n"
+
+          {
+            status: 200,
+            headers: { "content-type" => "text/event-stream" },
+            body: sse,
+          }
+        end
+      end.new
+
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: client, model: "test-model")
+
+    prompt_request =
+      runner.build_request(
+        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+      )
+
+    deltas = []
+    result = runner.perform_stream(prompt_request) { |delta| deltas << delta }
+
+    assert_equal %w[Hel lo], deltas
+    assert_equal "Hello", result.assistant_message.fetch("content")
+    assert_equal "stop", result.finish_reason
+    assert_equal 1, result.body.dig("usage", "prompt_tokens")
+  end
+
+  def test_prompt_runner_perform_stream_rejects_tool_calling_requests
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new, model: "test-model")
+
+    prompt_request =
+      runner.build_request(
+        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        llm_options: {
+          tools: [{ type: "function", function: { name: "state_get", parameters: { type: "object", properties: {} } } }],
+          tool_choice: "auto",
+        },
+      )
+
+    assert_raises(ArgumentError) { runner.perform_stream(prompt_request) { |_| nil } }
+  end
+
+  def test_prompt_runner_perform_stream_rejects_response_format
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new, model: "test-model")
+
+    prompt_request =
+      runner.build_request(
+        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        llm_options: { max_tokens: 10, response_format: { type: "json_object" } },
+      )
+
+    assert_raises(ArgumentError) { runner.perform_stream(prompt_request) { |_| nil } }
   end
 end

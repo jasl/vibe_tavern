@@ -1770,6 +1770,20 @@ process_task =
     p50 = elapsed[(elapsed.size * 0.50).floor] || 0
     p95 = elapsed[(elapsed.size * 0.95).floor] || 0
 
+    tool_runs = runs.reject { |t| t[:scenario].to_s == "chat_only" }
+    tool_ok_count = tool_runs.count { |t| t[:ok] }
+    tool_rate = tool_runs.empty? ? nil : tool_ok_count.fdiv(tool_runs.size)
+    tool_elapsed = tool_runs.map { |t| t[:elapsed_ms].to_i }.sort
+    tool_p50 = tool_elapsed[(tool_elapsed.size * 0.50).floor] || 0
+    tool_p95 = tool_elapsed[(tool_elapsed.size * 0.95).floor] || 0
+
+    control_runs = runs.select { |t| t[:scenario].to_s == "chat_only" }
+    control_ok_count = control_runs.count { |t| t[:ok] }
+    control_rate = control_runs.empty? ? nil : control_ok_count.fdiv(control_runs.size)
+    control_elapsed = control_runs.map { |t| t[:elapsed_ms].to_i }.sort
+    control_p50 = control_elapsed[(control_elapsed.size * 0.50).floor] || 0
+    control_p95 = control_elapsed[(control_elapsed.size * 0.95).floor] || 0
+
     failure_samples = failures.first(3)
 
     {
@@ -1784,6 +1798,16 @@ process_task =
       ok_rate: rate,
       ms_p50: p50,
       ms_p95: p95,
+      tool_runs: tool_runs.size,
+      tool_ok: tool_ok_count,
+      tool_ok_rate: tool_rate,
+      tool_ms_p50: tool_p50,
+      tool_ms_p95: tool_p95,
+      control_runs: control_runs.size,
+      control_ok: control_ok_count,
+      control_ok_rate: control_rate,
+      control_ms_p50: control_p50,
+      control_ms_p95: control_p95,
       scenarios: scenarios.map { |s| s[:id] },
       run_results: runs,
       failure_samples: failure_samples,
@@ -1855,7 +1879,7 @@ summary = {
   tool_failure_policy: tool_failure_policy,
   tool_calling_fallback_retry_count: fallback_retry_count,
   tool_allowlist: tool_allowlist,
-  request_overrides: request_overrides,
+  request_overrides: base_request_overrides,
   sampling_profile_filter: sampling_profile_filter,
   sampling_profiles: selected_sampling_profiles.map(&:id),
   sampling_profile_enforce_applicability: enforce_sampling_profile_applicability,
@@ -1925,6 +1949,11 @@ successes = reports.sum { |r| r[:ok].to_i }
 total_runs = reports.sum { |r| r[:runs].to_i }
 failures = total_runs - successes
 
+tool_runs = all_runs.reject { |r| r[:scenario].to_s == "chat_only" }
+tool_ok = tool_runs.count { |r| r[:ok] == true }
+control_runs = all_runs.select { |r| r[:scenario].to_s == "chat_only" }
+control_ok = control_runs.count { |r| r[:ok] == true }
+
 puts "LLM Tool Call Eval"
 puts "ts: #{summary[:ts]}"
 puts "base_url: #{base_url}"
@@ -1938,7 +1967,7 @@ puts "tool_failure_policy: #{tool_failure_policy}"
 puts "tool_calling_fallback_retry_count: #{fallback_retry_count}"
 puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_allowlist: #{tool_allowlist ? tool_allowlist.join(",") : "(full)"}"
-puts "request_overrides: #{request_overrides.any? ? request_overrides.keys.join(",") : "(none)"}"
+puts "request_overrides: #{base_request_overrides.any? ? base_request_overrides.keys.join(",") : "(none)"}"
 puts "sampling_profile_filter: #{sampling_profile_filter}"
 puts "sampling_profiles: #{selected_sampling_profiles.map(&:id).join(",")}"
 puts "model_filter: #{model_filter}"
@@ -1946,7 +1975,7 @@ puts "selected_models: #{selected_model_entries.map(&:id).join(",")}"
 puts "strategy_filter: #{raw_strategy_filter}" unless raw_strategy_filter.empty?
 puts "strategy_matrix: #{strategy_matrix}" if strategy_matrix
 puts "strategies: #{requested_strategies.map(&:id).join(",")}"
-puts "parallel_tool_calls(default): #{request_overrides.fetch("parallel_tool_calls", "(provider default)")}"
+puts "parallel_tool_calls(default): #{base_request_overrides.fetch("parallel_tool_calls", "(provider default)")}"
 puts "content_tag_tool_call_fallback_global_override: #{enable_content_tag_tool_call_fallback}"
 if best_effort_content_tag_tool_call_fallback_models.any?
   puts "best_effort_content_tag_tool_call_fallback_models: #{best_effort_content_tag_tool_call_fallback_models.join(",")}"
@@ -1956,10 +1985,26 @@ puts "jobs: #{parallel_jobs}"
 puts "trials_per_model: #{trials_per_model}"
 puts "scenarios: #{scenarios.map { |s| s[:id] }.join(",")}"
 puts "model_profiles: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"
+puts "tool_scenarios_only: #{tool_ok}/#{tool_runs.size}" if tool_runs.any?
+puts "control_chat_only: #{control_ok}/#{control_runs.size}" if control_runs.any?
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
 
-header = ["model", "profile", "strategy", "fallback_profile", "runs", "ok", "rate", "p50_ms", "p95_ms", "status", "category", "sample", "error"]
+header = [
+  "model",
+  "profile",
+  "strategy",
+  "fallback_profile",
+  "tool_ok",
+  "tool_rate",
+  "control_ok",
+  "control_rate",
+  "tool_p95_ms",
+  "status",
+  "category",
+  "sample",
+  "error",
+]
 rows =
   reports.map do |r|
     sample = Array(r[:failure_samples]).first
@@ -1970,11 +2015,11 @@ rows =
       r[:sampling_profile].to_s,
       r[:strategy].to_s,
       r[:fallback_profile].to_s,
-      r[:runs].to_s,
-      r[:ok].to_s,
-      format("%.0f%%", r[:ok_rate].to_f * 100),
-      r[:ms_p50].to_s,
-      r[:ms_p95].to_s,
+      "#{r[:tool_ok]}/#{r[:tool_runs]}",
+      r[:tool_ok_rate] ? format("%.0f%%", r[:tool_ok_rate].to_f * 100) : "-",
+      "#{r[:control_ok]}/#{r[:control_runs]}",
+      r[:control_ok_rate] ? format("%.0f%%", r[:control_ok_rate].to_f * 100) : "-",
+      r[:tool_ms_p95].to_s,
       sample && sample[:error_status] ? sample[:error_status].to_s : "-",
       sample ? (sample[:error_category] || "-") : "-",
       sample_path,

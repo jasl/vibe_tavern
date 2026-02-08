@@ -46,6 +46,13 @@ Responsibilities:
 - apply outbound `MessageTransforms` and inbound `ResponseTransforms`
 - send one OpenAI-compatible request via `SimpleInference`
 - optionally parse **structured directives** output (when enabled)
+- (optional) stream chat-only responses via `PromptRunner#perform_stream`
+
+Streaming policy (production default):
+- Tool calling turns are **non-streaming** (mutually exclusive in code).
+- Streaming is intended for:
+  - chat-only runs (no tools, no `response_format`), and
+  - future: a final "answer-only" turn after tools (tools disabled).
 
 Important config capability:
 - `llm_options_defaults:` can be injected at construction time (provider-level
