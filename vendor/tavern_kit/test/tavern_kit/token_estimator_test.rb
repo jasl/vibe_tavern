@@ -1,8 +1,26 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "tempfile"
 
 class TavernKit::TokenEstimatorTest < Minitest::Test
+  private
+
+  def build_word_level_tokenizer_json
+    require "tokenizers"
+
+    vocab = { "[UNK]" => 0, "hello" => 1, "world" => 2, "😁" => 3 }
+    model = Tokenizers::Models::WordLevel.new(vocab: vocab, unk_token: "[UNK]")
+    tok = Tokenizers::Tokenizer.new(model)
+    tok.pre_tokenizer = Tokenizers::PreTokenizers::Whitespace.new
+
+    file = Tempfile.new(["tokenizer", ".json"])
+    tok.save(file.path)
+    file
+  end
+
+  public
+
   def test_estimate_uses_tiktoken
     estimator = TavernKit::TokenEstimator.default
     encoding = ::Tiktoken.get_encoding("cl100k_base")
@@ -84,5 +102,98 @@ class TavernKit::TokenEstimatorTest < Minitest::Test
 
     assert_kind_of Integer, estimator.estimate("hello", model_hint: "any-model")
     assert_kind_of Hash, estimator.describe(model_hint: "any-model")
+  end
+
+  def test_registry_can_select_hf_tokenizers_backend
+    tokenizer_json = build_word_level_tokenizer_json
+
+    estimator =
+      TavernKit::TokenEstimator.new(
+        registry: {
+          "oss-model" => { tokenizer_family: :hf_tokenizers, tokenizer_path: tokenizer_json.path },
+        },
+      )
+
+    text = "hello 😁"
+    assert_equal 2, estimator.estimate(text, model_hint: "oss-model")
+
+    tokenization = estimator.tokenize(text, model_hint: "oss-model")
+    assert_equal "hf_tokenizers", tokenization.backend
+    assert_equal 2, tokenization.token_count
+    assert_equal [1, 3], tokenization.ids
+    assert_equal ["hello", "😁"], tokenization.tokens
+    assert_equal [[0, 5], [6, 7]], tokenization.offsets
+  ensure
+    tokenizer_json&.close
+    tokenizer_json&.unlink
+  end
+
+  def test_hf_backend_load_failure_falls_back_to_tiktoken
+    estimator =
+      TavernKit::TokenEstimator.new(
+        registry: {
+          "oss-model" => { tokenizer_family: :hf_tokenizers, tokenizer_path: "/nope/tokenizer.json" },
+        },
+      )
+
+    text = "hello 😁"
+    expected = ::Tiktoken.get_encoding("cl100k_base").encode(text).length
+    assert_equal expected, estimator.estimate(text, model_hint: "oss-model")
+
+    tokenization = estimator.tokenize(text, model_hint: "oss-model")
+    assert_equal "tiktoken", tokenization.backend
+    assert_equal expected, tokenization.token_count
+    assert_kind_of Array, tokenization.ids
+  end
+
+  def test_hf_tokenizer_cache_loads_once_per_path
+    tokenizer_json = build_word_level_tokenizer_json
+
+    calls = 0
+    verbose, $VERBOSE = $VERBOSE, nil
+    original = Tokenizers.method(:from_file)
+    Tokenizers.define_singleton_method(:from_file) do |path|
+      calls += 1
+      original.call(path)
+    end
+
+    estimator =
+      TavernKit::TokenEstimator.new(
+        registry: {
+          "oss-model" => { tokenizer_family: :hf_tokenizers, tokenizer_path: tokenizer_json.path },
+        },
+      )
+
+    2.times { estimator.estimate("hello 😁", model_hint: "oss-model") }
+    assert_equal 1, calls
+  ensure
+    $VERBOSE = nil
+    Tokenizers.define_singleton_method(:from_file, original) if original
+    $VERBOSE = verbose
+    tokenizer_json&.close
+    tokenizer_json&.unlink
+  end
+
+  def test_prewarm_loads_hf_tokenizers_and_can_be_strict
+    tokenizer_json = build_word_level_tokenizer_json
+
+    estimator =
+      TavernKit::TokenEstimator.new(
+        registry: {
+          "ok" => { tokenizer_family: :hf_tokenizers, tokenizer_path: tokenizer_json.path },
+          "bad" => { tokenizer_family: :hf_tokenizers, tokenizer_path: "/nope/tokenizer.json" },
+        },
+      )
+
+    result = estimator.prewarm!(strict: false)
+    assert_equal [tokenizer_json.path], result.fetch(:loaded)
+    assert_equal 1, result.fetch(:failed).size
+
+    assert_raises(ArgumentError) do
+      estimator.prewarm!(strict: true)
+    end
+  ensure
+    tokenizer_json&.close
+    tokenizer_json&.unlink
   end
 end

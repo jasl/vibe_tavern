@@ -20,6 +20,12 @@ to ship `runtime[:language_policy]` P0.
   - exact and glob (`File.fnmatch?`) lookups by `model_hint`
   - current P0 supports `tokenizer_family: :heuristic` via
     `chars_per_token:` (keeps hot-path fast + deterministic)
+- P1 Core is implemented:
+  - `tokenizer_family: :hf_tokenizers` loads local `tokenizer.json` via the
+    `tokenizers` gem (optional dependency, safe fallback)
+  - process-level caching for loaded tokenizers
+  - `TokenEstimator#prewarm!` for boot-time preload (Hash registries)
+  - `TavernKit::PromptInspector` (debug-only) with token breakdowns
 
 This is good for OpenAI-family models supported by `tiktoken`, but many
 non-OpenAI models (and local “OpenAI-compatible” endpoints) do not map cleanly
@@ -135,6 +141,9 @@ Recommended P1 approach (fits “~10 popular models”):
 - Add an app initializer to **prewarm** (load) all configured tokenizers at
   boot, with a strict mode for production deploy validation.
 
+Status: Core support is done; remaining work is app-side asset curation +
+registry wiring (no business logic depends on this yet).
+
 Example (app/provider config object):
 
 ```ruby
@@ -195,15 +204,15 @@ end
 ## Development plan (ordered)
 
 P1 (multi-backend tokenizer loading):
-1) Add `:hf_tokenizers` adapter support in `vendor/tavern_kit` (optional dep).
-2) Add tokenizer.json cache + `prewarm!` to avoid hot-path load cost.
-3) Add app-side registry + canonical model hint normalization helpers.
-4) Add a minimal “popular models” seed registry (≤ ~10 families) with glob
-   patterns for variants.
-5) Add narrow tests for:
+1) ✅ Add `:hf_tokenizers` adapter support in `vendor/tavern_kit` (optional dep).
+2) ✅ Add tokenizer.json cache + `prewarm!` to avoid hot-path load cost.
+3) ✅ Add narrow tests for:
    - missing gem/file → fallback to `tiktoken` / heuristic
    - cache behavior (load once per path)
    - prewarm strict vs non-strict behavior
+4) ⏳ Add app-side registry + canonical model hint normalization helpers.
+5) ⏳ Add a minimal “popular models” seed registry (≤ ~10 families) with glob
+   patterns for variants.
 6) (Optional) Add SentencePiece backend support if needed.
 
 P2 (accuracy guardrails):

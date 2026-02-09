@@ -15,4 +15,6 @@ gem "simplecov", require: false
 gem "rubocop", "~> 1.21"
 gem "rubocop-rails-omakase", require: false
 
+gem "tokenizers"
+
 gem "easy_talk", path: "../easy_talk"

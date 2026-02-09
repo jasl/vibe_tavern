@@ -562,6 +562,10 @@ selection per hint (without hardcoding platform logic into Core).
   - any object responding to `lookup(hint)` or `call(hint)`
 - Minimal entry shape (P0):
   - `{ tokenizer_family: :heuristic, chars_per_token: Float }`
+- Additional entry shape (P1, optional dependency):
+  - `{ tokenizer_family: :hf_tokenizers, tokenizer_path: String }`
+    - loads a local `tokenizer.json` via the `tokenizers` gem
+    - intended for common OSS model families (Qwen/Llama/Mistral/etc.)
 
 ```ruby
 class TokenEstimator
@@ -569,8 +573,33 @@ class TokenEstimator
 
   # Optional. Used for instrumentation/debugging (backend/encoding/source).
   def describe(model_hint: nil) -> Hash
+
+  # Optional (debug). Returns tokenization details when available.
+  # - `tiktoken` backend: ids only (single-token UTF-8 decoding is not reliable)
+  # - `hf_tokenizers` backend: ids + tokens + character offsets
+  def tokenize(text, model_hint: nil) -> Tokenization
+
+  # Optional (ops). Preload tokenizer assets from a Hash registry.
+  # - `strict: true` raises if any configured tokenizer fails to load
+  # - non-hash registries are not enumerable; callers must prewarm explicitly
+  def prewarm!(strict: false) -> Hash
 end
 ```
+
+### 8a. PromptInspector (Debug)
+
+`PromptInspector` is a debug utility that inspects prompt message arrays and
+produces token usage breakdowns. It is **not** used by trimming/budgeting hot
+paths.
+
+- `PromptInspector.inspect_plan(plan, token_estimator:, model_hint:, **opts) -> Inspection`
+- `PromptInspector.inspect_messages(messages, token_estimator:, model_hint:, **opts) -> Inspection`
+
+Options:
+
+- `message_overhead_tokens:` per-message overhead (matches Trimmer/MaxTokens)
+- `include_message_metadata_tokens:` include token counts for message metadata
+- `include_metadata_details:` include tokenization detail for metadata (debug)
 
 ---
 

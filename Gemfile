@@ -50,6 +50,7 @@ gem "stimulus-rails"
 
 gem "js_regex_to_ruby"
 gem "liquid"
+gem "tokenizers"
 gem "easy_talk", path: "vendor/easy_talk"
 gem "tavern_kit", path: "vendor/tavern_kit"
 

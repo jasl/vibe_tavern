@@ -5,11 +5,34 @@ require "tiktoken_ruby"
 module TavernKit
   # Token counting utility with a pluggable adapter interface.
   class TokenEstimator
+    Tokenization =
+      Data.define(:backend, :token_count, :ids, :tokens, :offsets, :details) do
+        def initialize(backend:, token_count:, ids: nil, tokens: nil, offsets: nil, details: nil)
+          super(
+            backend: backend.to_s,
+            token_count: Integer(token_count),
+            ids: ids,
+            tokens: tokens,
+            offsets: offsets,
+            details: details.is_a?(Hash) ? details : {},
+          )
+        end
+
+        def detailed? = ids || tokens || offsets
+      end
+
     module Adapter
       class Base
         def estimate(text, model_hint: nil) = raise NotImplementedError
 
         def describe(model_hint: nil) = { backend: self.class.name }
+
+        def tokenize(text, model_hint: nil)
+          Tokenization.new(
+            backend: describe(model_hint: model_hint).fetch(:backend, self.class.name),
+            token_count: estimate(text, model_hint: model_hint),
+          )
+        end
       end
 
       class Tiktoken < Base
@@ -23,6 +46,24 @@ module TavernKit
 
         def estimate(text, model_hint: nil)
           encoding_for(model_hint).encode(text.to_s).length
+        end
+
+        def tokenize(text, model_hint: nil)
+          encoding = encoding_for(model_hint)
+          ids = encoding.encode(text.to_s)
+
+          Tokenization.new(
+            backend: "tiktoken",
+            token_count: ids.length,
+            ids: ids,
+            # NOTE: `tiktoken_ruby` cannot reliably decode a *single* token id
+            # into valid UTF-8 (emoji and other multi-byte sequences can split
+            # across tokens). For debug, ids are still useful; leave tokens and
+            # offsets unset rather than raising.
+            tokens: nil,
+            offsets: nil,
+            details: describe(model_hint: model_hint),
+          )
         end
 
         def describe(model_hint: nil)
@@ -56,6 +97,54 @@ module TavernKit
           end
         rescue StandardError
           Selection.new(encoding: @default, source: :default)
+        end
+      end
+
+      class HuggingFaceTokenizers < Base
+        DEFAULT_CACHE_MAX_SIZE = 16
+
+        def initialize(tokenizer_path:, cache: nil)
+          @tokenizer_path = tokenizer_path.to_s
+          @cache = cache || TavernKit::LRUCache.new(max_size: DEFAULT_CACHE_MAX_SIZE)
+        end
+
+        def estimate(text, model_hint: nil)
+          tokenizer.encode(text.to_s, add_special_tokens: false).ids.length
+        end
+
+        def tokenize(text, model_hint: nil)
+          encoding = tokenizer.encode(text.to_s, add_special_tokens: false)
+          ids = encoding.ids
+
+          Tokenization.new(
+            backend: "hf_tokenizers",
+            token_count: ids.length,
+            ids: ids,
+            tokens: encoding.tokens,
+            offsets: encoding.offsets,
+            details: describe(model_hint: model_hint),
+          )
+        end
+
+        def describe(model_hint: nil)
+          {
+            backend: "hf_tokenizers",
+            tokenizer_path: @tokenizer_path,
+          }
+        end
+
+        def prewarm!
+          tokenizer
+          true
+        end
+
+        private
+
+        def tokenizer
+          @cache.fetch(@tokenizer_path) do
+            require "tokenizers"
+            Tokenizers.from_file(@tokenizer_path)
+          end
         end
       end
 
@@ -93,17 +182,85 @@ module TavernKit
       @adapter = adapter
       @registry = registry
       @heuristics = {}
+      @hf_tokenizer_cache = TavernKit::LRUCache.new(max_size: Adapter::HuggingFaceTokenizers::DEFAULT_CACHE_MAX_SIZE)
+      @hf_adapters = {}
       @fallback_heuristic = Adapter::Heuristic.new
     end
 
     def estimate(text, model_hint: nil)
-      resolve_adapter(model_hint).estimate(text, model_hint: model_hint)
+      entry = resolve_registry_entry(model_hint)
+      resolved = resolve_adapter(model_hint, entry: entry)
+      resolved.estimate(text, model_hint: model_hint)
     rescue StandardError
+      begin
+        if resolved && resolved != @adapter
+          return @adapter.estimate(text, model_hint: model_hint)
+        end
+      rescue StandardError
+        # ignore and fall through
+      end
+
       begin
         @fallback_heuristic.estimate(text, model_hint: model_hint)
       rescue StandardError
         0
       end
+    end
+
+    def tokenize(text, model_hint: nil)
+      entry = resolve_registry_entry(model_hint)
+      resolved = resolve_adapter(model_hint, entry: entry)
+
+      if resolved.respond_to?(:tokenize)
+        resolved.tokenize(text, model_hint: model_hint)
+      else
+        Tokenization.new(
+          backend: resolved.class.name,
+          token_count: resolved.estimate(text, model_hint: model_hint),
+          details: describe(model_hint: model_hint),
+        )
+      end
+    rescue StandardError
+      begin
+        if resolved && resolved != @adapter && @adapter.respond_to?(:tokenize)
+          return @adapter.tokenize(text, model_hint: model_hint)
+        end
+      rescue StandardError
+        # ignore and fall through
+      end
+
+      Tokenization.new(
+        backend: "heuristic",
+        token_count: @fallback_heuristic.estimate(text, model_hint: model_hint),
+        details: @fallback_heuristic.describe(model_hint: model_hint),
+      )
+    rescue StandardError
+      Tokenization.new(backend: "unknown", token_count: 0)
+    end
+
+    def prewarm!(strict: false)
+      return { loaded: [], failed: [] } unless @registry.is_a?(Hash)
+
+      paths = registry_hf_tokenizer_paths(@registry)
+      loaded = []
+      failed = []
+
+      paths.each do |path|
+        begin
+          adapter = @hf_adapters[path] ||= Adapter::HuggingFaceTokenizers.new(tokenizer_path: path, cache: @hf_tokenizer_cache)
+          adapter.prewarm!
+          loaded << path
+        rescue StandardError => e
+          failed << { path: path, error_class: e.class.name, message: e.message }
+        end
+      end
+
+      if strict == true && failed.any?
+        msg = failed.map { |f| "#{f[:path]} (#{f[:error_class]}: #{f[:message]})" }.join(", ")
+        raise ArgumentError, "Failed to prewarm tokenizers: #{msg}"
+      end
+
+      { loaded: loaded, failed: failed }
     end
 
     def describe(model_hint: nil)
@@ -151,9 +308,32 @@ module TavernKit
           end
 
         @heuristics[key] ||= Adapter::Heuristic.new(chars_per_token: key)
+      when :hf_tokenizers, :huggingface_tokenizers, :tokenizers
+        path = entry[:tokenizer_path] || entry[:path]
+        path = path.to_s
+        return @adapter if path.empty?
+
+        @hf_adapters[path] ||= Adapter::HuggingFaceTokenizers.new(tokenizer_path: path, cache: @hf_tokenizer_cache)
       else
         @adapter
       end
+    end
+
+    def registry_hf_tokenizer_paths(registry)
+      registry
+        .each_value
+        .filter_map { |v| normalize_registry_entry(v) }
+        .select do |entry|
+          family = entry[:tokenizer_family]
+          family = family.to_s.strip.downcase.tr("-", "_").to_sym
+          %i[hf_tokenizers huggingface_tokenizers tokenizers].include?(family)
+        end
+        .map { |entry| (entry[:tokenizer_path] || entry[:path]).to_s }
+        .map(&:strip)
+        .reject(&:empty?)
+        .uniq
+    rescue StandardError
+      []
     end
 
     def resolve_registry_entry(model_hint)

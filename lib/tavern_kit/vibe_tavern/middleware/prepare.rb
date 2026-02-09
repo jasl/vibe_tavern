@@ -79,6 +79,7 @@ module TavernKit
           end
 
           registry = config.fetch(:registry, nil)
+          registry = config.fetch(:tokenizer_registry, nil) if registry.nil?
           return if registry.nil?
 
           raise ArgumentError, "token_estimation.registry must be a Hash" unless registry.is_a?(Hash)
