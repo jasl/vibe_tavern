@@ -175,6 +175,7 @@ module DirectivesEval
 
     def error_category(message)
       msg = message.to_s
+      return "EMPTY_ASSISTANT_TEXT" if msg.start_with?("EMPTY_ASSISTANT_TEXT")
       return "ASSERTION_FAILED" if msg.start_with?("ASSERTION_FAILED:")
       return "LANGUAGE_DRIFT" if msg.start_with?("LANGUAGE_DRIFT:")
       return "DIRECTIVES_RUN_FAILED" if msg.start_with?("DIRECTIVES_RUN_FAILED")
@@ -1023,8 +1024,23 @@ run_task =
           )
         end
 
+        assistant_text_value = result.is_a?(Hash) ? result[:assistant_text] : nil
+        directives_value = result.is_a?(Hash) ? result[:directives] : nil
+        final_empty_response =
+          result.is_a?(Hash) &&
+            assistant_text_value.to_s.strip.empty? &&
+            Array(directives_value).empty? &&
+            had_http_error != true
+
+        if final_empty_response
+          category = DirectivesEval::Util.error_category(error)
+          if category.empty? || category == "ASSERTION_FAILED"
+            ok = false
+            error = "EMPTY_ASSISTANT_TEXT"
+          end
+        end
+
         if language_policy_enabled
-          assistant_text_value = result.is_a?(Hash) ? result[:assistant_text] : nil
           assistant_text_language_shape =
             DirectivesEval::LanguagePolicy.language_shape(
               assistant_text_value,

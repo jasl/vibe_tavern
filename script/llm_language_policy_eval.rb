@@ -469,9 +469,12 @@ SCENARIOS = [
     id: "verbatim_zones",
     title: "Verbatim zones (code/macros/URL) preserved",
     uses_lang_spans: false,
-    user_text: lambda do |_lang|
+    user_text: lambda do |lang|
+      label = lang.to_s.strip
+      language_hint = label.empty? ? "English" : "the target language"
+
       <<~TEXT
-        Reply with 2 short sentences in the target language.
+        Reply with 2 short sentences in #{language_hint}.
 
         Include the following EXACTLY (verbatim) somewhere in your reply:
 
@@ -728,6 +731,8 @@ process_task =
       ok = true
       error = nil
       assistant_text = nil
+      assistant_message = nil
+      finish_reason = nil
       injected_target_lang = nil
 
       begin
@@ -742,7 +747,9 @@ process_task =
         while retry_attempts_used < max_attempts
           retry_attempts_used += 1
           result = prompt_runner.perform(prompt_request)
-          assistant_text = result.assistant_message.fetch("content", nil).to_s
+          assistant_message = result.assistant_message
+          finish_reason = result.finish_reason
+          assistant_text = assistant_message.fetch("content", nil).to_s
 
           break unless assistant_text.strip.empty? && retry_attempts_used < max_attempts
 
@@ -751,19 +758,24 @@ process_task =
           )
         end
 
-        reasons =
-          Array(
-            scenario.fetch(:assert).call(
-              assistant_text: assistant_text,
-              language_policy_enabled: language_policy_enabled,
-              language_policy_target_lang: language_policy_target_lang,
-              injected_target_lang: injected_target_lang,
-            ),
-          )
-
-        unless reasons.empty?
+        if assistant_text.strip.empty?
           ok = false
-          error = "ASSERTION_FAILED: #{reasons.join("; ")}"
+          error = "EMPTY_ASSISTANT_TEXT"
+        else
+          reasons =
+            Array(
+              scenario.fetch(:assert).call(
+                assistant_text: assistant_text,
+                language_policy_enabled: language_policy_enabled,
+                language_policy_target_lang: language_policy_target_lang,
+                injected_target_lang: injected_target_lang,
+              ),
+            )
+
+          unless reasons.empty?
+            ok = false
+            error = "ASSERTION_FAILED: #{reasons.join("; ")}"
+          end
         end
       rescue SimpleInference::Errors::HTTPError => e
         ok = false
@@ -817,7 +829,9 @@ process_task =
         ok: ok,
         error: error,
         elapsed_ms: elapsed_ms,
+        finish_reason: finish_reason,
         assistant_text: assistant_text,
+        assistant_message: assistant_message,
         assistant_text_language_shape: assistant_text_language_shape,
         assistant_text_language_ok: assistant_text_language_ok,
       }
@@ -915,6 +929,8 @@ summary_by_scenario_and_language_policy =
       cat =
         if err.start_with?("LANGUAGE_DRIFT:")
           "LANGUAGE_DRIFT"
+        elsif err.start_with?("EMPTY_ASSISTANT_TEXT")
+          "EMPTY_ASSISTANT_TEXT"
         elsif err.start_with?("ASSERTION_FAILED:")
           "ASSERTION_FAILED"
         elsif err.start_with?("HTTP_ERROR:")

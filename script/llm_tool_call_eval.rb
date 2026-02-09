@@ -1170,6 +1170,7 @@ end
 
 def error_category(message, status: nil)
   msg = message.to_s
+  return "EMPTY_ASSISTANT_TEXT" if msg.start_with?("EMPTY_ASSISTANT_TEXT")
   return "ASSERTION_FAILED" if msg.start_with?("ASSERTION_FAILED:")
   return "LANGUAGE_DRIFT" if msg.start_with?("LANGUAGE_DRIFT:")
   return "NO_TOOL_CALLS" if msg.start_with?("NO_TOOL_CALLS:")
@@ -2031,6 +2032,14 @@ process_task =
           log_line.call(
             "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] .. empty assistant_text; retrying (attempt #{retry_attempts_used + 1}/#{max_attempts})",
           )
+        end
+
+        if assistant_text.to_s.strip.empty? && error_status.nil?
+          category = ok ? nil : error_category(error, status: error_status)
+          if ok || %w[ASSERTION_FAILED NO_TOOL_CALLS].include?(category)
+            ok = false
+            error = "EMPTY_ASSISTANT_TEXT"
+          end
         end
 
         assistant_text_language_shape = nil
