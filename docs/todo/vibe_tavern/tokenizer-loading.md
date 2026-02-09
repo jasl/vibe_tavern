@@ -1,4 +1,4 @@
-# TODO: Tokenizer Loading for Accurate Token Estimation (Plan)
+# TODO: Tokenizer Loading for Accurate Token Estimation
 
 Goal: improve token estimation/trimming accuracy across **multi-provider** and
 OpenAI-compatible model endpoints by selecting/loading the correct tokenizer per
@@ -8,24 +8,23 @@ This is a separate backlog item from native multilingual support. It affects
 prompt trimming/budgeting correctness and reliability, but it is not required
 to ship `runtime[:language_policy]` P0.
 
-## Current state
+## Current state (done in TavernKit Core)
 
-- Token estimation utility exists:
-  - `vendor/tavern_kit/lib/tavern_kit/token_estimator.rb`
-- Default path uses `tiktoken_ruby` with:
-  - default encoding `cl100k_base`
-  - `encoding_for_model(model_hint)` when possible
-  - safe fallback to default encoding on errors
-- `TokenEstimator` already supports an optional app-owned `registry:`:
-  - exact and glob (`File.fnmatch?`) lookups by `model_hint`
-  - current P0 supports `tokenizer_family: :heuristic` via
-    `chars_per_token:` (keeps hot-path fast + deterministic)
-- P1 Core is implemented:
-  - `tokenizer_family: :hf_tokenizers` loads local `tokenizer.json` via the
-    `tokenizers` gem (optional dependency, safe fallback)
-  - process-level caching for loaded tokenizers
-  - `TokenEstimator#prewarm!` for boot-time preload (Hash registries)
-  - `TavernKit::PromptInspector` (debug-only) with token breakdowns
+Implemented in `vendor/tavern_kit/` (platform-agnostic):
+
+- `TavernKit::TokenEstimator` supports a registry-driven backend selector:
+  - default: `tiktoken` (best effort) → fallback heuristic (never raise)
+  - optional: `:hf_tokenizers` (local `tokenizer.json` via `tokenizers` gem)
+  - registry supports exact keys and glob patterns (`File.fnmatch?`)
+- Caching:
+  - process-level LRU cache for loaded `tokenizer.json`
+  - `TokenEstimator#prewarm!` for boot-time preload (Hash registries only)
+- Debug tooling:
+  - `TavernKit::PromptInspector` with per-message + totals breakdowns
+
+Docs live in:
+- `vendor/tavern_kit/docs/core-interface-design.md`
+- `vendor/tavern_kit/docs/prompt-inspector.md`
 
 This is good for OpenAI-family models supported by `tiktoken`, but many
 non-OpenAI models (and local “OpenAI-compatible” endpoints) do not map cleanly
@@ -44,7 +43,7 @@ Status:
 
 - P0 (registry + model_hint wiring + safe fallbacks) is implemented. Source of
   truth lives in `vendor/tavern_kit/docs/` (Core docs).
-- Remaining work is P1+ multi-backend tokenizer loading.
+- Remaining work is app-side asset curation + registry wiring.
 
 ## Why this matters
 
@@ -79,52 +78,26 @@ SillyTavern maintains a per-model tokenizer loader with multiple backends:
 
 See: `resources/SillyTavern/src/endpoints/tokenizers.js`
 
-## Proposed design (TavernKit-side)
+## Remaining work (VibeTavern app-side)
 
-Keep the existing adapter interface and add a **registry + selector**:
+This is the “small set of popular models” part (≤ ~10 families). We need to:
 
-1) Registry (app/provider owned; optional):
-   - `model_name` → `tokenizer_backend` + optional `tokenizer_resource`
-   - Or “family” declaration (preferred):
-     - `tokenizer_family: :tiktoken | :hf_tokenizers | :sentencepiece | :heuristic`
-     - `tokenizer_id:` / `tokenizer_path:` / `fallback_id:` (optional)
-   - Practical constraint: we only need to support a small set of **canonical**
-     tokenizer families (≤ ~10). Variants should map to the closest canonical
-     hint via exact keys or glob patterns.
+1) Create canonical model hint normalization:
+   - map provider model IDs/variants into a small set of stable hints
+     (e.g. `"llama3"`, `"qwen3"`, `"mistral"`)
+2) Curate and commit tokenizer assets in-repo (do **not** use `/resources/`):
+   - suggested location: `vendor/tokenizers/<family>/tokenizer.json`
+3) Wire registry + prewarm during boot:
+   - build a registry Hash with glob patterns for variants
+   - initialize a long-lived `TavernKit::TokenEstimator.new(registry: ...)`
+   - `prewarm!(strict: Rails.env.production?)` so production fails fast on
+     missing/misconfigured assets
 
-2) Selector:
-   - Use an explicit registry entry if present.
-   - Otherwise:
-     - try `tiktoken` with `encoding_for_model`
-     - fallback to heuristic `chars_per_token` estimation (configurable per
-       family/provider)
+## Decisions (kept)
 
-3) Adapters (incremental):
-   - Keep: `TokenEstimator::Adapter::Tiktoken`
-   - Add (P1+): `Adapter::HuggingFaceTokenizers` (local `tokenizer.json`)
-     - powered by the `tokenizers` Ruby gem (Rust HF `tokenizers`)
-     - optional dependency; missing gem or missing file must gracefully
-       fallback to default `tiktoken` (and then heuristic)
-     - no runtime downloads; tokenizer assets are app-owned and committed
-   - Consider later (optional): `Adapter::SentencePiece` (local `.model` file)
-   - Consider “provider tokenize endpoint” adapters where available (but do not
-     block on it; avoid extra network calls in trimming loops).
-
-## Decisions (current)
-
-- Registry location: app-only.
-  - If the app does not provide a registry entry, fallback to:
-    `tiktoken` (best effort) → heuristic estimate.
-- Minimal registry entry shape (P0):
-  - `{ tokenizer_family: :heuristic, chars_per_token: Float }`
-- Tokenizer assets: pre-bundled only.
-  - Do not download tokenizer assets at runtime.
-- Ruby backend recommendation:
-  - P0: keep `tiktoken_ruby` + heuristic fallback (fast, low risk).
-  - P1: add HF `tokenizers` support (local `tokenizer.json`) for common OSS
-    model families; keep it optional and strictly app-configured.
-  - P1 (optional): add SentencePiece support if we can adopt a stable Ruby gem
-    and ship `.model` assets with the app.
+- Registry is app-owned (provider integration knows the real model IDs).
+- Tokenizer assets are pre-bundled only (no runtime downloads).
+- The hot path should stay deterministic and never raise.
 
 Recommended P1 approach (fits “~10 popular models”):
 
@@ -137,7 +110,7 @@ Recommended P1 approach (fits “~10 popular models”):
 - Provide a registry mapping canonical hints (and glob variants) to a backend:
   - `{ tokenizer_family: :hf_tokenizers, tokenizer_path: "..." }`
   - fallback: `{ tokenizer_family: :heuristic, chars_per_token: ... }`
-- Add a process-level tokenizer cache (LRU) keyed by `tokenizer_path`.
+- Rely on core process-level LRU caching keyed by `tokenizer_path`.
 - Add an app initializer to **prewarm** (load) all configured tokenizers at
   boot, with a strict mode for production deploy validation.
 
@@ -201,26 +174,18 @@ end
 # }
 ```
 
-## Development plan (ordered)
+## Remaining checklist (ordered)
 
-P1 (multi-backend tokenizer loading):
-1) ✅ Add `:hf_tokenizers` adapter support in `vendor/tavern_kit` (optional dep).
-2) ✅ Add tokenizer.json cache + `prewarm!` to avoid hot-path load cost.
-3) ✅ Add narrow tests for:
-   - missing gem/file → fallback to `tiktoken` / heuristic
-   - cache behavior (load once per path)
-   - prewarm strict vs non-strict behavior
-4) ⏳ Add app-side registry + canonical model hint normalization helpers.
-5) ⏳ Add a minimal “popular models” seed registry (≤ ~10 families) with glob
-   patterns for variants.
-6) (Optional) Add SentencePiece backend support if needed.
+P1 (app-side registry + assets):
+1) ⏳ Add canonical model hint normalization helpers.
+2) ⏳ Add a small seed registry (≤ ~10 families) + glob variants.
+3) ⏳ Bundle tokenizer assets under `vendor/tokenizers/`.
+4) ⏳ Add a boot-time initializer that prewarms in production.
 
-P2 (accuracy guardrails):
+P2 (accuracy guardrails, optional):
 1) Add calibration fixtures per family/provider.
-2) Enforce conservative safety margins for trimming:
-   - e.g. “treat estimate as lower bound; keep headroom”
-3) Calibration helper:
-   - use `script/llm_token_estimator_sanity.rb` to compare estimates vs provider `usage`
+2) Enforce conservative safety margins for trimming (treat estimate as lower bound).
+3) Add a calibration script to compare estimates vs provider `usage`.
 
 ## Acceptance criteria
 
@@ -229,11 +194,7 @@ P2 (accuracy guardrails):
 - For unsupported models, estimator falls back safely and emits trace signals
   (so we can fix config rather than guess).
 
-## Open questions (remaining)
+## Open questions
 
-1) Canonical tokenizer asset curation:
-   - where to store `tokenizer.json` in-repo (`vendor/tokenizers/` suggested)
-   - licensing/attribution for bundled tokenizer assets
-2) If we add SentencePiece (optional), which Ruby gem do we trust operationally?
-   - build/deploy story on Linux (native extension) and dev environments
-   - caching lifecycle (process-level singleton vs per-request)
+1) Licensing/attribution for bundling tokenizer assets.
+2) If we add SentencePiece later: which Ruby gem is operationally safe?
