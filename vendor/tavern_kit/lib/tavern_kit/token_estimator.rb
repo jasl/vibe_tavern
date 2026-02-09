@@ -133,7 +133,7 @@ module TavernKit
           }
         end
 
-        def prewarm!
+        def preload!
           tokenizer
           true
         end
@@ -238,7 +238,7 @@ module TavernKit
       Tokenization.new(backend: "unknown", token_count: 0)
     end
 
-    def prewarm!(strict: false)
+    def preload!(strict: false)
       return { loaded: [], failed: [] } unless @registry.is_a?(Hash)
 
       paths = registry_hf_tokenizer_paths(@registry)
@@ -248,7 +248,7 @@ module TavernKit
       paths.each do |path|
         begin
           adapter = @hf_adapters[path] ||= Adapter::HuggingFaceTokenizers.new(tokenizer_path: path, cache: @hf_tokenizer_cache)
-          adapter.prewarm!
+          adapter.preload!
           loaded << path
         rescue StandardError, LoadError => e
           failed << { path: path, error_class: e.class.name, message: e.message }
@@ -257,7 +257,7 @@ module TavernKit
 
       if strict == true && failed.any?
         msg = failed.map { |f| "#{f[:path]} (#{f[:error_class]}: #{f[:message]})" }.join(", ")
-        raise ArgumentError, "Failed to prewarm tokenizers: #{msg}"
+        raise ArgumentError, "Failed to preload tokenizers: #{msg}"
       end
 
       { loaded: loaded, failed: failed }
@@ -288,7 +288,7 @@ module TavernKit
       return @adapter unless entry
 
       family =
-        (entry[:tokenizer_family] || entry[:family] || entry[:backend])
+        entry[:tokenizer_family]
           .to_s
           .strip
           .downcase
@@ -297,7 +297,7 @@ module TavernKit
 
       case family
       when :heuristic
-        chars_per_token = entry[:chars_per_token] || entry[:cpt]
+        chars_per_token = entry[:chars_per_token]
         chars_per_token = Adapter::Heuristic::DEFAULT_CHARS_PER_TOKEN if chars_per_token.nil?
 
         key =
@@ -309,7 +309,7 @@ module TavernKit
 
         @heuristics[key] ||= Adapter::Heuristic.new(chars_per_token: key)
       when :hf_tokenizers, :huggingface_tokenizers, :tokenizers
-        path = entry[:tokenizer_path] || entry[:path]
+        path = entry[:tokenizer_path]
         path = path.to_s
         return @adapter if path.empty?
 
@@ -324,11 +324,10 @@ module TavernKit
         .each_value
         .filter_map { |v| normalize_registry_entry(v) }
         .select do |entry|
-          family = entry[:tokenizer_family] || entry[:family] || entry[:backend]
-          family = family.to_s.strip.downcase.tr("-", "_").to_sym
+          family = entry[:tokenizer_family].to_s.strip.downcase.tr("-", "_").to_sym
           %i[hf_tokenizers huggingface_tokenizers tokenizers].include?(family)
         end
-        .map { |entry| (entry[:tokenizer_path] || entry[:path]).to_s }
+        .map { |entry| entry[:tokenizer_path].to_s }
         .map(&:strip)
         .reject(&:empty?)
         .uniq

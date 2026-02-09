@@ -1,0 +1,9 @@
+{
+  "hint": "qwen3",
+  "hf_repo": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+  "revision": "main",
+  "url": "https://huggingface.co/Qwen/Qwen3-30B-A3B-Instruct-2507/resolve/main/tokenizer.json",
+  "etag": "\"6aec39639a0a2d1ca966356b8c2b8426a484f80ff80731f44fa8482040713bdf\"",
+  "x_repo_commit": null,
+  "downloaded_at": "2026-02-09T20:54:32Z"
+}

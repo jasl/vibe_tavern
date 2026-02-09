@@ -16,7 +16,7 @@ module TavernKit
           normalize_runtime!(ctx)
           apply_token_estimation!(ctx)
 
-          ctx.token_estimator ||= TavernKit::TokenEstimator.default
+          ctx.token_estimator ||= TavernKit::VibeTavern::TokenEstimation.estimator
         end
 
         def normalize_runtime!(ctx)
@@ -57,7 +57,7 @@ module TavernKit
 
           # Allow runtime to override a blank/invalid explicit hint.
           if explicit.nil?
-            ctx[:model_hint] = selected.to_s
+            ctx[:model_hint] = TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(selected)
             ctx[:model_hint_source] =
               if runtime_hint
                 :runtime
@@ -79,7 +79,6 @@ module TavernKit
           end
 
           registry = config.fetch(:registry, nil)
-          registry = config.fetch(:tokenizer_registry, nil) if registry.nil?
           return if registry.nil?
 
           raise ArgumentError, "token_estimation.registry must be a Hash" unless registry.is_a?(Hash)

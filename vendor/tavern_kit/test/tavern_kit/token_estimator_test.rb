@@ -174,7 +174,7 @@ class TavernKit::TokenEstimatorTest < Minitest::Test
     tokenizer_json&.unlink
   end
 
-  def test_prewarm_loads_hf_tokenizers_and_can_be_strict
+  def test_preload_loads_hf_tokenizers_and_can_be_strict
     tokenizer_json = build_word_level_tokenizer_json
 
     estimator =
@@ -185,12 +185,12 @@ class TavernKit::TokenEstimatorTest < Minitest::Test
         },
       )
 
-    result = estimator.prewarm!(strict: false)
+    result = estimator.preload!(strict: false)
     assert_equal [tokenizer_json.path], result.fetch(:loaded)
     assert_equal 1, result.fetch(:failed).size
 
     assert_raises(ArgumentError) do
-      estimator.prewarm!(strict: true)
+      estimator.preload!(strict: true)
     end
   ensure
     tokenizer_json&.close

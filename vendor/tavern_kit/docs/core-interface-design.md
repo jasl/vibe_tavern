@@ -581,8 +581,8 @@ class TokenEstimator
 
   # Optional (ops). Preload tokenizer assets from a Hash registry.
   # - `strict: true` raises if any configured tokenizer fails to load
-  # - non-hash registries are not enumerable; callers must prewarm explicitly
-  def prewarm!(strict: false) -> Hash
+  # - non-hash registries are not enumerable; callers must preload explicitly
+  def preload!(strict: false) -> Hash
 end
 ```
 

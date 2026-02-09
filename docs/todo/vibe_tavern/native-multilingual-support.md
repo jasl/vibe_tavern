@@ -510,4 +510,4 @@ Notes:
    - define translator prompt contract (verbatim zones, output constraints)
    - decide where it lives (app layer vs optional infra module)
 4) Tokenizer loading (token estimation correctness):
-   - See `docs/todo/vibe_tavern/tokenizer-loading.md`.
+   - See `docs/research/vibe_tavern/token-estimation.md`.
