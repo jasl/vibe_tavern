@@ -64,6 +64,10 @@ module TavernKit
           overhead_per_message = resolve_non_negative_int(option(:message_overhead_tokens, 0), ctx, allow_nil: true) || 0
           include_metadata_tokens = resolve_value(option(:include_message_metadata_tokens, false), ctx) == true
 
+          if ctx.instrumenter && estimator.respond_to?(:describe)
+            ctx.instrument(:stat, key: :token_estimator, value: estimator.describe(model_hint: model_hint), stage: ctx.current_stage)
+          end
+
           messages = if ctx.plan
             ctx.plan.messages
           elsif ctx.blocks

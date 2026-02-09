@@ -118,6 +118,7 @@ module TavernKit
             variables_store variables_store if variables_store
             llm_options llm_options unless llm_options.empty?
             strict strict
+            meta :default_model_hint, @model
           end
 
         messages = plan.to_messages(dialect: dialect)

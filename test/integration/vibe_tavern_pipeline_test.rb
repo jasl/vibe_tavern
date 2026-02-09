@@ -190,4 +190,46 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
 
     assert_instance_of TavernKit::VariablesStore::InMemory, ctx.variables_store
   end
+
+  test "token_estimation runtime config can set model_hint and token_estimator registry" do
+    ctx = TavernKit::Prompt::Context.new(user_message: "Hello")
+    ctx[:runtime] = {
+      token_estimation: {
+        model_hint: "llama-3.1",
+        registry: {
+          "llama-3.1" => { tokenizer_family: :heuristic, chars_per_token: 2.0 },
+        },
+      },
+    }
+
+    TavernKit::VibeTavern::Pipeline.call(ctx)
+
+    assert_equal "llama-3.1", ctx[:model_hint]
+    assert_equal :runtime, ctx[:model_hint_source]
+    assert_equal :runtime_registry, ctx[:token_estimator_source]
+
+    info = ctx.token_estimator.describe(model_hint: ctx[:model_hint])
+    assert_equal "heuristic", info[:backend]
+    assert_equal true, info[:registry]
+  end
+
+  test "sets model_hint from default_model_hint when explicit hint is absent" do
+    ctx = TavernKit::Prompt::Context.new(user_message: "Hello")
+    ctx[:default_model_hint] = "gpt-4"
+
+    TavernKit::VibeTavern::Pipeline.call(ctx)
+
+    assert_equal "gpt-4", ctx[:model_hint]
+    assert_equal :default, ctx[:model_hint_source]
+  end
+
+  test "explicit model_hint wins over token_estimation runtime hint" do
+    ctx = TavernKit::Prompt::Context.new(user_message: "Hello")
+    ctx[:model_hint] = "explicit"
+    ctx[:runtime] = { token_estimation: { model_hint: "runtime" } }
+
+    TavernKit::VibeTavern::Pipeline.call(ctx)
+
+    assert_equal "explicit", ctx[:model_hint]
+  end
 end

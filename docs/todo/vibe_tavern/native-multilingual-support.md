@@ -387,3 +387,5 @@ reliability.
    - define triggering (detector thresholds, allowlist-only, per-run toggle)
    - define translator prompt contract (verbatim zones, output constraints)
    - decide where it lives (app layer vs optional infra module)
+4) Tokenizer loading (token estimation correctness):
+   - See `docs/todo/vibe_tavern/tokenizer-loading.md`.

@@ -13,6 +13,7 @@ module TavernKit
           max_tokens = preset.context_window_tokens.to_i
           reserve_tokens = preset.reserved_response_tokens.to_i
           overhead = preset.message_token_overhead.to_i
+          model_hint = ctx[:model_hint]
 
           result = TavernKit::Trimmer.trim(
             ctx.blocks,
@@ -20,6 +21,7 @@ module TavernKit
             max_tokens: max_tokens,
             reserve_tokens: reserve_tokens,
             token_estimator: ctx.token_estimator,
+            model_hint: model_hint,
             message_overhead_tokens: overhead,
             stage: :trimming,
           )
@@ -39,6 +41,10 @@ module TavernKit
           end
 
           if ctx.instrumenter
+            if ctx.token_estimator.respond_to?(:describe)
+              ctx.instrument(:stat, stage: :trimming, key: :token_estimator, value: ctx.token_estimator.describe(model_hint: model_hint))
+            end
+
             ctx.instrument(:stat, stage: :trimming, key: :budget_tokens, value: result.report.budget_tokens)
             ctx.instrument(:stat, stage: :trimming, key: :initial_tokens, value: result.report.initial_tokens)
             ctx.instrument(:stat, stage: :trimming, key: :final_tokens, value: result.report.final_tokens)

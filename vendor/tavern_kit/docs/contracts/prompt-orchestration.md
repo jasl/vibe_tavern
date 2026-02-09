@@ -102,6 +102,21 @@ Keep it simple:
 Trimmer operates on `Array<Prompt::Block>` and enforces a token budget by
 disabling blocks in-place (returns modified copies, does not remove).
 
+### Token estimation
+
+Trimmer is intentionally provider-agnostic and delegates token counting to
+`TokenEstimator`:
+
+- `Trimmer.trim(..., token_estimator:, model_hint: ...)`
+- `model_hint` is an app-owned “tokenizer hint” (model id or family label)
+  forwarded into the estimator/adapter selection.
+
+Token estimation is a hot path:
+
+- estimators must be deterministic and fast
+- estimators must not raise on external input; fallback to a safe heuristic
+  estimate when an adapter/registry cannot resolve
+
 ### Budget rule (SillyTavern)
 
 SillyTavern uses the same budgeting rule as ST's `ChatCompletion.setTokenBudget(context, response)`:

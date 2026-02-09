@@ -536,11 +536,39 @@ end
 
 ### 8. TokenEstimator
 
-Pluggable adapter interface with optional model hint:
+Token counting utility used by trimming/budget enforcement.
+
+Contract:
+
+- `estimate(text, model_hint: nil) -> Integer`
+  - must be deterministic and fast (hot path)
+  - must not raise on external input; fallback to a safe heuristic estimate
+- optional `describe(model_hint: nil) -> Hash` for instrumentation/debugging
+  - example: `{ backend: "tiktoken", encoding: "cl100k_base", source: "model" }`
+
+Model hint:
+
+- `model_hint` should be a stable, app-owned “tokenizer hint” (often the model id
+  or a normalized family label like `"qwen2.5"`).
+- It is passed through to adapter selection and can influence encoding choice.
+
+Optional registry:
+
+`TokenEstimator` supports an app-owned registry that can override backend
+selection per hint (without hardcoding platform logic into Core).
+
+- Registry types:
+  - `Hash` (exact keys + glob patterns via `File.fnmatch?`)
+  - any object responding to `lookup(hint)` or `call(hint)`
+- Minimal entry shape (P0):
+  - `{ tokenizer_family: :heuristic, chars_per_token: Float }`
 
 ```ruby
 class TokenEstimator
   def estimate(text, model_hint: nil) -> Integer
+
+  # Optional. Used for instrumentation/debugging (backend/encoding/source).
+  def describe(model_hint: nil) -> Hash
 end
 ```
 
