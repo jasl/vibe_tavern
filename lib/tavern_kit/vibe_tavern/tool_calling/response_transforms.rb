@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "../text_masker"
 
 module TavernKit
   module VibeTavern
@@ -26,7 +27,7 @@ module TavernKit
           REGISTRY[canonical] = transform
         end
 
-        def apply!(assistant_message, transforms, strict: false)
+        def apply!(assistant_message, transforms, strict: false, runtime: nil)
           return unless assistant_message.is_a?(Hash)
 
           Array(transforms).each do |name|
@@ -35,7 +36,7 @@ module TavernKit
 
             transform = REGISTRY[canonical]
             if transform
-              transform.call(assistant_message)
+              call_transform(transform, assistant_message, runtime)
             elsif strict
               raise ArgumentError, "Unknown response transform: #{name}"
             end
@@ -46,6 +47,25 @@ module TavernKit
           name.to_s.strip.downcase.tr("-", "_")
         end
         private_class_method :canonical_name
+
+        def call_transform(transform, assistant_message, runtime)
+          return transform.call(assistant_message) if runtime.nil?
+
+          params = transform.respond_to?(:parameters) ? transform.parameters : []
+          accepts_keywords =
+            params.any? do |type, _name|
+              %i[key keyreq keyrest].include?(type)
+            end
+
+          if accepts_keywords
+            transform.call(assistant_message, runtime: runtime)
+          elsif transform.arity == 2
+            transform.call(assistant_message, runtime)
+          else
+            transform.call(assistant_message)
+          end
+        end
+        private_class_method :call_transform
       end
     end
   end
@@ -165,26 +185,48 @@ extract_tool_call_from_tag_payload =
 
 TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
   "assistant_content_tool_call_tags_to_tool_calls",
-  lambda do |msg|
+  lambda do |msg, runtime: nil|
     tool_calls = msg.fetch("tool_calls", nil)
     return if tool_calls.is_a?(Array) && tool_calls.any?
+    return if tool_calls.is_a?(Hash) && tool_calls.any?
 
     content = msg.fetch("content", nil)
     return unless content.is_a?(String)
     return unless content.include?("<tool_call>")
 
-    tagged = content.scan(/<tool_call>(.*?)<\/tool_call>/m).flatten
-    return if tagged.empty?
+    escape_hatch_cfg = nil
+    if runtime && runtime.respond_to?(:[])
+      output_tags_cfg = runtime[:output_tags]
+      if output_tags_cfg
+        raise ArgumentError, "runtime[:output_tags] must be a Hash" unless output_tags_cfg.is_a?(Hash)
+        escape_hatch_cfg = output_tags_cfg.fetch(:escape_hatch, nil)
+      end
+    end
+
+    masked, placeholders =
+      TavernKit::VibeTavern::TextMasker.mask(
+        content,
+        escape_hatch: escape_hatch_cfg,
+      )
+
+    tagged = masked.scan(/<tool_call>(.*?)<\/tool_call>/m).flatten
+    if tagged.empty?
+      msg["content"] = TavernKit::VibeTavern::TextMasker.unmask(masked, placeholders)
+      return
+    end
 
     parsed =
       tagged.each_with_index.filter_map do |payload, idx|
         extract_tool_call_from_tag_payload.call(payload, idx + 1)
       end
-    return if parsed.empty?
+    if parsed.empty?
+      msg["content"] = TavernKit::VibeTavern::TextMasker.unmask(masked, placeholders)
+      return
+    end
 
     msg["tool_calls"] = parsed
 
-    cleaned = content.gsub(/<tool_call>.*?<\/tool_call>/m, "").strip
-    msg["content"] = cleaned
+    cleaned_masked = masked.gsub(/<tool_call>.*?<\/tool_call>/m, "").strip
+    msg["content"] = TavernKit::VibeTavern::TextMasker.unmask(cleaned_masked, placeholders)
   end,
 )

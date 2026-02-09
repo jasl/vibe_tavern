@@ -232,7 +232,7 @@ class ToolLoopRunnerTest < Minitest::Test
                     index: 0,
                     message: {
                       role: "assistant",
-                      content: "",
+                      content: "Calling tools now.",
                       tool_calls: [
                         {
                           id: "call_1",
@@ -329,6 +329,7 @@ class ToolLoopRunnerTest < Minitest::Test
 
     assistant_with_calls = msgs2.find { |m| m["role"] == "assistant" && m.key?("tool_calls") }
     refute_nil assistant_with_calls
+    assert_equal "", assistant_with_calls["content"].to_s
 
     tool_result = msgs2.find { |m| m["role"] == "tool" && m.key?("tool_call_id") }
     refute_nil tool_result
@@ -2568,6 +2569,131 @@ class ToolLoopRunnerTest < Minitest::Test
     assistant_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "assistant" && m["tool_calls"].is_a?(Array) }
     refute_nil assistant_msg
     assert_equal "", assistant_msg["content"]
+  end
+
+  def test_response_transform_ignores_tool_call_tags_inside_fenced_code_blocks
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          raise "unexpected extra request" if @call_count > 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          content = <<~TEXT
+            ```txt
+            <tool_call>{"name":"state_get","arguments":{"workspace_id":"#{workspace_id}"}}</tool_call>
+            ```
+          TEXT
+
+          response_body = {
+            choices: [
+              {
+                message: { role: "assistant", content: content },
+                finish_reason: "stop",
+              },
+            ],
+          }
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          tool_calling: {
+            response_transforms: ["assistant_content_tool_call_tags_to_tool_calls"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_equal 1, requests.length
+    assert_includes result[:assistant_text], "<tool_call>"
+    assert_match(/```txt/m, result[:assistant_text])
+  end
+
+  def test_response_transform_ignores_escaped_tool_call_tags
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          raise "unexpected extra request" if @call_count > 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          content = %Q(\\<tool_call>{"name":"state_get","arguments":{"workspace_id":"#{workspace_id}"}}\\</tool_call>)
+
+          response_body = {
+            choices: [
+              {
+                message: { role: "assistant", content: content },
+                finish_reason: "stop",
+              },
+            ],
+          }
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          output_tags: { enabled: false, escape_hatch: { enabled: true, mode: :html_entity } },
+          tool_calling: {
+            response_transforms: ["assistant_content_tool_call_tags_to_tool_calls"],
+          },
+        },
+        type: :app,
+      )
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_equal 1, requests.length
+    assert_includes result[:assistant_text], "&lt;tool_call>"
+    refute_includes result[:assistant_text], "<tool_call>"
   end
 
   def test_parse_args_accepts_blank_string_and_json_code_fence

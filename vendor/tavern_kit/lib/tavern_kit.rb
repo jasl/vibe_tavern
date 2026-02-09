@@ -12,6 +12,7 @@ require_relative "tavern_kit/regex_safety"
 require_relative "tavern_kit/lru_cache"
 require_relative "tavern_kit/js_regex_cache"
 require_relative "tavern_kit/runtime"
+require_relative "tavern_kit/load_hooks"
 
 require_relative "tavern_kit/participant"
 require_relative "tavern_kit/user"
@@ -101,6 +102,14 @@ require_relative "tavern_kit/risu_ai"
 
 module TavernKit
   class << self
+    def on_load(scope, id: nil, &block)
+      LoadHooks.on_load(scope, id: id, &block)
+    end
+
+    def run_load_hooks(scope, payload)
+      LoadHooks.run_load_hooks(scope, payload)
+    end
+
     # Parse a character from a Hash (e.g. JSON.parse result).
     #
     # For file-based formats (png/byaf/charx), use TavernKit::Ingest.

@@ -66,4 +66,36 @@ class RisuaiBuildTest < Minitest::Test
     assert_equal "user", msgs[6][:role]
     assert_equal "hi", msgs[6][:content]
   end
+
+  def test_risuai_description_text_builder_override
+    character = TavernKit::Character.create(name: "Char", description: "DESC")
+    user = TavernKit::User.new(name: "User", persona: "PERSONA")
+
+    template = [
+      { "type" => "plain", "type2" => "main", "role" => "system", "text" => "MAIN" },
+      { "type" => "persona", "innerFormat" => "P: {{slot}}" },
+      { "type" => "description" },
+      { "type" => "chat", "rangeStart" => 0, "rangeEnd" => "end" },
+    ]
+
+    plan = TavernKit::RisuAI.build do
+      configure_middleware(
+        :prepare,
+        description_text_builder: lambda do |_ctx|
+          "CUSTOM DESC"
+        end,
+      )
+
+      preset({ "promptTemplate" => template })
+      character(character)
+      user(user)
+      message("hi")
+      runtime({ chat_index: 1 })
+    end
+
+    msgs = plan.to_messages(dialect: :openai)
+
+    assert_equal "system", msgs[2][:role]
+    assert_equal "CUSTOM DESC", msgs[2][:content]
+  end
 end

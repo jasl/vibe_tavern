@@ -171,6 +171,56 @@ class DirectivesRunnerTest < Minitest::Test
     assert_in_delta 0.7, req.fetch("temperature"), 0.0001
   end
 
+  def test_directives_runner_injects_language_policy_via_runtime
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+
+          envelope = {
+            assistant_text: "ok",
+            directives: [{ type: "ui.toast", payload: { message: "Saved." } }],
+          }
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: JSON.generate(envelope) }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = TavernKit::VibeTavern::Directives::Runner.build(client: client, model: "test-model")
+
+    runtime = { language_policy: { enabled: true, target_lang: "ja-JP" } }
+    result =
+      runner.run(
+        system: "SYS",
+        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        runtime: runtime,
+      )
+
+    assert_equal true, result[:ok]
+
+    req = JSON.parse(requests[0][:body])
+    system_texts =
+      Array(req["messages"]).filter_map do |m|
+        next unless m.is_a?(Hash) && m["role"] == "system"
+
+        m["content"].to_s
+      end
+
+    assert system_texts.any? { |t| t.include?("Language Policy:") && t.include?("Respond in: ja-JP") }
+    assert req["response_format"].is_a?(Hash)
+  end
+
   def test_directives_runner_falls_back_from_json_schema_to_json_object
     requests = []
 

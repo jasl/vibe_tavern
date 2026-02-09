@@ -107,6 +107,11 @@ class PresetsTest < Minitest::Test
     assert_includes response_transforms, "assistant_tool_calls_object_to_array"
   end
 
+  def test_provider_defaults_for_openai_include_sequential_tool_calling_reliability_defaults
+    cfg = TavernKit::VibeTavern::ToolCalling::Presets.provider_defaults("openai")
+    assert_equal false, cfg.dig(:request_overrides, :parallel_tool_calls)
+  end
+
   def test_content_tag_tool_call_fallback_preset_is_opt_in
     cfg = TavernKit::VibeTavern::ToolCalling::Presets.content_tag_tool_call_fallback
     assert_equal ["assistant_content_tool_call_tags_to_tool_calls"], cfg[:response_transforms]

@@ -75,21 +75,23 @@ module TavernKit
               when ToolDefinition
                 d
               when Hash
-                attrs = {
-                  name: d[:name] || d["name"],
-                  description: d[:description] || d["description"],
-                  parameters: d[:parameters] || d["parameters"],
-                }
+                name = d.fetch(:name)
+                description = d.fetch(:description)
+                parameters = d.fetch(:parameters)
 
                 exposed =
                   if d.key?(:exposed_to_model)
-                    d[:exposed_to_model]
-                  elsif d.key?("exposed_to_model")
-                    d["exposed_to_model"]
+                    TavernKit::Coerce.bool(d.fetch(:exposed_to_model), default: false)
+                  else
+                    true
                   end
-                attrs[:exposed_to_model] = exposed unless exposed.nil?
 
-                ToolDefinition.new(**attrs)
+                ToolDefinition.new(
+                  name: name,
+                  description: description,
+                  parameters: parameters,
+                  exposed_to_model: exposed,
+                )
               else
                 raise ArgumentError, "Invalid tool definition: #{d.inspect}"
               end

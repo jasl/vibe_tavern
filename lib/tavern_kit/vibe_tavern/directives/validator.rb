@@ -251,8 +251,10 @@ module TavernKit
           when String
             { code: value }
           when Hash
-            code = value[:code] || value["code"] || "PAYLOAD_INVALID"
-            details = value[:details] || value["details"]
+            acc = TavernKit::Utils::HashAccessor.wrap(value)
+            code = acc.fetch(:code, default: nil)
+            code = "PAYLOAD_INVALID" if code.blank?
+            details = acc.fetch(:details, default: nil)
             h = { code: code.to_s }
             h[:details] = details if details.is_a?(Hash)
             h

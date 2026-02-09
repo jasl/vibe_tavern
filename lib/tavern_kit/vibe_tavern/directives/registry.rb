@@ -38,9 +38,9 @@ module TavernKit
                 d
               when Hash
                 DirectiveDefinition.new(
-                  type: d[:type] || d["type"],
-                  description: d[:description] || d["description"],
-                  aliases: d[:aliases] || d["aliases"],
+                  type: d.fetch(:type),
+                  description: d.fetch(:description, nil),
+                  aliases: d.fetch(:aliases, nil),
                 )
               else
                 raise ArgumentError, "Invalid directive definition: #{d.inspect}"

@@ -19,6 +19,7 @@ For Rails integration work (the app rewrite), see the top-level `docs/` folder.
 - Core interface design: `docs/core-interface-design.md`
 - Pipeline observability/debugging: `docs/pipeline-observability.md`
 - Prompt orchestration contracts (dialects/trimming/injection): `docs/contracts/prompt-orchestration.md`
+- Load hooks contract (initialization/registration): `docs/contracts/load-hooks.md`
 - Compatibility matrices:
   - SillyTavern: `docs/compatibility/sillytavern.md`
   - RisuAI: `docs/compatibility/risuai.md`

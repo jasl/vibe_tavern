@@ -106,7 +106,7 @@ TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
 
       tool_calls.each do |tc|
         next unless tc.is_a?(Hash)
-        next if tc.key?(:signature) || tc.key?("signature")
+        next if tc.key?(:signature)
 
         tc[:signature] = "skip_thought_signature_validator"
       end

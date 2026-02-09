@@ -10,6 +10,23 @@ module TavernKit
       # - Run RisuAI::Lore::Engine
       # - Build initial prompt sections and assemble blocks via TemplateCards
       class Prepare < TavernKit::Prompt::Middleware::Base
+        DEFAULT_DESCRIPTION_TEXT_BUILDER =
+          lambda do |ctx|
+            data = ctx.character&.data
+            return "" unless data
+
+            desc = data.respond_to?(:description) ? data.description.to_s : ""
+            personality = data.respond_to?(:personality) ? data.personality.to_s : ""
+            scenario = data.respond_to?(:scenario) ? data.scenario.to_s : ""
+
+            parts = []
+            parts << desc unless desc.strip.empty?
+            parts << "Description of #{ctx.character.name}: #{personality}" unless personality.strip.empty?
+            parts << "Circumstances and context of the dialogue: #{scenario}" unless scenario.strip.empty?
+
+            parts.join("\n\n").strip
+          end.freeze
+
         private
 
         def before(ctx)
@@ -128,18 +145,7 @@ module TavernKit
           end
 
           if ctx.character&.respond_to?(:data)
-            data = ctx.character.data
-
-            desc = data.respond_to?(:description) ? data.description.to_s : ""
-            personality = data.respond_to?(:personality) ? data.personality.to_s : ""
-            scenario = data.respond_to?(:scenario) ? data.scenario.to_s : ""
-
-            parts = []
-            parts << desc unless desc.strip.empty?
-            parts << "Description of #{ctx.character.name}: #{personality}" unless personality.strip.empty?
-            parts << "Circumstances and context of the dialogue: #{scenario}" unless scenario.strip.empty?
-
-            content = parts.join("\n\n").strip
+            content = build_description_text(ctx, description_text_builder: option(:description_text_builder))
             groups[:description] << { role: :system, content: content } unless content.empty?
           end
 
@@ -157,6 +163,20 @@ module TavernKit
           end
 
           groups
+        end
+
+        def build_description_text(ctx, description_text_builder:)
+          builder = description_text_builder
+          unless builder.nil? || builder.respond_to?(:call)
+            ctx.warn("risu_ai.prepare.description_text_builder must respond to #call (ignoring)")
+            builder = nil
+          end
+
+          builder ||= DEFAULT_DESCRIPTION_TEXT_BUILDER
+          builder.call(ctx).to_s.strip
+        rescue StandardError => e
+          ctx.warn("risu_ai.prepare.description_text_builder error (using default): #{e.class}: #{e.message}")
+          DEFAULT_DESCRIPTION_TEXT_BUILDER.call(ctx).to_s.strip
         end
       end
     end

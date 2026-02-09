@@ -127,6 +127,18 @@ Language policy is **app-owned configuration**:
   `target_lang` into `runtime[:language_policy]`
 - `TavernKit::VibeTavern` does not derive language preference from chat text
 
+Optional (app-side customization):
+- `policy_text_builder`: a Ruby callable (lambda/proc) that builds the injected
+  policy text. Recommended to set via pipeline middleware options (keeps runtime
+  serializable), e.g.:
+
+```ruby
+TavernKit::VibeTavern::Pipeline.configure(
+  :language_policy,
+  policy_text_builder: ->(target_lang, style_hint:, special_tags:) { "..." }
+)
+```
+
 ## Language codes (strict, allowlisted BCP-47)
 
 For reliability, enforce **BCP-47 codes only** and support a small allowlist.
@@ -143,6 +155,13 @@ Policy (P0 recommendation):
   and emit a warning/trace event at the app boundary (do not guess).
 - Canonicalize common case variants (`zh-cn` → `zh-CN`) **before** allowlist
   checks (app-side preferred).
+- Accept a small set of common aliases that map to the allowlist (still strict):
+  - `en` → `en-US`
+  - `ja` → `ja-JP`
+  - `ko` → `ko-KR`
+  - `yue` → `yue-HK`
+  - `zh-Hans` → `zh-CN`
+  - `zh-Hant` → `zh-TW`
 - Tier 2 enforcement is “language-shape” best-effort:
   - do not require semantic correctness (we don't need to "know the language")
   - allow only high-confidence checks (script/character distribution), otherwise warn
@@ -163,6 +182,9 @@ to be translated/localized. Recommended initial set:
 - Liquid macro syntaxes:
   - `{{ ... }}` and `{% ... %}` (see `docs/research/vibe_tavern/macros.md`)
 - HTML/XML tags and attributes: `<...>` (treat as verbatim by default)
+- Optional language spans (for mixed-language roleplay):
+  - `<lang code="ja-JP">...</lang>` can be used to intentionally embed a different language
+  - App enables this by adding `"lang"` to `runtime[:language_policy][:special_tags]`
 - structured directives JSON (when used):
   - keys: `assistant_text`, `directives`, `type`, `payload`
   - directive types are canonical strings (not translated)
@@ -180,6 +202,81 @@ Important: for native multilingual mode we are not running a translator, so
 this is a **generation-time constraint** (prompt policy), not a mask/unmask
 post-process.
 
+## Output tag post-processing (optional, app-configurable)
+
+Some XML-ish tags may be used as **prompt control markers** (e.g. `<lang ...>`)
+but should not be shown to end users as-is.
+
+VibeTavern supports an optional, deterministic post-pass on assistant text via:
+
+`runtime[:output_tags]`
+
+Example (strip wrappers / drop `<think>`):
+
+```ruby
+runtime[:output_tags] = {
+  enabled: true,
+  rules: [
+    { tag: "lang", action: :strip },  # keep inner text
+    { tag: "think", action: :drop },  # remove tag + inner
+  ],
+  sanitizers: {},
+}
+```
+
+Example (transform `<lang code="ja">...` to a renderable tag):
+
+```ruby
+runtime[:output_tags] = {
+  enabled: true,
+  rules: [
+    { tag: "lang", action: :rename, to: "span", attrs: { "code" => "data-lang" } },
+  ],
+  sanitizers: {},
+}
+```
+
+Notes:
+- This post-pass is applied to chat-only assistant text, tool-loop final answers,
+  and directives `assistant_text`.
+- It does **not** modify text inside fenced code blocks, inline code, or Liquid
+  macros (treated as verbatim zones).
+- Escape hatch: prefix a tag’s `<` with a backslash (`\<`) to prevent it from
+  being treated as a control/protocol tag by deterministic post-processing.
+  - Default behavior renders escaped `<` as `&lt;` (so the literal tag stays
+    visible even when the frontend allows HTML).
+  - Configure via `runtime[:output_tags][:escape_hatch]`:
+    - `{ enabled: true, mode: :html_entity }` (default)
+    - `{ enabled: true, mode: :literal }` (for frontends that HTML-escape)
+    - `{ enabled: true, mode: :keep_backslash }` (debug / preserve `\<`)
+  - Example input: `\<lang code="ja-JP">ありがとう\</lang>`
+
+### `<lang>` span sanitizer/validator (optional)
+
+To make mixed-language roleplay spans more robust against “messy” human input
+(e.g. `< lang ...>`, `</lang >`, missing `</lang>`), you can enable a
+deterministic sanitizer/validator for `<lang>` spans:
+
+```ruby
+runtime[:output_tags] = {
+  enabled: true,
+  rules: [{ tag: "lang", action: :strip }],
+  sanitizers: {
+    lang_spans: {
+      enabled: true,
+      validate_code: true,       # require BCP-47-ish tag (best-effort)
+      auto_close: true,          # append missing </lang> when needed
+      on_invalid_code: :strip,   # :strip|:keep|:drop
+    },
+  },
+  # warn: true,                                 # (optional) stderr warnings
+  # warner: ->(msg) { Rails.logger.warn(msg) },  # (optional) app logger
+}
+```
+
+This runs before the output tag rules, and still respects verbatim zones
+(code fences / inline code / Liquid macros are never modified).
+
 ## Middleware design: `LanguagePolicy`
 
 Add a new middleware:
@@ -190,7 +287,7 @@ Pipeline insertion:
   after `:plan_assembly` (because `PlanAssembly` finalizes `ctx.plan`).
 
 Behavior (P0):
-1) Read config from `ctx.runtime` (preferred) or `ctx[:language_policy]`.
+1) Read config from `ctx.runtime`.
 2) If `enabled` and `target_lang` present:
    - Insert a new **system block** near the end of system instructions,
      ideally **after** post-history instructions and **before** the current user
@@ -318,9 +415,15 @@ P2 (hybrid fallback, non-streaming only):
    - tool loop final assistant message
 2) Observability: per-run drift stats in trace/events.
 
-## Evaluation (planned)
+## Evaluation (implemented)
 
 Add “language policy on/off” as an explicit eval dimension for both protocols:
+
+- Full runner (tool calling + directives + language policy):
+  - `script/llm_vibe_tavern_eval.rb`
+  - `OPENROUTER_RUN_LANGUAGE_POLICY_EVAL=1` is the default.
+- Dedicated language policy harness (chat-only, focuses on verbatim + `<lang>`):
+  - `script/llm_language_policy_eval.rb`
 
 - Tool calling harness: `script/llm_tool_call_eval.rb`
   - primary metric: tool-scenarios success rate must not regress vs baseline
@@ -340,6 +443,25 @@ Add “language policy on/off” as an explicit eval dimension for both protocol
 This is intentionally separate from any “Translate both” post-translation work:
 we are measuring the **impact of the language policy prompt** on protocol
 reliability.
+
+Recommended smoke command (runs the on/off matrix and writes 3 report dirs):
+
+```sh
+OPENROUTER_LANGUAGE_POLICY_MATRIX=1 \
+OPENROUTER_EVAL_PRESET=smoke \
+OPENROUTER_MODEL_FILTER=stable \
+OPENROUTER_SCENARIOS=simple \
+OPENROUTER_TRIALS=1 \
+OPENROUTER_JOBS=1 \
+script/llm_vibe_tavern_eval.rb
+```
+
+Notes:
+- Use `OPENROUTER_LANGUAGE_POLICY_FILTER=off,zh-CN,ja` to target specific entries
+  (aliases like `ja` are canonicalized to `ja-JP`).
+- To reduce upstream flakiness in reports, the eval harness retries once when it
+  receives HTTP-200 with an empty assistant response:
+  - `OPENROUTER_EMPTY_RESPONSE_RETRY_COUNT` (default: `1`)
 
 ## Acceptance criteria (P0)
 

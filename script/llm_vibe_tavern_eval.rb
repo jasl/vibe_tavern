@@ -39,6 +39,8 @@ ruby = RbConfig.ruby
 script_dir = File.expand_path(__dir__)
 tool_call_script = File.join(script_dir, "llm_tool_call_eval.rb")
 directives_script = File.join(script_dir, "llm_directives_eval.rb")
+language_policy_script = File.join(script_dir, "llm_language_policy_eval.rb")
+run_language_policy_eval = ENV.fetch("OPENROUTER_RUN_LANGUAGE_POLICY_EVAL", "1") == "1"
 
 child_env = ENV.to_h
 child_env["OPENROUTER_EVAL_PRESET"] = eval_preset
@@ -47,6 +49,7 @@ puts "VibeTavern Eval"
 puts "preset: #{eval_preset}"
 puts "tool calling: #{tool_call_script}"
 puts "directives: #{directives_script}"
+puts "language policy: #{language_policy_script}" if run_language_policy_eval
 puts
 
 tool_report =
@@ -65,7 +68,18 @@ directives_report =
     directives_script,
   )
 
+language_policy_report =
+  if run_language_policy_eval
+    run_child(
+      "language policy",
+      child_env,
+      ruby,
+      language_policy_script,
+    )
+  end
+
 puts
 puts "Done."
 puts "tool calling report: #{tool_report || "(unknown)"}"
 puts "directives report: #{directives_report || "(unknown)"}"
+puts "language policy report: #{language_policy_report || "(unknown)"}" if run_language_policy_eval

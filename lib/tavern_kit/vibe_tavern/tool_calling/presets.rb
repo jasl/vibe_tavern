@@ -121,9 +121,9 @@ module TavernKit
               openrouter_tool_calling(**kwargs),
             )
           when "openai"
-            openai_compatible_reliability
+            openai_compatible_reliability(parallel_tool_calls: false)
           when "volcanoengine", "volcano_engine", "volcano"
-            openai_compatible_reliability
+            openai_compatible_reliability(parallel_tool_calls: false)
           else
             {}
           end

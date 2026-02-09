@@ -252,6 +252,172 @@ module ToolCallEval
       selected.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
     end
   end
+
+  module LanguagePolicy
+    Entry = Struct.new(:id, :enabled, :target_lang, :tags, keyword_init: true) do
+      def initialize(id:, enabled:, target_lang: nil, tags: [])
+        super(
+          id: id.to_s,
+          enabled: enabled == true,
+          target_lang: target_lang&.to_s,
+          tags: normalize_tags(tags),
+        )
+      end
+
+      def matches?(raw_token)
+        token = raw_token.to_s.strip.downcase
+        return false if token.empty?
+
+        candidates = ([id] + tags).map(&:to_s).map(&:downcase).uniq
+
+        if token.include?("*")
+          candidates.any? { |value| File.fnmatch(token, value) }
+        else
+          candidates.include?(token)
+        end
+      end
+
+      private
+
+      def normalize_tags(value)
+        Array(value).map { |item| item.to_s.strip.downcase }.reject(&:empty?).uniq
+      end
+    end
+
+    DEFAULT_TARGET_LANGS = %w[zh-CN ja-JP].freeze
+
+    OFF =
+      Entry.new(
+        id: "off",
+        enabled: false,
+        tags: %w[off disabled none 0 false],
+      ).freeze
+
+    CANONICAL_TARGET_LANGS = {
+      "en" => "en-US",
+      "en-us" => "en-US",
+      "zh-cn" => "zh-CN",
+      "zh-tw" => "zh-TW",
+      "zh-hans" => "zh-CN",
+      "zh-hans-cn" => "zh-CN",
+      "zh-hant" => "zh-TW",
+      "zh-hant-tw" => "zh-TW",
+      "ko-kr" => "ko-KR",
+      "ko" => "ko-KR",
+      "ja-jp" => "ja-JP",
+      "ja" => "ja-JP",
+      "yue-hk" => "yue-HK",
+      "yue" => "yue-HK",
+    }.freeze
+
+    module_function
+
+    def canonical_target_lang(raw)
+      s = raw.to_s.strip.tr("_", "-")
+      return "" if s.empty?
+
+      CANONICAL_TARGET_LANGS.fetch(s.downcase, s)
+    end
+
+    def filter(raw_filter, matrix: false)
+      return matrix_entries(DEFAULT_TARGET_LANGS) if matrix
+
+      tokens = raw_filter.to_s.split(",").map(&:strip).reject(&:empty?)
+      return [OFF] if tokens.empty?
+      return matrix_entries(DEFAULT_TARGET_LANGS) if tokens.any? { |token| %w[all full *].include?(token.downcase) }
+
+      include_tokens = tokens.reject { |token| token.start_with?("!") }
+      exclude_tokens = tokens.select { |token| token.start_with?("!") }.map { |t| t.delete_prefix("!") }.reject(&:empty?)
+
+      selected =
+        if include_tokens.empty?
+          tokens
+        else
+          include_tokens
+        end
+
+      entries =
+        selected.flat_map do |token|
+          case token.to_s.strip.downcase
+          when "off", "disabled", "none", "0", "false"
+            OFF
+          when "on", "enabled", "1", "true"
+            matrix_entries(DEFAULT_TARGET_LANGS)
+          else
+            canonical = canonical_target_lang(token)
+            canonical.empty? ? nil : entry_for(canonical)
+          end
+        end
+
+      entries = Array(entries).flatten.compact.uniq { |e| e.id }
+      entries = [OFF] if entries.empty?
+
+      entries.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
+    end
+
+    def language_shape(text, target_lang:)
+      t = strip_language_spans(text)
+      return "unknown" if t.strip.empty?
+
+      lang = canonical_target_lang(target_lang)
+      return "unknown" if lang.empty?
+
+      has_kana = t.match?(/[\u3040-\u30FF]/)
+      has_han = t.match?(/\p{Han}/)
+      has_hangul = t.match?(/[\uAC00-\uD7AF]/)
+      latin_word_count = t.scan(/[A-Za-z]{2,}/).length
+
+      case lang
+      when "ja-JP"
+        return "ok" if has_kana
+        return "unknown" if has_han
+        return "drift" if has_hangul
+        return "drift" if latin_word_count >= 3
+
+        "unknown"
+      when "zh-CN", "zh-TW", "yue-HK"
+        return "drift" if has_kana
+        return "ok" if has_han
+        return "drift" if has_hangul
+        return "drift" if latin_word_count >= 3
+
+        "unknown"
+      when "ko-KR"
+        return "ok" if has_hangul
+        return "unknown" if has_han
+        return "drift" if has_kana
+        return "drift" if latin_word_count >= 3
+
+        "unknown"
+      when "en-US"
+        return "ok" if latin_word_count >= 1
+        return "unknown" if has_han || has_kana || has_hangul
+
+        "unknown"
+      else
+        "unknown"
+      end
+    rescue StandardError
+      "unknown"
+    end
+
+    def strip_language_spans(text)
+      text.to_s.gsub(/<lang\b[^>]*>.*?<\/lang>/im, "")
+    rescue StandardError
+      text.to_s
+    end
+
+    def entry_for(target_lang)
+      canonical = canonical_target_lang(target_lang)
+      Entry.new(id: canonical, enabled: true, target_lang: canonical, tags: [canonical.downcase])
+    end
+    private_class_method :entry_for
+
+    def matrix_entries(langs)
+      [OFF] + Array(langs).map { |lang| entry_for(lang) }
+    end
+    private_class_method :matrix_entries
+  end
 end
 
 env_blank =
@@ -338,6 +504,14 @@ verbose_level =
     1
   end
 verbose_level = 0 if verbose_level < 0
+
+empty_response_retry_count =
+  begin
+    Integer(ENV.fetch("OPENROUTER_EMPTY_RESPONSE_RETRY_COUNT", "1"))
+  rescue ArgumentError, TypeError
+    1
+  end
+empty_response_retry_count = 0 if empty_response_retry_count < 0
 enable_content_tag_tool_call_fallback = ENV.fetch("OPENROUTER_ENABLE_CONTENT_TAG_TOOL_CALL_FALLBACK", "0") == "1"
 fallback_matrix = ENV.fetch("OPENROUTER_FALLBACK_MATRIX", "0") == "1"
 
@@ -959,9 +1133,45 @@ def done_text?(text)
   normalized.match?(/\Adone[.!]?\z/i)
 end
 
+def localized_done_text(target_lang)
+  lang = ToolCallEval::LanguagePolicy.canonical_target_lang(target_lang)
+
+  case lang
+  when "zh-CN", "zh-TW", "yue-HK"
+    "已完成。"
+  when "ja-JP"
+    "完了です。"
+  when "ko-KR"
+    "완료했습니다."
+  when "en-US"
+    "Done."
+  else
+    "Done."
+  end
+rescue StandardError
+  "Done."
+end
+
+def final_answer_ok?(text, language_policy_enabled:, target_lang:)
+  if language_policy_enabled
+    !text.to_s.strip.empty?
+  else
+    done_text?(text)
+  end
+end
+
+def final_answer_failure_reason(language_policy_enabled:, target_lang:)
+  if language_policy_enabled
+    "assistant_text is blank (expected #{target_lang})"
+  else
+    %(assistant_text != "Done.")
+  end
+end
+
 def error_category(message, status: nil)
   msg = message.to_s
   return "ASSERTION_FAILED" if msg.start_with?("ASSERTION_FAILED:")
+  return "LANGUAGE_DRIFT" if msg.start_with?("LANGUAGE_DRIFT:")
   return "NO_TOOL_CALLS" if msg.start_with?("NO_TOOL_CALLS:")
   return "TOOL_ERROR" if msg.start_with?("TOOL_ERROR:")
   return "NO_TOOL_USE_ENDPOINT" if msg.include?("No endpoints found that support tool use")
@@ -1067,8 +1277,10 @@ chat_only_scenario = {
     Reply exactly with: Done.
   SYS
   user_text: ->(_workspace) { "Reply exactly with: Done." },
-  assert: lambda { |assistant_text:, **|
-    done_text?(assistant_text) ? [] : [%(assistant_text != "Done.")]
+  assert: lambda { |assistant_text:, language_policy_enabled:, language_policy_target_lang:, **|
+    return [] if final_answer_ok?(assistant_text, language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)
+
+    [final_answer_failure_reason(language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)]
   },
 }.freeze
 
@@ -1098,9 +1310,15 @@ SCENARIOS =
           - state_patch: {"request_id":"r1","ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
         SYS
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
-        assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, language_policy_enabled:, language_policy_target_lang:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
+          unless final_answer_ok?(
+            assistant_text,
+            language_policy_enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+          )
+            reasons << final_answer_failure_reason(language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)
+          end
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
           reasons
         },
@@ -1121,9 +1339,15 @@ SCENARIOS =
           - After a successful `state_patch`, reply with a single sentence: "Done."
         SYS
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
-        assert: lambda { |assistant_text:, workspace:, tools_enabled:, trace:, **|
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, trace:, language_policy_enabled:, language_policy_target_lang:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
+          unless final_answer_ok?(
+            assistant_text,
+            language_policy_enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+          )
+            reasons << final_answer_failure_reason(language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)
+          end
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
           saw_mixed =
@@ -1159,9 +1383,15 @@ SCENARIOS =
           - state_patch: {"request_id":"r1","ops":[{"op":"set","path":"/draft/foo","value":"bar"}]}
         SYS
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
-        assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, language_policy_enabled:, language_policy_target_lang:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
+          unless final_answer_ok?(
+            assistant_text,
+            language_policy_enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+          )
+            reasons << final_answer_failure_reason(language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)
+          end
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
           reasons
         },
@@ -1183,9 +1413,15 @@ SCENARIOS =
           - After tools are done, reply with a single sentence: "Done."
         SYS
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
-        assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, language_policy_enabled:, language_policy_target_lang:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
+          unless final_answer_ok?(
+            assistant_text,
+            language_policy_enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+          )
+            reasons << final_answer_failure_reason(language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)
+          end
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
           reasons
         },
@@ -1204,9 +1440,15 @@ SCENARIOS =
           - After tools are done, reply with a single sentence: "Done."
         SYS
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
-        assert: lambda { |assistant_text:, workspace:, tools_enabled:, trace:, **|
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, trace:, language_policy_enabled:, language_policy_target_lang:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
+          unless final_answer_ok?(
+            assistant_text,
+            language_policy_enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+          )
+            reasons << final_answer_failure_reason(language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)
+          end
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
           multi =
@@ -1237,9 +1479,15 @@ SCENARIOS =
           - After tools are done, reply with a single sentence: "Done."
         SYS
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
-        assert: lambda { |assistant_text:, workspace:, tools_enabled:, **|
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, language_policy_enabled:, language_policy_target_lang:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
+          unless final_answer_ok?(
+            assistant_text,
+            language_policy_enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+          )
+            reasons << final_answer_failure_reason(language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)
+          end
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
           reasons
         },
@@ -1261,9 +1509,15 @@ SCENARIOS =
           - After tools are done, reply with a single sentence: "Done."
         SYS
         user_text: ->(workspace) { "workspace_id=#{workspace.id}" },
-        assert: lambda { |assistant_text:, workspace:, tools_enabled:, raw_history:, **|
+        assert: lambda { |assistant_text:, workspace:, tools_enabled:, raw_history:, language_policy_enabled:, language_policy_target_lang:, **|
           reasons = []
-          reasons << %(assistant_text != "Done.") unless done_text?(assistant_text)
+          unless final_answer_ok?(
+            assistant_text,
+            language_policy_enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+          )
+            reasons << final_answer_failure_reason(language_policy_enabled: language_policy_enabled, target_lang: language_policy_target_lang)
+          end
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
           saw_truncation =
@@ -1379,6 +1633,24 @@ if scenarios.empty?
   exit 2
 end
 
+language_policy_matrix = ENV.fetch("OPENROUTER_LANGUAGE_POLICY_MATRIX", "0") == "1"
+raw_language_policy_filter = ENV.fetch("OPENROUTER_LANGUAGE_POLICY_FILTER", "").to_s
+language_policy_strict = ENV.fetch("OPENROUTER_LANGUAGE_POLICY_STRICT", "0") == "1"
+
+selected_language_policies =
+  ToolCallEval::LanguagePolicy.filter(
+    raw_language_policy_filter,
+    matrix: language_policy_matrix,
+  )
+
+if selected_language_policies.empty?
+  warn(
+    "No language policy entries selected from OPENROUTER_LANGUAGE_POLICY_FILTER=#{raw_language_policy_filter.inspect}. " \
+    "Falling back to off.",
+  )
+  selected_language_policies = [ToolCallEval::LanguagePolicy::OFF]
+end
+
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
 out_dir = Rails.root.join("tmp", "llm_tool_call_eval_reports", timestamp)
 FileUtils.mkdir_p(out_dir)
@@ -1398,14 +1670,17 @@ task_list =
 
     profiles.flat_map do |sampling_profile|
       requested_strategies.flat_map do |strategy|
-        fallback_profiles.map do |fallback_profile|
-          {
-            model_entry: model_entry,
-            model_index: model_index,
-            strategy: strategy,
-            fallback_profile: fallback_profile,
-            sampling_profile: sampling_profile,
-          }
+        fallback_profiles.flat_map do |fallback_profile|
+          selected_language_policies.map do |language_policy|
+            {
+              model_entry: model_entry,
+              model_index: model_index,
+              strategy: strategy,
+              fallback_profile: fallback_profile,
+              sampling_profile: sampling_profile,
+              language_policy: language_policy,
+            }
+          end
         end
       end
     end
@@ -1426,7 +1701,13 @@ sampling_matrix_enabled =
   selected_sampling_profiles.length > 1 ||
     selected_sampling_profiles.any? { |p| p.id != OpenRouterSamplingProfiles::DEFAULT_PROFILE_ID }
 
-matrix_enabled = fallback_profiles.length > 1 || sampling_matrix_enabled || requested_strategies.length > 1
+language_policy_matrix_enabled = selected_language_policies.length > 1
+
+matrix_enabled =
+  fallback_profiles.length > 1 ||
+    sampling_matrix_enabled ||
+    requested_strategies.length > 1 ||
+    language_policy_matrix_enabled
 
 process_task =
   lambda do |task, task_index, task_total|
@@ -1451,6 +1732,12 @@ process_task =
     enable_tag_fallback = fallback_profile.fetch(:content_tag_tool_call_fallback) == true
     sampling_profile = task.fetch(:sampling_profile)
     sampling_profile_id = sampling_profile.id.to_s
+
+    language_policy = task.fetch(:language_policy)
+    language_policy_id = language_policy.id.to_s
+    language_policy_enabled = language_policy.enabled == true
+    language_policy_target_lang = language_policy.target_lang.to_s
+    language_policy_target_lang = nil if language_policy_target_lang.strip.empty?
 
     llm_options_defaults =
       deep_merge_hashes(
@@ -1479,6 +1766,7 @@ process_task =
     model_label_parts << fallback_profile_id if fallback_profiles.length > 1
     model_label = matrix_enabled ? model_label_parts.join(":") : model
     safe_model = model_label.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
+    safe_lang = language_policy_id.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
     provider_tool_calling_preset =
       build_provider_tool_calling_preset.call(
         apply_provider_defaults: apply_provider_defaults,
@@ -1497,17 +1785,14 @@ process_task =
         safe_scenario = scenario_id.gsub(%r{[^a-zA-Z0-9_.-]+}, "__")
 
         log_line.call(
-          "[#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] testing #{model_label} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
+          "[#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] testing #{model_label} lang=#{language_policy_id} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
         )
 
-        workspace = ToolCallEval::Workspace.new
-        scenario[:prepare].call(workspace) if scenario[:prepare]
+        scenario_prepare = scenario[:prepare]
+        scenario_user_text = scenario.fetch(:user_text)
+        scenario_assert = scenario.fetch(:assert)
 
-        tool_executor = ToolCallEval::Executor.new(workspace: workspace)
-        registry =
-          TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
-            definitions: ToolCallEval.tool_definitions,
-          )
+        workspace = nil
 
         effective_request_overrides = deep_merge_hashes(base_request_overrides, {})
 
@@ -1515,7 +1800,6 @@ process_task =
         # already specifies parallel_tool_calls or a scenario opts in.
         if tools_enabled &&
             !effective_request_overrides.key?("parallel_tool_calls") &&
-            !effective_request_overrides.key?(:parallel_tool_calls) &&
             !strategy.default_parallel_tool_calls.nil?
           effective_request_overrides["parallel_tool_calls"] = strategy.default_parallel_tool_calls
         end
@@ -1545,27 +1829,29 @@ process_task =
         effective_tool_use_mode = normalize_tool_use_mode(tool_calling.fetch(:tool_use_mode, tool_use_mode))
         effective_tools_enabled = effective_tool_use_mode != "disabled"
 
+        system_text = scenario.fetch(:system).to_s
+        if language_policy_enabled && language_policy_target_lang
+          done_override = localized_done_text(language_policy_target_lang)
+          system_text = system_text.gsub("Done.", done_override)
+        end
+
+        runtime_inputs = { tool_calling: tool_calling }
+        if language_policy_enabled && language_policy_target_lang
+          runtime_inputs[:language_policy] = {
+            enabled: true,
+            target_lang: language_policy_target_lang,
+          }
+        end
+
         runtime =
           TavernKit::Runtime::Base.build(
-            {
-              tool_calling: tool_calling,
-            },
+            runtime_inputs,
             type: :app,
           )
 
-        runner =
-          TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-            client: client,
-            model: model,
-            tool_executor: tool_executor,
-            runtime: runtime,
-            registry: registry,
-            system: scenario.fetch(:system).to_s,
-            strict: false,
-            llm_options_defaults: llm_options_defaults,
-          )
-
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        retry_attempts_used = 0
+        max_attempts = empty_response_retry_count + 1
 
         ok = true
         error = nil
@@ -1577,93 +1863,133 @@ process_task =
         trace = nil
         raw_history = nil
 
-        begin
-          user_text = scenario.fetch(:user_text).call(workspace).to_s
-          result =
-            if verbose_level <= 0
-              runner.run(user_text: user_text)
-            else
-              runner.run user_text: user_text do |raw_event|
-                event = raw_event.is_a?(Hash) ? raw_event : {}
-                type = event.fetch(:type, "").to_s
-                turn = event.fetch(:turn, nil)
+        while retry_attempts_used < max_attempts
+          retry_attempts_used += 1
 
-                case type
-                when "llm_request_start"
-                  tools_on = event[:tools_enabled] == true
-                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] -> llm (tools=#{tools_on ? "on" : "off"})"
-                  if verbose_level >= 2
-                    msg << " msgs=#{event[:messages_count]}"
-                    msg << " tools=#{event[:tools_count]}"
-                    msg << " choice=#{event[:tool_choice] || "auto"}"
-                    if event[:request_attempts_left].to_i.positive?
-                      msg << " retries_left=#{event[:request_attempts_left]}"
-                    end
-                  end
-                  log_line.call(msg)
-                when "llm_request_error"
-                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] !! llm error"
-                  msg << " status=#{event[:status]}" if event[:status]
-                  msg << " #{event[:elapsed_ms]}ms" if verbose_level >= 2 && event[:elapsed_ms]
-                  msg << " #{truncate(event[:message].to_s, max_chars: 220)}" unless event[:message].to_s.strip.empty?
-                  log_line.call(msg)
-                when "llm_request_retry"
-                  log_line.call(
-                    "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] .. retry (tools=off, attempts_left=#{event[:request_attempts_left]})",
-                  )
-                when "llm_request_end"
-                  ms = event[:elapsed_ms]
-                  finish = event[:finish_reason]
-                  tool_calls = Array(event[:tool_calls]).select { |v| v.is_a?(Hash) }
-                  names = tool_calls.map { |tc| tc.fetch(:name, nil) }.map(&:to_s).map(&:strip).reject(&:empty?).uniq
+          workspace = ToolCallEval::Workspace.new
+          scenario_prepare.call(workspace) if scenario_prepare
 
-                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- llm"
-                  msg << " #{ms}ms" if ms
-                  msg << " finish=#{finish}" if finish
-                  msg << " tool_calls=#{names.join(",")}" if names.any?
-                  log_line.call(msg)
-                when "tool_call_start"
-                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] -> tool #{event[:name]}"
-                  msg << " args=#{event[:arguments_bytes]}B" if verbose_level >= 2
-                  if (parse = event[:parse_status]) && parse.to_s != "ok"
-                    msg << " parse=#{parse}"
-                  end
-                  log_line.call(msg)
-                when "tool_call_end"
-                  msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- tool #{event[:name]} ok=#{event[:ok]}"
-                  msg << " #{event[:elapsed_ms]}ms" if event[:elapsed_ms]
-                  errors = Array(event[:error_codes]).map(&:to_s).map(&:strip).reject(&:empty?)
-                  msg << " errors=#{errors.join(",")}" if errors.any?
-                  if verbose_level >= 2
-                    msg << " out=#{event[:output_bytes]}B"
-                    msg << " replaced" if event[:output_replaced] == true
-                  end
-                  log_line.call(msg)
-                when "fix_empty_final"
-                  log_line.call(
-                    "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] .. empty final; retry finalization (disable_tools=#{event[:disable_tools]})",
-                  )
-                when "final"
-                  log_line.call("  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- final")
-                end
-              rescue StandardError
-                nil
-              end
+          tool_executor = ToolCallEval::Executor.new(workspace: workspace)
+          registry =
+            TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
+              definitions: ToolCallEval.tool_definitions,
+            )
+
+          runner =
+            TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+              client: client,
+              model: model,
+              tool_executor: tool_executor,
+              runtime: runtime,
+              registry: registry,
+              system: system_text,
+              strict: false,
+              llm_options_defaults: llm_options_defaults,
+            )
+
+          ok = true
+          error = nil
+          error_status = nil
+          error_body = nil
+          error_raw_body = nil
+          assistant_text = nil
+          trace = nil
+          raw_history = nil
+
+          begin
+            user_text = scenario_user_text.call(workspace).to_s
+            if language_policy_enabled && language_policy_target_lang
+              done_override = localized_done_text(language_policy_target_lang)
+              user_text = user_text.gsub("Done.", done_override)
             end
 
-          assistant_text = result[:assistant_text]
-          trace = result[:trace]
-          raw_history = Array(result[:history])
+            result =
+              if verbose_level <= 0
+                runner.run(user_text: user_text)
+              else
+                runner.run user_text: user_text do |raw_event|
+                  event = raw_event.is_a?(Hash) ? raw_event : {}
+                  type = event.fetch(:type, "").to_s
+                  turn = event.fetch(:turn, nil)
 
-          fail_reasons =
-            Array(
-                scenario.fetch(:assert).call(
+                  case type
+                  when "llm_request_start"
+                    tools_on = event[:tools_enabled] == true
+                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] -> llm (tools=#{tools_on ? "on" : "off"})"
+                    if verbose_level >= 2
+                      msg << " msgs=#{event[:messages_count]}"
+                      msg << " tools=#{event[:tools_count]}"
+                      msg << " choice=#{event[:tool_choice] || "auto"}"
+                      if event[:request_attempts_left].to_i.positive?
+                        msg << " retries_left=#{event[:request_attempts_left]}"
+                      end
+                    end
+                    log_line.call(msg)
+                  when "llm_request_error"
+                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] !! llm error"
+                    msg << " status=#{event[:status]}" if event[:status]
+                    msg << " #{event[:elapsed_ms]}ms" if verbose_level >= 2 && event[:elapsed_ms]
+                    msg << " #{truncate(event[:message].to_s, max_chars: 220)}" unless event[:message].to_s.strip.empty?
+                    log_line.call(msg)
+                  when "llm_request_retry"
+                    log_line.call(
+                      "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] .. retry (tools=off, attempts_left=#{event[:request_attempts_left]})",
+                    )
+                  when "llm_request_end"
+                    ms = event[:elapsed_ms]
+                    finish = event[:finish_reason]
+                    tool_calls = Array(event[:tool_calls]).select { |v| v.is_a?(Hash) }
+                    names = tool_calls.map { |tc| tc.fetch(:name, nil) }.map(&:to_s).map(&:strip).reject(&:empty?).uniq
+
+                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- llm"
+                    msg << " #{ms}ms" if ms
+                    msg << " finish=#{finish}" if finish
+                    msg << " tool_calls=#{names.join(",")}" if names.any?
+                    log_line.call(msg)
+                  when "tool_call_start"
+                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] -> tool #{event[:name]}"
+                    msg << " args=#{event[:arguments_bytes]}B" if verbose_level >= 2
+                    if (parse = event[:parse_status]) && parse.to_s != "ok"
+                      msg << " parse=#{parse}"
+                    end
+                    log_line.call(msg)
+                  when "tool_call_end"
+                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- tool #{event[:name]} ok=#{event[:ok]}"
+                    msg << " #{event[:elapsed_ms]}ms" if event[:elapsed_ms]
+                    errors = Array(event[:error_codes]).map(&:to_s).map(&:strip).reject(&:empty?)
+                    msg << " errors=#{errors.join(",")}" if errors.any?
+                    if verbose_level >= 2
+                      msg << " out=#{event[:output_bytes]}B"
+                      msg << " replaced" if event[:output_replaced] == true
+                    end
+                    log_line.call(msg)
+                  when "fix_empty_final"
+                    log_line.call(
+                      "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] .. empty final; retry finalization (disable_tools=#{event[:disable_tools]})",
+                    )
+                  when "final"
+                    log_line.call("  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- final")
+                  end
+                rescue StandardError
+                  nil
+                end
+              end
+
+            assistant_text = result[:assistant_text]
+            trace = result[:trace]
+            raw_history = Array(result[:history])
+
+            fail_reasons =
+              Array(
+                scenario_assert.call(
                   assistant_text: assistant_text,
                   workspace: workspace,
                   tools_enabled: effective_tools_enabled,
                   trace: trace,
                   raw_history: raw_history,
-                )
+                  language_policy_enabled: language_policy_enabled,
+                  language_policy_target_lang: language_policy_target_lang,
+                ),
               )
 
             unless fail_reasons.empty?
@@ -1678,20 +2004,56 @@ process_task =
               end
               ok = false
             end
-        rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
-          ok = false
-          error = "#{e.code}: #{e.message}"
-          trace = e.details.is_a?(Hash) ? e.details.fetch(:trace, nil) : nil
-          raw_history = e.details.is_a?(Hash) ? Array(e.details.fetch(:history, nil)) : nil
-        rescue SimpleInference::Errors::HTTPError => e
-          ok = false
-          error_status = e.status
-          error = truncate(e.message, max_chars: 400)
-          error_body = e.body.is_a?(Hash) ? e.body : nil
-          error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
-        rescue StandardError => e
-          ok = false
-          error = truncate("#{e.class}: #{e.message}", max_chars: 400)
+          rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
+            ok = false
+            error = "#{e.code}: #{e.message}"
+            trace = e.details.is_a?(Hash) ? e.details.fetch(:trace, nil) : nil
+            raw_history = e.details.is_a?(Hash) ? Array(e.details.fetch(:history, nil)) : nil
+          rescue SimpleInference::Errors::HTTPError => e
+            ok = false
+            error_status = e.status
+            error = truncate(e.message, max_chars: 400)
+            error_body = e.body.is_a?(Hash) ? e.body : nil
+            error_raw_body = truncate(e.raw_body.to_s, max_chars: 20_000)
+          rescue StandardError => e
+            ok = false
+            error = truncate("#{e.class}: #{e.message}", max_chars: 400)
+          end
+
+          failure_category = ok ? nil : error_category(error, status: error_status)
+          retryable_empty_response =
+            assistant_text.to_s.strip.empty? &&
+              error_status.nil? &&
+              %w[ASSERTION_FAILED NO_TOOL_CALLS].include?(failure_category)
+
+          break unless retryable_empty_response && retry_attempts_used < max_attempts
+
+          log_line.call(
+            "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] .. empty assistant_text; retrying (attempt #{retry_attempts_used + 1}/#{max_attempts})",
+          )
+        end
+
+        assistant_text_language_shape = nil
+        assistant_text_language_ok = nil
+        if language_policy_enabled && language_policy_target_lang
+          assistant_text_language_shape =
+            ToolCallEval::LanguagePolicy.language_shape(
+              assistant_text,
+              target_lang: language_policy_target_lang,
+            )
+
+          assistant_text_language_ok =
+            case assistant_text_language_shape
+            when "ok" then true
+            when "drift" then false
+            else
+              nil
+            end
+
+          if ok && language_policy_strict && assistant_text_language_shape == "drift"
+            ok = false
+            error = "LANGUAGE_DRIFT: expected #{language_policy_target_lang}"
+          end
         end
 
         elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
@@ -1702,6 +2064,16 @@ process_task =
           strategy: strategy_id,
           fallback_profile: fallback_profile_id,
           sampling_profile: sampling_profile_id,
+          empty_response_retry: {
+            max_retries: empty_response_retry_count,
+            attempts: retry_attempts_used,
+          },
+          language_policy: {
+            id: language_policy_id,
+            enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+            strict: language_policy_strict,
+          },
           llm_options_defaults: llm_options_defaults,
           content_tag_tool_call_fallback: effective_tag_fallback,
           scenario: scenario_id,
@@ -1712,6 +2084,8 @@ process_task =
           tools_enabled: effective_tools_enabled,
           runtime_tool_calling: tool_calling,
           assistant_text: assistant_text,
+          assistant_text_language_shape: assistant_text_language_shape,
+          assistant_text_language_ok: assistant_text_language_ok,
           draft: workspace.draft,
           error: error,
           error_status: error_status,
@@ -1732,7 +2106,7 @@ process_task =
         error_hint = provider_error_hint(report)
         report[:error_hint] = error_hint if error_hint
 
-        file_name = "#{safe_model}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
+        file_name = "#{safe_model}__lang_#{safe_lang}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
         report_path = out_dir.join(file_name)
         File.write(report_path, JSON.pretty_generate(report))
 
@@ -1742,6 +2116,10 @@ process_task =
           strategy: strategy_id,
           fallback_profile: fallback_profile_id,
           sampling_profile: sampling_profile_id,
+          empty_response_retry_attempts: retry_attempts_used,
+          language_policy: language_policy_id,
+          assistant_text_language_shape: assistant_text_language_shape,
+          assistant_text_language_ok: assistant_text_language_ok,
           content_tag_tool_call_fallback: effective_tag_fallback,
           scenario: scenario_id,
           trial: trial_idx + 1,
@@ -1759,7 +2137,7 @@ process_task =
 
         status_str = ok ? "OK" : "FAIL"
         log_line.call(
-          "[#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] #{status_str} #{model_label} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model}, #{elapsed_ms}ms)",
+          "[#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [#{scenario_idx}/#{scenario_total}] #{status_str} #{model_label} lang=#{language_policy_id} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model}, #{elapsed_ms}ms)",
         )
       end
     end
@@ -1786,16 +2164,33 @@ process_task =
 
     failure_samples = failures.first(3)
 
+    lang_ok_runs = nil
+    lang_drift_runs = nil
+    lang_unknown_runs = nil
+    if language_policy_enabled
+      lang_ok_runs = runs.count { |t| t[:assistant_text_language_ok] == true }
+      lang_drift_runs = runs.count { |t| t[:assistant_text_language_shape].to_s == "drift" }
+      lang_unknown_runs = runs.count { |t| t[:assistant_text_language_shape].to_s == "unknown" }
+    end
+
     {
       model: model_label,
       model_base: model,
       strategy: strategy_id,
       fallback_profile: fallback_profile_id,
       sampling_profile: sampling_profile_id,
+      language_policy: language_policy_id,
+      language_enabled: language_policy_enabled,
       content_tag_tool_call_fallback: task_effective_tag_fallback == true,
       runs: runs.size,
       ok: ok_count,
       ok_rate: rate,
+      language_ok_runs: lang_ok_runs,
+      language_ok_rate: lang_ok_runs ? lang_ok_runs.fdiv(runs.size) : nil,
+      language_drift_runs: lang_drift_runs,
+      language_drift_rate: lang_drift_runs ? lang_drift_runs.fdiv(runs.size) : nil,
+      language_unknown_runs: lang_unknown_runs,
+      language_unknown_rate: lang_unknown_runs ? lang_unknown_runs.fdiv(runs.size) : nil,
       ms_p50: p50,
       ms_p95: p95,
       tool_runs: tool_runs.size,
@@ -1851,10 +2246,11 @@ else
     model_entry = task.is_a?(Hash) ? task.fetch(:model_entry, nil) : nil
     model = model_entry.respond_to?(:id) ? model_entry.id : nil
     strategy_id = task.is_a?(Hash) ? task.fetch(:strategy, nil)&.id : nil
+    language_policy_id = task.is_a?(Hash) ? task.fetch(:language_policy, nil)&.id : nil
     fallback_profile_id = task.is_a?(Hash) ? task.dig(:fallback_profile, :id) : nil
     sampling_profile_id = task.is_a?(Hash) ? task.fetch(:sampling_profile, nil)&.id : nil
     raise(
-      "#{e.class}: worker failed for model=#{model.inspect} strategy=#{strategy_id.inspect} fallback_profile=#{fallback_profile_id.inspect} sampling_profile=#{sampling_profile_id.inspect}: #{e.message}",
+      "#{e.class}: worker failed for model=#{model.inspect} strategy=#{strategy_id.inspect} lang=#{language_policy_id.inspect} fallback_profile=#{fallback_profile_id.inspect} sampling_profile=#{sampling_profile_id.inspect}: #{e.message}",
     )
   end
 
@@ -1871,6 +2267,10 @@ summary = {
   base_url: base_url,
   api_prefix: api_prefix,
   http_adapter: http_adapter_name,
+  language_policy_filter: raw_language_policy_filter,
+  language_policy_matrix: language_policy_matrix,
+  language_policy_strict: language_policy_strict,
+  language_policies: selected_language_policies.map(&:id),
   client_timeout: client_timeout,
   client_open_timeout: client_open_timeout,
   client_read_timeout: client_read_timeout,
@@ -1918,6 +2318,30 @@ summary_by_scenario =
   end
 summary_by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
 File.write(out_dir.join("summary_by_scenario.json"), JSON.pretty_generate(summary_by_scenario))
+
+summary_by_scenario_and_language_policy =
+  all_runs.each_with_object({}) do |run, out|
+    lang = run[:language_policy].to_s
+    lang = ToolCallEval::LanguagePolicy::OFF.id if lang.empty?
+    sid = run[:scenario].to_s
+
+    out[lang] ||= {}
+    out[lang][sid] ||= { "runs" => 0, "ok" => 0, "errors" => Hash.new(0) }
+    out[lang][sid]["runs"] += 1
+    out[lang][sid]["ok"] += 1 if run[:ok] == true
+    unless run[:ok] == true
+      cat = run[:error_category].to_s
+      cat = "unknown" if cat.empty?
+      out[lang][sid]["errors"][cat] += 1
+    end
+  end
+summary_by_scenario_and_language_policy.each_value do |by_scenario|
+  by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
+end
+File.write(
+  out_dir.join("summary_by_scenario_and_language_policy.json"),
+  JSON.pretty_generate(summary_by_scenario_and_language_policy),
+)
 
 summary_by_scenario_and_strategy =
   all_runs.each_with_object({}) do |run, out|
@@ -1975,6 +2399,10 @@ puts "selected_models: #{selected_model_entries.map(&:id).join(",")}"
 puts "strategy_filter: #{raw_strategy_filter}" unless raw_strategy_filter.empty?
 puts "strategy_matrix: #{strategy_matrix}" if strategy_matrix
 puts "strategies: #{requested_strategies.map(&:id).join(",")}"
+puts "language_policy_filter: #{raw_language_policy_filter}" unless raw_language_policy_filter.strip.empty?
+puts "language_policy_matrix: #{language_policy_matrix}" if language_policy_matrix
+puts "language_policy_strict: #{language_policy_strict}" if language_policy_strict
+puts "language_policies: #{selected_language_policies.map(&:id).join(",")}"
 puts "parallel_tool_calls(default): #{base_request_overrides.fetch("parallel_tool_calls", "(provider default)")}"
 puts "content_tag_tool_call_fallback_global_override: #{enable_content_tag_tool_call_fallback}"
 if best_effort_content_tag_tool_call_fallback_models.any?
@@ -1994,6 +2422,7 @@ header = [
   "model",
   "profile",
   "strategy",
+  "lang",
   "fallback_profile",
   "tool_ok",
   "tool_rate",
@@ -2014,6 +2443,7 @@ rows =
       r[:model_base].to_s,
       r[:sampling_profile].to_s,
       r[:strategy].to_s,
+      r[:language_policy].to_s,
       r[:fallback_profile].to_s,
       "#{r[:tool_ok]}/#{r[:tool_runs]}",
       r[:tool_ok_rate] ? format("%.0f%%", r[:tool_ok_rate].to_f * 100) : "-",

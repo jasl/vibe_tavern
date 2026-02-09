@@ -176,6 +176,7 @@ module DirectivesEval
     def error_category(message)
       msg = message.to_s
       return "ASSERTION_FAILED" if msg.start_with?("ASSERTION_FAILED:")
+      return "LANGUAGE_DRIFT" if msg.start_with?("LANGUAGE_DRIFT:")
       return "DIRECTIVES_RUN_FAILED" if msg.start_with?("DIRECTIVES_RUN_FAILED")
       return "HTTP_ERROR" if msg.start_with?("HTTP_ERROR:")
       return "TIMEOUT" if msg.downcase.include?("timeout")
@@ -191,13 +192,9 @@ module DirectivesEval
       Array(attempts).any? do |attempt|
         next false unless attempt.is_a?(Hash)
 
-        http_error = attempt[:http_error]
-        http_error = attempt["http_error"] if http_error.nil?
-        next false unless http_error == true
+        next false unless attempt[:http_error] == true
 
-        status = attempt[:http_status]
-        status = attempt["http_status"] if status.nil?
-        status.to_i == 404
+        attempt.fetch(:http_status, nil).to_i == 404
       end
     end
 
@@ -205,9 +202,7 @@ module DirectivesEval
       Array(attempts).any? do |attempt|
         next false unless attempt.is_a?(Hash)
 
-        semantic = attempt[:semantic_error]
-        semantic = attempt["semantic_error"] if semantic.nil?
-        semantic.is_a?(Hash)
+        attempt[:semantic_error].is_a?(Hash)
       end
     end
   end
@@ -312,6 +307,172 @@ module DirectivesEval
       selected.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
     end
   end
+
+  module LanguagePolicy
+    Entry = Struct.new(:id, :enabled, :target_lang, :tags, keyword_init: true) do
+      def initialize(id:, enabled:, target_lang: nil, tags: [])
+        super(
+          id: id.to_s,
+          enabled: enabled == true,
+          target_lang: target_lang&.to_s,
+          tags: normalize_tags(tags),
+        )
+      end
+
+      def matches?(raw_token)
+        token = raw_token.to_s.strip.downcase
+        return false if token.empty?
+
+        candidates = ([id] + tags).map(&:to_s).map(&:downcase).uniq
+
+        if token.include?("*")
+          candidates.any? { |value| File.fnmatch(token, value) }
+        else
+          candidates.include?(token)
+        end
+      end
+
+      private
+
+      def normalize_tags(value)
+        Array(value).map { |item| item.to_s.strip.downcase }.reject(&:empty?).uniq
+      end
+    end
+
+    DEFAULT_TARGET_LANGS = %w[zh-CN ja-JP].freeze
+
+    OFF =
+      Entry.new(
+        id: "off",
+        enabled: false,
+        tags: %w[off disabled none 0 false],
+      ).freeze
+
+    CANONICAL_TARGET_LANGS = {
+      "en" => "en-US",
+      "en-us" => "en-US",
+      "zh-cn" => "zh-CN",
+      "zh-tw" => "zh-TW",
+      "zh-hans" => "zh-CN",
+      "zh-hans-cn" => "zh-CN",
+      "zh-hant" => "zh-TW",
+      "zh-hant-tw" => "zh-TW",
+      "ko-kr" => "ko-KR",
+      "ko" => "ko-KR",
+      "ja-jp" => "ja-JP",
+      "ja" => "ja-JP",
+      "yue-hk" => "yue-HK",
+      "yue" => "yue-HK",
+    }.freeze
+
+    module_function
+
+    def canonical_target_lang(raw)
+      s = raw.to_s.strip.tr("_", "-")
+      return "" if s.empty?
+
+      CANONICAL_TARGET_LANGS.fetch(s.downcase, s)
+    end
+
+    def filter(raw_filter, matrix: false)
+      return matrix_entries(DEFAULT_TARGET_LANGS) if matrix
+
+      tokens = raw_filter.to_s.split(",").map(&:strip).reject(&:empty?)
+      return [OFF] if tokens.empty?
+      return matrix_entries(DEFAULT_TARGET_LANGS) if tokens.any? { |token| %w[all full *].include?(token.downcase) }
+
+      include_tokens = tokens.reject { |token| token.start_with?("!") }
+      exclude_tokens = tokens.select { |token| token.start_with?("!") }.map { |t| t.delete_prefix("!") }.reject(&:empty?)
+
+      selected =
+        if include_tokens.empty?
+          tokens
+        else
+          include_tokens
+        end
+
+      entries =
+        selected.flat_map do |token|
+          case token.to_s.strip.downcase
+          when "off", "disabled", "none", "0", "false"
+            OFF
+          when "on", "enabled", "1", "true"
+            matrix_entries(DEFAULT_TARGET_LANGS)
+          else
+            canonical = canonical_target_lang(token)
+            canonical.empty? ? nil : entry_for(canonical)
+          end
+        end
+
+      entries = Array(entries).flatten.compact.uniq { |e| e.id }
+      entries = [OFF] if entries.empty?
+
+      entries.reject { |entry| exclude_tokens.any? { |token| entry.matches?(token) } }
+    end
+
+    def language_shape(text, target_lang:)
+      t = strip_language_spans(text)
+      return "unknown" if t.strip.empty?
+
+      lang = canonical_target_lang(target_lang)
+      return "unknown" if lang.empty?
+
+      has_kana = t.match?(/[\u3040-\u30FF]/)
+      has_han = t.match?(/\p{Han}/)
+      has_hangul = t.match?(/[\uAC00-\uD7AF]/)
+      has_latin = t.match?(/[A-Za-z]/)
+
+      case lang
+      when "ja-JP"
+        return "ok" if has_kana
+        return "unknown" if has_han
+        return "drift" if has_hangul
+        return "unknown" if has_latin
+
+        "unknown"
+      when "zh-CN", "zh-TW", "yue-HK"
+        return "drift" if has_kana
+        return "ok" if has_han
+        return "drift" if has_hangul
+        return "unknown" if has_latin
+
+        "unknown"
+      when "ko-KR"
+        return "ok" if has_hangul
+        return "unknown" if has_han
+        return "drift" if has_kana
+        return "unknown" if has_latin
+
+        "unknown"
+      when "en-US"
+        return "ok" if has_latin
+        return "unknown" if has_han || has_kana || has_hangul
+
+        "unknown"
+      else
+        "unknown"
+      end
+    rescue StandardError
+      "unknown"
+    end
+
+    def strip_language_spans(text)
+      text.to_s.gsub(/<lang\b[^>]*>.*?<\/lang>/im, "")
+    rescue StandardError
+      text.to_s
+    end
+
+    def entry_for(target_lang)
+      canonical = canonical_target_lang(target_lang)
+      Entry.new(id: canonical, enabled: true, target_lang: canonical, tags: [canonical.downcase])
+    end
+    private_class_method :entry_for
+
+    def matrix_entries(langs)
+      [OFF] + Array(langs).map { |lang| entry_for(lang) }
+    end
+    private_class_method :matrix_entries
+  end
 end
 
 env_blank =
@@ -360,6 +521,14 @@ parallel_jobs =
     1
   end
 parallel_jobs = 1 if parallel_jobs < 1
+
+empty_response_retry_count =
+  begin
+    Integer(ENV.fetch("OPENROUTER_EMPTY_RESPONSE_RETRY_COUNT", "1"))
+  rescue ArgumentError, TypeError
+    1
+  end
+empty_response_retry_count = 0 if empty_response_retry_count < 0
 
 client_timeout =
   begin
@@ -606,6 +775,24 @@ if scenarios.empty?
   exit 2
 end
 
+language_policy_matrix = ENV.fetch("OPENROUTER_LANGUAGE_POLICY_MATRIX", "0") == "1"
+raw_language_policy_filter = ENV.fetch("OPENROUTER_LANGUAGE_POLICY_FILTER", "").to_s
+language_policy_strict = ENV.fetch("OPENROUTER_LANGUAGE_POLICY_STRICT", "0") == "1"
+
+selected_language_policies =
+  DirectivesEval::LanguagePolicy.filter(
+    raw_language_policy_filter,
+    matrix: language_policy_matrix,
+  )
+
+if selected_language_policies.empty?
+  warn(
+    "No language policy entries selected from OPENROUTER_LANGUAGE_POLICY_FILTER=#{raw_language_policy_filter.inspect}. " \
+    "Falling back to off.",
+  )
+  selected_language_policies = [DirectivesEval::LanguagePolicy::OFF]
+end
+
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
 out_dir = Rails.root.join("tmp", "llm_directives_eval_reports", timestamp)
 FileUtils.mkdir_p(out_dir)
@@ -625,10 +812,15 @@ run_task =
     model_index = task.fetch(:model_index)
     sampling_profile = task.fetch(:sampling_profile)
     strategy = task.fetch(:strategy)
+    language_policy = task.fetch(:language_policy)
 
     model = model_entry.id
     sampling_profile_id = sampling_profile.id
     strategy_id = strategy.id.to_s
+    language_policy_id = language_policy.id.to_s
+    language_policy_enabled = language_policy.enabled == true
+    language_policy_target_lang = language_policy.target_lang.to_s
+    language_policy_target_lang = nil if language_policy_target_lang.strip.empty?
     semantic_repair = strategy.semantic_repair == true
     apply_provider_defaults = strategy.apply_provider_defaults == true
     apply_model_workarounds = strategy.apply_model_workarounds == true
@@ -742,54 +934,115 @@ run_task =
         model_idx = model_index + 1
 
         log_line.call(
-          "[#{task_idx}/#{task_total}] [#{model_idx}/#{selected_models.length}] testing #{model} profile=#{sampling_profile_id} strategy=#{strategy_id} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
+          "[#{task_idx}/#{task_total}] [#{model_idx}/#{selected_models.length}] testing #{model} profile=#{sampling_profile_id} strategy=#{strategy_id} lang=#{language_policy_id} scenario=#{scenario_id} (trial #{trial_idx + 1}/#{trials_per_model})...",
         )
 
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        retry_attempts_used = 0
+        max_attempts = empty_response_retry_count + 1
 
         ok = true
         error = nil
         result = nil
+        assistant_text_language_shape = nil
+        assistant_text_language_ok = nil
 
-        begin
-          result =
-            directives_runner.run(
-              system: scenario[:system],
-              history: [TavernKit::Prompt::Message.new(role: :user, content: scenario[:user])],
-              structured_output_options: structured_output_options,
-              result_validator: semantic_repair ? scenario[:assert] : nil,
+        while retry_attempts_used < max_attempts
+          retry_attempts_used += 1
+
+          ok = true
+          error = nil
+          result = nil
+
+          begin
+            runtime =
+              if language_policy_enabled
+                {
+                  language_policy: {
+                    enabled: true,
+                    target_lang: language_policy_target_lang,
+                  },
+                }
+              end
+
+            result =
+              directives_runner.run(
+                system: scenario[:system],
+                history: [TavernKit::Prompt::Message.new(role: :user, content: scenario[:user])],
+                runtime: runtime,
+                structured_output_options: structured_output_options,
+                result_validator: semantic_repair ? scenario[:assert] : nil,
+              )
+
+            if result[:ok] == true
+              reasons = Array(scenario[:assert].call(result))
+              unless reasons.empty?
+                ok = false
+                error = "ASSERTION_FAILED: #{reasons.join("; ")}"
+              end
+            else
+              ok = false
+              attempts = Array(result[:attempts])
+              last_attempt = attempts.last
+              last_semantic =
+                attempts.reverse.find { |a| a.is_a?(Hash) && a[:semantic_error].is_a?(Hash) }
+              if last_attempt.is_a?(Hash) && last_attempt[:http_error]
+                status = last_attempt[:http_status]
+                msg = last_attempt[:message].to_s
+                error = "DIRECTIVES_RUN_FAILED: HTTP #{status} #{msg}".strip
+              elsif last_semantic
+                reasons = Array(last_semantic.dig(:semantic_error, :reasons)).map(&:to_s).map(&:strip).reject(&:empty?)
+                error = "ASSERTION_FAILED: #{reasons.join("; ")}" if reasons.any?
+                error ||= "ASSERTION_FAILED"
+              else
+                error = "DIRECTIVES_RUN_FAILED"
+              end
+            end
+          rescue SimpleInference::Errors::HTTPError => e
+            ok = false
+            error = "HTTP_ERROR: #{e.status} #{e.message}"
+          rescue StandardError => e
+            ok = false
+            error = "#{e.class}: #{e.message}"
+          end
+
+          had_http_error =
+            result.is_a?(Hash) &&
+              Array(result[:attempts]).any? { |a| a.is_a?(Hash) && a[:http_error] == true }
+
+          retryable_empty_response =
+            result.is_a?(Hash) &&
+              result[:assistant_text].to_s.strip.empty? &&
+              Array(result[:directives]).empty? &&
+              !had_http_error
+
+          break unless retryable_empty_response && retry_attempts_used < max_attempts
+
+          log_line.call(
+            "  [#{task_idx}/#{task_total}] [#{model_idx}/#{selected_models.length}] .. empty assistant_text/directives; retrying (attempt #{retry_attempts_used + 1}/#{max_attempts})",
+          )
+        end
+
+        if language_policy_enabled
+          assistant_text_value = result.is_a?(Hash) ? result[:assistant_text] : nil
+          assistant_text_language_shape =
+            DirectivesEval::LanguagePolicy.language_shape(
+              assistant_text_value,
+              target_lang: language_policy_target_lang,
             )
 
-          if result[:ok] == true
-            reasons = Array(scenario[:assert].call(result))
-            unless reasons.empty?
-              ok = false
-              error = "ASSERTION_FAILED: #{reasons.join("; ")}"
-            end
-          else
-            ok = false
-            attempts = Array(result[:attempts])
-            last_attempt = attempts.last
-            last_semantic =
-              attempts.reverse.find { |a| a.is_a?(Hash) && a[:semantic_error].is_a?(Hash) }
-            if last_attempt.is_a?(Hash) && last_attempt[:http_error]
-              status = last_attempt[:http_status]
-              msg = last_attempt[:message].to_s
-              error = "DIRECTIVES_RUN_FAILED: HTTP #{status} #{msg}".strip
-            elsif last_semantic
-              reasons = Array(last_semantic.dig(:semantic_error, :reasons)).map(&:to_s).map(&:strip).reject(&:empty?)
-              error = "ASSERTION_FAILED: #{reasons.join("; ")}" if reasons.any?
-              error ||= "ASSERTION_FAILED"
+          assistant_text_language_ok =
+            case assistant_text_language_shape
+            when "ok" then true
+            when "drift" then false
             else
-              error = "DIRECTIVES_RUN_FAILED"
+              nil
             end
+
+          if ok && language_policy_strict && assistant_text_language_shape == "drift"
+            ok = false
+            error = "LANGUAGE_DRIFT: expected #{language_policy_target_lang}"
           end
-        rescue SimpleInference::Errors::HTTPError => e
-          ok = false
-          error = "HTTP_ERROR: #{e.status} #{e.message}"
-        rescue StandardError => e
-          ok = false
-          error = "#{e.class}: #{e.message}"
         end
 
         elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
@@ -798,6 +1051,16 @@ run_task =
           model: model,
           sampling_profile: sampling_profile_id,
           strategy: strategy_id,
+          empty_response_retry: {
+            max_retries: empty_response_retry_count,
+            attempts: retry_attempts_used,
+          },
+          language_policy: {
+            id: language_policy_id,
+            enabled: language_policy_enabled,
+            target_lang: language_policy_target_lang,
+            strict: language_policy_strict,
+          },
           semantic_repair: semantic_repair,
           apply_provider_defaults: apply_provider_defaults,
           apply_model_workarounds: apply_model_workarounds,
@@ -809,6 +1072,8 @@ run_task =
           elapsed_ms: elapsed_ms,
           mode: result.is_a?(Hash) ? result[:mode] : nil,
           assistant_text: result.is_a?(Hash) ? result[:assistant_text] : nil,
+          assistant_text_language_shape: assistant_text_language_shape,
+          assistant_text_language_ok: assistant_text_language_ok,
           directives: result.is_a?(Hash) ? result[:directives] : nil,
           warnings: result.is_a?(Hash) ? result[:warnings] : nil,
           attempts: result.is_a?(Hash) ? result[:attempts] : nil,
@@ -818,8 +1083,9 @@ run_task =
         safe_model = DirectivesEval::Util.safe_filename(model)
         safe_profile = DirectivesEval::Util.safe_filename(sampling_profile_id)
         safe_strategy = DirectivesEval::Util.safe_filename(strategy_id)
+        safe_lang = DirectivesEval::Util.safe_filename(language_policy_id)
         safe_scenario = DirectivesEval::Util.safe_filename(scenario_id)
-        file_name = "#{safe_model}__#{safe_profile}__#{safe_strategy}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
+        file_name = "#{safe_model}__#{safe_profile}__#{safe_strategy}__lang_#{safe_lang}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
         File.write(out_dir.join(file_name), JSON.pretty_generate(report))
 
         attempts = report[:attempts]
@@ -831,11 +1097,15 @@ run_task =
           model: model,
           sampling_profile: sampling_profile_id,
           strategy: strategy_id,
+          empty_response_retry_attempts: retry_attempts_used,
+          language_policy: language_policy_id,
           scenario: scenario_id,
           trial: trial_idx + 1,
           ok: ok,
           elapsed_ms: elapsed_ms,
           mode: report[:mode],
+          assistant_text_language_shape: assistant_text_language_shape,
+          assistant_text_language_ok: assistant_text_language_ok,
           attempts_count: attempts_count,
           had_http_404: had_http_404,
           had_semantic_error: had_semantic_error,
@@ -848,7 +1118,7 @@ run_task =
 
         status_str = ok ? "OK" : "FAIL"
         log_line.call(
-          "[#{task_idx}/#{task_total}] #{status_str} #{model} profile=#{sampling_profile_id} strategy=#{strategy_id} scenario=#{scenario_id} (trial #{trial_idx + 1}, #{elapsed_ms}ms)",
+          "[#{task_idx}/#{task_total}] #{status_str} #{model} profile=#{sampling_profile_id} strategy=#{strategy_id} lang=#{language_policy_id} scenario=#{scenario_id} (trial #{trial_idx + 1}, #{elapsed_ms}ms)",
         )
       end
     end
@@ -867,13 +1137,30 @@ run_task =
         out[mode] += 1
       end
 
+    lang_ok_runs = nil
+    lang_drift_runs = nil
+    lang_unknown_runs = nil
+    if language_policy_enabled
+      lang_ok_runs = runs.count { |t| t[:assistant_text_language_ok] == true }
+      lang_drift_runs = runs.count { |t| t[:assistant_text_language_shape].to_s == "drift" }
+      lang_unknown_runs = runs.count { |t| t[:assistant_text_language_shape].to_s == "unknown" }
+    end
+
     {
       model: model,
       sampling_profile: sampling_profile_id,
       strategy: strategy_id,
+      language_policy: language_policy_id,
+      language_enabled: language_policy_enabled,
       runs: runs.size,
       ok: ok_count,
       ok_rate: rate,
+      language_ok_runs: lang_ok_runs,
+      language_ok_rate: lang_ok_runs ? lang_ok_runs.fdiv(runs.size) : nil,
+      language_drift_runs: lang_drift_runs,
+      language_drift_rate: lang_drift_runs ? lang_drift_runs.fdiv(runs.size) : nil,
+      language_unknown_runs: lang_unknown_runs,
+      language_unknown_rate: lang_unknown_runs ? lang_unknown_runs.fdiv(runs.size) : nil,
       multi_attempt_runs: multi_attempt_runs,
       multi_attempt_rate: multi_attempt_runs.fdiv(runs.size),
       http_404_runs: http_404_runs,
@@ -900,13 +1187,16 @@ task_list =
     profiles = [default_sampling_profile] if profiles.empty?
 
     profiles.flat_map do |profile|
-      requested_strategies.map do |strategy|
-        {
-          model_entry: model_entry,
-          model_index: model_index,
-          sampling_profile: profile,
-          strategy: strategy,
-        }
+      requested_strategies.flat_map do |strategy|
+        selected_language_policies.map do |language_policy|
+          {
+            model_entry: model_entry,
+            model_index: model_index,
+            sampling_profile: profile,
+            strategy: strategy,
+            language_policy: language_policy,
+          }
+        end
       end
     end
   end
@@ -944,6 +1234,10 @@ summary = {
   base_url: base_url,
   api_prefix: api_prefix,
   require_parameters: require_parameters_default,
+  language_policy_filter: raw_language_policy_filter,
+  language_policy_matrix: language_policy_matrix,
+  language_policy_strict: language_policy_strict,
+  language_policies: selected_language_policies.map(&:id),
   sampling_profile_filter: sampling_profile_filter,
   sampling_profiles: selected_sampling_profiles.map(&:id),
   sampling_profile_enforce_applicability: enforce_sampling_profile_applicability,
@@ -976,6 +1270,31 @@ summary_by_scenario =
   end
 summary_by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
 File.write(out_dir.join("summary_by_scenario.json"), JSON.pretty_generate(summary_by_scenario))
+
+summary_by_scenario_and_language_policy =
+  all_runs.each_with_object({}) do |run, out|
+    sid = run[:scenario].to_s
+    lang = run[:language_policy].to_s
+    lang = DirectivesEval::LanguagePolicy::OFF.id if lang.empty?
+
+    out[lang] ||= {}
+    out[lang][sid] ||= { "runs" => 0, "ok" => 0, "errors" => Hash.new(0) }
+    out[lang][sid]["runs"] += 1
+    out[lang][sid]["ok"] += 1 if run[:ok] == true
+
+    unless run[:ok] == true
+      cat = DirectivesEval::Util.error_category(run[:error])
+      cat = "unknown" if cat.empty?
+      out[lang][sid]["errors"][cat] += 1
+    end
+  end
+summary_by_scenario_and_language_policy.each_value do |by_scenario|
+  by_scenario.each_value { |v| v["errors"] = v["errors"].to_h }
+end
+File.write(
+  out_dir.join("summary_by_scenario_and_language_policy.json"),
+  JSON.pretty_generate(summary_by_scenario_and_language_policy),
+)
 
 summary_by_scenario_and_strategy =
   all_runs.each_with_object({}) do |run, out|
@@ -1010,6 +1329,10 @@ puts "scenarios: #{summary[:scenarios].join(",")}"
 puts "trials_per_model: #{trials_per_model}"
 puts "jobs: #{parallel_jobs}"
 puts "require_parameters: #{require_parameters_default}"
+puts "language_policy_filter: #{raw_language_policy_filter}" unless raw_language_policy_filter.strip.empty?
+puts "language_policy_matrix: #{language_policy_matrix}" if language_policy_matrix
+puts "language_policy_strict: #{language_policy_strict}" if language_policy_strict
+puts "language_policies: #{selected_language_policies.map(&:id).join(",")}"
 puts "sampling_profile_filter: #{sampling_profile_filter}"
 puts "sampling_profiles: #{selected_sampling_profiles.map(&:id).join(",")}"
 puts "strategy_filter: #{raw_strategy_filter}" unless raw_strategy_filter.empty?
@@ -1019,7 +1342,7 @@ puts "semantic_repair: #{summary[:semantic_repair]}" unless summary[:semantic_re
 puts "full report: #{out_dir.relative_path_from(Rails.root)}"
 puts
 
-header = ["model", "profile", "strategy", "runs", "ok", "rate", "p50_ms", "p95_ms", "sample"]
+header = ["model", "profile", "strategy", "lang", "runs", "ok", "rate", "p50_ms", "p95_ms", "sample"]
 rows =
   reports.map do |r|
     sample = Array(r[:failure_samples]).first
@@ -1028,6 +1351,7 @@ rows =
       r[:model].to_s,
       r[:sampling_profile].to_s,
       r[:strategy].to_s,
+      r[:language_policy].to_s,
       r[:runs].to_s,
       r[:ok].to_s,
       format("%.0f%%", r[:ok_rate].to_f * 100),

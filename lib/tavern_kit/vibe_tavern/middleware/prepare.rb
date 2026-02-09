@@ -38,23 +38,17 @@ module TavernKit
           raw = runtime&.[](:token_estimation)
           raw = ctx[:token_estimation] if raw.nil? && ctx.key?(:token_estimation)
 
-          raw.is_a?(Hash) ? raw : nil
-        rescue StandardError
-          nil
+          return nil if raw.nil?
+
+          raise ArgumentError, "token_estimation config must be a Hash" unless raw.is_a?(Hash)
+
+          raw
         end
 
         def apply_model_hint!(ctx, config)
           explicit = ctx.key?(:model_hint) ? presence(ctx[:model_hint]) : nil
 
-          runtime_hint =
-            presence(
-              config[:model_hint] ||
-                config["model_hint"] ||
-                config[:tokenizer_model_hint] ||
-                config["tokenizer_model_hint"] ||
-                config[:hint] ||
-                config["hint"],
-            )
+          runtime_hint = presence(config.fetch(:model_hint, nil))
 
           default_hint = ctx.key?(:default_model_hint) ? presence(ctx[:default_model_hint]) : nil
 
@@ -76,28 +70,21 @@ module TavernKit
         def apply_token_estimator!(ctx, config)
           return if ctx.token_estimator
 
-          estimator =
-            config[:token_estimator] ||
-              config["token_estimator"] ||
-              config[:estimator] ||
-              config["estimator"]
-          if estimator && estimator.respond_to?(:estimate)
+          estimator = config.fetch(:token_estimator, nil)
+          if estimator
+            raise ArgumentError, "token_estimation.token_estimator must respond to #estimate" unless estimator.respond_to?(:estimate)
             ctx.token_estimator = estimator
             ctx[:token_estimator_source] = :runtime
             return
           end
 
-          registry =
-            config[:registry] ||
-              config["registry"] ||
-              config[:tokenizer_registry] ||
-              config["tokenizer_registry"]
-          return unless registry
+          registry = config.fetch(:registry, nil)
+          return if registry.nil?
+
+          raise ArgumentError, "token_estimation.registry must be a Hash" unless registry.is_a?(Hash)
 
           ctx.token_estimator = TavernKit::TokenEstimator.new(registry: registry)
           ctx[:token_estimator_source] = :runtime_registry
-        rescue StandardError
-          nil
         end
 
         def presence(value)

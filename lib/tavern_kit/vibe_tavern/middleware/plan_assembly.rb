@@ -15,6 +15,39 @@ module TavernKit
       # - optional post-history instructions
       # - user message
       class PlanAssembly < TavernKit::Prompt::Middleware::Base
+        DEFAULT_SYSTEM_TEXT_BUILDER =
+          lambda do |ctx|
+            char = ctx.character
+            user = ctx.user
+
+            return "" unless char || user
+
+            parts = []
+            parts << TavernKit::Utils.presence(char&.data&.system_prompt)
+
+            char_name =
+              if char&.respond_to?(:display_name)
+                char.display_name.to_s
+              elsif char&.respond_to?(:name)
+                char.name.to_s
+              else
+                ""
+              end
+            char_name = TavernKit::Utils.presence(char_name)
+            parts << "You are #{char_name}." if char_name
+
+            parts << TavernKit::Utils.presence(char&.data&.description)
+            parts << TavernKit::Utils.presence(char&.data&.personality)
+
+            scenario = TavernKit::Utils.presence(char&.data&.scenario)
+            parts << "Scenario:\n#{scenario}" if scenario
+
+            persona = TavernKit::Utils.presence(user&.persona_text)
+            parts << "User persona:\n#{persona}" if persona
+
+            parts.compact.join("\n\n")
+          end.freeze
+
         private
 
         def before(ctx)
@@ -135,31 +168,7 @@ module TavernKit
 
           return nil unless char || user
 
-          parts = []
-          parts << presence(char&.data&.system_prompt)
-
-          char_name =
-            if char&.respond_to?(:display_name)
-              char.display_name.to_s
-            elsif char&.respond_to?(:name)
-              char.name.to_s
-            else
-              ""
-            end
-          char_name = TavernKit::Utils.presence(char_name)
-          parts << "You are #{char_name}." if char_name
-
-          parts << presence(char&.data&.description)
-          parts << presence(char&.data&.personality)
-
-          scenario = presence(char&.data&.scenario)
-          parts << "Scenario:\n#{scenario}" if scenario
-
-          persona = presence(user&.persona_text)
-          parts << "User persona:\n#{persona}" if persona
-
-          text = parts.compact.join("\n\n")
-          text = TavernKit::Utils.presence(text)
+          text = build_default_system_text(ctx, default_system_text_builder: option(:default_system_text_builder))
           return nil unless text
 
           TavernKit::Prompt::Block.new(
@@ -171,8 +180,21 @@ module TavernKit
           )
         end
 
-        def presence(value)
-          TavernKit::Utils.presence(value)
+        def build_default_system_text(ctx, default_system_text_builder:)
+          builder = default_system_text_builder
+          unless builder.nil? || builder.respond_to?(:call)
+            ctx.warn("plan_assembly.default_system_text_builder must respond to #call (ignoring)")
+            builder = nil
+          end
+
+          builder ||= DEFAULT_SYSTEM_TEXT_BUILDER
+
+          text = builder.call(ctx).to_s
+          TavernKit::Utils.presence(text)
+        rescue StandardError => e
+          ctx.warn("plan_assembly.default_system_text_builder error (using default): #{e.class}: #{e.message}")
+          text = DEFAULT_SYSTEM_TEXT_BUILDER.call(ctx).to_s
+          TavernKit::Utils.presence(text)
         end
       end
     end

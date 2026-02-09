@@ -84,24 +84,24 @@ module TavernKit
           structured_request_overrides = normalize_llm_options(fetch_preset(effective_preset, :structured_request_overrides))
           prompt_only_request_overrides = normalize_llm_options(fetch_preset(effective_preset, :prompt_only_request_overrides))
 
-          base_structured_output_options = structured_output_options.is_a?(Hash) ? structured_output_options : {}
+          base_structured_output_options =
+            if structured_output_options.is_a?(Hash)
+              deep_symbolize_keys(structured_output_options)
+            else
+              {}
+            end
 
-          registry = base_structured_output_options[:registry] || base_structured_output_options["registry"]
+          registry = base_structured_output_options[:registry]
           registry = nil unless registry.respond_to?(:types)
 
           schema_name =
-            base_structured_output_options[:schema_name] ||
-              base_structured_output_options["schema_name"] ||
-              TavernKit::VibeTavern::Directives::Schema::NAME
+            base_structured_output_options[:schema_name] || TavernKit::VibeTavern::Directives::Schema::NAME
 
           allowed_types =
-            base_structured_output_options[:allowed_types] ||
-              base_structured_output_options["allowed_types"] ||
-              (registry ? registry.types : nil)
+            base_structured_output_options[:allowed_types] || (registry ? registry.types : nil)
 
           output_instructions =
-            base_structured_output_options[:output_instructions] ||
-              base_structured_output_options["output_instructions"]
+            base_structured_output_options[:output_instructions]
           output_instructions = output_instructions.to_s.strip
           if output_instructions.empty? && registry && registry.respond_to?(:instructions_text)
             output_instructions = registry.instructions_text.to_s.strip

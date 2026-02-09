@@ -298,9 +298,23 @@ module TavernKit
               tool_calls: tool_calls_summary,
             }
 
+            content_stripped = false
+            content_sample = nil
+            assistant_content_for_history = assistant_content
+            if tool_calls.any?
+              content_stripped = !assistant_content_for_history.strip.empty?
+              content_sample = assistant_content_for_history[0, 200] if content_stripped
+              assistant_content_for_history = ""
+            end
+
+            if content_stripped
+              trace_entry[:response_summary][:assistant_content_stripped] = true
+              trace_entry[:response_summary][:assistant_content_sample] = content_sample
+            end
+
             history << TavernKit::Prompt::Message.new(
               role: :assistant,
-              content: assistant_content,
+              content: assistant_content_for_history,
               metadata: tool_calls.empty? ? nil : { tool_calls: tool_calls },
             )
 
@@ -565,9 +579,7 @@ module TavernKit
           return explicit == true unless explicit.nil?
 
           val = runtime_setting_bool(key)
-          return val if val == true || val == false
-
-          default
+          val.nil? ? default : val
         end
 
         def resolve_bytes_setting(key, default:)
@@ -654,7 +666,7 @@ module TavernKit
 
           raw =
             if @runtime.is_a?(Hash)
-              @runtime[:tool_calling] || @runtime["tool_calling"]
+              runtime_settings_hash&.[](:tool_calling)
             else
               @runtime[:tool_calling]
             end
@@ -670,9 +682,7 @@ module TavernKit
 
         def runtime_setting_bool(key)
           val = runtime_setting_value(key)
-          return val if val == true || val == false
-
-          nil
+          TavernKit::Coerce.bool(val, default: nil)
         end
 
         def resolve_fix_empty_final_user_text(default:)

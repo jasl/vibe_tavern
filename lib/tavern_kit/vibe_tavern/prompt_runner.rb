@@ -3,6 +3,7 @@
 require_relative "tool_calling/message_transforms"
 require_relative "tool_calling/response_transforms"
 require_relative "directives"
+require_relative "output_tags"
 
 module TavernKit
   module VibeTavern
@@ -10,6 +11,7 @@ module TavernKit
       PromptRequest =
         Data.define(
           :plan,
+          :runtime,
           :messages,
           :options,
           :request,
@@ -20,6 +22,7 @@ module TavernKit
         ) do
           def initialize(
             plan:,
+            runtime:,
             messages:,
             options:,
             request:,
@@ -30,6 +33,7 @@ module TavernKit
           )
             super(
               plan: plan,
+              runtime: runtime,
               messages: messages,
               options: options,
               request: request,
@@ -103,6 +107,7 @@ module TavernKit
         history = Array(history)
 
         system_text = system.to_s
+        runtime = normalize_runtime(runtime)
         build_history =
           if system_text.empty?
             history
@@ -126,30 +131,25 @@ module TavernKit
         request = { model: @model, messages: messages }.merge(options)
 
         structured_output_kind = structured_output&.to_sym
-        structured_output_options = structured_output_options.is_a?(Hash) ? structured_output_options : {}
+        structured_output_options =
+          if structured_output_options.is_a?(Hash)
+            deep_symbolize_keys(structured_output_options)
+          else
+            {}
+          end
 
         if structured_output_kind == :directives_v1
-          registry = structured_output_options[:registry] || structured_output_options["registry"]
+          registry = structured_output_options[:registry]
           registry = nil unless registry.respond_to?(:types)
 
           schema_name =
-            structured_output_options[:schema_name] ||
-              structured_output_options["schema_name"] ||
-              TavernKit::VibeTavern::Directives::Schema::NAME
+            structured_output_options[:schema_name] || TavernKit::VibeTavern::Directives::Schema::NAME
 
           allowed_types =
-            structured_output_options[:allowed_types] ||
-              structured_output_options["allowed_types"] ||
-              (registry ? registry.types : nil)
+            structured_output_options[:allowed_types] || (registry ? registry.types : nil)
 
           inject_response_format =
-            if structured_output_options.key?(:inject_response_format)
-              structured_output_options[:inject_response_format]
-            elsif structured_output_options.key?("inject_response_format")
-              structured_output_options["inject_response_format"]
-            else
-              true
-            end
+            structured_output_options.key?(:inject_response_format) ? structured_output_options[:inject_response_format] : true
 
           if inject_response_format != false
             options[:response_format] ||=
@@ -175,6 +175,7 @@ module TavernKit
 
         PromptRequest.new(
           plan: plan,
+          runtime: runtime,
           messages: messages,
           options: options,
           request: request,
@@ -189,7 +190,7 @@ module TavernKit
         prompt_request = prompt_request.is_a?(PromptRequest) ? prompt_request : nil
         raise ArgumentError, "prompt_request is required" unless prompt_request
 
-        if prompt_request.request[:stream] == true || prompt_request.request["stream"] == true
+        if prompt_request.request[:stream] == true
           raise ArgumentError, "PromptRunner does not support streaming via #perform; use #perform_stream instead"
         end
 
@@ -208,7 +209,19 @@ module TavernKit
             assistant_message,
             response_transforms,
             strict: prompt_request.strict,
+            runtime: prompt_request.runtime,
           )
+        end
+
+        runtime = prompt_request.runtime
+        output_tags_enabled = runtime && TavernKit::VibeTavern::OutputTags.enabled?(runtime)
+
+        if output_tags_enabled && prompt_request.structured_output_kind.nil?
+          assistant_message["content"] =
+            TavernKit::VibeTavern::OutputTags.transform(
+              assistant_message.fetch("content", nil),
+              runtime: runtime,
+            )
         end
 
         structured_output = nil
@@ -217,19 +230,19 @@ module TavernKit
 
         if prompt_request.structured_output_kind == :directives_v1
           opts = prompt_request.structured_output_options
-          registry = opts.is_a?(Hash) ? (opts[:registry] || opts["registry"]) : nil
+          registry = opts.is_a?(Hash) ? opts[:registry] : nil
           registry = nil unless registry.respond_to?(:types)
 
           allowed_types =
-            opts.is_a?(Hash) ? (opts[:allowed_types] || opts["allowed_types"]) : nil
+            opts.is_a?(Hash) ? opts[:allowed_types] : nil
           allowed_types = registry.types if allowed_types.nil? && registry
 
           type_aliases =
-            opts.is_a?(Hash) ? (opts[:type_aliases] || opts["type_aliases"]) : nil
+            opts.is_a?(Hash) ? opts[:type_aliases] : nil
           type_aliases = registry.type_aliases if type_aliases.nil? && registry&.respond_to?(:type_aliases)
 
           payload_validator =
-            opts.is_a?(Hash) ? (opts[:payload_validator] || opts["payload_validator"]) : nil
+            opts.is_a?(Hash) ? opts[:payload_validator] : nil
 
           tool_calls = assistant_message.fetch("tool_calls", nil)
           tool_calls_present =
@@ -244,7 +257,7 @@ module TavernKit
 
           # If this turn contains tool calls, do not attempt to parse directives.
           unless tool_calls_present
-            raw_max_bytes = opts.is_a?(Hash) ? (opts[:max_bytes] || opts["max_bytes"]) : nil
+            raw_max_bytes = opts.is_a?(Hash) ? opts[:max_bytes] : nil
             max_bytes =
               begin
                 Integer(raw_max_bytes)
@@ -279,6 +292,16 @@ module TavernKit
           end
         end
 
+        if output_tags_enabled && structured_output.is_a?(Hash) && structured_output.key?("assistant_text")
+          transformed = structured_output.dup
+          transformed["assistant_text"] =
+            TavernKit::VibeTavern::OutputTags.transform(
+              structured_output.fetch("assistant_text", nil),
+              runtime: runtime,
+            )
+          structured_output = transformed
+        end
+
         PromptResult.new(
           prompt_request: prompt_request,
           response: response,
@@ -301,11 +324,11 @@ module TavernKit
         end
 
         req = prompt_request.request
-        if req.key?(:tools) || req.key?("tools") || req.key?(:tool_choice) || req.key?("tool_choice")
+        if req.key?(:tools) || req.key?(:tool_choice)
           raise ArgumentError, "PromptRunner#perform_stream does not support tool calling; use ToolLoopRunner (non-streaming)"
         end
 
-        if req.key?(:response_format) || req.key?("response_format")
+        if req.key?(:response_format)
           raise ArgumentError, "PromptRunner#perform_stream does not support response_format; use #perform instead"
         end
 
@@ -314,8 +337,8 @@ module TavernKit
         end
 
         request = req.dup
-        model = request.delete(:model) || request.delete("model")
-        messages = request.delete(:messages) || request.delete("messages")
+        model = request.delete(:model)
+        messages = request.delete(:messages)
 
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         chat_result =
@@ -347,7 +370,17 @@ module TavernKit
             assistant_message,
             response_transforms,
             strict: prompt_request.strict,
+            runtime: prompt_request.runtime,
           )
+        end
+
+        runtime = prompt_request.runtime
+        if runtime && TavernKit::VibeTavern::OutputTags.enabled?(runtime)
+          assistant_message["content"] =
+            TavernKit::VibeTavern::OutputTags.transform(
+              assistant_message.fetch("content", nil),
+              runtime: runtime,
+            )
         end
 
         PromptResult.new(
@@ -382,6 +415,15 @@ module TavernKit
         h.delete(:tool_choice)
         h.delete(:response_format)
         h
+      end
+
+      def normalize_runtime(value)
+        return nil if value.nil?
+        return value unless value.is_a?(Hash)
+
+        TavernKit::Runtime::Base.build(value, type: :app)
+      rescue StandardError
+        nil
       end
 
       def deep_symbolize_keys(value)
