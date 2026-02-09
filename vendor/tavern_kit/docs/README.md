@@ -17,6 +17,7 @@ For Rails integration work (the app rewrite), see the top-level `docs/` folder.
 
 - Reference sources (pinned upstream commits/specs): `docs/reference-sources.md`
 - Core interface design: `docs/core-interface-design.md`
+- Prompt inspection (debug): `docs/prompt-inspector.md`
 - Pipeline observability/debugging: `docs/pipeline-observability.md`
 - Prompt orchestration contracts (dialects/trimming/injection): `docs/contracts/prompt-orchestration.md`
 - Load hooks contract (initialization/registration): `docs/contracts/load-hooks.md`

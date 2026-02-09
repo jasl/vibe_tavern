@@ -592,6 +592,8 @@ end
 produces token usage breakdowns. It is **not** used by trimming/budgeting hot
 paths.
 
+See: `docs/prompt-inspector.md`
+
 - `PromptInspector.inspect_plan(plan, token_estimator:, model_hint:, **opts) -> Inspection`
 - `PromptInspector.inspect_messages(messages, token_estimator:, model_hint:, **opts) -> Inspection`
 
