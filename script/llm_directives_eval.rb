@@ -176,6 +176,9 @@ module DirectivesEval
     def error_category(message)
       msg = message.to_s
       return "EMPTY_ASSISTANT_TEXT" if msg.start_with?("EMPTY_ASSISTANT_TEXT")
+      return "CONNECTION_ERROR" if msg.start_with?("CONNECTION_ERROR:")
+      return "TIMEOUT_ERROR" if msg.start_with?("TIMEOUT_ERROR:")
+      return "DECODE_ERROR" if msg.start_with?("DECODE_ERROR:")
       return "ASSERTION_FAILED" if msg.start_with?("ASSERTION_FAILED:")
       return "LANGUAGE_DRIFT" if msg.start_with?("LANGUAGE_DRIFT:")
       return "DIRECTIVES_RUN_FAILED" if msg.start_with?("DIRECTIVES_RUN_FAILED")
@@ -1002,6 +1005,15 @@ run_task =
           rescue SimpleInference::Errors::HTTPError => e
             ok = false
             error = "HTTP_ERROR: #{e.status} #{e.message}"
+          rescue SimpleInference::Errors::TimeoutError => e
+            ok = false
+            error = "TIMEOUT_ERROR: #{DirectivesEval::Util.truncate(e.message, max_chars: 400)}"
+          rescue SimpleInference::Errors::ConnectionError => e
+            ok = false
+            error = "CONNECTION_ERROR: #{DirectivesEval::Util.truncate(e.message, max_chars: 400)}"
+          rescue SimpleInference::Errors::DecodeError => e
+            ok = false
+            error = "DECODE_ERROR: #{DirectivesEval::Util.truncate(e.message, max_chars: 400)}"
           rescue StandardError => e
             ok = false
             error = "#{e.class}: #{e.message}"
@@ -1017,10 +1029,17 @@ run_task =
               Array(result[:directives]).empty? &&
               !had_http_error
 
-          break unless retryable_empty_response && retry_attempts_used < max_attempts
+          failure_category = DirectivesEval::Util.error_category(error)
+          retryable_network_error =
+            !had_http_error &&
+              %w[CONNECTION_ERROR TIMEOUT_ERROR DECODE_ERROR].include?(failure_category)
+          retryable_transient_failure = retryable_empty_response || retryable_network_error
+
+          break unless retryable_transient_failure && retry_attempts_used < max_attempts
 
           log_line.call(
-            "  [#{task_idx}/#{task_total}] [#{model_idx}/#{selected_models.length}] .. empty assistant_text/directives; retrying (attempt #{retry_attempts_used + 1}/#{max_attempts})",
+            "  [#{task_idx}/#{task_total}] [#{model_idx}/#{selected_models.length}] .. transient failure (#{failure_category}); retrying " \
+            "(attempt #{retry_attempts_used + 1}/#{max_attempts})",
           )
         end
 

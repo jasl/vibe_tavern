@@ -744,12 +744,34 @@ process_task =
           )
         injected_target_lang = LanguagePolicyEval::Util.extract_injected_target_lang(prompt_request.messages)
 
+        transient_error = nil
+
         while retry_attempts_used < max_attempts
           retry_attempts_used += 1
-          result = prompt_runner.perform(prompt_request)
-          assistant_message = result.assistant_message
-          finish_reason = result.finish_reason
-          assistant_text = assistant_message.fetch("content", nil).to_s
+
+          begin
+            result = prompt_runner.perform(prompt_request)
+            assistant_message = result.assistant_message
+            finish_reason = result.finish_reason
+            assistant_text = assistant_message.fetch("content", nil).to_s
+            transient_error = nil
+          rescue SimpleInference::Errors::TimeoutError => e
+            transient_error = "TIMEOUT_ERROR: #{e.message}"
+          rescue SimpleInference::Errors::ConnectionError => e
+            transient_error = "CONNECTION_ERROR: #{e.message}"
+          rescue SimpleInference::Errors::DecodeError => e
+            transient_error = "DECODE_ERROR: #{e.message}"
+          end
+
+          if transient_error
+            break if retry_attempts_used >= max_attempts
+
+            log_line.call(
+              "  [#{task_idx}/#{task_total}] .. transient failure (#{transient_error.split(":", 2).first}); retrying " \
+              "(attempt #{retry_attempts_used + 1}/#{max_attempts})",
+            )
+            next
+          end
 
           break unless assistant_text.strip.empty? && retry_attempts_used < max_attempts
 
@@ -758,7 +780,10 @@ process_task =
           )
         end
 
-        if assistant_text.strip.empty?
+        if transient_error
+          ok = false
+          error = transient_error
+        elsif assistant_text.strip.empty?
           ok = false
           error = "EMPTY_ASSISTANT_TEXT"
         else
@@ -931,6 +956,12 @@ summary_by_scenario_and_language_policy =
           "LANGUAGE_DRIFT"
         elsif err.start_with?("EMPTY_ASSISTANT_TEXT")
           "EMPTY_ASSISTANT_TEXT"
+        elsif err.start_with?("CONNECTION_ERROR:")
+          "CONNECTION_ERROR"
+        elsif err.start_with?("TIMEOUT_ERROR:")
+          "TIMEOUT_ERROR"
+        elsif err.start_with?("DECODE_ERROR:")
+          "DECODE_ERROR"
         elsif err.start_with?("ASSERTION_FAILED:")
           "ASSERTION_FAILED"
         elsif err.start_with?("HTTP_ERROR:")
