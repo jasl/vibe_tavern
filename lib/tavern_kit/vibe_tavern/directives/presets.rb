@@ -143,30 +143,11 @@ module TavernKit
 
         def normalize_request_overrides(value)
           return {} if value.nil?
-          return deep_symbolize_keys(value) if value.is_a?(Hash)
+          return TavernKit::Utils.deep_symbolize_keys(value) if value.is_a?(Hash)
 
           {}
         end
         private_class_method :normalize_request_overrides
-
-        def deep_symbolize_keys(value)
-          case value
-          when Hash
-            value.each_with_object({}) do |(k, v), out|
-              if k.is_a?(Symbol)
-                out[k] = deep_symbolize_keys(v)
-              else
-                sym = k.to_s.to_sym
-                out[sym] = deep_symbolize_keys(v) unless out.key?(sym)
-              end
-            end
-          when Array
-            value.map { |v| deep_symbolize_keys(v) }
-          else
-            value
-          end
-        end
-        private_class_method :deep_symbolize_keys
 
         def deep_merge_hashes(left, right)
           out = (left.is_a?(Hash) ? left : {}).dup

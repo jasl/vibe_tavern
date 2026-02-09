@@ -73,7 +73,7 @@ module TavernKit
             end
 
             payload_raw = fetch_key(d, "payload")
-            payload = payload_raw.is_a?(Hash) ? deep_stringify_keys(payload_raw) : nil
+            payload = payload_raw.is_a?(Hash) ? TavernKit::Utils.deep_stringify_keys(payload_raw) : nil
             unless payload
               warnings << { code: "MISSING_PAYLOAD", index: idx, type: canonical }
               next
@@ -145,7 +145,7 @@ module TavernKit
           normalized_ops = []
 
           list.each_with_index do |op, idx|
-            h = op.is_a?(Hash) ? deep_stringify_keys(op) : {}
+            h = op.is_a?(Hash) ? TavernKit::Utils.deep_stringify_keys(op) : {}
 
             action_raw = h.fetch("op", "").to_s.strip
             action_raw = infer_patch_op(h) if action_raw.empty?
@@ -253,7 +253,7 @@ module TavernKit
           when Hash
             acc = TavernKit::Utils::HashAccessor.wrap(value)
             code = acc.fetch(:code, default: nil)
-            code = "PAYLOAD_INVALID" if code.blank?
+            code = "PAYLOAD_INVALID" if code.to_s.strip.empty?
             details = acc.fetch(:details, default: nil)
             h = { code: code.to_s }
             h[:details] = details if details.is_a?(Hash)
@@ -302,20 +302,6 @@ module TavernKit
           end
         end
         private_class_method :fetch_key
-
-        def deep_stringify_keys(value)
-          case value
-          when Hash
-            value.each_with_object({}) do |(k, v), out|
-              out[k.to_s] = deep_stringify_keys(v)
-            end
-          when Array
-            value.map { |v| deep_stringify_keys(v) }
-          else
-            value
-          end
-        end
-        private_class_method :deep_stringify_keys
       end
     end
   end

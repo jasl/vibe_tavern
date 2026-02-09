@@ -86,7 +86,7 @@ module TavernKit
 
           base_structured_output_options =
             if structured_output_options.is_a?(Hash)
-              deep_symbolize_keys(structured_output_options)
+              TavernKit::Utils.deep_symbolize_keys(structured_output_options)
             else
               {}
             end
@@ -308,35 +308,17 @@ module TavernKit
         def fetch_preset(preset, key)
           return nil unless preset.is_a?(Hash)
 
-          preset[key] || preset[key.to_s]
+          preset[key]
         end
 
         def normalize_llm_options(value)
-          h = value.is_a?(Hash) ? deep_symbolize_keys(value) : {}
+          h = value.is_a?(Hash) ? TavernKit::Utils.deep_symbolize_keys(value) : {}
           h.delete(:model)
           h.delete(:messages)
           h.delete(:tools)
           h.delete(:tool_choice)
           h.delete(:response_format)
           h
-        end
-
-        def deep_symbolize_keys(value)
-          case value
-          when Hash
-            value.each_with_object({}) do |(k, v), out|
-              if k.is_a?(Symbol)
-                out[k] = deep_symbolize_keys(v)
-              else
-                sym = k.to_s.to_sym
-                out[sym] = deep_symbolize_keys(v) unless out.key?(sym)
-              end
-            end
-          when Array
-            value.map { |v| deep_symbolize_keys(v) }
-          else
-            value
-          end
         end
 
         def deep_merge_hashes(left, right)

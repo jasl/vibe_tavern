@@ -75,7 +75,7 @@ module TavernKit
           return unless enabled
 
           raw_target = cfg.fetch(:target_lang)
-          raise ArgumentError, "language_policy.target_lang must be present" if raw_target.blank?
+          raise ArgumentError, "language_policy.target_lang must be present" if raw_target.to_s.strip.empty?
 
           target_lang = canonicalize_target_lang(raw_target)
           unless SUPPORTED_TARGET_LANGS.include?(target_lang)
@@ -85,7 +85,7 @@ module TavernKit
 
           style_hint = cfg.fetch(:style_hint, nil)
           style_hint = style_hint.to_s.strip
-          style_hint = nil if style_hint.blank?
+          style_hint = nil if style_hint.empty?
           special_tags =
             Array(cfg.fetch(:special_tags, nil))
               .map { |item| item.to_s.strip }

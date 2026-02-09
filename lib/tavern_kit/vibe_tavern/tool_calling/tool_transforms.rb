@@ -29,7 +29,7 @@ module TavernKit
         # in place. If the transform returns an Array, the returned Array becomes
         # the new working set for subsequent transforms.
         def apply(tools, transforms, strict: false)
-          current = Array(tools).map { |t| deep_symbolize_keys(t) }
+          current = Array(tools).map { |t| TavernKit::Utils.deep_symbolize_keys(t) }
 
           Array(transforms).each do |name|
             canonical = canonical_name(name)
@@ -38,7 +38,7 @@ module TavernKit
             transform = REGISTRY[canonical]
             if transform
               result = transform.call(current)
-              current = result if result.is_a?(Array)
+              current = result.map { |t| TavernKit::Utils.deep_symbolize_keys(t) } if result.is_a?(Array)
             elsif strict
               raise ArgumentError, "Unknown tool transform: #{name}"
             end
@@ -51,25 +51,6 @@ module TavernKit
           name.to_s.strip.downcase.tr("-", "_")
         end
         private_class_method :canonical_name
-
-        def deep_symbolize_keys(value)
-          case value
-          when Hash
-            value.each_with_object({}) do |(k, v), out|
-              if k.is_a?(Symbol)
-                out[k] = deep_symbolize_keys(v)
-              else
-                sym = k.to_s.to_sym
-                out[sym] = deep_symbolize_keys(v) unless out.key?(sym)
-              end
-            end
-          when Array
-            value.map { |v| deep_symbolize_keys(v) }
-          else
-            value
-          end
-        end
-        private_class_method :deep_symbolize_keys
       end
     end
   end

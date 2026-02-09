@@ -26,7 +26,7 @@ module TavernKit
           # Allow executors to return already-normalized envelopes, but don't
           # require it for simple implementations.
           if result.is_a?(Hash)
-            normalized = deep_symbolize_keys(result)
+            normalized = TavernKit::Utils.deep_symbolize_keys(result)
             return normalize_envelope(name, normalized) if normalized.key?(:ok)
           end
 
@@ -41,7 +41,7 @@ module TavernKit
         private
 
         def ok_envelope(name, data)
-          data = deep_symbolize_keys(data) if data.is_a?(Hash)
+          data = TavernKit::Utils.deep_symbolize_keys(data) if data.is_a?(Hash)
 
           {
             ok: true,
@@ -107,19 +107,6 @@ module TavernKit
             message = e.fetch(:message, nil)
 
             { code: code.to_s, message: message.to_s }
-          end
-        end
-
-        def deep_symbolize_keys(value)
-          case value
-          when Hash
-            value.each_with_object({}) do |(k, v), out|
-              out[k.to_s.to_sym] = deep_symbolize_keys(v)
-            end
-          when Array
-            value.map { |v| deep_symbolize_keys(v) }
-          else
-            value
           end
         end
       end

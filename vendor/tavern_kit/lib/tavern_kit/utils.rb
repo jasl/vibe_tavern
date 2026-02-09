@@ -37,11 +37,21 @@ module TavernKit
     # Deep-convert keys to symbols.
     def deep_symbolize_keys(value)
       case value
-      when Array then value.map { |v| deep_symbolize_keys(v) }
+      when Array
+        value.map { |v| deep_symbolize_keys(v) }
       when Hash
-        value.transform_keys { |k| k.respond_to?(:to_sym) ? k.to_sym : k }
-              .transform_values { |v| deep_symbolize_keys(v) }
-      else value
+        value.each_with_object({}) do |(k, v), out|
+          if k.is_a?(Symbol)
+            out[k] = deep_symbolize_keys(v)
+          elsif k.respond_to?(:to_sym)
+            sym = k.to_sym
+            out[sym] = deep_symbolize_keys(v) unless out.key?(sym)
+          else
+            out[k] = deep_symbolize_keys(v)
+          end
+        end
+      else
+        value
       end
     end
 

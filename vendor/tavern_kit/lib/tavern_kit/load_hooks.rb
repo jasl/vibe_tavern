@@ -90,4 +90,3 @@ module TavernKit
     private_class_method :hooks_for
   end
 end
-

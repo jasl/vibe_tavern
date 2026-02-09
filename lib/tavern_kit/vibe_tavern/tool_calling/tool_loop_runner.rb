@@ -549,7 +549,7 @@ module TavernKit
           return message if message.is_a?(TavernKit::Prompt::Message)
 
           if message.is_a?(Hash)
-            message = deep_symbolize_keys(message)
+            message = TavernKit::Utils.deep_symbolize_keys(message)
 
             role = message.fetch(:role, "user").to_s
             role = "user" if role.strip.empty?
@@ -628,7 +628,7 @@ module TavernKit
           raw = runtime_setting_value(:request_overrides)
           return {} unless raw.is_a?(Hash)
 
-          raw = deep_symbolize_keys(raw)
+          raw = TavernKit::Utils.deep_symbolize_keys(raw)
 
           # Keep ownership clear: these keys are controlled by ToolLoopRunner.
           reserved = %i[model messages tools tool_choice response_format].freeze
@@ -671,13 +671,13 @@ module TavernKit
               @runtime[:tool_calling]
             end
 
-          @tool_calling_settings = raw.is_a?(Hash) ? deep_symbolize_keys(raw) : nil
+          @tool_calling_settings = raw.is_a?(Hash) ? TavernKit::Utils.deep_symbolize_keys(raw) : nil
         end
 
         def runtime_settings_hash
           return @runtime_settings_hash if defined?(@runtime_settings_hash)
 
-          @runtime_settings_hash = @runtime.is_a?(Hash) ? deep_symbolize_keys(@runtime) : nil
+          @runtime_settings_hash = @runtime.is_a?(Hash) ? TavernKit::Utils.deep_symbolize_keys(@runtime) : nil
         end
 
         def runtime_setting_bool(key)
@@ -848,7 +848,7 @@ module TavernKit
           return {} if value.nil?
 
           if value.is_a?(Hash) || value.is_a?(Array)
-            normalized = deep_stringify_keys(value)
+            normalized = TavernKit::Utils.deep_stringify_keys(value)
 
             begin
               json = JSON.generate(normalized)
@@ -869,7 +869,7 @@ module TavernKit
           return :too_large if str.bytesize > @max_tool_args_bytes
 
           parsed = JSON.parse(str)
-          return deep_stringify_keys(parsed) if parsed.is_a?(Hash)
+          return TavernKit::Utils.deep_stringify_keys(parsed) if parsed.is_a?(Hash)
 
           :invalid_json
         rescue JSON::ParserError
@@ -886,19 +886,6 @@ module TavernKit
           fenced[1].to_s.strip
         end
 
-        def deep_stringify_keys(value)
-          case value
-          when Hash
-            value.each_with_object({}) do |(k, v), out|
-              out[k.to_s] = deep_stringify_keys(v)
-            end
-          when Array
-            value.map { |v| deep_stringify_keys(v) }
-          else
-            value
-          end
-        end
-
         def tool_error_envelope(name, code:, message:, data: nil)
           {
             ok: false,
@@ -911,30 +898,12 @@ module TavernKit
           }
         end
 
-        def deep_symbolize_keys(value)
-          case value
-          when Hash
-            value.each_with_object({}) do |(k, v), out|
-              if k.is_a?(Symbol)
-                out[k] = deep_symbolize_keys(v)
-              else
-                sym = k.to_s.to_sym
-                out[sym] = deep_symbolize_keys(v) unless out.key?(sym)
-              end
-            end
-          when Array
-            value.map { |v| deep_symbolize_keys(v) }
-          else
-            value
-          end
-        end
-
         def normalize_tool_calls_payload(value)
           case value
           when Array
-            value.filter_map { |tc| tc.is_a?(Hash) ? deep_symbolize_keys(tc) : nil }
+            value.filter_map { |tc| tc.is_a?(Hash) ? TavernKit::Utils.deep_symbolize_keys(tc) : nil }
           when Hash
-            [deep_symbolize_keys(value)]
+            [TavernKit::Utils.deep_symbolize_keys(value)]
           else
             []
           end

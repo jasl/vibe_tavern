@@ -78,4 +78,3 @@ TavernKit.on_load(:my_scope, id: :"my_feature.register") do |infra|
   infra.output_tags_registry.register_sanitizer(:lang_spans, MyLangSpanSanitizer)
 end
 ```
-

@@ -52,4 +52,3 @@ class TavernKit::LoadHooksTest < Minitest::Test
     assert_equal [1, 2], calls
   end
 end
-
