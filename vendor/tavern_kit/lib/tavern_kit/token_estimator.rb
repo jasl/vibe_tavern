@@ -18,7 +18,7 @@ module TavernKit
           )
         end
 
-        def detailed? = ids || tokens || offsets
+        def detailed? = !!(ids || tokens || offsets)
       end
 
     module Adapter
