@@ -191,12 +191,12 @@ module TavernKit
       entry = resolve_registry_entry(model_hint)
       resolved = resolve_adapter(model_hint, entry: entry)
       resolved.estimate(text, model_hint: model_hint)
-    rescue StandardError
+    rescue StandardError, LoadError
       begin
         if resolved && resolved != @adapter
           return @adapter.estimate(text, model_hint: model_hint)
         end
-      rescue StandardError
+      rescue StandardError, LoadError
         # ignore and fall through
       end
 
@@ -220,12 +220,12 @@ module TavernKit
           details: describe(model_hint: model_hint),
         )
       end
-    rescue StandardError
+    rescue StandardError, LoadError
       begin
         if resolved && resolved != @adapter && @adapter.respond_to?(:tokenize)
           return @adapter.tokenize(text, model_hint: model_hint)
         end
-      rescue StandardError
+      rescue StandardError, LoadError
         # ignore and fall through
       end
 
@@ -250,7 +250,7 @@ module TavernKit
           adapter = @hf_adapters[path] ||= Adapter::HuggingFaceTokenizers.new(tokenizer_path: path, cache: @hf_tokenizer_cache)
           adapter.prewarm!
           loaded << path
-        rescue StandardError => e
+        rescue StandardError, LoadError => e
           failed << { path: path, error_class: e.class.name, message: e.message }
         end
       end
@@ -324,7 +324,7 @@ module TavernKit
         .each_value
         .filter_map { |v| normalize_registry_entry(v) }
         .select do |entry|
-          family = entry[:tokenizer_family]
+          family = entry[:tokenizer_family] || entry[:family] || entry[:backend]
           family = family.to_s.strip.downcase.tr("-", "_").to_sym
           %i[hf_tokenizers huggingface_tokenizers tokenizers].include?(family)
         end

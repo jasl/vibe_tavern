@@ -196,4 +196,37 @@ class TavernKit::TokenEstimatorTest < Minitest::Test
     tokenizer_json&.close
     tokenizer_json&.unlink
   end
+
+  def test_hf_backend_missing_gem_falls_back_to_tiktoken
+    verbose, $VERBOSE = $VERBOSE, nil
+    Kernel.module_eval do
+      alias_method :__tavernkit_token_estimator_orig_require, :require
+      def require(name)
+        raise LoadError, "cannot load such file -- tokenizers" if name == "tokenizers"
+
+        __tavernkit_token_estimator_orig_require(name)
+      end
+    end
+
+    estimator =
+      TavernKit::TokenEstimator.new(
+        registry: {
+          "oss-model" => { tokenizer_family: :hf_tokenizers, tokenizer_path: "/any/tokenizer.json" },
+        },
+      )
+
+    text = "hello 😁"
+    expected = ::Tiktoken.get_encoding("cl100k_base").encode(text).length
+    assert_equal expected, estimator.estimate(text, model_hint: "oss-model")
+
+    tokenization = estimator.tokenize(text, model_hint: "oss-model")
+    assert_equal "tiktoken", tokenization.backend
+    assert_equal expected, tokenization.token_count
+  ensure
+    Kernel.module_eval do
+      alias_method :require, :__tavernkit_token_estimator_orig_require
+      remove_method :__tavernkit_token_estimator_orig_require
+    end
+    $VERBOSE = verbose
+  end
 end
