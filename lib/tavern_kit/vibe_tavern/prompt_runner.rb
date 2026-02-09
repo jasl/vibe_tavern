@@ -117,7 +117,7 @@ module TavernKit
 
         llm_options = deep_merge_hashes(@llm_options_defaults, normalize_llm_options(llm_options))
         plan =
-          TavernKit::VibeTavern.build do
+          TavernKit::Prompt::DSL.build(pipeline: Pipeline) do
             history build_history
             runtime runtime if runtime
             variables_store variables_store if variables_store
