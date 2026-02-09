@@ -220,4 +220,56 @@ class VibeTavernOutputTagsTest < ActiveSupport::TestCase
 
     assert_equal input, TavernKit::VibeTavern::OutputTags.transform(input, runtime: runtime)
   end
+
+  test "handles nested control tags for strip rules" do
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          output_tags: {
+            enabled: true,
+            rules: [{ tag: "lang", action: :strip }],
+            sanitizers: {},
+          },
+        },
+        type: :app,
+      )
+
+    input = %(<lang code="ja">A<lang code="en">B</lang>C</lang>)
+    assert_equal "ABC", TavernKit::VibeTavern::OutputTags.transform(input, runtime: runtime)
+  end
+
+  test "handles nested control tags for drop rules" do
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          output_tags: {
+            enabled: true,
+            rules: [{ tag: "think", action: :drop }],
+            sanitizers: {},
+          },
+        },
+        type: :app,
+      )
+
+    input = %(A<think>X<think>Y</think>Z</think>B)
+    assert_equal "AB", TavernKit::VibeTavern::OutputTags.transform(input, runtime: runtime)
+  end
+
+  test "handles nested control tags for rename rules" do
+    runtime =
+      TavernKit::Runtime::Base.build(
+        {
+          output_tags: {
+            enabled: true,
+            rules: [{ tag: "lang", action: :rename, to: "span" }],
+            sanitizers: {},
+          },
+        },
+        type: :app,
+      )
+
+    input = %(<lang code="ja">A<lang code="en">B</lang>C</lang>)
+    expected = %(<span code="ja">A<span code="en">B</span>C</span>)
+    assert_equal expected, TavernKit::VibeTavern::OutputTags.transform(input, runtime: runtime)
+  end
 end

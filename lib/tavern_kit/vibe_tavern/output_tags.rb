@@ -222,34 +222,54 @@ module TavernKit
       private_class_method :emit_warnings
 
       def apply_rules(text, rules)
-        out = text.to_s
-
-        Array(rules).each do |rule|
+        Array(rules).reduce(text.to_s) do |out, rule|
           tag = rule.tag.to_s.strip
-          next if tag.empty?
+          tag.empty? ? out : apply_rule(out, rule)
+        end
+      end
+      private_class_method :apply_rules
 
-          tag_re = Regexp.escape(tag)
-          pattern = /<#{tag_re}\b([^>]*)>(.*?)<\/#{tag_re}\s*>/im
+      def apply_rule(text, rule)
+        tag = rule.tag.to_s.strip
+        return text.to_s if tag.empty?
 
-          case rule.action
-          when :drop
-            out = out.gsub(pattern, "")
-          when :strip
-            out = out.gsub(pattern, "\\2")
-          when :rename
-            out = out.gsub(pattern) do
-              raw_attrs = Regexp.last_match(1).to_s
-              inner = Regexp.last_match(2).to_s
-              new_tag = rule.to.to_s
+        out = +""
+        pos = 0
+        depth = 0
+
+        tag_re = /<\s*(\/?)\s*#{Regexp.escape(tag)}\b([^>]*)>/im
+
+        while (m = tag_re.match(text, pos))
+          out << text[pos...m.begin(0)] if rule.action != :drop || depth.zero?
+
+          is_close = !m[1].to_s.empty?
+          raw_attrs = m[2].to_s
+
+          if is_close
+            if depth.positive?
+              depth -= 1
+              out << "</#{rule.to}>" if rule.action == :rename
+            end
+          else
+            depth += 1
+            if rule.action == :rename
               new_attrs = rewrite_attrs(raw_attrs, rule.attrs)
-              "<#{new_tag}#{new_attrs}>#{inner}</#{new_tag}>"
+              out << "<#{rule.to}#{new_attrs}>"
             end
           end
+
+          pos = m.end(0)
+        end
+
+        out << text[pos..] if rule.action != :drop || depth.zero?
+
+        if rule.action == :rename && depth.positive?
+          out << ("</#{rule.to}>" * depth)
         end
 
         out
       end
-      private_class_method :apply_rules
+      private_class_method :apply_rule
 
       def rewrite_attrs(raw_attrs, mapping)
         pairs = parse_attrs(raw_attrs)
