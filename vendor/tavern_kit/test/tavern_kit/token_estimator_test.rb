@@ -110,12 +110,24 @@ class TavernKit::TokenEstimatorTest < Minitest::Test
     estimator =
       TavernKit::TokenEstimator.new(
         registry: {
-          "oss-model" => { tokenizer_family: :hf_tokenizers, tokenizer_path: tokenizer_json.path },
+          "oss-model" => {
+            tokenizer_family: :hf_tokenizers,
+            tokenizer_path: tokenizer_json.path,
+            source_hint: "oss-model",
+            source_repo: "acme/oss-model",
+          },
         },
       )
 
     text = "hello 😁"
     assert_equal 2, estimator.estimate(text, model_hint: "oss-model")
+
+    info = estimator.describe(model_hint: "oss-model")
+    assert_equal true, info[:registry]
+    assert_equal "oss-model", info[:registry_source_hint]
+    assert_equal "acme/oss-model", info[:registry_source_repo]
+    assert_equal "oss-model", info[:registry_model_hint]
+    assert_equal "hf_tokenizers", info[:registry_tokenizer_family]
 
     tokenization = estimator.tokenize(text, model_hint: "oss-model")
     assert_equal "hf_tokenizers", tokenization.backend
@@ -123,9 +135,33 @@ class TavernKit::TokenEstimatorTest < Minitest::Test
     assert_equal [1, 3], tokenization.ids
     assert_equal ["hello", "😁"], tokenization.tokens
     assert_equal [[0, 5], [6, 7]], tokenization.offsets
+    assert_equal true, tokenization.details[:registry]
+    assert_equal "oss-model", tokenization.details[:registry_source_hint]
+    assert_equal "acme/oss-model", tokenization.details[:registry_source_repo]
   ensure
     tokenizer_json&.close
     tokenizer_json&.unlink
+  end
+
+  def test_describe_includes_registry_metadata_for_tiktoken_registry_entry
+    estimator =
+      TavernKit::TokenEstimator.new(
+        registry: {
+          "kimi-k2.5" => {
+            tokenizer_family: :tiktoken,
+            source_hint: "kimi-k2.5",
+            source_repo: "moonshotai/Kimi-K2.5",
+          },
+        },
+      )
+
+    info = estimator.describe(model_hint: "kimi-k2.5")
+
+    assert_equal "tiktoken", info[:backend]
+    assert_equal true, info[:registry]
+    assert_equal "kimi-k2.5", info[:registry_source_hint]
+    assert_equal "moonshotai/Kimi-K2.5", info[:registry_source_repo]
+    assert_equal "tiktoken", info[:registry_tokenizer_family]
   end
 
   def test_hf_backend_load_failure_falls_back_to_tiktoken

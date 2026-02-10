@@ -16,6 +16,8 @@ require_relative "../config/environment"
 module DownloadTokenizers
   module_function
 
+  HF_TOKENIZER_FAMILIES = %i[hf_tokenizers huggingface_tokenizers tokenizers].freeze
+
   def run(argv)
     options = parse_options(argv)
 
@@ -34,7 +36,14 @@ module DownloadTokenizers
 
     sources.each do |source|
       hint = source.fetch(:hint)
-      dest = Rails.root.join(source.fetch(:relative_path))
+      family = source_tokenizer_family(source)
+
+      unless source_downloadable?(source)
+        puts "skip: #{hint} (#{family} does not require tokenizer.json)"
+        next
+      end
+
+      dest = Pathname.new(TavernKit::VibeTavern::TokenEstimation.tokenizer_path(root: Rails.root, hint: hint))
       dest_dir = dest.dirname
 
       if options[:check]
@@ -97,7 +106,7 @@ module DownloadTokenizers
     OptionParser.new do |parser|
       parser.banner = "Usage: script/download_tokenizers.rb [options]"
 
-      parser.on("--only x,y,z", Array, "Only download specific hints (e.g. deepseek,qwen3)") do |list|
+      parser.on("--only x,y,z", Array, "Only process specific hints") do |list|
         list.each { |hint| opts[:only] << hint.to_s.strip }
       end
 
@@ -126,8 +135,17 @@ module DownloadTokenizers
 
   def build_url(source)
     repo = source.fetch(:hf_repo)
-    rev = source.fetch(:revision)
-    "https://huggingface.co/#{repo}/resolve/#{rev}/tokenizer.json"
+    "https://huggingface.co/#{repo}/resolve/main/tokenizer.json"
+  end
+
+  def source_tokenizer_family(source)
+    source.fetch(:tokenizer_family, :hf_tokenizers).to_s.strip.downcase.tr("-", "_").to_sym
+  end
+
+  def source_downloadable?(source)
+    return false if source[:hf_repo].to_s.strip.empty?
+
+    HF_TOKENIZER_FAMILIES.include?(source_tokenizer_family(source))
   end
 
   def http_download(url, io:, token:)
@@ -189,7 +207,6 @@ module DownloadTokenizers
     meta = {
       hint: source.fetch(:hint),
       hf_repo: source.fetch(:hf_repo),
-      revision: source.fetch(:revision),
       url: url,
       etag: response["etag"],
       x_repo_commit: response["x-repo-commit"],

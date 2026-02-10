@@ -211,15 +211,18 @@ module TavernKit
       entry = resolve_registry_entry(model_hint)
       resolved = resolve_adapter(model_hint, entry: entry)
 
-      if resolved.respond_to?(:tokenize)
-        resolved.tokenize(text, model_hint: model_hint)
-      else
-        Tokenization.new(
-          backend: resolved.class.name,
-          token_count: resolved.estimate(text, model_hint: model_hint),
-          details: describe(model_hint: model_hint),
-        )
-      end
+      tokenization =
+        if resolved.respond_to?(:tokenize)
+          resolved.tokenize(text, model_hint: model_hint)
+        else
+          Tokenization.new(
+            backend: resolved.class.name,
+            token_count: resolved.estimate(text, model_hint: model_hint),
+            details: describe(model_hint: model_hint),
+          )
+        end
+
+      attach_registry_metadata_to_tokenization(tokenization, entry: entry, model_hint: model_hint)
     rescue StandardError, LoadError
       begin
         if resolved && resolved != @adapter && @adapter.respond_to?(:tokenize)
@@ -270,13 +273,7 @@ module TavernKit
       raw = adapter.respond_to?(:describe) ? adapter.describe(model_hint: model_hint) : { backend: adapter.class.name }
       info = raw.is_a?(Hash) ? raw : { backend: adapter.class.name }
 
-      if entry
-        info = info.dup
-        info[:registry] = true
-        info[:source] ||= "registry"
-      end
-
-      info
+      attach_registry_metadata(info, entry: entry, model_hint: model_hint)
     rescue StandardError
       { backend: @adapter.class.name }
     end
@@ -317,6 +314,51 @@ module TavernKit
       else
         @adapter
       end
+    end
+
+    def attach_registry_metadata(info, entry:, model_hint:)
+      return info unless entry.is_a?(Hash)
+
+      out = info.is_a?(Hash) ? info.dup : { backend: @adapter.class.name }
+      out[:registry] = true
+      out[:source] ||= "registry"
+
+      family = entry[:tokenizer_family].to_s.strip
+      out[:registry_tokenizer_family] = family unless family.empty?
+
+      path = entry[:tokenizer_path].to_s.strip
+      out[:registry_tokenizer_path] = path unless path.empty?
+
+      source_hint = entry[:source_hint].to_s.strip
+      out[:registry_source_hint] = source_hint unless source_hint.empty?
+
+      source_repo = entry[:source_repo].to_s.strip
+      out[:registry_source_repo] = source_repo unless source_repo.empty?
+
+      hinted = model_hint.to_s.strip
+      out[:registry_model_hint] = hinted unless hinted.empty?
+
+      out
+    rescue StandardError
+      info
+    end
+
+    def attach_registry_metadata_to_tokenization(tokenization, entry:, model_hint:)
+      return tokenization unless tokenization.is_a?(Tokenization)
+      return tokenization unless entry.is_a?(Hash)
+
+      details = attach_registry_metadata(tokenization.details || {}, entry: entry, model_hint: model_hint)
+
+      Tokenization.new(
+        backend: tokenization.backend,
+        token_count: tokenization.token_count,
+        ids: tokenization.ids,
+        tokens: tokenization.tokens,
+        offsets: tokenization.offsets,
+        details: details,
+      )
+    rescue StandardError
+      tokenization
     end
 
     def registry_hf_tokenizer_paths(registry)

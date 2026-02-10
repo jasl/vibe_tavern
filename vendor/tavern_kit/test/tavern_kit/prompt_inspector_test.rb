@@ -18,7 +18,12 @@ class TavernKit::PromptInspectorTest < Minitest::Test
     estimator =
       TavernKit::TokenEstimator.new(
         registry: {
-          "oss-model" => { tokenizer_family: :hf_tokenizers, tokenizer_path: file.path },
+          "oss-model" => {
+            tokenizer_family: :hf_tokenizers,
+            tokenizer_path: file.path,
+            source_hint: "oss-model",
+            source_repo: "acme/oss-model",
+          },
         },
       )
 
@@ -42,11 +47,17 @@ class TavernKit::PromptInspectorTest < Minitest::Test
 
     assert_equal 1, inspection.totals.message_count
     assert_equal 3, inspection.messages.first.overhead_tokens
+    assert_equal true, inspection.estimator[:registry]
+    assert_equal "oss-model", inspection.estimator[:registry_source_hint]
+    assert_equal "acme/oss-model", inspection.estimator[:registry_source_repo]
 
     tok = inspection.messages.first.content_tokenization
     assert_equal "hf_tokenizers", tok.backend
     assert_equal ["hello", "😁"], tok.tokens
     assert_equal [[0, 5], [6, 7]], tok.offsets
+    assert_equal true, tok.details[:registry]
+    assert_equal "oss-model", tok.details[:registry_source_hint]
+    assert_equal "acme/oss-model", tok.details[:registry_source_repo]
   ensure
     tokenizer_json&.close
     tokenizer_json&.unlink

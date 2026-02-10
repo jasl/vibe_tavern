@@ -38,6 +38,7 @@ inspection =
 
 inspection.totals.total_tokens
 inspection.messages.first.total_tokens
+inspection.estimator # backend + registry metadata (if matched)
 ```
 
 Inspect messages directly (supports `TavernKit::Prompt::Message` and `Hash`):
@@ -74,6 +75,13 @@ deterministic.
 - `hf_tokenizers` backend (`tokenizers` gem + local `tokenizer.json`):
   - returns `ids` + `tokens` + `offsets`
   - offsets are **character offsets** (Ruby string indices), not byte offsets
+
+When a registry entry is used, inspector output includes registry metadata:
+
+- top-level: `inspection.estimator[:registry_source_hint]`,
+  `inspection.estimator[:registry_source_repo]`, `inspection.estimator[:registry_tokenizer_family]`
+- per-message tokenization: `inspection.messages[i].content_tokenization.details`
+  includes the same registry fields
 
 ## Performance notes
 

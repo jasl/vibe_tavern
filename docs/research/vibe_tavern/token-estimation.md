@@ -44,9 +44,10 @@ VibeTavern provides an app-owned registry + canonicalization layer:
 
 - `TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(model_id)`
   - maps provider model ids/variants into a small canonical set
-  - example: `deepseek/deepseek-chat-v3-0324:nitro` → `deepseek`
+  - example: `deepseek/deepseek-chat-v3-0324:nitro` → `deepseek-v3`
 - `TavernKit::VibeTavern::TokenEstimation.registry`
-  - maps canonical hints to local tokenizer assets under `vendor/tokenizers/`
+  - maps canonical hints to backend entries (HF tokenizer.json or `tiktoken`)
+  - carries source metadata (`source_hint`, `source_repo`) for inspector/debug
 - `TavernKit::VibeTavern::TokenEstimation.estimator`
   - memoized `TavernKit::TokenEstimator` configured with the registry
 
@@ -73,6 +74,16 @@ Tokenizer assets live in-repo (not under `/resources`, which is gitignored):
 - `vendor/tokenizers/<hint>/tokenizer.json`
 - `vendor/tokenizers/<hint>/source.json` (source metadata)
 
+Default root path is `Rails.root/vendor/tokenizers`. You can override it via
+credentials:
+
+```yaml
+token_estimation:
+  tokenizer_root: /absolute/path/to/tokenizers
+```
+
+If `tokenizer_root` is relative, it is resolved against `Rails.root`.
+
 Download/update them with:
 
 ```sh
@@ -81,9 +92,29 @@ script/download_tokenizers.rb
 
 Options:
 
-- `--only deepseek,qwen3`
+- `--only deepseek-v3,qwen3,kimi-k2.5`
 - `--force`
 - `--check`
+
+Notes:
+
+- entries with `tokenizer_family: :tiktoken` are skipped by the downloader
+  because they do not need local `tokenizer.json`.
+- `PromptInspector` can show the selected source via
+  `inspection.estimator[:registry_source_hint]` and
+  `inspection.estimator[:registry_source_repo]`.
+
+Audit mapping against current eval model set:
+
+```sh
+script/llm_token_estimator_registry_audit.rb --strict
+```
+
+This scans model declarations from eval scripts and reports:
+
+- model id -> canonical hint
+- backend family + source metadata
+- tokenizer file presence (for `hf_tokenizers`)
 
 ## Accuracy notes
 
@@ -99,4 +130,3 @@ template” that adds tokens the client cannot perfectly reproduce. Use:
 - Claude tokenizer: must be obtained via provider APIs (non-local asset).
 - SentencePiece: evaluate a stable Ruby library + bundling story before adding.
 - Licensing/attribution for bundled tokenizer assets.
-
