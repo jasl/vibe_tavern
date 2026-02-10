@@ -4,26 +4,68 @@ require "test_helper"
 
 class TavernKit::PromptBuilder::TraceTest < Minitest::Test
   class WarnA < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "warn_a step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "warn_a step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "warn_a step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       ctx.warn("a")
       ctx.instrument(:stat, key: :a_count, value: 1)
     end
   end
 
   class WarnB < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "warn_b step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "warn_b step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "warn_b step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       ctx.warn("b")
     end
   end
 
   class Boom < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(_ctx)
+          raise ArgumentError, "boom step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "boom step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "boom step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(_ctx, _config)
       raise "boom"
     end
   end

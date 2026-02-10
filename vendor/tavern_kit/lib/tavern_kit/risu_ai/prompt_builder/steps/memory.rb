@@ -9,9 +9,25 @@ module TavernKit
       # This calls an application-provided adapter and inserts the returned
       # blocks into the `:memory` slot for TemplateCards.
       class Memory < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
 
-        def before(ctx)
+              raise ArgumentError, "memory step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "memory step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "memory step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
+
+        def self.before(ctx, _config)
           adapter = ctx[:risuai_memory_adapter]
           return if adapter.nil?
           return unless adapter.respond_to?(:integrate)
@@ -33,7 +49,10 @@ module TavernKit
           ctx[:risuai_memory_result] = result
         end
 
-        def coerce_input(value)
+        class << self
+          private
+
+          def coerce_input(value)
           return value if value.is_a?(TavernKit::RisuAI::Memory::MemoryInput)
 
           h = value.is_a?(Hash) ? TavernKit::Utils.deep_stringify_keys(value) : {}
@@ -43,6 +62,7 @@ module TavernKit
             metadata: h["metadata"],
             budget_tokens: h["budget_tokens"],
           )
+          end
         end
       end
       end

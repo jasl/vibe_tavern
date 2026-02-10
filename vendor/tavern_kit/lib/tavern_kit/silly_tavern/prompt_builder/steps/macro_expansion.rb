@@ -6,9 +6,25 @@ module TavernKit
       module Steps
       # Expand {{macro}} syntax in block content via ST Macro engine.
       class MacroExpansion < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
 
-        def before(ctx)
+              raise ArgumentError, "macro_expansion step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "macro_expansion step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "macro_expansion step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
+
+        def self.before(ctx, _config)
           ctx.expander ||= build_default_expander(ctx)
 
           env = TavernKit::SillyTavern::ExpanderVars.build(ctx)
@@ -26,8 +42,11 @@ module TavernKit
           end
 
           ctx.blocks = expanded
-          ctx.instrument(:stat, step: :macro_expansion, key: :expanded_blocks, value: expanded.size)
+          ctx.instrument(:stat, step: ctx.current_step, key: :expanded_blocks, value: expanded.size)
         end
+
+        class << self
+          private
 
         def build_default_expander(ctx)
           builtins = TavernKit::SillyTavern::Macro::Packs::SillyTavern.default_registry
@@ -45,6 +64,7 @@ module TavernKit
             end
 
           TavernKit::SillyTavern::Macro::V2Engine.new(registry: registry)
+        end
         end
       end
       end

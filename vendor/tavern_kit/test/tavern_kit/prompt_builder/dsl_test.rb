@@ -5,9 +5,23 @@ require "test_helper"
 class TavernKit::PromptBuilderTest < Minitest::Test
   # Simple step that creates a plan from state
   class SimplePlanStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "simple_plan step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "simple_plan step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "simple_plan step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       blocks = []
       if ctx.user_message
         blocks << TavernKit::PromptBuilder::Block.new(role: :user, content: ctx.user_message)
@@ -17,9 +31,23 @@ class TavernKit::PromptBuilderTest < Minitest::Test
   end
 
   class DialectPlanStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "dialect_plan step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "dialect_plan step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "dialect_plan step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       ctx.plan = TavernKit::PromptBuilder::Plan.new(
         blocks: [
           TavernKit::PromptBuilder::Block.new(role: :user, content: ctx.dialect.to_s),

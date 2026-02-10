@@ -8,11 +8,27 @@ module TavernKit
       #
       # Step contract is pinned in `docs/contracts/prompt-orchestration.md`.
       class Lore < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
+
+              raise ArgumentError, "lore step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "lore step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "lore step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
 
         DEFAULT_WORLD_INFO_BUDGET_PERCENT = 25
 
-        def before(ctx)
+        def self.before(ctx, _config)
           preset = ctx.preset
 
           ctx.scan_messages ||= build_scan_messages(ctx)
@@ -52,9 +68,12 @@ module TavernKit
           ctx.lore_result = ctx.lore_engine.scan(input)
           ctx.outlets = build_outlets(ctx.lore_result)
 
-          ctx.instrument(:stat, step: :lore, key: :world_info_activated, value: ctx.lore_result.activated_entries.size)
-          ctx.instrument(:stat, step: :lore, key: :world_info_tokens, value: ctx.lore_result.total_tokens)
+          ctx.instrument(:stat, step: ctx.current_step, key: :world_info_activated, value: ctx.lore_result.activated_entries.size)
+          ctx.instrument(:stat, step: ctx.current_step, key: :world_info_tokens, value: ctx.lore_result.total_tokens)
         end
+
+        class << self
+          private
 
         def build_scan_messages(ctx)
           history = TavernKit::ChatHistory.wrap(ctx.history)
@@ -250,6 +269,7 @@ module TavernKit
         def presence_str(value)
           s = value.to_s
           s.strip.empty? ? nil : s
+        end
         end
       end
       end

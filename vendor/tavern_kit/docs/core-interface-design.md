@@ -58,11 +58,17 @@ To keep the builder API strict and predictable:
 - Step config ownership is local to each step:
   - define `Step::Config`
   - implement `Step::Config.from_hash`
-  - step consumes only `option(:config)` as that typed object
+  - step consumes the typed config argument (`StepClass.before(state, config)`)
 - `Pipeline` resolves step config from:
   - static step defaults (`use_step ...`)
   - deep-merged `context.module_configs[step_name]` overrides
   - typed parsing via step-local config class/builder
+
+Step execution contract:
+- steps are not instantiated
+- `Pipeline` calls step class hooks (`StepClass.before/after`) with the typed
+  config object
+  - this prevents per-run state from leaking into step instance variables
 
 Unknown step names in `context.module_configs` are ignored; known step config
 shape errors are fail-fast.

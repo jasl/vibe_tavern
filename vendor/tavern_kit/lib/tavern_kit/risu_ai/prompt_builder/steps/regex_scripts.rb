@@ -9,9 +9,25 @@ module TavernKit
       # This applies scripts in `ctx[:risuai_regex_scripts]` to every block's
       # content in `mode: :request` (tolerant; no-op when none are configured).
       class RegexScripts < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
 
-        def before(ctx)
+              raise ArgumentError, "regex_scripts step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "regex_scripts step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "regex_scripts step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
+
+        def self.before(ctx, _config)
           ctx.blocks ||= []
 
           scripts = ctx[:risuai_regex_scripts]
@@ -65,6 +81,9 @@ module TavernKit
           nil
         end
 
+        class << self
+          private
+
         def context_int(context, key, default:)
           value = context_value(context, key, default: default)
           value.to_i
@@ -83,6 +102,7 @@ module TavernKit
           return context[key] if context.respond_to?(:[]) && context.key?(key)
 
           default
+        end
         end
       end
       end

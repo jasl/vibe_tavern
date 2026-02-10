@@ -6,9 +6,25 @@ module TavernKit
       module Steps
       # ST token budget enforcement (delegates to Core Trimmer).
       class Trimming < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
 
-        def before(ctx)
+              raise ArgumentError, "trimming step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "trimming step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "trimming step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
+
+        def self.before(ctx, _config)
           preset = ctx.preset
 
           max_tokens = preset.context_window_tokens.to_i
@@ -24,7 +40,7 @@ module TavernKit
             token_estimator: ctx.token_estimator,
             model_hint: model_hint,
             message_overhead_tokens: overhead,
-            step: :trimming,
+            step: ctx.current_step,
           )
 
           ctx.blocks = TavernKit::Trimmer.apply(ctx.blocks, result)
@@ -42,16 +58,19 @@ module TavernKit
           end
 
           if ctx.token_estimator.respond_to?(:describe)
-            ctx.instrument(:stat, step: :trimming, key: :token_estimator) do
+            ctx.instrument(:stat, step: ctx.current_step, key: :token_estimator) do
               { value: ctx.token_estimator.describe(model_hint: model_hint) }
             end
           end
 
-          ctx.instrument(:stat, step: :trimming, key: :budget_tokens, value: result.report.budget_tokens)
-          ctx.instrument(:stat, step: :trimming, key: :initial_tokens, value: result.report.initial_tokens)
-          ctx.instrument(:stat, step: :trimming, key: :final_tokens, value: result.report.final_tokens)
-          ctx.instrument(:stat, step: :trimming, key: :eviction_count, value: result.report.eviction_count)
+          ctx.instrument(:stat, step: ctx.current_step, key: :budget_tokens, value: result.report.budget_tokens)
+          ctx.instrument(:stat, step: ctx.current_step, key: :initial_tokens, value: result.report.initial_tokens)
+          ctx.instrument(:stat, step: ctx.current_step, key: :final_tokens, value: result.report.final_tokens)
+          ctx.instrument(:stat, step: ctx.current_step, key: :eviction_count, value: result.report.eviction_count)
         end
+
+        class << self
+          private
 
         def build_plan(ctx, trace:, trim_report:)
           TavernKit::PromptBuilder::Plan.new(
@@ -65,6 +84,7 @@ module TavernKit
             trace: trace,
             llm_options: ctx.llm_options,
           )
+        end
         end
       end
       end

@@ -6,9 +6,25 @@ module TavernKit
       module Steps
       # ST injection step (extension prompts + Author's Note + persona).
       class Injection < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
 
-        def before(ctx)
+              raise ArgumentError, "injection step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "injection step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "injection step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
+
+        def self.before(ctx, _config)
           injections = collect_injections(ctx)
 
           # ST chat-completions parity (openai.js): for continue+continue_prefill,
@@ -31,6 +47,9 @@ module TavernKit
           :chat,           # Array<InjectionRegistry::Entry>
           keyword_init: true,
         )
+
+        class << self
+          private
 
         def collect_injections(ctx)
           before_entries = []
@@ -368,6 +387,7 @@ module TavernKit
 
         def text_dialect?(ctx)
           ctx.dialect.to_s.strip.downcase.to_sym == :text
+        end
         end
       end
       end

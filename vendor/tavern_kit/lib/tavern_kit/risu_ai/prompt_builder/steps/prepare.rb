@@ -11,6 +11,28 @@ module TavernKit
         # - Run RisuAI::Lore::Engine
         # - Build initial prompt sections and assemble blocks via TemplateCards
         class Prepare < TavernKit::PromptBuilder::Step
+          Config =
+            Data.define(:description_text_builder) do
+              def self.from_hash(raw)
+                return raw if raw.is_a?(self)
+
+                raise ArgumentError, "prepare step config must be a Hash" unless raw.is_a?(Hash)
+                raw.each_key do |key|
+                  raise ArgumentError, "prepare step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+                end
+
+                unknown = raw.keys - %i[description_text_builder]
+                raise ArgumentError, "unknown prepare step config keys: #{unknown.inspect}" if unknown.any?
+
+                builder = raw.fetch(:description_text_builder, nil)
+                if builder && !builder.respond_to?(:call)
+                  raise ArgumentError, "prepare.description_text_builder must respond to #call"
+                end
+
+                new(description_text_builder: builder)
+              end
+            end
+
           DEFAULT_DESCRIPTION_TEXT_BUILDER =
             lambda do |ctx|
               data = ctx.character&.data
@@ -28,9 +50,7 @@ module TavernKit
               parts.join("\n\n").strip
             end.freeze
 
-          private
-
-          def before(ctx)
+          def self.before(ctx, config)
             normalize_risuai_context!(ctx)
 
             ctx.token_estimator ||= TavernKit::TokenEstimator.default
@@ -60,11 +80,14 @@ module TavernKit
 
             ctx.lore_result = lore_engine.scan(lore_input)
 
-            groups = build_groups(ctx)
+            groups = build_groups(ctx, description_text_builder: config.description_text_builder)
 
             ctx[:risuai_template] = template
             ctx[:risuai_groups] = groups
           end
+
+          class << self
+            private
 
           # Ensure the application-owned context contract is available once at the
           # pipeline entrypoint so downstream steps can rely on it.
@@ -140,7 +163,7 @@ module TavernKit
             lines
           end
 
-          def build_groups(ctx)
+          def build_groups(ctx, description_text_builder:)
             groups = {
               persona: [],
               description: [],
@@ -156,7 +179,7 @@ module TavernKit
             end
 
             if ctx.character&.respond_to?(:data)
-              content = build_description_text(ctx, description_text_builder: option(:description_text_builder))
+              content = build_description_text(ctx, description_text_builder: description_text_builder)
               groups[:description] << { role: :system, content: content } unless content.empty?
             end
 
@@ -188,6 +211,7 @@ module TavernKit
           rescue StandardError => e
             ctx.warn("risu_ai.prepare.description_text_builder error (using default): #{e.class}: #{e.message}")
             DEFAULT_DESCRIPTION_TEXT_BUILDER.call(ctx).to_s.strip
+          end
           end
         end
       end

@@ -6,7 +6,23 @@ module TavernKit
       module Steps
       # Resolve ST pinned prompt groups into block arrays.
       class PinnedGroups < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
+
+              raise ArgumentError, "pinned_groups step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "pinned_groups step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "pinned_groups step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
 
         WI_POSITIONS = {
           "before_char_defs" => :world_info_before_char_defs,
@@ -15,7 +31,7 @@ module TavernKit
           "after_example_messages" => :world_info_after_example_messages,
         }.freeze
 
-        def before(ctx)
+        def self.before(ctx, _config)
           preset = ctx.preset
 
           fields = effective_character_fields(ctx)
@@ -31,8 +47,11 @@ module TavernKit
           end
 
           ctx.pinned_groups = groups
-          ctx.instrument(:stat, step: :pinned_groups, key: :pinned_groups, value: groups.size)
+          ctx.instrument(:stat, step: ctx.current_step, key: :pinned_groups, value: groups.size)
         end
+
+        class << self
+          private
 
         def build_group_blocks(entry, ctx, preset, fields, by_wi_position)
           id = entry.id
@@ -338,6 +357,7 @@ module TavernKit
           result&.transform_keys { |k| TavernKit::Utils.underscore(k.to_s).to_sym }
         rescue StandardError
           nil
+        end
         end
       end
       end

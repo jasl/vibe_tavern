@@ -38,6 +38,7 @@ Scope:
 - Per-run overrides are supplied via `context.module_configs[step_name]`.
 - `Pipeline` deep-merges defaults + overrides and then resolves typed config
   via step-local parser (`Step::Config.from_hash` or step-specific builder).
+- Steps are not instantiated; `Pipeline` calls `StepClass.before/after(state, config)`.
 - Unknown step keys in `context.module_configs` are ignored.
 - Known step config parse errors are treated as programmer errors (fail-fast).
 
@@ -88,4 +89,5 @@ Recommended inspection order:
 - Prefer `state.warn` (not `raise`) for expected external input failures.
 - Keep expensive instrumentation lazy via `state.instrument { ... }` blocks.
 - Emit local counters with `state.instrument(:stat, step: ..., key: ..., value: ...)`.
+- Do not store per-run state in instance variables (steps are class hooks).
 - Do not mix transport/protocol concerns into prompt-building steps.

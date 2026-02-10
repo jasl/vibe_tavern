@@ -29,12 +29,7 @@ module TavernKit
               end
             end
 
-          private
-
-          def before(ctx)
-            config = option(:config)
-            raise ArgumentError, "prepare step config must be Steps::Prepare::Config" unless config.is_a?(Config)
-
+          def self.before(ctx, _config)
             ctx.variables_store!
 
             apply_token_estimation!(ctx)
@@ -42,14 +37,17 @@ module TavernKit
             ctx.token_estimator ||= TavernKit::VibeTavern::TokenEstimation.estimator
           end
 
-          def apply_token_estimation!(ctx)
+          class << self
+            private
+
+            def apply_token_estimation!(ctx)
             token_estimation = token_estimation_config(ctx) || {}
 
             apply_model_hint!(ctx, token_estimation)
             apply_token_estimator!(ctx, token_estimation)
-          end
+            end
 
-          def token_estimation_config(ctx)
+            def token_estimation_config(ctx)
             context = ctx.context
             token_estimation = context&.[](:token_estimation)
 
@@ -58,9 +56,9 @@ module TavernKit
             raise ArgumentError, "token_estimation config must be a Hash" unless token_estimation.is_a?(Hash)
 
             token_estimation
-          end
+            end
 
-          def apply_model_hint!(ctx, token_estimation)
+            def apply_model_hint!(ctx, token_estimation)
             explicit_hint = ctx.key?(:model_hint) ? presence(ctx[:model_hint]) : nil
 
             # Allow context to override a blank/invalid explicit hint.
@@ -75,9 +73,9 @@ module TavernKit
 
             ctx[:model_hint] = TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(selected_hint)
             ctx[:model_hint_source] = context_hint ? :context : :default
-          end
+            end
 
-          def apply_token_estimator!(ctx, token_estimation)
+            def apply_token_estimator!(ctx, token_estimation)
             return if ctx.token_estimator
 
             token_estimator = token_estimation.fetch(:token_estimator, nil)
@@ -95,10 +93,11 @@ module TavernKit
 
             ctx.token_estimator = TavernKit::TokenEstimator.new(registry: registry)
             ctx[:token_estimator_source] = :context_registry
-          end
+            end
 
-          def presence(value)
+            def presence(value)
             TavernKit::Utils.presence(value)
+            end
           end
         end
       end

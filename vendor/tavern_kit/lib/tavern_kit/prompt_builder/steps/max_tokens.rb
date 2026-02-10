@@ -8,16 +8,63 @@ module TavernKit
   class PromptBuilder
     module Steps
       class MaxTokens < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define(
+            :max_tokens,
+            :reserve_tokens,
+            :mode,
+            :token_estimator,
+            :model_hint,
+            :message_overhead_tokens,
+            :include_message_metadata_tokens,
+          ) do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
 
-        def after(state)
-          max_tokens = resolve_non_negative_int(option(:max_tokens), state, allow_nil: true)
+              raise ArgumentError, "max_tokens step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "max_tokens step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              unknown = raw.keys - %i[
+                max_tokens
+                reserve_tokens
+                mode
+                token_estimator
+                model_hint
+                message_overhead_tokens
+                include_message_metadata_tokens
+              ]
+              raise ArgumentError, "unknown max_tokens step config keys: #{unknown.inspect}" if unknown.any?
+
+              max_tokens = raw.fetch(:max_tokens, nil)
+              reserve_tokens = raw.fetch(:reserve_tokens, 0)
+              mode = raw.fetch(:mode, :warn)
+              token_estimator = raw.fetch(:token_estimator, nil)
+              model_hint = raw.fetch(:model_hint, nil)
+              message_overhead_tokens = raw.fetch(:message_overhead_tokens, 0)
+              include_message_metadata_tokens = raw.fetch(:include_message_metadata_tokens, false)
+
+              new(
+                max_tokens: max_tokens,
+                reserve_tokens: reserve_tokens,
+                mode: mode,
+                token_estimator: token_estimator,
+                model_hint: model_hint,
+                message_overhead_tokens: message_overhead_tokens,
+                include_message_metadata_tokens: include_message_metadata_tokens,
+              )
+            end
+          end
+
+        def self.after(state, config)
+          max_tokens = resolve_non_negative_int(config.max_tokens, state, allow_nil: true)
           return if max_tokens.nil? || max_tokens.zero?
 
-          reserve_tokens = resolve_non_negative_int(option(:reserve_tokens, 0), state, allow_nil: false)
+          reserve_tokens = resolve_non_negative_int(config.reserve_tokens, state, allow_nil: false)
           limit_tokens = [max_tokens - reserve_tokens, 0].max
 
-          estimation = estimate_prompt_tokens(state)
+          estimation = estimate_prompt_tokens(state, config)
           prompt_tokens = estimation.fetch(:total)
 
           state.instrument(:stat, key: :estimated_prompt_tokens, value: prompt_tokens, step: state.current_step)
@@ -30,7 +77,7 @@ module TavernKit
 
           return if prompt_tokens <= limit_tokens
 
-          mode = resolve_mode(option(:mode, :warn), state)
+          mode = resolve_mode(config.mode, state)
 
           case mode
           when :warn
@@ -40,7 +87,7 @@ module TavernKit
               estimated_tokens: prompt_tokens,
               max_tokens: max_tokens,
               reserve_tokens: reserve_tokens,
-              step: option(:__step, self.class.step_name),
+              step: state.current_step || step_name,
             )
           when :off, :none, nil
             nil
@@ -48,6 +95,9 @@ module TavernKit
             raise ArgumentError, "Unknown mode: #{mode.inspect} (expected :warn or :error)"
           end
         end
+
+        class << self
+          private
 
         def exceeded_message(prompt_tokens, limit_tokens, max_tokens, reserve_tokens)
           format(
@@ -59,11 +109,11 @@ module TavernKit
           )
         end
 
-        def estimate_prompt_tokens(state)
-          estimator = option(:token_estimator) || state.token_estimator || TavernKit::TokenEstimator.default
-          model_hint = resolve_value(option(:model_hint, state[:model_hint]), state)
-          overhead_per_message = resolve_non_negative_int(option(:message_overhead_tokens, 0), state, allow_nil: true) || 0
-          include_metadata_tokens = resolve_value(option(:include_message_metadata_tokens, false), state) == true
+        def estimate_prompt_tokens(state, config)
+          estimator = config.token_estimator || state.token_estimator || TavernKit::TokenEstimator.default
+          model_hint = resolve_value(config.model_hint.nil? ? state[:model_hint] : config.model_hint, state)
+          overhead_per_message = resolve_non_negative_int(config.message_overhead_tokens, state, allow_nil: true) || 0
+          include_metadata_tokens = resolve_value(config.include_message_metadata_tokens, state) == true
 
           if estimator.respond_to?(:describe)
             state.instrument(:stat, key: :token_estimator, step: state.current_step) do
@@ -136,6 +186,7 @@ module TavernKit
         def resolve_mode(value, state)
           resolved = resolve_value(value, state)
           resolved.nil? ? nil : resolved.to_sym
+        end
         end
       end
     end

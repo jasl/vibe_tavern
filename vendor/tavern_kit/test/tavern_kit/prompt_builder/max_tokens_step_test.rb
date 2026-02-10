@@ -4,9 +4,23 @@ require "test_helper"
 
 class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
   class BuildPlanStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "build_plan step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "build_plan step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "build_plan step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       blocks = []
       blocks << TavernKit::PromptBuilder::Block.new(role: :user, content: ctx.user_message.to_s) if ctx.user_message
       ctx.plan = TavernKit::PromptBuilder::Plan.new(blocks: blocks)
@@ -14,9 +28,23 @@ class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
   end
 
   class BuildTwoMessagesPlanStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "build_two_messages_plan step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "build_two_messages_plan step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "build_two_messages_plan step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       blocks = [
         TavernKit::PromptBuilder::Block.new(role: :user, content: "hi"),
         TavernKit::PromptBuilder::Block.new(role: :user, content: "ok"),
@@ -26,9 +54,23 @@ class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
   end
 
   class BuildOneMessageWithMetadataPlanStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "build_one_message_with_metadata_plan step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "build_one_message_with_metadata_plan step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "build_one_message_with_metadata_plan step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       blocks = [
         TavernKit::PromptBuilder::Block.new(
           role: :assistant,

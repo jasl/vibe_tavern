@@ -21,16 +21,10 @@ module TavernKit
     class Pipeline
       include Enumerable
 
-      # Terminal handler for the step stack.
-      class Terminal
-        def call(state)
-          state
-        end
-      end
-      TERMINAL = Terminal.new
-
       # Entry representing a step in the pipeline.
       Entry = Data.define(:step_class, :options, :name, :config_class, :default_config)
+
+      Frame = Data.define(:name, :step_class, :config, :prev_step)
 
       # Create an empty pipeline (no steps).
       # @return [Pipeline]
@@ -169,8 +163,72 @@ module TavernKit
       # Execute the pipeline on a state.
       def call(state)
         state = coerce_state(state)
-        stack = build_stack(state)
-        stack.call(state)
+
+        initial_step = state.current_step
+        frames = []
+        idx = 0
+
+        pipeline_error = nil
+        pipeline_error_cause = nil
+
+        while idx < @entries.size && pipeline_error.nil?
+          entry = @entries[idx]
+          config = resolve_step_config(entry, state)
+          prev_step = state.current_step
+          state.current_step = entry.name
+          frames << Frame.new(
+            name: entry.name,
+            step_class: entry.step_class,
+            config: config,
+            prev_step: prev_step,
+          )
+
+          state.instrument(:step_start, name: entry.name)
+
+          begin
+            entry.step_class.before(state, config)
+            idx += 1
+          rescue StandardError => e
+            state.instrument(:step_error, name: entry.name, error: e)
+            frames.pop
+            state.current_step = prev_step
+
+            pipeline_error, pipeline_error_cause = coerce_pipeline_error(e, step: entry.name)
+          end
+        end
+
+        if pipeline_error.nil?
+          while frames.any?
+            frame = frames.pop
+            state.current_step = frame.name
+
+            begin
+              frame.step_class.after(state, frame.config)
+              state.instrument(:step_finish, name: frame.name)
+              state.current_step = frame.prev_step
+            rescue StandardError => e
+              state.instrument(:step_error, name: frame.name, error: e)
+              state.current_step = frame.prev_step
+
+              pipeline_error, pipeline_error_cause = coerce_pipeline_error(e, step: frame.name)
+              break
+            end
+          end
+        end
+
+        if pipeline_error
+          while frames.any?
+            frame = frames.pop
+            state.current_step = frame.name
+            state.instrument(:step_error, name: frame.name, error: pipeline_error)
+            state.current_step = frame.prev_step
+          end
+
+          state.current_step = initial_step
+          raise_with_cause(pipeline_error, pipeline_error_cause)
+        end
+
+        state.current_step = initial_step
         state
       end
 
@@ -203,46 +261,18 @@ module TavernKit
         end
       end
 
-      def build_stack(state)
-        app = TERMINAL
-
-        @entries.reverse_each do |entry|
-          step_options = resolve_step_options(entry, state)
-          app = entry.step_class.new(app, **step_options, __step: entry.name)
-        end
-
-        app
-      end
-
-      def resolve_step_options(entry, state)
-        base = entry.options
-        if entry.config_class
-          return resolve_typed_config_options(entry, state, base)
-        end
-
-        context = state.context
-        return base unless context
-
-        overrides = context.module_configs.fetch(entry.name, nil)
-        return base unless overrides.is_a?(Hash) && overrides.any?
-
-        TavernKit::Utils.deep_merge_hashes(base, overrides)
-      end
-
-      def resolve_typed_config_options(entry, state, base)
+      def resolve_step_config(entry, state)
         context = state.context
         overrides = context&.module_configs&.fetch(entry.name, nil)
+
         has_overrides = overrides.is_a?(Hash) && overrides.any?
 
-        typed =
-          if has_overrides
-            merged = TavernKit::Utils.deep_merge_hashes(base, overrides)
-            resolve_typed_config(entry.name, entry.config_class, merged)
-          else
-            entry.default_config
-          end
-
-        { config: typed }
+        if has_overrides
+          merged = TavernKit::Utils.deep_merge_hashes(entry.options, overrides)
+          resolve_typed_config(entry.name, entry.config_class, merged)
+        else
+          entry.default_config
+        end
       end
 
       def coerce_state(value)
@@ -270,7 +300,9 @@ module TavernKit
       end
 
       def resolve_config_class(step_class)
-        return nil unless step_class.const_defined?(:Config, false)
+        unless step_class.const_defined?(:Config, false)
+          raise ArgumentError, "#{step_class} must define a Config class"
+        end
 
         config_class = step_class.const_get(:Config, false)
         unless config_class.respond_to?(:from_hash)
@@ -281,8 +313,6 @@ module TavernKit
       end
 
       def resolve_default_config(name, config_class, options)
-        return nil unless config_class
-
         resolve_typed_config(name, config_class, options)
       end
 
@@ -299,6 +329,23 @@ module TavernKit
         end
 
         config
+      end
+
+      def coerce_pipeline_error(error, step:)
+        return [error, nil] if error.is_a?(TavernKit::PipelineError)
+
+        [
+          TavernKit::PipelineError.new("#{error.class}: #{error.message}", step: step),
+          error,
+        ]
+      end
+
+      def raise_with_cause(error, cause)
+        if cause
+          raise error, cause: cause
+        end
+
+        raise error
       end
     end
   end

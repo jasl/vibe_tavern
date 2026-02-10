@@ -71,10 +71,8 @@ module TavernKit
               parts.compact.join("\n\n")
             end.freeze
 
-          private
-
-          def before(ctx)
-            ctx.blocks = build_blocks(ctx)
+          def self.before(ctx, config)
+            ctx.blocks = build_blocks(ctx, config)
 
             ctx.plan = TavernKit::PromptBuilder::Plan.new(
               blocks: ctx.blocks,
@@ -88,13 +86,16 @@ module TavernKit
               llm_options: ctx.llm_options,
             )
 
-            ctx.instrument(:stat, step: :plan_assembly, key: :plan_blocks, value: ctx.blocks.size)
+            ctx.instrument(:stat, step: ctx.current_step, key: :plan_blocks, value: ctx.blocks.size)
           end
 
-          def build_blocks(ctx)
+          class << self
+            private
+
+            def build_blocks(ctx, config)
             blocks = []
 
-            system_block = build_system_block(ctx)
+            system_block = build_system_block(ctx, config)
             blocks << system_block if system_block
 
             history = TavernKit::ChatHistory.wrap(ctx.history)
@@ -126,9 +127,9 @@ module TavernKit
             end
 
             blocks
-          end
+            end
 
-          def build_system_block(ctx)
+            def build_system_block(ctx, config)
             # Explicit override (including nil/blank) wins.
             if ctx.key?(:system_template)
               return nil if ctx[:system_template].to_s.strip.empty?
@@ -136,10 +137,10 @@ module TavernKit
               return build_template_block(ctx, ctx[:system_template], source: :system_template, slot: :system)
             end
 
-            build_default_system_block(ctx)
+            build_default_system_block(ctx, config)
           end
 
-          def build_post_history_block(ctx)
+            def build_post_history_block(ctx)
             if ctx.key?(:post_history_template)
               return nil if ctx[:post_history_template].to_s.strip.empty?
 
@@ -164,7 +165,7 @@ module TavernKit
             )
           end
 
-          def build_template_block(ctx, template, source:, slot:)
+            def build_template_block(ctx, template, source:, slot:)
             rendered =
               TavernKit::VibeTavern::LiquidMacros.render_for(
                 ctx,
@@ -185,14 +186,11 @@ module TavernKit
             )
           end
 
-          def build_default_system_block(ctx)
+            def build_default_system_block(ctx, config)
             char = ctx.character
             user = ctx.user
 
             return nil unless char || user
-
-            config = option(:config)
-            raise ArgumentError, "plan_assembly step config must be Steps::PlanAssembly::Config" unless config.is_a?(Config)
 
             text = build_default_system_text(ctx, default_system_text_builder: config.default_system_text_builder)
             return nil unless text
@@ -206,7 +204,7 @@ module TavernKit
             )
           end
 
-          def build_default_system_text(ctx, default_system_text_builder:)
+            def build_default_system_text(ctx, default_system_text_builder:)
             builder = default_system_text_builder || DEFAULT_SYSTEM_TEXT_BUILDER
 
             text = builder.call(ctx).to_s
@@ -215,6 +213,7 @@ module TavernKit
             ctx.warn("plan_assembly.default_system_text_builder error (using default): #{e.class}: #{e.message}")
             text = DEFAULT_SYSTEM_TEXT_BUILDER.call(ctx).to_s
             TavernKit::Utils.presence(text)
+            end
           end
         end
       end

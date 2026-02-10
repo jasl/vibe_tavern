@@ -6,9 +6,25 @@ module TavernKit
       module Steps
       # Step: CBS macro expansion for all blocks.
       class CBS < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
 
-        def before(ctx)
+              raise ArgumentError, "cbs step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "cbs step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "cbs step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
+
+        def self.before(ctx, _config)
           ctx.blocks ||= []
 
           context = ctx.context
@@ -48,6 +64,9 @@ module TavernKit
           end
         end
 
+        class << self
+          private
+
         def inferred_message_index(ctx)
           history = TavernKit::ChatHistory.wrap(ctx.history)
           history.size
@@ -73,6 +92,7 @@ module TavernKit
           return context[key] if context.respond_to?(:[]) && context.key?(key)
 
           default
+        end
         end
       end
       end

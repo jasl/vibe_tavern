@@ -131,6 +131,7 @@ PromptBuilder input contract:
   `preset`, `dialect`, `strict`, `llm_options`, etc.).
 - Unknown input keys fail fast (`ArgumentError`).
 - Step config parsing is step-owned and typed (`Step::Config.from_hash`).
+- Steps are not instantiated; Pipeline calls `StepClass.before/after(state, config)`.
 
 ## File ingestion (PNG / CHARX / BYAF)
 

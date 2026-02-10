@@ -5,42 +5,105 @@ require "test_helper"
 class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
   # Test step that records calls
   class RecordStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define(:label) do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "record step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "record step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          unknown = raw.keys - %i[label]
+          raise ArgumentError, "unknown record step config keys: #{unknown.inspect}" if unknown.any?
+
+          label = raw.fetch(:label)
+          new(label: label)
+        end
+      end
+
+    def self.before(ctx, config)
       ctx[:calls] ||= []
-      ctx[:calls] << :"before_#{options[:label]}"
+      ctx[:calls] << :"before_#{config.label}"
     end
 
-    def after(ctx)
+    def self.after(ctx, config)
       ctx[:calls] ||= []
-      ctx[:calls] << :"after_#{options[:label]}"
+      ctx[:calls] << :"after_#{config.label}"
     end
   end
 
   class AlphaStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "alpha step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "alpha step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "alpha step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       ctx[:calls] ||= []
       ctx[:calls] << :alpha
     end
   end
 
   class BetaStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
+          raise ArgumentError, "beta step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "beta step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "beta step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
       ctx[:calls] ||= []
       ctx[:calls] << :beta
     end
   end
 
   class CaptureOptionsStep < TavernKit::PromptBuilder::Step
-    private
+    Config =
+      Data.define(:nested, :scalar, :list) do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
 
-    def before(ctx)
-      ctx[:captured_options] = options
+          raise ArgumentError, "capture options step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "capture options step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          unknown = raw.keys - %i[nested scalar list]
+          raise ArgumentError, "unknown capture options step config keys: #{unknown.inspect}" if unknown.any?
+
+          new(
+            nested: raw.fetch(:nested),
+            scalar: raw.fetch(:scalar),
+            list: raw.fetch(:list),
+          )
+        end
+      end
+
+    def self.before(ctx, config)
+      ctx[:captured_config] = config.to_h
     end
   end
 
@@ -61,12 +124,36 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
         end
       end
 
-    private
+    def self.before(ctx, config)
+      ctx[:typed_config] = config
+      ctx[:typed_label] = config.label
+    end
+  end
 
-    def before(ctx)
-      cfg = options.fetch(:config)
-      ctx[:typed_config] = cfg
-      ctx[:typed_label] = cfg.label
+  class NoInstantiateStep < TavernKit::PromptBuilder::Step
+    def initialize(*)
+      raise "steps must not be instantiated"
+    end
+
+    Config =
+      Data.define do
+        def self.from_hash(raw)
+          return raw if raw.is_a?(self)
+
+          raise ArgumentError, "no_instantiate step config must be a Hash" unless raw.is_a?(Hash)
+          raw.each_key do |key|
+            raise ArgumentError, "no_instantiate step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          raise ArgumentError, "no_instantiate step does not accept step config keys: #{raw.keys.inspect}" if raw.any?
+
+          new
+        end
+      end
+
+    def self.before(ctx, _config)
+      ctx[:calls] ||= []
+      ctx[:calls] << :no_instantiate
     end
   end
 
@@ -183,9 +270,8 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
         nested: { keep: :base, override: :context },
         scalar: :context,
         list: [9],
-        __step: :capture,
       },
-      state[:captured_options],
+      state[:captured_config],
     )
   end
 
@@ -252,6 +338,17 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
 
     error = assert_raises(ArgumentError) { pipeline.call(state) }
     assert_match(/invalid config for step typed/, error.message)
+  end
+
+  def test_pipeline_does_not_instantiate_steps
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step :no_instantiate, NoInstantiateStep
+    end
+
+    state = TavernKit::PromptBuilder::State.new
+    pipeline.call(state)
+
+    assert_equal [:no_instantiate], state[:calls]
   end
 
   def test_duplicate_name_raises

@@ -6,9 +6,25 @@ module TavernKit
       module Steps
       # Build the final PromptBuilder::Plan.
       class PlanAssembly < TavernKit::PromptBuilder::Step
-        private
+        Config =
+          Data.define do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
 
-        def before(ctx)
+              raise ArgumentError, "plan_assembly step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "plan_assembly step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              if raw.any?
+                raise ArgumentError, "plan_assembly step does not accept step config keys: #{raw.keys.inspect}"
+              end
+
+              new
+            end
+          end
+
+        def self.before(ctx, _config)
           preset = ctx.preset
           blocks = Array(ctx.blocks)
 
@@ -67,8 +83,11 @@ module TavernKit
             llm_options: ctx.llm_options,
           )
 
-          ctx.instrument(:stat, step: :plan_assembly, key: :plan_blocks, value: ctx.blocks.size)
+          ctx.instrument(:stat, step: ctx.current_step, key: :plan_blocks, value: ctx.blocks.size)
         end
+
+        class << self
+          private
 
         def build_llm_options(ctx, preset, env:)
           return {} unless claude_source?(ctx)
@@ -307,6 +326,7 @@ module TavernKit
 
         def text_dialect?(ctx)
           ctx.dialect.to_s.strip.downcase.to_sym == :text
+        end
         end
       end
       end

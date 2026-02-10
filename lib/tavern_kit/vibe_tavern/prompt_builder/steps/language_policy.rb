@@ -83,11 +83,7 @@ module TavernKit
               parts.join("\n")
             end.freeze
 
-          private
-
-          def before(ctx)
-            config = option(:config)
-            raise ArgumentError, "language_policy step config must be Steps::LanguagePolicy::Config" unless config.is_a?(Config)
+          def self.before(ctx, config)
             return unless config.enabled
 
             target_lang = config.target_lang.to_s.strip
@@ -110,14 +106,17 @@ module TavernKit
             insert_policy_block!(ctx, target_lang, policy_text)
           end
 
-          def build_policy_text(target_lang, style_hint:, special_tags:, policy_text_builder:)
+          class << self
+            private
+
+            def build_policy_text(target_lang, style_hint:, special_tags:, policy_text_builder:)
             builder = policy_text_builder || DEFAULT_POLICY_TEXT_BUILDER
             raise ArgumentError, "language_policy.policy_text_builder must respond to #call" unless builder.respond_to?(:call)
 
             builder.call(target_lang, style_hint: style_hint, special_tags: special_tags).to_s
-          end
+            end
 
-          def insert_policy_block!(ctx, target_lang, policy_text)
+            def insert_policy_block!(ctx, target_lang, policy_text)
             ctx.blocks = Array(ctx.blocks).dup
 
             policy_block =
@@ -134,10 +133,10 @@ module TavernKit
 
             rebuild_plan!(ctx)
 
-            ctx.instrument(:stat, step: :language_policy, key: :enabled, value: true)
-          end
+            ctx.instrument(:stat, step: ctx.current_step, key: :enabled, value: true)
+            end
 
-          def resolve_insertion_index(blocks)
+            def resolve_insertion_index(blocks)
             user_index = blocks.find_index { |block| block.respond_to?(:slot) && block.slot == :user_message }
             return user_index if user_index
 
@@ -155,13 +154,14 @@ module TavernKit
             return tail_start_index if tail_start_index < blocks.length
 
             blocks.length
-          end
+            end
 
-          def rebuild_plan!(ctx)
+            def rebuild_plan!(ctx)
             plan = ctx.plan
             return unless plan
 
             ctx.plan = plan.with_blocks(ctx.blocks).with(warnings: ctx.warnings)
+            end
           end
         end
       end
