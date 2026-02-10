@@ -20,13 +20,13 @@ module TavernKit
       end
 
       def self.normalize_hash_keys(raw)
-        h = raw.is_a?(Hash) ? raw : {}
+        hash = raw.is_a?(Hash) ? raw : {}
 
-        h.each_with_object({}) do |(key, value), out|
+        hash.each_with_object({}) do |(key, value), normalized|
           underscored = TavernKit::Utils.underscore(key)
           next if underscored.strip.empty?
 
-          out[underscored.to_sym] = value
+          normalized[underscored.to_sym] = value
         end
       end
       private_class_method :normalize_hash_keys
@@ -92,7 +92,7 @@ module TavernKit
         super
       end
 
-      def respond_to_missing?(name, include_private = false)
+      def respond_to_missing?(name, _include_private = false)
         key = name.to_s.delete_suffix("=").to_sym
         @data.key?(key) || super
       end
@@ -103,17 +103,17 @@ module TavernKit
         return {} if value.nil?
         raise ArgumentError, "module_configs must be a Hash" unless value.is_a?(Hash)
 
-        value.each_with_object({}) do |(key, cfg), out|
-          step_name = key.to_s.strip.downcase.tr("-", "_").to_sym
-          raise ArgumentError, "module_configs.#{key} must be a Hash" unless cfg.is_a?(Hash)
+        value.each_with_object({}) do |(step_key, step_config), normalized|
+          step_name = step_key.to_s.strip.downcase.tr("-", "_").to_sym
+          raise ArgumentError, "module_configs.#{step_key} must be a Hash" unless step_config.is_a?(Hash)
 
-          cfg.each_key do |cfg_key|
-            unless cfg_key.is_a?(Symbol)
-              raise ArgumentError, "module_configs.#{key} keys must be Symbols (got #{cfg_key.class})"
+          step_config.each_key do |config_key|
+            unless config_key.is_a?(Symbol)
+              raise ArgumentError, "module_configs.#{step_key} keys must be Symbols (got #{config_key.class})"
             end
           end
 
-          out[step_name] = cfg.dup
+          normalized[step_name] = step_config.dup
         end
       end
     end

@@ -41,16 +41,16 @@ module TavernKit
             ctx.plan = build_plan(ctx, trace: trace, trim_report: ctx.trim_report)
           end
 
-          if ctx.instrumenter
-            if ctx.token_estimator.respond_to?(:describe)
-              ctx.instrument(:stat, step: :trimming, key: :token_estimator, value: ctx.token_estimator.describe(model_hint: model_hint))
+          if ctx.token_estimator.respond_to?(:describe)
+            ctx.instrument(:stat, step: :trimming, key: :token_estimator) do
+              { value: ctx.token_estimator.describe(model_hint: model_hint) }
             end
-
-            ctx.instrument(:stat, step: :trimming, key: :budget_tokens, value: result.report.budget_tokens)
-            ctx.instrument(:stat, step: :trimming, key: :initial_tokens, value: result.report.initial_tokens)
-            ctx.instrument(:stat, step: :trimming, key: :final_tokens, value: result.report.final_tokens)
-            ctx.instrument(:stat, step: :trimming, key: :eviction_count, value: result.report.eviction_count)
           end
+
+          ctx.instrument(:stat, step: :trimming, key: :budget_tokens, value: result.report.budget_tokens)
+          ctx.instrument(:stat, step: :trimming, key: :initial_tokens, value: result.report.initial_tokens)
+          ctx.instrument(:stat, step: :trimming, key: :final_tokens, value: result.report.final_tokens)
+          ctx.instrument(:stat, step: :trimming, key: :eviction_count, value: result.report.eviction_count)
         end
 
         def build_plan(ctx, trace:, trim_report:)

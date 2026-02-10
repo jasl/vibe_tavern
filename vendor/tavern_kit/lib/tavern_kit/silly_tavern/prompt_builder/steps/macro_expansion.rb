@@ -26,7 +26,7 @@ module TavernKit
           end
 
           ctx.blocks = expanded
-          ctx.instrument(:stat, step: :macro_expansion, key: :expanded_blocks, value: expanded.size) if ctx.instrumenter
+          ctx.instrument(:stat, step: :macro_expansion, key: :expanded_blocks, value: expanded.size)
         end
 
         def build_default_expander(ctx)

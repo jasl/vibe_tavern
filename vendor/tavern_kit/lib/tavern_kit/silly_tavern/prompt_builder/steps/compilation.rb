@@ -38,7 +38,7 @@ module TavernKit
           end
 
           ctx.blocks = blocks
-          ctx.instrument(:stat, step: :compilation, key: :blocks, value: blocks.size) if ctx.instrumenter
+          ctx.instrument(:stat, step: :compilation, key: :blocks, value: blocks.size)
         end
       end
       end

@@ -83,91 +83,86 @@ module TavernKit
               parts.join("\n")
             end.freeze
 
-        private
+          private
 
-        def before(ctx)
-          cfg = option(:config)
-          return if cfg.nil?
-          raise ArgumentError, "language_policy step config must be Steps::LanguagePolicy::Config" unless cfg.is_a?(Config)
-          return unless cfg.enabled
+          def before(ctx)
+            config = option(:config)
+            raise ArgumentError, "language_policy step config must be Steps::LanguagePolicy::Config" unless config.is_a?(Config)
+            return unless config.enabled
 
-          target_lang = cfg.target_lang.to_s.strip
-          raise ArgumentError, "language_policy.target_lang must be present" if target_lang.empty?
+            target_lang = config.target_lang.to_s.strip
+            raise ArgumentError, "language_policy.target_lang must be present" if target_lang.empty?
 
-          unless TavernKit::VibeTavern::LanguagePolicy::SUPPORTED_TARGET_LANGS.include?(target_lang)
-            ctx.warn("language_policy.target_lang not supported (disabling): #{target_lang.inspect}")
-            return
+            unless TavernKit::VibeTavern::LanguagePolicy::SUPPORTED_TARGET_LANGS.include?(target_lang)
+              ctx.warn("language_policy.target_lang not supported (disabling): #{target_lang.inspect}")
+              return
+            end
+
+            policy_text =
+              build_policy_text(
+                target_lang,
+                style_hint: config.style_hint,
+                special_tags: config.special_tags,
+                policy_text_builder: config.policy_text_builder,
+              )
+            return if policy_text.strip.empty?
+
+            insert_policy_block!(ctx, target_lang, policy_text)
           end
 
-          style_hint = cfg.style_hint
-          special_tags = cfg.special_tags
-          policy_text_builder = cfg.policy_text_builder
+          def build_policy_text(target_lang, style_hint:, special_tags:, policy_text_builder:)
+            builder = policy_text_builder || DEFAULT_POLICY_TEXT_BUILDER
+            raise ArgumentError, "language_policy.policy_text_builder must respond to #call" unless builder.respond_to?(:call)
 
-          policy_text =
-            build_policy_text(
-              target_lang,
-              style_hint: style_hint,
-              special_tags: special_tags,
-              policy_text_builder: policy_text_builder,
-            )
-          return if policy_text.strip.empty?
-
-          insert_policy_block!(ctx, target_lang, policy_text)
-        end
-
-        def build_policy_text(target_lang, style_hint:, special_tags:, policy_text_builder:)
-          builder = policy_text_builder || DEFAULT_POLICY_TEXT_BUILDER
-          raise ArgumentError, "language_policy.policy_text_builder must respond to #call" unless builder.respond_to?(:call)
-
-          builder.call(target_lang, style_hint: style_hint, special_tags: special_tags).to_s
-        end
-
-        def insert_policy_block!(ctx, target_lang, policy_text)
-          ctx.blocks = Array(ctx.blocks).dup
-
-          policy_block =
-            TavernKit::PromptBuilder::Block.new(
-              role: :system,
-              content: policy_text,
-              slot: :language_policy,
-              token_budget_group: :system,
-              metadata: { source: :language_policy, target_lang: target_lang },
-            )
-
-          insertion_index = resolve_insertion_index(ctx.blocks)
-          ctx.blocks.insert(insertion_index, policy_block)
-
-          rebuild_plan!(ctx)
-
-          ctx.instrument(:stat, step: :language_policy, key: :enabled, value: true) if ctx.instrumenter
-        end
-
-        def resolve_insertion_index(blocks)
-          idx = blocks.find_index { |b| b.respond_to?(:slot) && b.slot == :user_message }
-          return idx if idx
-
-          # Prefer inserting just before the trailing "prompting" messages
-          # (user/tool) so the last message remains user/tool for chat semantics.
-          tail_start = blocks.length
-          while tail_start.positive?
-            b = blocks[tail_start - 1]
-            role = b.respond_to?(:role) ? b.role : nil
-            break unless role == :user || role == :tool
-
-            tail_start -= 1
+            builder.call(target_lang, style_hint: style_hint, special_tags: special_tags).to_s
           end
 
-          return tail_start if tail_start < blocks.length
+          def insert_policy_block!(ctx, target_lang, policy_text)
+            ctx.blocks = Array(ctx.blocks).dup
 
-          blocks.length
-        end
+            policy_block =
+              TavernKit::PromptBuilder::Block.new(
+                role: :system,
+                content: policy_text,
+                slot: :language_policy,
+                token_budget_group: :system,
+                metadata: { source: :language_policy, target_lang: target_lang },
+              )
 
-        def rebuild_plan!(ctx)
-          plan = ctx.plan
-          return unless plan
+            insertion_index = resolve_insertion_index(ctx.blocks)
+            ctx.blocks.insert(insertion_index, policy_block)
 
-          ctx.plan = plan.with_blocks(ctx.blocks).with(warnings: ctx.warnings)
-        end
+            rebuild_plan!(ctx)
+
+            ctx.instrument(:stat, step: :language_policy, key: :enabled, value: true)
+          end
+
+          def resolve_insertion_index(blocks)
+            user_index = blocks.find_index { |block| block.respond_to?(:slot) && block.slot == :user_message }
+            return user_index if user_index
+
+            # Prefer inserting just before the trailing "prompting" messages
+            # (user/tool) so the last message remains user/tool for chat semantics.
+            tail_start_index = blocks.length
+            while tail_start_index.positive?
+              block = blocks[tail_start_index - 1]
+              role = block.respond_to?(:role) ? block.role : nil
+              break unless role == :user || role == :tool
+
+              tail_start_index -= 1
+            end
+
+            return tail_start_index if tail_start_index < blocks.length
+
+            blocks.length
+          end
+
+          def rebuild_plan!(ctx)
+            plan = ctx.plan
+            return unless plan
+
+            ctx.plan = plan.with_blocks(ctx.blocks).with(warnings: ctx.warnings)
+          end
         end
       end
     end

@@ -25,24 +25,24 @@ module TavernKit
       # @param state [State] the builder state
       # @return [State] the processed state
       def call(state)
-        step = option(:__step, self.class.step_name)
-        previous_step = state.current_step
-        state.current_step = step
+        step_name = option(:__step, self.class.step_name)
+        previous_step_name = state.current_step
+        state.current_step = step_name
 
-        state.instrument(:step_start, name: step) if state.instrumenter
+        state.instrument(:step_start, name: step_name)
         before(state)
         @app.call(state)
         after(state)
-        state.instrument(:step_finish, name: step) if state.instrumenter
+        state.instrument(:step_finish, name: step_name)
         state
-      rescue => e
-        state.instrument(:step_error, name: step, error: e) if state&.instrumenter
+      rescue StandardError => e
+        state&.instrument(:step_error, name: step_name, error: e)
 
-        raise e if e.is_a?(TavernKit::PipelineError)
+        raise if e.is_a?(TavernKit::PipelineError)
 
-        raise TavernKit::PipelineError.new("#{e.class}: #{e.message}", step: step), cause: e
+        raise TavernKit::PipelineError.new("#{e.class}: #{e.message}", step: step_name), cause: e
       ensure
-        state.current_step = previous_step if state
+        state.current_step = previous_step_name if state
       end
 
       # Name used when a step is registered without an explicit name.

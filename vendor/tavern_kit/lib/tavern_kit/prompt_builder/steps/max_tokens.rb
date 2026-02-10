@@ -20,15 +20,13 @@ module TavernKit
           estimation = estimate_prompt_tokens(state)
           prompt_tokens = estimation.fetch(:total)
 
-          if state.instrumenter
-            state.instrument(:stat, key: :estimated_prompt_tokens, value: prompt_tokens, step: state.current_step)
-            state.instrument(:stat, key: :estimated_content_tokens, value: estimation.fetch(:content), step: state.current_step)
-            state.instrument(:stat, key: :estimated_metadata_tokens, value: estimation.fetch(:metadata), step: state.current_step)
-            state.instrument(:stat, key: :message_overhead_per_message_tokens, value: estimation.fetch(:overhead_per_message), step: state.current_step)
-            state.instrument(:stat, key: :message_overhead_tokens, value: estimation.fetch(:overhead_total), step: state.current_step)
-            state.instrument(:stat, key: :message_count, value: estimation.fetch(:message_count), step: state.current_step)
-            state.instrument(:stat, key: :max_prompt_tokens, value: limit_tokens, step: state.current_step)
-          end
+          state.instrument(:stat, key: :estimated_prompt_tokens, value: prompt_tokens, step: state.current_step)
+          state.instrument(:stat, key: :estimated_content_tokens, value: estimation.fetch(:content), step: state.current_step)
+          state.instrument(:stat, key: :estimated_metadata_tokens, value: estimation.fetch(:metadata), step: state.current_step)
+          state.instrument(:stat, key: :message_overhead_per_message_tokens, value: estimation.fetch(:overhead_per_message), step: state.current_step)
+          state.instrument(:stat, key: :message_overhead_tokens, value: estimation.fetch(:overhead_total), step: state.current_step)
+          state.instrument(:stat, key: :message_count, value: estimation.fetch(:message_count), step: state.current_step)
+          state.instrument(:stat, key: :max_prompt_tokens, value: limit_tokens, step: state.current_step)
 
           return if prompt_tokens <= limit_tokens
 
@@ -67,8 +65,10 @@ module TavernKit
           overhead_per_message = resolve_non_negative_int(option(:message_overhead_tokens, 0), state, allow_nil: true) || 0
           include_metadata_tokens = resolve_value(option(:include_message_metadata_tokens, false), state) == true
 
-          if state.instrumenter && estimator.respond_to?(:describe)
-            state.instrument(:stat, key: :token_estimator, value: estimator.describe(model_hint: model_hint), step: state.current_step)
+          if estimator.respond_to?(:describe)
+            state.instrument(:stat, key: :token_estimator, step: state.current_step) do
+              { value: estimator.describe(model_hint: model_hint) }
+            end
           end
 
           messages = if state.plan

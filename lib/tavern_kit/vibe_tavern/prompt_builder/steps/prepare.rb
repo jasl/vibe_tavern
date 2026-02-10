@@ -32,8 +32,8 @@ module TavernKit
           private
 
           def before(ctx)
-            cfg = option(:config)
-            raise ArgumentError, "prepare step config must be Steps::Prepare::Config" unless cfg.is_a?(Config)
+            config = option(:config)
+            raise ArgumentError, "prepare step config must be Steps::Prepare::Config" unless config.is_a?(Config)
 
             ctx.variables_store!
 
@@ -43,57 +43,52 @@ module TavernKit
           end
 
           def apply_token_estimation!(ctx)
-            config = token_estimation_config(ctx) || {}
+            token_estimation = token_estimation_config(ctx) || {}
 
-            apply_model_hint!(ctx, config)
-            apply_token_estimator!(ctx, config) if config.any?
+            apply_model_hint!(ctx, token_estimation)
+            apply_token_estimator!(ctx, token_estimation)
           end
 
           def token_estimation_config(ctx)
             context = ctx.context
-            raw = context&.[](:token_estimation)
+            token_estimation = context&.[](:token_estimation)
 
-            return nil if raw.nil?
+            return nil if token_estimation.nil?
 
-            raise ArgumentError, "token_estimation config must be a Hash" unless raw.is_a?(Hash)
+            raise ArgumentError, "token_estimation config must be a Hash" unless token_estimation.is_a?(Hash)
 
-            raw
+            token_estimation
           end
 
-          def apply_model_hint!(ctx, config)
-            explicit = ctx.key?(:model_hint) ? presence(ctx[:model_hint]) : nil
+          def apply_model_hint!(ctx, token_estimation)
+            explicit_hint = ctx.key?(:model_hint) ? presence(ctx[:model_hint]) : nil
 
-            context_hint = presence(config.fetch(:model_hint, nil))
+            # Allow context to override a blank/invalid explicit hint.
+            return if explicit_hint
+
+            context_hint = presence(token_estimation.fetch(:model_hint, nil))
 
             default_hint = ctx.key?(:default_model_hint) ? presence(ctx[:default_model_hint]) : nil
 
-            selected = explicit || context_hint || default_hint
-            return unless selected
+            selected_hint = context_hint || default_hint
+            return unless selected_hint
 
-            # Allow context to override a blank/invalid explicit hint.
-            if explicit.nil?
-              ctx[:model_hint] = TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(selected)
-              ctx[:model_hint_source] =
-                if context_hint
-                  :context
-                elsif default_hint
-                  :default
-                end
-            end
+            ctx[:model_hint] = TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(selected_hint)
+            ctx[:model_hint_source] = context_hint ? :context : :default
           end
 
-          def apply_token_estimator!(ctx, config)
+          def apply_token_estimator!(ctx, token_estimation)
             return if ctx.token_estimator
 
-            estimator = config.fetch(:token_estimator, nil)
-            if estimator
-              raise ArgumentError, "token_estimation.token_estimator must respond to #estimate" unless estimator.respond_to?(:estimate)
-              ctx.token_estimator = estimator
+            token_estimator = token_estimation.fetch(:token_estimator, nil)
+            if token_estimator
+              raise ArgumentError, "token_estimation.token_estimator must respond to #estimate" unless token_estimator.respond_to?(:estimate)
+              ctx.token_estimator = token_estimator
               ctx[:token_estimator_source] = :context
               return
             end
 
-            registry = config.fetch(:registry, nil)
+            registry = token_estimation.fetch(:registry, nil)
             return if registry.nil?
 
             raise ArgumentError, "token_estimation.registry must be a Hash" unless registry.is_a?(Hash)
