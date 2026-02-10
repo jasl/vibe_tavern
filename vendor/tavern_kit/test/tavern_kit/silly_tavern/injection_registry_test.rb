@@ -33,7 +33,7 @@ class TavernKit::SillyTavern::InjectionRegistryTest < Minitest::Test
     registry = TavernKit::SillyTavern::InjectionRegistry.from_st_json(fixture)
     delta = registry.each.find { |e| e.id == "delta" }
 
-    ctx = TavernKit::Prompt::Context.new
+    ctx = TavernKit::PromptBuilder::State.new
     ctx.warning_handler = nil
 
     assert delta.active_for?(ctx)

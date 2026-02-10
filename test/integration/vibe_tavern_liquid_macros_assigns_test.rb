@@ -17,12 +17,12 @@ class VibeTavernLiquidMacrosAssignsTest < ActiveSupport::TestCase
     user = TavernKit::User.new(name: "Alice", persona: "A curious adventurer")
 
     runtime =
-      TavernKit::Runtime::Base.build(
+      TavernKit::PromptBuilder::Context.build(
         { "chatIndex" => 1, "messageIndex" => 2, "model" => "gpt-x", "role" => "assistant" },
         type: :app,
       )
 
-    ctx = TavernKit::Prompt::Context.new(character: character, user: user, runtime: runtime)
+    ctx = TavernKit::PromptBuilder::Context.new(character: character, user: user, runtime: runtime)
 
     assigns = TavernKit::VibeTavern::LiquidMacros::Assigns.build(ctx)
 
@@ -45,7 +45,7 @@ class VibeTavernLiquidMacrosAssignsTest < ActiveSupport::TestCase
   end
 
   test "derives runtime from ctx[:runtime] when ctx.runtime is not set" do
-    ctx = TavernKit::Prompt::Context.new
+    ctx = TavernKit::PromptBuilder::Context.new
     ctx[:runtime] = { "chatIndex" => 7 }
 
     assigns = TavernKit::VibeTavern::LiquidMacros::Assigns.build(ctx)

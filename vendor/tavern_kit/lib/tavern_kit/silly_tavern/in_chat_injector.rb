@@ -8,19 +8,19 @@ module TavernKit
     # - Text-completion pipeline: `doChatInject()` (public/script.js)
     # - Chat-completion pipeline: `populationInjectionPrompts()` (public/scripts/openai.js)
     #
-    # This helper is used by the Injection middleware, but is kept as a
+    # This helper is used by the Injection step, but is kept as a
     # standalone unit so its contract can be tested directly.
     module InChatInjector
       module_function
 
       ROLE_ORDER = %i[system user assistant].freeze
 
-      # @param messages [Array<Prompt::Message>] chronological (oldest -> newest)
+      # @param messages [Array<PromptBuilder::Message>] chronological (oldest -> newest)
       # @param entries [Array<InjectionRegistry::Entry>] in-chat entries only
       # @param generation_type [Symbol] :normal, :continue, ...
-      # @param prompt_entries [Array<Prompt::PromptEntry>] optional Prompt Manager in-chat entries
+      # @param prompt_entries [Array<PromptBuilder::PromptEntry>] optional Prompt Manager in-chat entries
       # @param continue_depth0_shift [Boolean] ST doChatInject() shifts depth=0 injections to depth=1 on continue
-      # @return [Array<Prompt::Message>] new message array with injections applied
+      # @return [Array<PromptBuilder::Message>] new message array with injections applied
       def inject(messages, entries, generation_type:, prompt_entries: [], continue_depth0_shift: true)
         base = Array(messages)
         injects = Array(entries).select(&:in_chat?)
@@ -79,7 +79,7 @@ module TavernKit
             joint = [role_prompts, extension_prompt].map { |s| s.to_s.strip }.reject(&:empty?).join("\n")
             next if joint.empty?
 
-            out << TavernKit::Prompt::Message.new(role: role, content: joint)
+            out << TavernKit::PromptBuilder::Message.new(role: role, content: joint)
           end
         end
 

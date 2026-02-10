@@ -34,7 +34,7 @@ class TavernKit::PromptInspectorTest < Minitest::Test
     estimator, tokenizer_json = build_estimator_with_hf_backend
 
     messages = [
-      TavernKit::Prompt::Message.new(role: :user, content: "hello 😁"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "hello 😁"),
     ]
 
     inspection =
@@ -67,9 +67,9 @@ class TavernKit::PromptInspectorTest < Minitest::Test
     estimator, tokenizer_json = build_estimator_with_hf_backend
 
     plan =
-      TavernKit::Prompt::Plan.new(
+      TavernKit::PromptBuilder::Plan.new(
         blocks: [
-          TavernKit::Prompt::Block.new(role: :user, content: "hello 😁"),
+          TavernKit::PromptBuilder::Block.new(role: :user, content: "hello 😁"),
         ],
       )
 
@@ -99,7 +99,7 @@ class TavernKit::PromptInspectorTest < Minitest::Test
 
     bad = "\xC3".b.force_encoding("UTF-8")
     metadata = { "bad" => bad }
-    msg = TavernKit::Prompt::Message.new(role: :user, content: "hello", metadata: metadata)
+    msg = TavernKit::PromptBuilder::Message.new(role: :user, content: "hello", metadata: metadata)
 
     inspection =
       TavernKit::PromptInspector.inspect_messages(

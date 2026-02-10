@@ -5,7 +5,7 @@ require "test_helper"
 class TavernKit::RisuAI::RuntimeTest < Minitest::Test
   def test_normalize_coerces_known_fields
     char = TavernKit::Character.create(name: "Seraphina")
-    ctx = TavernKit::Prompt::Context.new(character: char, history: [])
+    ctx = TavernKit::PromptBuilder::Context.new(character: char, history: [])
 
     runtime = TavernKit::RisuAI::Runtime.build(
       {
@@ -45,7 +45,7 @@ class TavernKit::RisuAI::RuntimeTest < Minitest::Test
 
   def test_rng_word_default_falls_back_to_character_name
     char = TavernKit::Character.create(name: "Seraphina")
-    ctx = TavernKit::Prompt::Context.new(character: char, history: [])
+    ctx = TavernKit::PromptBuilder::Context.new(character: char, history: [])
 
     runtime = TavernKit::RisuAI::Runtime.build({}, context: ctx)
     assert_equal "Seraphina", runtime.to_h[:rng_word]

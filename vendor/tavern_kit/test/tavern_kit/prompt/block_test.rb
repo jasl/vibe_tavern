@@ -2,9 +2,9 @@
 
 require "test_helper"
 
-class TavernKit::Prompt::BlockTest < Minitest::Test
+class TavernKit::PromptBuilder::BlockTest < Minitest::Test
   def test_basic_block
-    block = TavernKit::Prompt::Block.new(role: :system, content: "You are a helpful assistant.")
+    block = TavernKit::PromptBuilder::Block.new(role: :system, content: "You are a helpful assistant.")
     assert_equal :system, block.role
     assert_equal "You are a helpful assistant.", block.content
     assert block.enabled?
@@ -16,7 +16,7 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
   end
 
   def test_block_with_all_attributes
-    block = TavernKit::Prompt::Block.new(
+    block = TavernKit::PromptBuilder::Block.new(
       id: "test-001",
       role: :user,
       content: "Hello!",
@@ -58,14 +58,14 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
   end
 
   def test_block_auto_generates_id
-    block = TavernKit::Prompt::Block.new(role: :system, content: "test")
+    block = TavernKit::PromptBuilder::Block.new(role: :system, content: "test")
     refute_nil block.id
     assert_kind_of String, block.id
     assert_match(/\A[0-9a-f-]+\z/, block.id)
   end
 
   def test_block_to_message
-    block = TavernKit::Prompt::Block.new(
+    block = TavernKit::PromptBuilder::Block.new(
       role: :user,
       content: "Hello!",
       name: "Alice",
@@ -73,7 +73,7 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
       message_metadata: { tool_call_id: "call_123" },
     )
     msg = block.to_message
-    assert_kind_of TavernKit::Prompt::Message, msg
+    assert_kind_of TavernKit::PromptBuilder::Message, msg
     assert_equal :user, msg.role
     assert_equal "Hello!", msg.content
     assert_equal "Alice", msg.name
@@ -82,7 +82,7 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
   end
 
   def test_block_to_h
-    block = TavernKit::Prompt::Block.new(role: :system, content: "test", id: "x")
+    block = TavernKit::PromptBuilder::Block.new(role: :system, content: "test", id: "x")
     h = block.to_h
     assert_equal "x", h[:id]
     assert_equal :system, h[:role]
@@ -90,7 +90,7 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
   end
 
   def test_block_with
-    block = TavernKit::Prompt::Block.new(role: :system, content: "original", id: "x")
+    block = TavernKit::PromptBuilder::Block.new(role: :system, content: "original", id: "x")
     modified = block.with(content: "modified")
     assert_equal "original", block.content
     assert_equal "modified", modified.content
@@ -98,7 +98,7 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
   end
 
   def test_block_disable_enable
-    block = TavernKit::Prompt::Block.new(role: :system, content: "test")
+    block = TavernKit::PromptBuilder::Block.new(role: :system, content: "test")
     assert block.enabled?
 
     disabled = block.disable
@@ -111,30 +111,30 @@ class TavernKit::Prompt::BlockTest < Minitest::Test
 
   def test_block_invalid_role
     assert_raises(ArgumentError) do
-      TavernKit::Prompt::Block.new(role: "system", content: "test")
+      TavernKit::PromptBuilder::Block.new(role: "system", content: "test")
     end
   end
 
   def test_block_invalid_content
     assert_raises(ArgumentError) do
-      TavernKit::Prompt::Block.new(role: :system, content: 42)
+      TavernKit::PromptBuilder::Block.new(role: :system, content: 42)
     end
   end
 
   def test_block_invalid_insertion_point
     assert_raises(ArgumentError) do
-      TavernKit::Prompt::Block.new(role: :system, content: "test", insertion_point: "in_chat")
+      TavernKit::PromptBuilder::Block.new(role: :system, content: "test", insertion_point: "in_chat")
     end
   end
 
   def test_block_invalid_budget_group
     assert_raises(ArgumentError) do
-      TavernKit::Prompt::Block.new(role: :system, content: "test", token_budget_group: "system")
+      TavernKit::PromptBuilder::Block.new(role: :system, content: "test", token_budget_group: "system")
     end
   end
 
   def test_block_tags_are_frozen
-    block = TavernKit::Prompt::Block.new(role: :system, content: "test", tags: [:a, :b])
+    block = TavernKit::PromptBuilder::Block.new(role: :system, content: "test", tags: [:a, :b])
     assert block.tags.frozen?
   end
 end

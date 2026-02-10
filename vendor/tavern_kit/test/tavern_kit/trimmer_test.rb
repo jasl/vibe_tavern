@@ -10,7 +10,7 @@ class TavernKit::TrimmerTest < Minitest::Test
   end
 
   def build_block(id:, tokens:, budget_group:, role: :system, removable: true, priority: 100, metadata: {})
-    TavernKit::Prompt::Block.new(
+    TavernKit::PromptBuilder::Block.new(
       id: id,
       role: role,
       content: tokens.to_s,

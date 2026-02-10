@@ -1,0 +1,79 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+class TavernKit::SillyTavern::PromptBuilder::Steps::MacroExpansionTest < Minitest::Test
+  class BoomExpander
+    def expand(_text, environment:)
+      raise TavernKit::SillyTavern::MacroSyntaxError.new("boom", macro_name: "x", position: 0)
+    end
+  end
+
+  def run_macro_expansion(ctx)
+    TavernKit::PromptBuilder::Pipeline.new do
+      use_step TavernKit::SillyTavern::PromptBuilder::Steps::MacroExpansion, name: :macro_expansion
+    end.call(ctx)
+  end
+
+  def test_expands_basic_env_macros
+    ctx = TavernKit::PromptBuilder::State.new(
+      character: TavernKit::Character.create(name: "Alice"),
+      user: TavernKit::User.new(name: "Bob"),
+      preset: TavernKit::SillyTavern::Preset.new,
+      history: [],
+      user_message: "",
+    )
+
+    ctx.blocks = [
+      TavernKit::PromptBuilder::Block.new(role: :system, content: "Hello {{user}} and {{char}}."),
+    ]
+
+    run_macro_expansion(ctx)
+
+    assert_equal "Hello Bob and Alice.", ctx.blocks.first.content
+  end
+
+  def test_macro_registry_can_override_builtins
+    registry = TavernKit::SillyTavern::Macro::Registry.new
+    registry.register("user") { |_inv| "Zed" }
+
+    ctx = TavernKit::PromptBuilder::State.new(
+      character: TavernKit::Character.create(name: "Alice"),
+      user: TavernKit::User.new(name: "Bob"),
+      preset: TavernKit::SillyTavern::Preset.new,
+      history: [],
+      user_message: "",
+      macro_registry: registry,
+    )
+
+    ctx.blocks = [
+      TavernKit::PromptBuilder::Block.new(role: :system, content: "Hello {{user}} and {{char}}."),
+    ]
+
+    run_macro_expansion(ctx)
+
+    assert_equal "Hello Zed and Alice.", ctx.blocks.first.content
+  end
+
+  def test_macro_errors_warn_and_preserve_original_content
+    ctx = TavernKit::PromptBuilder::State.new(
+      character: TavernKit::Character.create(name: "Alice"),
+      user: TavernKit::User.new(name: "Bob"),
+      preset: TavernKit::SillyTavern::Preset.new,
+      history: [],
+      user_message: "",
+      expander: BoomExpander.new,
+    )
+    ctx.warning_handler = nil
+
+    ctx.blocks = [
+      TavernKit::PromptBuilder::Block.new(role: :system, content: "Hi {{x}}"),
+    ]
+
+    run_macro_expansion(ctx)
+
+    assert_equal "Hi {{x}}", ctx.blocks.first.content
+    assert_equal 1, ctx.warnings.size
+    assert_match(/Macro expansion error/, ctx.warnings.first)
+  end
+end

@@ -1,4 +1,4 @@
-# TODO: Native Multilingual Support via Language Policy (Middleware Plan)
+# TODO: Native Multilingual Support via Language Policy (Step Plan)
 
 Goal: add **native**, configurable multilingual support to `TavernKit::VibeTavern`
 so the model can reply in the **user’s preferred language** even when Character,
@@ -11,7 +11,7 @@ must be preserved **verbatim** and must not be “translated” or localized.
 
 This repo does **not** add an app-level content/ethics policy in the infra
 layer. Any safety guardrails remain the responsibility of the upstream LLM /
-provider. This middleware must stay focused on:
+provider. This step must stay focused on:
 - output language and style constraints
 - protocol correctness (tools/directives)
 - “verbatim zones” preservation
@@ -88,19 +88,19 @@ Unified configuration entry:
 
 Prompt-building pipeline:
 - `lib/tavern_kit/vibe_tavern/pipeline.rb`
-- `lib/tavern_kit/vibe_tavern/middleware/prepare.rb`
-- `lib/tavern_kit/vibe_tavern/middleware/plan_assembly.rb`
+- `lib/tavern_kit/vibe_tavern/prompt_builder/steps/prepare.rb`
+- `lib/tavern_kit/vibe_tavern/prompt_builder/steps/plan_assembly.rb`
 
 Protocols:
 - Tool loop: `lib/tavern_kit/vibe_tavern/tool_calling/tool_loop_runner.rb`
 - Directives runner: `lib/tavern_kit/vibe_tavern/directives/runner.rb`
 
 Recommended approach:
-- implement “target language output” as a **pipeline middleware** that injects
+- implement “target language output” as a **pipeline step** that injects
   a small **Language Policy** system block into the prompt plan.
 - keep it app-configurable via `runtime` (preferred) or prompt context metadata.
 
-Why middleware:
+Why step:
 - it works for chat-only streaming, directives runs, and tool loop runs
   uniformly (all use `PromptRunner#build_request` → `TavernKit::VibeTavern.build`)
 - it avoids scattering “respond in X” instructions across call sites
@@ -132,7 +132,7 @@ Language policy is **app-owned configuration**:
 
 Optional (app-side customization):
 - `policy_text_builder`: a Ruby callable (lambda/proc) that builds the injected
-  policy text. Recommended to set via pipeline middleware options (keeps runtime
+  policy text. Recommended to set via pipeline step options (keeps runtime
   serializable), e.g.:
 
 ```ruby
@@ -141,7 +141,7 @@ runner_config =
     provider: "openrouter",
     model: "openai/gpt-5.2:nitro",
     runtime: { language_policy: { enabled: true, target_lang: "zh-CN" } },
-    middleware_options: {
+    step_options: {
       language_policy: {
         policy_text_builder: ->(target_lang, style_hint:, special_tags:) { "..." },
       },
@@ -186,7 +186,7 @@ Policy (P0 recommendation):
 
 ## Verbatim zones (must-preserve contract)
 
-The middleware must define (and document) the “verbatim zones” that are never
+The step must define (and document) the “verbatim zones” that are never
 to be translated/localized. Recommended initial set:
 
 - fenced code blocks: triple backticks (```...```)
@@ -293,17 +293,17 @@ runtime[:output_tags] = {
 This runs before the output tag rules, and still respects verbatim zones
 (code fences / inline code / Liquid macros are never modified).
 
-## Middleware design: `LanguagePolicy`
+## Step design: `LanguagePolicy`
 
-Add a new middleware:
-- `lib/tavern_kit/vibe_tavern/middleware/language_policy.rb`
+Add a new step:
+- `lib/tavern_kit/vibe_tavern/prompt_builder/steps/language_policy.rb`
 
 Pipeline insertion:
-- `lib/tavern_kit/vibe_tavern/pipeline.rb` should `use ...LanguagePolicy`
+- `lib/tavern_kit/vibe_tavern/pipeline.rb` should `use_step ...LanguagePolicy`
   after `:plan_assembly` (because `PlanAssembly` finalizes `ctx.plan`).
 
 Behavior (P0):
-1) Consume typed `LanguagePolicy::Config` injected into middleware options by `RunnerConfig`.
+1) Consume typed `LanguagePolicy::Config` injected into step options by `RunnerConfig`.
 2) If `enabled` and `target_lang` present:
    - Insert a new **system block** near the end of system instructions,
      ideally **after** post-history instructions and **before** the current user
@@ -409,7 +409,7 @@ De-risking:
 ## Development plan (ordered)
 
 P0 (foundation, infra-only):
-1) Implement `Middleware::LanguagePolicy` and wire it into the pipeline.
+1) Implement `PromptBuilder::Steps::LanguagePolicy` and wire it into the pipeline.
 2) Define the runtime config contract (`runtime[:language_policy]`).
 3) Add deterministic tests for:
    - enabled vs disabled
@@ -490,7 +490,7 @@ Notes:
   - the envelope is valid JSON (no extra text)
   - `assistant_text` is in `target_lang`
   - directive `type` strings remain canonical
-- No additional “ethics/safety policy” text is injected by this middleware.
+- No additional “ethics/safety policy” text is injected by this step.
 
 ## Decisions (current)
 

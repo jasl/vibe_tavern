@@ -1848,7 +1848,7 @@ process_task =
         end
 
         runtime =
-          TavernKit::Runtime::Base.build(
+          TavernKit::PromptBuilder::Context.build(
             runtime_inputs,
             type: :app,
           )

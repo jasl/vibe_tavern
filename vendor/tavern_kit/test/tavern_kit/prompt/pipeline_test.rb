@@ -2,9 +2,9 @@
 
 require "test_helper"
 
-class TavernKit::Prompt::PipelineTest < Minitest::Test
-  # Test middleware that records calls
-  class RecordMiddleware < TavernKit::Prompt::Middleware::Base
+class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
+  # Test step that records calls
+  class RecordStep < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
@@ -18,7 +18,7 @@ class TavernKit::Prompt::PipelineTest < Minitest::Test
     end
   end
 
-  class AlphaMiddleware < TavernKit::Prompt::Middleware::Base
+  class AlphaStep < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
@@ -27,7 +27,7 @@ class TavernKit::Prompt::PipelineTest < Minitest::Test
     end
   end
 
-  class BetaMiddleware < TavernKit::Prompt::Middleware::Base
+  class BetaStep < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
@@ -37,14 +37,14 @@ class TavernKit::Prompt::PipelineTest < Minitest::Test
   end
 
   def test_empty_pipeline
-    pipeline = TavernKit::Prompt::Pipeline.empty
+    pipeline = TavernKit::PromptBuilder::Pipeline.empty
     assert pipeline.empty?
     assert_equal 0, pipeline.size
   end
 
-  def test_use_adds_middleware
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :alpha
+  def test_use_step_adds_step
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :alpha
     end
     assert_equal 1, pipeline.size
     assert_equal [:alpha], pipeline.names
@@ -52,116 +52,116 @@ class TavernKit::Prompt::PipelineTest < Minitest::Test
   end
 
   def test_pipeline_execution_order
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use RecordMiddleware, name: :first, label: :first
-      use RecordMiddleware, name: :second, label: :second
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step RecordStep, name: :first, label: :first
+      use_step RecordStep, name: :second, label: :second
     end
 
-    ctx = TavernKit::Prompt::Context.new
-    pipeline.call(ctx)
+    state = TavernKit::PromptBuilder::State.new
+    pipeline.call(state)
 
     # Before hooks in forward order, after hooks in reverse order
-    assert_equal [:before_first, :before_second, :after_second, :after_first], ctx[:calls]
+    assert_equal [:before_first, :before_second, :after_second, :after_first], state[:calls]
   end
 
-  def test_replace_middleware
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :step
+  def test_replace_step
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :step
     end
-    pipeline.replace(:step, BetaMiddleware)
+    pipeline.replace_step(:step, BetaStep)
 
-    ctx = TavernKit::Prompt::Context.new
-    pipeline.call(ctx)
-    assert_equal [:beta], ctx[:calls]
+    state = TavernKit::PromptBuilder::State.new
+    pipeline.call(state)
+    assert_equal [:beta], state[:calls]
   end
 
   def test_insert_before
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :alpha
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :alpha
     end
-    pipeline.insert_before(:alpha, BetaMiddleware, name: :beta)
+    pipeline.insert_step_before(:alpha, BetaStep, name: :beta)
 
     assert_equal [:beta, :alpha], pipeline.names
 
-    ctx = TavernKit::Prompt::Context.new
-    pipeline.call(ctx)
-    assert_equal [:beta, :alpha], ctx[:calls]
+    state = TavernKit::PromptBuilder::State.new
+    pipeline.call(state)
+    assert_equal [:beta, :alpha], state[:calls]
   end
 
   def test_insert_after
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :alpha
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :alpha
     end
-    pipeline.insert_after(:alpha, BetaMiddleware, name: :beta)
+    pipeline.insert_step_after(:alpha, BetaStep, name: :beta)
 
     assert_equal [:alpha, :beta], pipeline.names
   end
 
-  def test_remove_middleware
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :alpha
-      use BetaMiddleware, name: :beta
+  def test_remove_step
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :alpha
+      use_step BetaStep, name: :beta
     end
-    pipeline.remove(:alpha)
+    pipeline.remove_step(:alpha)
 
     assert_equal [:beta], pipeline.names
     refute pipeline.has?(:alpha)
   end
 
-  def test_configure_middleware
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use RecordMiddleware, name: :step, label: :original
+  def test_configure_step
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step RecordStep, name: :step, label: :original
     end
-    pipeline.configure(:step, label: :updated)
+    pipeline.configure_step(:step, label: :updated)
 
-    ctx = TavernKit::Prompt::Context.new
-    pipeline.call(ctx)
-    assert_equal [:before_updated, :after_updated], ctx[:calls]
+    state = TavernKit::PromptBuilder::State.new
+    pipeline.call(state)
+    assert_equal [:before_updated, :after_updated], state[:calls]
   end
 
   def test_duplicate_name_raises
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :step
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :step
     end
     assert_raises(ArgumentError) do
-      pipeline.use(BetaMiddleware, name: :step)
+      pipeline.use_step(BetaStep, name: :step)
     end
   end
 
-  def test_unknown_middleware_raises
-    pipeline = TavernKit::Prompt::Pipeline.empty
-    assert_raises(ArgumentError) { pipeline.replace(:unknown, AlphaMiddleware) }
-    assert_raises(ArgumentError) { pipeline.remove(:unknown) }
-    assert_raises(ArgumentError) { pipeline.insert_before(:unknown, AlphaMiddleware) }
-    assert_raises(ArgumentError) { pipeline.insert_after(:unknown, AlphaMiddleware) }
+  def test_unknown_step_raises
+    pipeline = TavernKit::PromptBuilder::Pipeline.empty
+    assert_raises(ArgumentError) { pipeline.replace_step(:unknown, AlphaStep) }
+    assert_raises(ArgumentError) { pipeline.remove_step(:unknown) }
+    assert_raises(ArgumentError) { pipeline.insert_step_before(:unknown, AlphaStep) }
+    assert_raises(ArgumentError) { pipeline.insert_step_after(:unknown, AlphaStep) }
   end
 
   def test_dup_creates_independent_copy
-    original = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :alpha
+    original = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :alpha
     end
     copy = original.dup
-    copy.use(BetaMiddleware, name: :beta)
+    copy.use_step(BetaStep, name: :beta)
 
     assert_equal [:alpha], original.names
     assert_equal [:alpha, :beta], copy.names
   end
 
   def test_bracket_access
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :alpha
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :alpha
     end
     entry = pipeline[:alpha]
     assert_equal :alpha, entry.name
-    assert_equal AlphaMiddleware, entry.middleware
+    assert_equal AlphaStep, entry.step_class
 
     assert_nil pipeline[:unknown]
   end
 
   def test_enumerable
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use AlphaMiddleware, name: :alpha
-      use BetaMiddleware, name: :beta
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step AlphaStep, name: :alpha
+      use_step BetaStep, name: :beta
     end
     names = pipeline.map(&:name)
     assert_equal [:alpha, :beta], names

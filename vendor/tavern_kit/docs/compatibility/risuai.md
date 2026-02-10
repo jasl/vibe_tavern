@@ -25,13 +25,13 @@ Scope notes (important):
 
 | Component | RisuAI | TavernKit | Notes |
 |----------|--------|-----------|-------|
-| Runtime contract (app-state sync) | ✅ | ✅ | `TavernKit::RisuAI::Runtime` + `Prompt::Context#runtime` |
+| Runtime contract (app-state sync) | ✅ | ✅ | `TavernKit::RisuAI::Runtime` + `PromptBuilder::State#runtime` |
 | CBS engine + macro registry | ✅ | ✅ | Prompt-building-focused; unknown macros preserved |
 | Lorebook engine (decorators + scanning) | ✅ | ✅ | Decorator-driven behavior, JS regex supported |
 | Template cards (promptTemplate) | ✅ | ✅ | Includes `stChatConvert` |
 | Regex scripts | ✅ | ✅ | Cached compiled regex + cached outputs |
 | Triggers | ✅ | ✅ | Prompt-building-safe effects; UI/DB effects deferred |
-| Memory system | ✅ | ✅* | Interface + middleware hooks; algorithms are app-owned |
+| Memory system | ✅ | ✅* | Interface + step hooks; algorithms are app-owned |
 | Tokenizer suite | ✅ | ⏸️ | Interface-first; full parity deferred |
 
 \* Memory: TavernKit provides the integration surface and data contracts, not a
@@ -147,7 +147,7 @@ Implementation: `TavernKit::RisuAI::TemplateCards`.
 
 ## 5. Regex Scripts
 
-Implementation: `TavernKit::RisuAI::RegexScripts` + middleware.
+Implementation: `TavernKit::RisuAI::RegexScripts` + step.
 
 | Feature | RisuAI | TavernKit | Notes |
 |---------|--------|-----------|-------|
@@ -161,7 +161,7 @@ Implementation: `TavernKit::RisuAI::RegexScripts` + middleware.
 
 ## 6. Trigger System
 
-Implementation: `TavernKit::RisuAI::Triggers` + middleware.
+Implementation: `TavernKit::RisuAI::Triggers` + step.
 
 | Feature | RisuAI | TavernKit | Notes |
 |---------|--------|-----------|-------|
@@ -206,7 +206,7 @@ Implementation: `TavernKit::RisuAI::Pipeline`.
 TavernKit provides:
 - `TavernKit::RisuAI::Memory::Base` interface
 - `MemoryInput` / `MemoryResult` contracts
-- middleware integration points
+- step integration points
 
 TavernKit does **not** ship a concrete memory algorithm (vector DB, summarizer).
 

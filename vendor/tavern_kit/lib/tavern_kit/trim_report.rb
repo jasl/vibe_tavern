@@ -3,13 +3,13 @@
 module TavernKit
   # Per-block eviction record used by both Lore and Trimmer budgeting.
   EvictionRecord = Data.define(
-    :block_id,          # String - Prompt::Block#id
-    :slot,              # Symbol, nil - Prompt::Block#slot
+    :block_id,          # String - PromptBuilder::Block#id
+    :slot,              # Symbol, nil - PromptBuilder::Block#slot
     :token_count,       # Integer
     :reason,            # Symbol - :budget_exceeded, :group_overflow, :priority_cutoff, ...
-    :budget_group,      # Symbol - Prompt::Block#token_budget_group
-    :priority,          # Integer, nil - Prompt::Block#priority (for :priority strategy)
-    :source             # Hash, nil - Prompt::Block#metadata[:source] (provenance)
+    :budget_group,      # Symbol - PromptBuilder::Block#token_budget_group
+    :priority,          # Integer, nil - PromptBuilder::Block#priority (for :priority strategy)
+    :source             # Hash, nil - PromptBuilder::Block#metadata[:source] (provenance)
   )
 
   # Detailed budgeting report for debugging and observability.
@@ -27,8 +27,8 @@ module TavernKit
 
   # Immutable result of a trim operation.
   TrimResult = Data.define(
-    :kept,              # Array<Prompt::Block>
-    :evicted,           # Array<Prompt::Block>
+    :kept,              # Array<PromptBuilder::Block>
+    :evicted,           # Array<PromptBuilder::Block>
     :report             # TrimReport
   )
 end

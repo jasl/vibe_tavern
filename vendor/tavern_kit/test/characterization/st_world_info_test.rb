@@ -66,7 +66,7 @@ class StWorldInfoTest < Minitest::Test
   end
 
   def test_js_regex_invalid_raises_in_strict_mode_via_ctx_warn
-    ctx = TavernKit::Prompt::Context.new(strict: true)
+    ctx = TavernKit::PromptBuilder::State.new(strict: true)
     buffer = TavernKit::SillyTavern::Lore::Engine::Buffer
 
     assert_raises(TavernKit::StrictModeError) do

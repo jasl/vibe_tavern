@@ -5,7 +5,7 @@ infrastructure protocols:
 
 - Tool calling (`ToolLoopRunner`)
 - Structured directives (`Directives::Runner`)
-- Native multilingual output policy (`Middleware::LanguagePolicy`)
+- Native multilingual output policy (`PromptBuilder::Steps::LanguagePolicy`)
 
 The intent is to pick **defaults** that keep **protocol reliability** high
 across providers/models.

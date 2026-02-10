@@ -11,7 +11,7 @@ This document "pins down" orchestration/output behavior so implementation stays 
 ## Definitions
 
 - **External input**: anything coming from JSON/PNG imports, user messages, chat history loaded from disk, or 3rd-party extensions.
-- **Programmer error**: bugs in TavernKit itself or in downstream custom middleware/hooks.
+- **Programmer error**: bugs in TavernKit itself or in downstream custom steps/hooks.
 
 ## Strict Mode / Debug Mode (Standardized)
 
@@ -20,18 +20,18 @@ TavernKit uses two orthogonal switches:
 - **Strict mode**: `ctx.strict = true` (or DSL `strict(true)`).
   - `ctx.warn("...")` raises `TavernKit::StrictModeError`.
   - Intended for tests + debugging only.
-- **Debug instrumentation**: `ctx.instrumenter = Prompt::Instrumenter::TraceCollector.new` (or DSL `instrumenter(...)`).
+- **Debug instrumentation**: `ctx.instrumenter = PromptBuilder::Instrumenter::TraceCollector.new` (or DSL `instrumenter(...)`).
   - When instrumenter is `nil` (default), debug work must be near-zero overhead.
-  - Middleware must rely on `ctx.instrument(...)` with lazy payload blocks when expensive.
+  - Steps must rely on `ctx.instrument(...)` with lazy payload blocks when expensive.
 
 Policy:
 
 - For external input, prefer `ctx.warn` + best-effort output (preserve raw tokens if needed).
-- For programmer errors, raise (let `Prompt::Middleware::Base` wrap with `PipelineError(stage: ...)`).
+- For programmer errors, raise (let `PromptBuilder::Step` wrap with `PipelineError(stage: ...)`).
 
-## Prompt::Message Contract (Tool/Function Calling)
+## PromptBuilder::Message Contract (Tool/Function Calling)
 
-Core message object is `TavernKit::Prompt::Message`:
+Core message object is `TavernKit::PromptBuilder::Message`:
 
 - `role`: Symbol (`:system`, `:user`, `:assistant`, `:tool`, `:function`, ...)
 - `content`: String (dialects may later map to provider content blocks)
@@ -61,12 +61,12 @@ Notes:
 
 ## Dialects Contract
 
-Dialects convert `Array<Prompt::Message>` into provider request payload shapes.
+Dialects convert `Array<PromptBuilder::Message>` into provider request payload shapes.
 
 Entry point (planned):
 
 ```ruby
-TavernKit::Dialects.convert(messages, dialect: :openai, **opts)
+TavernKit::PromptBuilder::Dialects.convert(messages, dialect: :openai, **opts)
 ```
 
 ### OpenAI dialect (ChatCompletions)
@@ -95,11 +95,11 @@ Keep it simple:
 
 - Dialects are addressed by Symbol (`:openai`, `:anthropic`, ...)
 - Adding a new dialect should be possible without modifying Core internals,
-  e.g. a registry map inside `TavernKit::Dialects`.
+  e.g. a registry map inside `TavernKit::PromptBuilder::Dialects`.
 
 ## Trimmer Contract
 
-Trimmer operates on `Array<Prompt::Block>` and enforces a token budget by
+Trimmer operates on `Array<PromptBuilder::Block>` and enforces a token budget by
 disabling blocks in-place (returns modified copies, does not remove).
 
 ### Token estimation
@@ -173,7 +173,7 @@ Trimmer must produce:
 - `TavernKit::TrimResult` (kept/evicted arrays + report)
 - `TavernKit::TrimReport` with per-block `EvictionRecord`
 
-SillyTavern trimming middleware should attach `trim_report` to `ctx.trim_report`
+SillyTavern trimming step should attach `trim_report` to `ctx.trim_report`
 and instrument summary stats (initial/final/budget, eviction_count).
 
 ## SillyTavern ContextTemplate (Story String) Contract
@@ -290,10 +290,10 @@ Notes:
 
 - `position` is always stored as the canonical symbol (`:before`, `:after`, `:chat`,
   `:none`), even if an alias was used during registration.
-- `filter` is called lazily during injection middleware; if it returns `false`, the
+- `filter` is called lazily during injection step; if it returns `false`, the
   entry is skipped for that build cycle (but remains registered).
   - Parity + safety: filter errors are treated as external input issues; injection
-    middleware should `ctx.warn(...)` and treat the entry as active (unfiltered).
+    step should `ctx.warn(...)` and treat the entry as active (unfiltered).
 - `depth` is only meaningful when `position == :chat`; ignored otherwise.
 
 ### Standard opts keys
@@ -367,14 +367,14 @@ end
 
 ### Hook context
 
-Hooks receive `ctx` (Prompt::Context) directly:
+Hooks receive `ctx` (`PromptBuilder::State`) directly:
 
 - `before_build` hooks: may mutate `ctx.character`, `ctx.user`, `ctx.preset`,
   `ctx.history`, `ctx.user_message`, `ctx.macro_vars`
 - `after_build` hooks: may mutate `ctx.plan` (add/remove/modify blocks)
 
 Hooks should NOT:
-- Mutate `ctx.blocks` directly in `before_build` (use middleware instead)
+- Mutate `ctx.blocks` directly in `before_build` (use steps instead)
 - Raise exceptions for recoverable issues (use `ctx.warn`)
 
 ### Execution order
@@ -554,10 +554,10 @@ This contract pins the ST join behavior from `getGroupCharacterCardsLazy()`:
 `baseChatReplace()` substitutions exist in ST, but this contract only requires
 the structural join behavior above; macro expansion still happens later in Stage 7.
 
-## Middleware Data Flow Contract
+## Step Data Flow Contract
 
-Each middleware stage has defined inputs and outputs. Stages run in order 1→9.
-The `:hooks` middleware wraps the pipeline and runs `before_build` hooks in its
+Each step has defined inputs and outputs. Steps run in order 1→9.
+The `:hooks` step wraps the pipeline and runs `before_build` hooks in its
 `before(ctx)` phase and `after_build` hooks in its `after(ctx)` phase.
 
 ### Stage 1: Hooks
@@ -754,7 +754,7 @@ Behavior:
 Name: :plan_assembly
 Input:  ctx.blocks, ctx.outlets, ctx.greeting_index, ctx.generation_type,
         ctx.resolved_greeting, ctx.preset
-Output: ctx.plan (Prompt::Plan)
+Output: ctx.plan (`PromptBuilder::Plan`)
 Side effects: Creates final Plan with blocks, greeting, outlets, warnings
 Behavior:
   - Handle continue mode: nudge prompt, prefill, postfix (NONE/SPACE/NEWLINE/DOUBLE_NEWLINE)
@@ -781,15 +781,15 @@ Behavior:
   - Instrument: initial_tokens, final_tokens, budget_tokens, eviction_count
 ```
 
-## Middleware Output Expectations
+## Step Output Expectations
 
-Middleware must output blocks that are ready for trimming and dialect conversion:
+Steps must output blocks that are ready for trimming and dialect conversion:
 
-- `Prompt::Block#token_budget_group` is set (`:system`, `:examples`, `:lore`, `:history`, ...)
-- `Prompt::Block#removable` is set correctly (protect hard-required content)
-- `Prompt::Block#message_metadata` is used for tool/function passthrough when needed
+- `PromptBuilder::Block#token_budget_group` is set (`:system`, `:examples`, `:lore`, `:history`, ...)
+- `PromptBuilder::Block#removable` is set correctly (protect hard-required content)
+- `PromptBuilder::Block#message_metadata` is used for tool/function passthrough when needed
 
 Stage naming:
 
 - All ST pipeline stages must have stable names (symbols) via Pipeline entry names.
-- Exceptions bubble; Base middleware wraps them into `PipelineError(stage: ...)`.
+- Exceptions bubble; base step wraps them into `PipelineError(stage: ...)`.

@@ -8,7 +8,7 @@ class TavernKit::SillyTavern::ExpanderVarsTest < Minitest::Test
     user = TavernKit::User.new(name: "Alice", persona: "A brave knight")
 
     ctx =
-      TavernKit::Prompt::Context.new(
+      TavernKit::PromptBuilder::Context.new(
         character: character,
         user: user,
         user_message: "Hello!",

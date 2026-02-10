@@ -133,7 +133,7 @@ module TavernKit
             request_attempts_left = @tool_use_mode == :relaxed ? @tool_calling_fallback_retry_count : 0
 
             if pending_user_text && !pending_user_text.strip.empty?
-              history << TavernKit::Prompt::Message.new(role: :user, content: pending_user_text.to_s)
+              history << TavernKit::PromptBuilder::Message.new(role: :user, content: pending_user_text.to_s)
               pending_user_text = nil
             end
 
@@ -335,7 +335,7 @@ module TavernKit
               trace_entry[:response_summary][:assistant_content_sample] = content_sample
             end
 
-            history << TavernKit::Prompt::Message.new(
+            history << TavernKit::PromptBuilder::Message.new(
               role: :assistant,
               content: assistant_content_for_history,
               metadata: tool_calls.empty? ? nil : { tool_calls: tool_calls },
@@ -421,7 +421,7 @@ module TavernKit
                   config: @runner_config.output_tags,
                 )
 
-              if history.last.is_a?(TavernKit::Prompt::Message)
+              if history.last.is_a?(TavernKit::PromptBuilder::Message)
                 history[-1] = history.last.with(content: assistant_text)
               end
 
@@ -559,7 +559,7 @@ module TavernKit
                 error_codes: error_codes,
               }
 
-              history << TavernKit::Prompt::Message.new(
+              history << TavernKit::PromptBuilder::Message.new(
                 role: :tool,
                 content: tool_content,
                 metadata: id.empty? ? nil : { tool_call_id: id },
@@ -579,7 +579,7 @@ module TavernKit
         private
 
         def normalize_history_message(message)
-          return message if message.is_a?(TavernKit::Prompt::Message)
+          return message if message.is_a?(TavernKit::PromptBuilder::Message)
 
           if message.is_a?(Hash)
             message = TavernKit::Utils.deep_symbolize_keys(message)
@@ -590,14 +590,14 @@ module TavernKit
             content = message.fetch(:content, "").to_s
             metadata = message.fetch(:metadata, nil)
 
-            return TavernKit::Prompt::Message.new(role: role.to_sym, content: content, metadata: metadata)
+            return TavernKit::PromptBuilder::Message.new(role: role.to_sym, content: content, metadata: metadata)
           end
 
           if message.respond_to?(:role) && message.respond_to?(:content)
-            return TavernKit::Prompt::Message.new(role: message.role.to_sym, content: message.content.to_s, metadata: message.respond_to?(:metadata) ? message.metadata : nil)
+            return TavernKit::PromptBuilder::Message.new(role: message.role.to_sym, content: message.content.to_s, metadata: message.respond_to?(:metadata) ? message.metadata : nil)
           end
 
-          TavernKit::Prompt::Message.new(role: :user, content: message.to_s)
+          TavernKit::PromptBuilder::Message.new(role: :user, content: message.to_s)
         end
 
         def emit_event(handler, type, **data)

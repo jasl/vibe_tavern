@@ -2,9 +2,9 @@
 
 require "test_helper"
 
-class TavernKit::Prompt::PromptEntryTest < Minitest::Test
+class TavernKit::PromptBuilder::PromptEntryTest < Minitest::Test
   def test_basic_initialization
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test_001")
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test_001")
     assert_equal "test_001", entry.id
     assert_equal "test_001", entry.name
     assert entry.enabled?
@@ -21,7 +21,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   end
 
   def test_initialization_with_all_attributes
-    entry = TavernKit::Prompt::PromptEntry.new(
+    entry = TavernKit::PromptBuilder::PromptEntry.new(
       id: "custom_001",
       name: "Custom Prompt",
       enabled: false,
@@ -53,18 +53,18 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   end
 
   def test_coerces_id_and_name_to_string
-    entry = TavernKit::Prompt::PromptEntry.new(id: :symbol_id, name: :symbol_name)
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: :symbol_id, name: :symbol_name)
     assert_equal "symbol_id", entry.id
     assert_equal "symbol_name", entry.name
   end
 
   def test_name_defaults_to_id
-    entry = TavernKit::Prompt::PromptEntry.new(id: "my_id")
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "my_id")
     assert_equal "my_id", entry.name
   end
 
   def test_to_h_serialization
-    entry = TavernKit::Prompt::PromptEntry.new(
+    entry = TavernKit::PromptBuilder::PromptEntry.new(
       id: "test",
       name: "Test",
       enabled: true,
@@ -90,7 +90,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_from_hash_basic
     hash = { id: "entry_1", name: "Entry One", content: "Hello" }
-    entry = TavernKit::Prompt::PromptEntry.from_hash(hash)
+    entry = TavernKit::PromptBuilder::PromptEntry.from_hash(hash)
 
     assert_equal "entry_1", entry.id
     assert_equal "Entry One", entry.name
@@ -99,7 +99,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_from_hash_with_string_keys
     hash = { "id" => "entry_2", "name" => "Entry Two", "enabled" => false }
-    entry = TavernKit::Prompt::PromptEntry.from_hash(hash)
+    entry = TavernKit::PromptBuilder::PromptEntry.from_hash(hash)
 
     assert_equal "entry_2", entry.id
     assert_equal "Entry Two", entry.name
@@ -108,21 +108,21 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_from_hash_with_key_fallback
     hash = { key: "fallback_id" }
-    entry = TavernKit::Prompt::PromptEntry.from_hash(hash)
+    entry = TavernKit::PromptBuilder::PromptEntry.from_hash(hash)
 
     assert_equal "fallback_id", entry.id
   end
 
   def test_from_hash_returns_nil_without_id
     hash = { name: "No ID" }
-    entry = TavernKit::Prompt::PromptEntry.from_hash(hash)
+    entry = TavernKit::PromptBuilder::PromptEntry.from_hash(hash)
 
     assert_nil entry
   end
 
   def test_from_hash_coerces_position
     hash = { id: "test", position: "in_chat" }
-    entry = TavernKit::Prompt::PromptEntry.from_hash(hash)
+    entry = TavernKit::PromptBuilder::PromptEntry.from_hash(hash)
 
     assert_equal :in_chat, entry.position
     assert entry.in_chat?
@@ -130,7 +130,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_from_hash_defaults_position_to_relative
     hash = { id: "test", position: "anything_else" }
-    entry = TavernKit::Prompt::PromptEntry.from_hash(hash)
+    entry = TavernKit::PromptBuilder::PromptEntry.from_hash(hash)
 
     assert_equal :relative, entry.position
     assert entry.relative?
@@ -139,21 +139,21 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   # --- Trigger Tests ---
 
   def test_triggered_by_returns_true_when_no_triggers
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", triggers: [])
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", triggers: [])
     assert entry.triggered_by?(:normal)
     assert entry.triggered_by?(:continue)
     assert entry.triggered_by?(:impersonate)
   end
 
   def test_triggered_by_returns_true_when_match
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", triggers: [:normal, :continue])
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", triggers: [:normal, :continue])
     assert entry.triggered_by?(:normal)
     assert entry.triggered_by?(:continue)
     refute entry.triggered_by?(:impersonate)
   end
 
   def test_triggered_by_coerces_input
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", triggers: [:normal])
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", triggers: [:normal])
     assert entry.triggered_by?("normal")
     assert entry.triggered_by?(0)
   end
@@ -161,18 +161,18 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   # --- Condition Tests ---
 
   def test_active_for_returns_true_when_no_conditions
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: nil)
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: nil)
     assert entry.active_for?({})
     assert entry.active_for?({ turn_count: 5 })
   end
 
   def test_active_for_returns_true_when_empty_conditions
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: {})
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: {})
     assert entry.active_for?({})
   end
 
   def test_active_for_returns_false_for_non_hash_context
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { turns: { min: 1 } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { turns: { min: 1 } })
     refute entry.active_for?(nil)
     refute entry.active_for?("invalid")
   end
@@ -180,28 +180,28 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   # --- Turns Conditions ---
 
   def test_turns_min_condition
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { turns: { min: 5 } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { turns: { min: 5 } })
     refute entry.active_for?({ turn_count: 3 })
     assert entry.active_for?({ turn_count: 5 })
     assert entry.active_for?({ turn_count: 10 })
   end
 
   def test_turns_max_condition
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { turns: { max: 10 } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { turns: { max: 10 } })
     assert entry.active_for?({ turn_count: 5 })
     assert entry.active_for?({ turn_count: 10 })
     refute entry.active_for?({ turn_count: 11 })
   end
 
   def test_turns_equals_condition
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { turns: { equals: 5 } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { turns: { equals: 5 } })
     refute entry.active_for?({ turn_count: 4 })
     assert entry.active_for?({ turn_count: 5 })
     refute entry.active_for?({ turn_count: 6 })
   end
 
   def test_turns_every_condition
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { turns: { every: 3 } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { turns: { every: 3 } })
     assert entry.active_for?({ turn_count: 0 })
     refute entry.active_for?({ turn_count: 1 })
     refute entry.active_for?({ turn_count: 2 })
@@ -211,12 +211,12 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   end
 
   def test_turns_every_zero_returns_false
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { turns: { every: 0 } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { turns: { every: 0 } })
     refute entry.active_for?({ turn_count: 5 })
   end
 
   def test_turns_shorthand_integer
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { turns: 5 })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { turns: 5 })
     refute entry.active_for?({ turn_count: 4 })
     assert entry.active_for?({ turn_count: 5 })
     refute entry.active_for?({ turn_count: 6 })
@@ -225,7 +225,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   # --- Chat Conditions ---
 
   def test_chat_any_condition
-    entry = TavernKit::Prompt::PromptEntry.new(
+    entry = TavernKit::PromptBuilder::PromptEntry.new(
       id: "test",
       conditions: { chat: { any: ["hello", "world"] } }
     )
@@ -236,7 +236,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   end
 
   def test_chat_all_condition
-    entry = TavernKit::Prompt::PromptEntry.new(
+    entry = TavernKit::PromptBuilder::PromptEntry.new(
       id: "test",
       conditions: { chat: { all: ["hello", "world"] } }
     )
@@ -247,7 +247,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   end
 
   def test_chat_depth_limits_messages
-    entry = TavernKit::Prompt::PromptEntry.new(
+    entry = TavernKit::PromptBuilder::PromptEntry.new(
       id: "test",
       conditions: { chat: { any: ["target"], depth: 2 } }
     )
@@ -258,13 +258,13 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   end
 
   def test_chat_shorthand_string
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { chat: "keyword" })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { chat: "keyword" })
     assert entry.active_for?({ chat_scan_messages: ["contains keyword here"] })
     refute entry.active_for?({ chat_scan_messages: ["no match"] })
   end
 
   def test_chat_shorthand_array
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { chat: ["foo", "bar"] })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { chat: ["foo", "bar"] })
     assert entry.active_for?({ chat_scan_messages: ["foo is here"] })
     assert entry.active_for?({ chat_scan_messages: ["bar is here"] })
     refute entry.active_for?({ chat_scan_messages: ["baz is here"] })
@@ -274,7 +274,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_character_name_condition
     character = Struct.new(:data).new(Struct.new(:name).new("Alice"))
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { character: { name: "Alice" } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { character: { name: "Alice" } })
 
     assert entry.active_for?({ character: character })
     refute entry.active_for?({ character: Struct.new(:data).new(Struct.new(:name).new("Bob")) })
@@ -282,14 +282,14 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_character_shorthand_string
     character = Struct.new(:data).new(Struct.new(:name).new("Alice"))
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { character: "Alice" })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { character: "Alice" })
 
     assert entry.active_for?({ character: character })
   end
 
   def test_character_tags_any_condition
     character = Struct.new(:data).new(Struct.new(:name, :tags).new("Alice", ["fantasy", "female"]))
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { character: { tags_any: ["fantasy", "scifi"] } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { character: { tags_any: ["fantasy", "scifi"] } })
 
     assert entry.active_for?({ character: character })
 
@@ -299,7 +299,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_character_tags_all_condition
     character = Struct.new(:data).new(Struct.new(:name, :tags).new("Alice", ["fantasy", "female"]))
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { character: { tags_all: ["fantasy", "female"] } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { character: { tags_all: ["fantasy", "female"] } })
 
     assert entry.active_for?({ character: character })
 
@@ -308,7 +308,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   end
 
   def test_character_returns_false_without_character
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { character: { name: "Alice" } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { character: { name: "Alice" } })
     refute entry.active_for?({ character: nil })
     refute entry.active_for?({})
   end
@@ -317,7 +317,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_user_name_condition
     user = Struct.new(:name).new("Bob")
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { user: { name: "Bob" } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { user: { name: "Bob" } })
 
     assert entry.active_for?({ user: user })
     refute entry.active_for?({ user: Struct.new(:name).new("Alice") })
@@ -325,14 +325,14 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
 
   def test_user_shorthand_string
     user = Struct.new(:name).new("Bob")
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { user: "Bob" })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { user: "Bob" })
 
     assert entry.active_for?({ user: user })
   end
 
   def test_user_persona_condition
     user = Struct.new(:name, :persona_text).new("Bob", "I am a brave knight")
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { user: { persona: "knight" } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { user: { persona: "knight" } })
 
     assert entry.active_for?({ user: user })
 
@@ -341,7 +341,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   end
 
   def test_user_returns_false_without_user
-    entry = TavernKit::Prompt::PromptEntry.new(id: "test", conditions: { user: { name: "Bob" } })
+    entry = TavernKit::PromptBuilder::PromptEntry.new(id: "test", conditions: { user: { name: "Bob" } })
     refute entry.active_for?({ user: nil })
     refute entry.active_for?({})
   end
@@ -349,7 +349,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
   # --- Composite Conditions ---
 
   def test_all_composite_condition
-    entry = TavernKit::Prompt::PromptEntry.new(
+    entry = TavernKit::PromptBuilder::PromptEntry.new(
       id: "test",
       conditions: {
         all: [
@@ -369,7 +369,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
     character_bob = Struct.new(:data).new(Struct.new(:name).new("Bob"))
     character_charlie = Struct.new(:data).new(Struct.new(:name).new("Charlie"))
 
-    entry = TavernKit::Prompt::PromptEntry.new(
+    entry = TavernKit::PromptBuilder::PromptEntry.new(
       id: "test",
       conditions: {
         any: [
@@ -388,7 +388,7 @@ class TavernKit::Prompt::PromptEntryTest < Minitest::Test
     character = Struct.new(:data).new(Struct.new(:name).new("Alice"))
     user = Struct.new(:name).new("Bob")
 
-    entry = TavernKit::Prompt::PromptEntry.new(
+    entry = TavernKit::PromptBuilder::PromptEntry.new(
       id: "test",
       conditions: {
         character: "Alice",

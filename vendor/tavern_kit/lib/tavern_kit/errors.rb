@@ -163,7 +163,7 @@ module TavernKit
     class CharXParseError < ParseError; end
   end
 
-  # Raised when a middleware stage fails during pipeline execution.
+  # Raised when a step fails during pipeline execution.
   #
   # Use the built-in exception cause chain (raise ..., cause: e) to retain the
   # original error for debugging.

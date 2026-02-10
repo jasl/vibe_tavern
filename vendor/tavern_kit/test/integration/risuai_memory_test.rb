@@ -9,7 +9,7 @@ class RisuaiMemoryTest < Minitest::Test
     def integrate(input, context:)
       @last_input = input
 
-      block = TavernKit::Prompt::Block.new(
+      block = TavernKit::PromptBuilder::Block.new(
         role: :system,
         content: "MEMORY",
         token_budget_group: :memory,

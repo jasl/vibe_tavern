@@ -2,35 +2,35 @@
 
 require "test_helper"
 
-class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
-  class BuildPlanMiddleware < TavernKit::Prompt::Middleware::Base
+class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
+  class BuildPlanStep < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
       blocks = []
-      blocks << TavernKit::Prompt::Block.new(role: :user, content: ctx.user_message.to_s) if ctx.user_message
-      ctx.plan = TavernKit::Prompt::Plan.new(blocks: blocks)
+      blocks << TavernKit::PromptBuilder::Block.new(role: :user, content: ctx.user_message.to_s) if ctx.user_message
+      ctx.plan = TavernKit::PromptBuilder::Plan.new(blocks: blocks)
     end
   end
 
-  class BuildTwoMessagesPlanMiddleware < TavernKit::Prompt::Middleware::Base
+  class BuildTwoMessagesPlanStep < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
       blocks = [
-        TavernKit::Prompt::Block.new(role: :user, content: "hi"),
-        TavernKit::Prompt::Block.new(role: :user, content: "ok"),
+        TavernKit::PromptBuilder::Block.new(role: :user, content: "hi"),
+        TavernKit::PromptBuilder::Block.new(role: :user, content: "ok"),
       ]
-      ctx.plan = TavernKit::Prompt::Plan.new(blocks: blocks)
+      ctx.plan = TavernKit::PromptBuilder::Plan.new(blocks: blocks)
     end
   end
 
-  class BuildOneMessageWithMetadataPlanMiddleware < TavernKit::Prompt::Middleware::Base
+  class BuildOneMessageWithMetadataPlanStep < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
       blocks = [
-        TavernKit::Prompt::Block.new(
+        TavernKit::PromptBuilder::Block.new(
           role: :assistant,
           content: "ok",
           message_metadata: {
@@ -44,7 +44,7 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
           },
         ),
       ]
-      ctx.plan = TavernKit::Prompt::Plan.new(blocks: blocks)
+      ctx.plan = TavernKit::PromptBuilder::Plan.new(blocks: blocks)
     end
   end
 
@@ -62,66 +62,66 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
     include_message_metadata_tokens: false,
     build: :one_message
   )
-    build_middleware =
+    build_step =
       case build
-      when :one_message then BuildPlanMiddleware
-      when :two_messages then BuildTwoMessagesPlanMiddleware
-      when :one_message_with_metadata then BuildOneMessageWithMetadataPlanMiddleware
+      when :one_message then BuildPlanStep
+      when :two_messages then BuildTwoMessagesPlanStep
+      when :one_message_with_metadata then BuildOneMessageWithMetadataPlanStep
       else
         raise ArgumentError, "Unknown build: #{build.inspect}"
       end
 
-    TavernKit::Prompt::Pipeline.new do
-      use TavernKit::Prompt::Middleware::MaxTokensMiddleware,
+    TavernKit::PromptBuilder::Pipeline.new do
+      use_step TavernKit::PromptBuilder::Steps::MaxTokens,
           name: :max_tokens,
           max_tokens: max_tokens,
           reserve_tokens: reserve_tokens,
           message_overhead_tokens: message_overhead_tokens,
           include_message_metadata_tokens: include_message_metadata_tokens,
           mode: mode
-      use build_middleware, name: :build_plan
+      use_step build_step, name: :build_plan
     end
   end
 
   def test_warn_mode_collects_warning_when_over_limit
     pipeline = build_pipeline(max_tokens: 5, mode: :warn)
-    ctx = TavernKit::Prompt::Context.new(
+    state = TavernKit::PromptBuilder::State.new(
       token_estimator: CharCountEstimator.new,
       warning_handler: nil,
       user_message: "hello!",
     )
 
-    pipeline.call(ctx)
+    pipeline.call(state)
 
-    assert_equal 1, ctx.warnings.size
-    assert_match(/exceeded limit/, ctx.warnings.first)
+    assert_equal 1, state.warnings.size
+    assert_match(/exceeded limit/, state.warnings.first)
   end
 
   def test_warn_mode_no_warning_when_under_limit
     pipeline = build_pipeline(max_tokens: 6, mode: :warn)
-    ctx = TavernKit::Prompt::Context.new(
+    state = TavernKit::PromptBuilder::State.new(
       token_estimator: CharCountEstimator.new,
       warning_handler: nil,
       user_message: "hello!",
     )
 
-    pipeline.call(ctx)
+    pipeline.call(state)
 
-    assert_equal [], ctx.warnings
+    assert_equal [], state.warnings
   end
 
   def test_message_overhead_tokens_adds_overhead_per_message
     pipeline = build_pipeline(max_tokens: 4, mode: :warn, message_overhead_tokens: 3, build: :two_messages)
-    ctx = TavernKit::Prompt::Context.new(
+    state = TavernKit::PromptBuilder::State.new(
       token_estimator: CharCountEstimator.new,
       warning_handler: nil,
     )
 
-    pipeline.call(ctx)
+    pipeline.call(state)
 
     # Messages are "hi" and "ok" => 4 content tokens + 2 * 3 overhead = 10.
-    assert_equal 1, ctx.warnings.size
-    assert_match(/exceeded limit 4/, ctx.warnings.first)
+    assert_equal 1, state.warnings.size
+    assert_match(/exceeded limit 4/, state.warnings.first)
   end
 
   def test_include_message_metadata_tokens_counts_tool_calls_payload
@@ -131,28 +131,28 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
       include_message_metadata_tokens: true,
       build: :one_message_with_metadata,
     )
-    ctx = TavernKit::Prompt::Context.new(
+    state = TavernKit::PromptBuilder::State.new(
       token_estimator: CharCountEstimator.new,
       warning_handler: nil,
     )
 
-    pipeline.call(ctx)
+    pipeline.call(state)
 
     # The metadata JSON is longer than the content, so it should exceed the soft cap.
-    assert_equal 1, ctx.warnings.size
-    assert_match(/exceeded limit 10/, ctx.warnings.first)
+    assert_equal 1, state.warnings.size
+    assert_match(/exceeded limit 10/, state.warnings.first)
   end
 
   def test_error_mode_raises_max_tokens_exceeded_error
     pipeline = build_pipeline(max_tokens: 5, mode: :error)
-    ctx = TavernKit::Prompt::Context.new(
+    state = TavernKit::PromptBuilder::State.new(
       token_estimator: CharCountEstimator.new,
       warning_handler: nil,
       user_message: "hello!",
     )
 
     err = assert_raises(TavernKit::MaxTokensExceededError) do
-      pipeline.call(ctx)
+      pipeline.call(state)
     end
 
     assert_equal :max_tokens, err.stage
@@ -164,29 +164,29 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
 
   def test_reserve_tokens_reduces_limit
     pipeline = build_pipeline(max_tokens: 10, reserve_tokens: 4, mode: :warn)
-    ctx = TavernKit::Prompt::Context.new(
+    state = TavernKit::PromptBuilder::State.new(
       token_estimator: CharCountEstimator.new,
       warning_handler: nil,
       user_message: "1234567",
     )
 
-    pipeline.call(ctx)
+    pipeline.call(state)
 
-    assert_equal 1, ctx.warnings.size
-    assert_match(/exceeded limit 6/, ctx.warnings.first)
+    assert_equal 1, state.warnings.size
+    assert_match(/exceeded limit 6/, state.warnings.first)
   end
 
   def test_max_tokens_zero_disables_guard
     pipeline = build_pipeline(max_tokens: 0, mode: :error)
-    ctx = TavernKit::Prompt::Context.new(
+    state = TavernKit::PromptBuilder::State.new(
       token_estimator: CharCountEstimator.new,
       warning_handler: nil,
       user_message: "hello!",
     )
 
-    pipeline.call(ctx)
+    pipeline.call(state)
 
-    assert_equal [], ctx.warnings
+    assert_equal [], state.warnings
   end
 
   def test_proc_options_are_evaluated_with_context
@@ -198,7 +198,7 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
       mode: ->(ctx) { ctx[:mode] },
     )
 
-    ctx = TavernKit::Prompt::Context.new(
+    state = TavernKit::PromptBuilder::State.new(
       token_estimator: CharCountEstimator.new,
       warning_handler: nil,
       user_message: "hello!",
@@ -209,9 +209,9 @@ class TavernKit::Prompt::MaxTokensMiddlewareTest < Minitest::Test
       mode: :warn,
     )
 
-    pipeline.call(ctx)
+    pipeline.call(state)
 
     # "hello!" => 6 content tokens + 1 * 4 overhead = 10, limit is 7.
-    assert_equal 1, ctx.warnings.size
+    assert_equal 1, state.warnings.size
   end
 end

@@ -119,7 +119,7 @@ module TavernKit
 
             msg = list[chat_index]
             if msg.is_a?(Hash)
-              h = TavernKit::Runtime::Base.normalize(msg)
+              h = TavernKit::PromptBuilder::Context.normalize(msg)
               role = h[:role]
               return role.to_s if role
             elsif msg && msg.respond_to?(:role)

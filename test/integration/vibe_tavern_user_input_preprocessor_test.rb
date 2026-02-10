@@ -30,7 +30,7 @@ class VibeTavernUserInputPreprocessorTest < ActiveSupport::TestCase
 
   test "passes runtime through to filters via registers" do
     store = TavernKit::VariablesStore::InMemory.new
-    runtime = TavernKit::Runtime::Base.build({ message_index: 5, rng_word: "seed" }, type: :app)
+    runtime = TavernKit::PromptBuilder::Context.build({ message_index: 5, rng_word: "seed" }, type: :app)
 
     out =
       TavernKit::VibeTavern::UserInputPreprocessor.call(
@@ -47,7 +47,7 @@ class VibeTavernUserInputPreprocessorTest < ActiveSupport::TestCase
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)
 
-    runtime = TavernKit::Runtime::Base.build({ toggles: { expand_user_input_macros: true } }, type: :app)
+    runtime = TavernKit::PromptBuilder::Context.build({ toggles: { expand_user_input_macros: true } }, type: :app)
 
     out =
       TavernKit::VibeTavern::UserInputPreprocessor.call(
@@ -63,7 +63,7 @@ class VibeTavernUserInputPreprocessorTest < ActiveSupport::TestCase
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)
 
-    runtime = TavernKit::Runtime::Base.build({ toggles: { "expand_user_input_macros" => true, "expandUserInputMacros" => true } }, type: :app)
+    runtime = TavernKit::PromptBuilder::Context.build({ toggles: { "expand_user_input_macros" => true, "expandUserInputMacros" => true } }, type: :app)
 
     out =
       TavernKit::VibeTavern::UserInputPreprocessor.call(

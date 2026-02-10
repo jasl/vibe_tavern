@@ -79,7 +79,7 @@ class RisuaiBuildTest < Minitest::Test
     ]
 
     plan = TavernKit::RisuAI.build do
-      configure_middleware(
+      configure_step(
         :prepare,
         description_text_builder: lambda do |_ctx|
           "CUSTOM DESC"

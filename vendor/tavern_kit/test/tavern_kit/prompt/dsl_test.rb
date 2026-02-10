@@ -2,77 +2,77 @@
 
 require "test_helper"
 
-class TavernKit::Prompt::DSLTest < Minitest::Test
-  # Simple middleware that creates a plan from context
-  class SimplePlanMiddleware < TavernKit::Prompt::Middleware::Base
+class TavernKit::PromptBuilderTest < Minitest::Test
+  # Simple step that creates a plan from state
+  class SimplePlanStep < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
       blocks = []
       if ctx.user_message
-        blocks << TavernKit::Prompt::Block.new(role: :user, content: ctx.user_message)
+        blocks << TavernKit::PromptBuilder::Block.new(role: :user, content: ctx.user_message)
       end
-      ctx.plan = TavernKit::Prompt::Plan.new(blocks: blocks)
+      ctx.plan = TavernKit::PromptBuilder::Plan.new(blocks: blocks)
     end
   end
 
-  class DialectPlanMiddleware < TavernKit::Prompt::Middleware::Base
+  class DialectPlanStep < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
-      ctx.plan = TavernKit::Prompt::Plan.new(
+      ctx.plan = TavernKit::PromptBuilder::Plan.new(
         blocks: [
-          TavernKit::Prompt::Block.new(role: :user, content: ctx.dialect.to_s),
+          TavernKit::PromptBuilder::Block.new(role: :user, content: ctx.dialect.to_s),
         ],
       )
     end
   end
 
   def simple_pipeline
-    TavernKit::Prompt::Pipeline.new do
-      use SimplePlanMiddleware, name: :simple
+    TavernKit::PromptBuilder::Pipeline.new do
+      use_step SimplePlanStep, name: :simple
     end
   end
 
   def dialect_pipeline
-    TavernKit::Prompt::Pipeline.new do
-      use DialectPlanMiddleware, name: :dialect
+    TavernKit::PromptBuilder::Pipeline.new do
+      use_step DialectPlanStep, name: :dialect
     end
   end
 
-  def test_dsl_requires_pipeline
+  def test_builder_requires_pipeline
     assert_raises(ArgumentError) do
-      TavernKit::Prompt::DSL.new(pipeline: nil)
+      TavernKit::PromptBuilder.new(pipeline: nil)
     end
   end
 
-  def test_dsl_block_style
+  def test_builder_block_style
     pipeline = simple_pipeline
-    plan = TavernKit::Prompt::DSL.build(pipeline: pipeline) do
+    plan = TavernKit::PromptBuilder.build(pipeline: pipeline) do
       message "Hello!"
     end
 
-    assert_kind_of TavernKit::Prompt::Plan, plan
+    assert_kind_of TavernKit::PromptBuilder::Plan, plan
     assert_equal 1, plan.size
     assert_equal "Hello!", plan.blocks.first.content
   end
 
-  def test_dsl_fluent_style
+  def test_builder_fluent_style
     pipeline = simple_pipeline
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
     dsl.message("Hello!")
     plan = dsl.build
 
-    assert_kind_of TavernKit::Prompt::Plan, plan
+    assert_kind_of TavernKit::PromptBuilder::Plan, plan
     assert_equal "Hello!", plan.blocks.first.content
   end
 
-  def test_dsl_setters_return_self
+  def test_builder_setters_return_self
     pipeline = simple_pipeline
     char = TavernKit::Character.create(name: "Test")
     user = TavernKit::User.new(name: "Alice")
 
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
     result = dsl.character(char)
     assert_same dsl, result
 
@@ -83,21 +83,21 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     assert_same dsl, result
   end
 
-  def test_dsl_cannot_build_twice
+  def test_builder_cannot_build_twice
     pipeline = simple_pipeline
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
     dsl.message("Hello!")
     dsl.build
 
     assert_raises(RuntimeError) { dsl.build }
   end
 
-  def test_dsl_sets_context_fields
+  def test_builder_sets_state_fields
     pipeline = simple_pipeline
     char = TavernKit::Character.create(name: "Test")
     user = TavernKit::User.new(name: "Alice")
 
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
     dsl.character(char)
     dsl.user(user)
     dsl.dialect(:text)
@@ -105,20 +105,20 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     dsl.generation_type(:continue)
     dsl.strict(true)
 
-    ctx = dsl.context
-    assert_equal char, ctx.character
-    assert_equal user, ctx.user
-    assert_equal :text, ctx.dialect
-    assert_equal "Hello!", ctx.user_message
-    assert_equal :continue, ctx.generation_type
-    assert_equal true, ctx.strict
+    state = dsl.state
+    assert_equal char, state.character
+    assert_equal user, state.user
+    assert_equal :text, state.dialect
+    assert_equal "Hello!", state.user_message
+    assert_equal :continue, state.generation_type
+    assert_equal true, state.strict
   end
 
-  def test_dsl_sets_instrumenter
-    collector = TavernKit::Prompt::Instrumenter::TraceCollector.new
+  def test_builder_sets_instrumenter
+    collector = TavernKit::PromptBuilder::Instrumenter::TraceCollector.new
 
     pipeline = simple_pipeline
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
     dsl.instrumenter(collector)
     dsl.warning_handler(nil)
     dsl.message("Hello!")
@@ -128,42 +128,42 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
     assert_equal [:simple], trace.stages.map(&:name)
   end
 
-  def test_dsl_macro_vars
+  def test_builder_macro_vars
     pipeline = simple_pipeline
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
     dsl.macro_vars({ "MyVar" => "value" })
 
-    assert_equal({ myvar: "value" }, dsl.context.macro_vars)
+    assert_equal({ myvar: "value" }, dsl.state.macro_vars)
   end
 
-  def test_dsl_set_var
+  def test_builder_set_var
     pipeline = simple_pipeline
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
     dsl.set_var("MyVar", "value")
 
-    assert_equal "value", dsl.context.macro_vars[:myvar]
+    assert_equal "value", dsl.state.macro_vars[:myvar]
   end
 
-  def test_dsl_meta_sets_context_metadata
+  def test_builder_meta_sets_state_metadata
     pipeline = simple_pipeline
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
     dsl.meta(:chat_index, 123)
 
-    assert_equal 123, dsl.context[:chat_index]
+    assert_equal 123, dsl.state[:chat_index]
   end
 
-  def test_dsl_variables_store_helpers
+  def test_builder_variables_store_helpers
     pipeline = simple_pipeline
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
 
     dsl.set_variable("x", "1")
-    assert_kind_of TavernKit::VariablesStore::InMemory, dsl.context.variables_store
-    assert_equal "1", dsl.context.variables_store.get("x", scope: :local)
+    assert_kind_of TavernKit::VariablesStore::InMemory, dsl.state.variables_store
+    assert_equal "1", dsl.state.variables_store.get("x", scope: :local)
 
     store = TavernKit::VariablesStore::InMemory.new
     dsl.variables_store(store)
     dsl.set_variables({ y: 2 }, scope: :global)
-    assert_same store, dsl.context.variables_store
+    assert_same store, dsl.state.variables_store
     assert_equal 2, store.get("y", scope: :global)
   end
 
@@ -179,21 +179,21 @@ class TavernKit::Prompt::DSLTest < Minitest::Test
       message "Hello!"
     end
 
-    assert_kind_of TavernKit::Prompt::Plan, plan
+    assert_kind_of TavernKit::PromptBuilder::Plan, plan
     assert_equal 1, plan.size
   end
 
-  def test_dsl_to_messages_sets_ctx_dialect_before_build
+  def test_builder_to_messages_sets_state_dialect_before_build
     pipeline = dialect_pipeline
-    dsl = TavernKit::Prompt::DSL.new(pipeline: pipeline)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
 
     output = dsl.to_messages(dialect: :text)
 
-    assert_equal :text, dsl.context.dialect
+    assert_equal :text, dsl.state.dialect
     assert_equal "text", output.fetch(:prompt)
   end
 
-  def test_tavern_kit_to_messages_sets_ctx_dialect_before_build
+  def test_tavern_kit_to_messages_sets_state_dialect_before_build
     pipeline = dialect_pipeline
     output = TavernKit.to_messages(dialect: :text, pipeline: pipeline) { }
 

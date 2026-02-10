@@ -51,7 +51,7 @@ VibeTavern provides an app-owned registry + canonicalization layer:
 - `TavernKit::VibeTavern::TokenEstimation.estimator`
   - memoized `TavernKit::TokenEstimator` configured with the registry
 
-The VibeTavern pipeline injects these defaults in `Middleware::Prepare`:
+The VibeTavern pipeline injects these defaults in `PromptBuilder::Steps::Prepare`:
 
 - when `ctx[:model_hint]` is not explicitly set, it is derived from
   `ctx[:default_model_hint]` (often the provider model id used for the request)

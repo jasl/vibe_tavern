@@ -2,11 +2,11 @@
 
 module TavernKit
   module SillyTavern
-    # Builds a Macro::Environment from a Prompt::Context for ST-compatible macro
+    # Builds a Macro::Environment from a PromptBuilder::Context for ST-compatible macro
     # expansion.
     #
     # This isolates "how do we map context state into macro expansion inputs"
-    # into a single place so middleware can stay consistent.
+    # into a single place so steps can stay consistent.
     module ExpanderVars
       module_function
 

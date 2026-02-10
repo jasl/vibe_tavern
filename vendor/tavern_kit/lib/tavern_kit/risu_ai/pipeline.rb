@@ -1,24 +1,24 @@
 # frozen_string_literal: true
 
-require_relative "middleware/prepare"
-require_relative "middleware/memory"
-require_relative "middleware/template_assembly"
-require_relative "middleware/cbs"
-require_relative "middleware/regex_scripts"
-require_relative "middleware/triggers"
-require_relative "middleware/plan_assembly"
+require_relative "prompt_builder/steps/prepare"
+require_relative "prompt_builder/steps/memory"
+require_relative "prompt_builder/steps/template_assembly"
+require_relative "prompt_builder/steps/cbs"
+require_relative "prompt_builder/steps/regex_scripts"
+require_relative "prompt_builder/steps/triggers"
+require_relative "prompt_builder/steps/plan_assembly"
 
 module TavernKit
   module RisuAI
-    # Default RisuAI middleware chain.
-    Pipeline = TavernKit::Prompt::Pipeline.new do
-      use TavernKit::RisuAI::Middleware::Prepare, name: :prepare
-      use TavernKit::RisuAI::Middleware::Memory, name: :memory
-      use TavernKit::RisuAI::Middleware::TemplateAssembly, name: :template_assembly
-      use TavernKit::RisuAI::Middleware::CBS, name: :cbs
-      use TavernKit::RisuAI::Middleware::RegexScripts, name: :regex_scripts
-      use TavernKit::RisuAI::Middleware::Triggers, name: :triggers
-      use TavernKit::RisuAI::Middleware::PlanAssembly, name: :plan_assembly
+    # Default RisuAI prompt-builder step chain.
+    Pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step TavernKit::RisuAI::PromptBuilder::Steps::Prepare, name: :prepare
+      use_step TavernKit::RisuAI::PromptBuilder::Steps::Memory, name: :memory
+      use_step TavernKit::RisuAI::PromptBuilder::Steps::TemplateAssembly, name: :template_assembly
+      use_step TavernKit::RisuAI::PromptBuilder::Steps::CBS, name: :cbs
+      use_step TavernKit::RisuAI::PromptBuilder::Steps::RegexScripts, name: :regex_scripts
+      use_step TavernKit::RisuAI::PromptBuilder::Steps::Triggers, name: :triggers
+      use_step TavernKit::RisuAI::PromptBuilder::Steps::PlanAssembly, name: :plan_assembly
     end
   end
 end

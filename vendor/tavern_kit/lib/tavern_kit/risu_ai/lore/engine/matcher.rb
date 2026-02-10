@@ -200,7 +200,7 @@ module TavernKit
           end
           return h if snake_symbol
 
-          TavernKit::Runtime::Base.normalize(h)
+          TavernKit::PromptBuilder::Context.normalize(h)
         end
       end
     end

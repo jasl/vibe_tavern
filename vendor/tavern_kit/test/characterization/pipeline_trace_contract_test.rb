@@ -18,7 +18,7 @@ class PipelineTraceContractTest < Minitest::Test
   ].freeze
 
   def test_trace_collector_records_stable_stage_order
-    instrumenter = TavernKit::Prompt::Instrumenter::TraceCollector.new
+    instrumenter = TavernKit::PromptBuilder::Instrumenter::TraceCollector.new
 
     _plan = TavernKit::SillyTavern.build do
       instrumenter instrumenter

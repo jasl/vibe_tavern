@@ -19,7 +19,7 @@ class TavernKit::ChatHistoryTest < Minitest::Test
 
     msgs = history.to_a
     assert_equal 2, msgs.size
-    assert_instance_of TavernKit::Prompt::Message, msgs[0]
+    assert_instance_of TavernKit::PromptBuilder::Message, msgs[0]
     assert_equal :user, msgs[0].role
     assert_equal "hi", msgs[0].content
     assert_equal :assistant, msgs[1].role

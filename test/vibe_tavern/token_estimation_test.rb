@@ -64,12 +64,12 @@ class VibeTavernTokenEstimationTest < ActiveSupport::TestCase
   end
 
   test "Prepare injects canonical model_hint and default estimator" do
-    ctx = TavernKit::Prompt::Context.new
+    ctx = TavernKit::PromptBuilder::State.new
     ctx[:default_model_hint] = "deepseek/deepseek-chat-v3-0324:nitro"
 
     pipeline =
-      TavernKit::Prompt::Pipeline.new do
-        use TavernKit::VibeTavern::Middleware::Prepare, name: :prepare
+      TavernKit::PromptBuilder::Pipeline.new do
+        use_step TavernKit::VibeTavern::PromptBuilder::Steps::Prepare, name: :prepare
       end
 
     pipeline.call(ctx)

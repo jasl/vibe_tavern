@@ -11,9 +11,9 @@ contract so downstream changes can be reviewed against a stable baseline.
 
 Goals:
 - provide a minimal, deterministic prompt build (history + user input)
-- produce a typed `TavernKit::Prompt::Plan` (so the app can render dialect messages)
+- produce a typed `TavernKit::PromptBuilder::Plan` (so the app can render dialect messages)
 - keep I/O out of the pipeline (no DB/network/filesystem side effects)
-- be easy to extend via additional app-owned middlewares
+- be easy to extend via additional app-owned steps
 
 Non-goals (for now):
 - ST/RisuAI parity behavior (use `TavernKit::SillyTavern` / `TavernKit::RisuAI`)
@@ -65,16 +65,16 @@ Accepted by the DSL but currently **ignored** by this pipeline (no behavior yet)
 
 ## Output Contract
 
-The pipeline produces a `TavernKit::Prompt::Plan` with:
+The pipeline produces a `TavernKit::PromptBuilder::Plan` with:
 - `blocks`: built from `history` plus an optional `user_message` block
 - `warnings`: whatever was collected in the context (usually empty here)
-- `trace`: `nil` (today; future middlewares may attach richer trace objects)
+- `trace`: `nil` (today; future steps may attach richer trace objects)
 
 The plan can then be rendered by `plan.to_messages(dialect: ...)`.
 
 ## Block Semantics (System + History + Post-history + User Message)
 
-Implementation: `lib/tavern_kit/vibe_tavern/middleware/plan_assembly.rb`
+Implementation: `lib/tavern_kit/vibe_tavern/prompt_builder/steps/plan_assembly.rb`
 
 System block (optional):
 - If `meta(:system_template, ...)` is present:
@@ -91,7 +91,7 @@ System block (optional):
   - inserted as the first block (`source: :default_system`)
 
 History:
-- Each history message becomes a `TavernKit::Prompt::Block` with:
+- Each history message becomes a `TavernKit::PromptBuilder::Block` with:
   - `role`: `message.role`
   - `content`: `message.content.to_s`
   - `name`: `message.name` (if provided)
@@ -137,15 +137,15 @@ Liquid rendering:
 ## Runtime Contract
 
 VibeTavern uses runtime as the "app snapshot" for a build. You can pass:
-- a `TavernKit::Runtime::Base` instance (recommended), or
+- a `TavernKit::PromptBuilder::Context` instance (recommended), or
 - a Hash (treated as runtime input and normalized by the pipeline)
 
-Normalization (Prepare middleware):
+Normalization (Prepare step):
 - if runtime is provided as a Hash, the pipeline converts it to a runtime object:
-  `TavernKit::Runtime::Base.build(hash, type: :app)`
+  `TavernKit::PromptBuilder::Context.build(hash, type: :app)`
 
 Immutability:
-- `runtime` cannot be replaced once the pipeline starts executing middlewares.
+- `runtime` cannot be replaced once the pipeline starts executing steps.
   If you need different runtime values, construct a new runtime instance per build.
 
 Key normalization:
@@ -176,7 +176,7 @@ If `instrumenter` is present:
   - `key: :plan_blocks`
   - `value: blocks.size`
 
-Use `TavernKit::Prompt::Instrumenter::TraceCollector` in development if you want
+Use `TavernKit::PromptBuilder::Instrumenter::TraceCollector` in development if you want
 to collect events for debugging.
 
 ## When to Use Platform Pipelines Instead

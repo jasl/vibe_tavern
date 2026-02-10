@@ -81,7 +81,7 @@ These rules keep the infra stable across providers/models:
   - tool output size limits
   - (optional) per-turn tool call limits
 - Reproducibility:
-  - tools + request options must be part of `Prompt::Plan` (via `plan.llm_options`)
+  - tools + request options must be part of `PromptBuilder::Plan` (via `plan.llm_options`)
     so a run is replayable/auditable.
 
 ## Code map (infra)

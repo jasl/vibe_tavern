@@ -1,130 +1,80 @@
 # Pipeline Observability & Debugging Guide
 
-This document standardizes how to debug prompt builds in TavernKit, without
-adding meaningful overhead to production runs.
+This document standardizes prompt-build observability for the new
+`PromptBuilder -> Pipeline -> Step` architecture.
 
 Scope:
-- `TavernKit::Prompt::Pipeline`
-- `TavernKit::Prompt::Context`
-- `TavernKit::Prompt::Instrumenter::*`
-- strict vs tolerant error/warn behavior
+- `TavernKit::PromptBuilder`
+- `TavernKit::PromptBuilder::Pipeline`
+- `TavernKit::PromptBuilder::Step`
+- `TavernKit::PromptBuilder::State`
+- `TavernKit::PromptBuilder::Instrumenter::*`
 
 ## Core Concepts
 
-### 1) Context is the build workspace
+### 1) `Context` vs `State`
 
-`Prompt::Context` is mutable working memory that flows through each middleware.
+- `PromptBuilder::Context` is the developer-facing input container.
+  - Holds request input/config and optional `module_configs` step overrides.
+- `PromptBuilder::State` is the internal mutable build workspace.
+  - Steps read/write intermediate fields (`blocks`, `outlets`, `lore_result`, `plan`, ...).
 
-- Inputs live on `ctx` (character/user/history/preset/runtime/etc)
-- Middlewares write intermediate state onto `ctx` (`blocks`, `outlets`, `lore_result`, ...)
-- The final output is `ctx.plan` (`Prompt::Plan`)
+`Pipeline#call` always executes on `State`.
 
-### 2) Runtime is app-owned state (sync contract)
+### 2) Runtime payload contract
 
-`ctx.runtime` is the application-owned state snapshot that must stay in sync
-with prompt building (chat indices, app metadata, feature toggles, etc).
+`state.runtime` is the application-owned per-build runtime payload.
 
-- Runtime must not be replaced once set (enforced by `Context#runtime=`).
-- Runtime should be treated as immutable during pipeline execution.
+- Runtime can be a typed runtime object (e.g. RisuAI runtime contract) or a
+  `PromptBuilder::Context` generated from a Hash.
+- Runtime is passed from app/runner to steps; steps should treat it as
+  read-mostly input and avoid replacing it after normalization.
 
-### 3) Warnings are first-class (tolerant by default)
+### 3) Warnings are first-class
 
-Prompt building contains user-supplied inputs. For *expected* issues (invalid
-macros, malformed entries, unsupported regexes, etc), prefer warnings instead
-of raising exceptions.
+Use `state.warn("...")` for expected external-input issues.
 
-- `ctx.warn("...")` appends to `ctx.warnings`
-- In strict mode (`ctx.strict = true`), `ctx.warn` raises `StrictModeError`
+- Tolerant mode: warning is collected (`state.warnings`) and build continues.
+- Strict mode: `state.warn` raises `TavernKit::StrictModeError`.
 
-Use strict mode for tests/debugging to surface “tolerant” failures.
+### 4) Instrumentation is optional
 
-### 4) Instrumentation is optional (nil means near-zero overhead)
+`state.instrumenter` is `nil` by default. When set, steps emit structured events.
 
-`ctx.instrumenter` is `nil` by default. When present, middlewares can emit
-debug events. When absent, instrumentation should cost ~0.
+Built-in collector:
+- `PromptBuilder::Instrumenter::TraceCollector`
 
-Built-in implementation:
-- `Prompt::Instrumenter::TraceCollector`
+Event contract:
+- `:step_start` (`name:`)
+- `:step_finish` (`name:`)
+- `:step_error` (`name:`, `error:`)
+- `:warning` (`message:`, `step:`)
+- `:stat` (`key:`, `value:`, `step:`)
 
-Event contract (see `lib/tavern_kit/prompt/instrumenter.rb`):
-- `:middleware_start` (name:)
-- `:middleware_finish` (name:, stats: optional)
-- `:middleware_error` (name:, error:)
-- `:warning` (message:, stage: optional)
-- `:stat` (key:, value:, stage: optional)
-
-## Recommended Debug Pattern
-
-### Enable instrumentation (debug build)
+## Recommended Debug Flow
 
 ```ruby
-instrumenter = TavernKit::Prompt::Instrumenter::TraceCollector.new
+instrumenter = TavernKit::PromptBuilder::Instrumenter::TraceCollector.new
 
 plan =
   TavernKit::SillyTavern.build do
-    strict true                  # optional: fail-fast on warnings
-    instrumenter instrumenter    # collect per-stage trace
-
-    # ... other DSL inputs
+    strict true
+    instrumenter instrumenter
+    # ... other inputs
   end
 
-plan.trace          # => Prompt::Trace (for ST builds)
-plan.trim_report    # => Prompt::TrimReport (when trimming is used)
-plan.debug_dump     # => string dump of blocks
+trace = instrumenter.to_trace(fingerprint: plan.fingerprint(dialect: :openai))
 ```
 
-Notes:
-- Some pipelines attach `plan.trace` automatically only in specific stages
-  (e.g. ST attaches it after trimming). If you need a trace in other pipelines,
-  you can call `instrumenter.to_trace(fingerprint: plan.fingerprint(...))`
-  in the application layer.
+Recommended inspection order:
+1. `plan.debug_dump`
+2. `plan.trim_report`
+3. `trace`
+4. `plan.fingerprint(...)`
 
-### Use lazy instrumentation payloads
+## Step Authoring Checklist
 
-`Context#instrument` supports a block for lazy payload evaluation:
-
-```ruby
-ctx.instrument(:stat, stage: :lore, key: :activated_count, value: count)
-
-ctx.instrument(:debug, stage: :lore) do
-  { expensive_dump: compute_big_hash(ctx) } # only runs when instrumenter is set
-end
-```
-
-This keeps the default production path fast.
-
-## Failure Semantics (Standard)
-
-### Expected problems
-
-Use `ctx.warn` for expected issues:
-- invalid/unparseable user content
-- unknown/unsupported macros that should be preserved
-- regex skipped due to safety limits
-
-Behavior:
-- tolerant mode: warning is collected and the pipeline continues
-- strict mode: `StrictModeError` is raised immediately
-
-### Unexpected problems (bugs / programmer errors)
-
-Raise exceptions. The middleware base will wrap them as `PipelineError` with
-the stage name attached, so downstream apps get a stable failure anchor:
-
-- `TavernKit::PipelineError` includes `stage:`
-
-## “Why This Prompt?” Playbook
-
-When debugging a prompt build, prefer this fixed path:
-
-1) `plan.debug_dump` (see every block, including disabled)
-2) `plan.trim_report` (evictions, token totals, budgets)
-3) `plan.trace` (per-stage durations, per-stage warnings, stage stats)
-4) `plan.fingerprint(...)` (useful as a cache key and repro identifier)
-
-## Middleware Authoring Checklist
-
-- Use `ctx.warn` (not `raise`) for expected invalid external input.
-- Wrap expensive debug payloads in `ctx.instrument { ... }`.
-- Emit stage-local counters via `ctx.instrument(:stat, stage: ..., key: ..., value: ...)`.
-- Never replace `ctx.runtime` / `ctx.variables_store` once set.
+- Prefer `state.warn` (not `raise`) for expected external input failures.
+- Keep expensive instrumentation lazy via `state.instrument { ... }` blocks.
+- Emit local counters with `state.instrument(:stat, step: ..., key: ..., value: ...)`.
+- Do not mix transport/protocol concerns into prompt-building steps.

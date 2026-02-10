@@ -18,7 +18,7 @@ Source of truth for integration semantics:
 - **Content models**: Character / Lore / Preset / Template / MessageHistory.
 - **Session state**: `variables_store` (persisted, per chat).
 - **Per-build snapshot**: `runtime` (not persisted; derived per request/build).
-- **Prompt build**: inputs -> `Prompt::Plan` -> dialect messages.
+- **Prompt build**: inputs -> `PromptBuilder::Plan` -> dialect messages.
 - **Observability**: store/replay-friendly artifacts (`fingerprint`, `trace`, `trim_report`).
 
 ---
@@ -113,7 +113,7 @@ Services:
   - Load JSONB -> `TavernKit::VariablesStore::InMemory`
   - Enforce scopes and serialization rules (string keys at boundary OK; store normalizes internally)
 - `PromptBuilding::BuildRuntime.call(chat, request_context:)`:
-  - Build `TavernKit::Runtime::Base.build({ ... }, type: :app, id: chat.id)`
+  - Build `TavernKit::PromptBuilder::Context.build({ ... }, type: :app, id: chat.id)`
   - Compute/derive:
     - `chat_index`, `message_index` (from DB message count / request)
     - RisuAI: `cbs_conditions`, `toggles`, `metadata`, `modules`, `assets` as needed
@@ -154,7 +154,7 @@ Service (single entrypoint):
   - Call TavernKit:
     - ST: `TavernKit::SillyTavern.build { ... }`
     - RisuAI: `TavernKit::RisuAI.build { ... }`
-  - Return `Prompt::Plan`
+  - Return `PromptBuilder::Plan`
   - Persist `variables_store` back to chat after build (if mutated)
 
 Tests:

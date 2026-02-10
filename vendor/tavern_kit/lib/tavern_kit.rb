@@ -14,7 +14,6 @@ require_relative "tavern_kit/text/json_pointer"
 require_relative "tavern_kit/text/verbatim_masker"
 require_relative "tavern_kit/lru_cache"
 require_relative "tavern_kit/js_regex_cache"
-require_relative "tavern_kit/runtime"
 require_relative "tavern_kit/load_hooks"
 
 require_relative "tavern_kit/participant"
@@ -53,27 +52,28 @@ require_relative "tavern_kit/hook_registry/base"
 require_relative "tavern_kit/injection_registry/base"
 require_relative "tavern_kit/injection_registry/entry"
 
-require_relative "tavern_kit/prompt/message"
-require_relative "tavern_kit/prompt/block"
-require_relative "tavern_kit/prompt/prompt_entry"
-require_relative "tavern_kit/prompt/plan"
+require_relative "tavern_kit/prompt_builder"
+require_relative "tavern_kit/prompt_builder/message"
+require_relative "tavern_kit/prompt_builder/block"
+require_relative "tavern_kit/prompt_builder/prompt_entry"
+require_relative "tavern_kit/prompt_builder/plan"
 require_relative "tavern_kit/prompt_inspector"
-require_relative "tavern_kit/prompt/context"
-require_relative "tavern_kit/prompt/trace"
-require_relative "tavern_kit/prompt/instrumenter"
-require_relative "tavern_kit/prompt/middleware/base"
-require_relative "tavern_kit/prompt/middleware/max_tokens"
-require_relative "tavern_kit/prompt/pipeline"
-require_relative "tavern_kit/prompt/dsl"
-require_relative "tavern_kit/prompt/dialects/base"
-require_relative "tavern_kit/prompt/dialects/openai"
-require_relative "tavern_kit/prompt/dialects/anthropic"
-require_relative "tavern_kit/prompt/dialects/google"
-require_relative "tavern_kit/prompt/dialects/cohere"
-require_relative "tavern_kit/prompt/dialects/ai21"
-require_relative "tavern_kit/prompt/dialects/mistral"
-require_relative "tavern_kit/prompt/dialects/xai"
-require_relative "tavern_kit/prompt/dialects/text"
+require_relative "tavern_kit/prompt_builder/context"
+require_relative "tavern_kit/prompt_builder/state"
+require_relative "tavern_kit/prompt_builder/trace"
+require_relative "tavern_kit/prompt_builder/instrumenter"
+require_relative "tavern_kit/prompt_builder/step"
+require_relative "tavern_kit/prompt_builder/steps/max_tokens"
+require_relative "tavern_kit/prompt_builder/pipeline"
+require_relative "tavern_kit/prompt_builder/dialects/base"
+require_relative "tavern_kit/prompt_builder/dialects/openai"
+require_relative "tavern_kit/prompt_builder/dialects/anthropic"
+require_relative "tavern_kit/prompt_builder/dialects/google"
+require_relative "tavern_kit/prompt_builder/dialects/cohere"
+require_relative "tavern_kit/prompt_builder/dialects/ai21"
+require_relative "tavern_kit/prompt_builder/dialects/mistral"
+require_relative "tavern_kit/prompt_builder/dialects/xai"
+require_relative "tavern_kit/prompt_builder/dialects/text"
 
 require_relative "tavern_kit/silly_tavern/context_template"
 require_relative "tavern_kit/silly_tavern/examples_parser"
@@ -124,7 +124,7 @@ module TavernKit
       CharacterCard.load(hash)
     end
 
-    # Build a prompt using the DSL-based pipeline.
+    # Build a prompt using PromptBuilder.
     #
     # Requires explicit pipeline selection — there is no default.
     #
@@ -135,39 +135,27 @@ module TavernKit
     #     message "Hello!"
     #   end
     #
-    # @param pipeline [Prompt::Pipeline] the pipeline to use (required)
-    # @yield [Prompt::DSL] DSL configuration block
-    # @return [Prompt::Plan]
+    # @param pipeline [PromptBuilder::Pipeline] the pipeline to use (required)
+    # @return [PromptBuilder::Plan]
     def build(pipeline:, **kwargs, &block)
       if block
-        Prompt::DSL.build(pipeline: pipeline, &block)
+        PromptBuilder.build(pipeline: pipeline, **kwargs, &block)
       else
-        dsl = Prompt::DSL.new(pipeline: pipeline)
-        kwargs.each do |key, value|
-          dsl.public_send(key, value) if dsl.respond_to?(key)
-        end
-        dsl.build
+        PromptBuilder.build(pipeline: pipeline, **kwargs)
       end
     end
 
     # Build messages directly using the pipeline.
     #
     # @param dialect [Symbol] output dialect (:openai, :anthropic, etc.)
-    # @param pipeline [Prompt::Pipeline] the pipeline to use (required)
+    # @param pipeline [PromptBuilder::Pipeline] the pipeline to use (required)
     # @return [Array<Hash>]
     def to_messages(dialect: :openai, pipeline:, **kwargs, &block)
-      dsl = Prompt::DSL.new(pipeline: pipeline)
-      dsl.dialect(dialect)
-
       if block
-        dsl.instance_eval(&block)
+        PromptBuilder.to_messages(dialect: dialect, pipeline: pipeline, **kwargs, &block)
       else
-        kwargs.each do |key, value|
-          dsl.public_send(key, value) if dsl.respond_to?(key)
-        end
+        PromptBuilder.to_messages(dialect: dialect, pipeline: pipeline, **kwargs)
       end
-
-      dsl.to_messages(dialect: dialect)
     end
   end
 end

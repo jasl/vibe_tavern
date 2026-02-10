@@ -68,7 +68,7 @@ class TavernKit::SillyTavern::PresetTest < Minitest::Test
       instruct: TavernKit::SillyTavern::Instruct.new(enabled: false),
     )
 
-    ctx = TavernKit::Prompt::Context.new(
+    ctx = TavernKit::PromptBuilder::Context.new(
       character: TavernKit::Character.create(name: "Alice"),
       user: TavernKit::User.new(name: "Bob"),
     )
@@ -103,7 +103,7 @@ class TavernKit::SillyTavern::PresetTest < Minitest::Test
       ],
     )
 
-    ctx = TavernKit::Prompt::Context.new(
+    ctx = TavernKit::PromptBuilder::Context.new(
       character: TavernKit::Character.create(name: "Alice"),
       user: TavernKit::User.new(name: "Bob"),
       generation_type: :continue,

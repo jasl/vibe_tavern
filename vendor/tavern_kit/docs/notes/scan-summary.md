@@ -62,7 +62,7 @@ Location: `resources/rails/activemodel/lib/active_model/schematized_json.rb`
 ### Gem Core (framework-agnostic)
 - **Data models**: `Data.define` for Character, User, Preset, Instruct, ContextTemplate
 - **Character Card**: V2/V3 loading, PNG read/write, version detection, round-trip export
-- **Pipeline**: 9-stage Rack-like middleware (Hooks -> Lore -> Entries -> PinnedGroups -> Injection -> Compilation -> MacroExpansion -> PlanAssembly -> Trimming)
+- **Pipeline**: 9-step Rack-like pipeline (Hooks -> Lore -> Entries -> PinnedGroups -> Injection -> Compilation -> MacroExpansion -> PlanAssembly -> Trimming)
 - **Macros**: 50+ SillyTavern-compatible macros via V1 (regex) and V2 (parser) engines
 - **Lore/World Info**: Keyword matching, token budgeting, recursive scanning, timed effects
 - **Output Dialects**: OpenAI, Anthropic, Google, Text (+ others)
@@ -80,7 +80,7 @@ Location: `resources/rails/activemodel/lib/active_model/schematized_json.rb`
 
 1. **Foundation** (3 tasks): Port tests, gem models, EasyTalk docs
 2. **Character Cards** (3 tasks): V2/V3 loading, PNG I/O, basic macros
-3. **Pipeline** (4 tasks): Middleware arch, core middleware, presets, output dialects
+3. **Pipeline** (4 tasks): Step arch, core steps, presets, output dialects
 4. **Advanced + Rails** (5 tasks): Full macros, World Info, trimming, EasyTalk integration, core models
 5. **Integration + Frontend** (5 tasks): Conversation/Message, PromptBuilder, API, ActionCable, Stimulus UI
 

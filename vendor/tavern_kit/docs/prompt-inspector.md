@@ -10,7 +10,7 @@ It is intentionally separate from the hot-path trimming/budgeting logic:
 
 ## What it does
 
-Given a `TavernKit::Prompt::Plan` or a message array, it returns:
+Given a `TavernKit::PromptBuilder::Plan` or a message array, it returns:
 
 - totals (content + metadata + overhead)
 - per-message breakdown
@@ -41,7 +41,7 @@ inspection.messages.first.total_tokens
 inspection.estimator # backend + registry metadata (if matched)
 ```
 
-Inspect messages directly (supports `TavernKit::Prompt::Message` and `Hash`):
+Inspect messages directly (supports `TavernKit::PromptBuilder::Message` and `Hash`):
 
 ```ruby
 inspection =

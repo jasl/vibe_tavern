@@ -64,7 +64,7 @@ Guidelines:
   - Add rewrite docs index: `218591b`
 
 - App-owned pipeline baseline (`TavernKit::VibeTavern`)
-  - Introduce a minimal pipeline (history + user message -> `Prompt::Plan`): `c77b138`
+  - Introduce a minimal pipeline (history + user message -> `PromptBuilder::Plan`): `c77b138`
   - Document the pipeline contract (inputs/outputs/semantics): `37f2b4c`
   - Update rewrite docs to make `VibeTavern` the default pipeline for integration examples: `c6d382f`, `1e20282`
 

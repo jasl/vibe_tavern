@@ -28,7 +28,7 @@ module TavernKit
           model:,
           runtime: nil,
           pipeline: TavernKit::VibeTavern::Pipeline,
-          middleware_options: nil,
+          step_options: nil,
           llm_options_defaults: nil
         )
           caps = TavernKit::VibeTavern::Capabilities.resolve(provider: provider, model: model)
@@ -62,7 +62,7 @@ module TavernKit
           configured_pipeline =
             configure_pipeline(
               pipeline,
-              middleware_options: middleware_options,
+              step_options: step_options,
               language_policy_config: language_policy,
             )
 
@@ -82,53 +82,53 @@ module TavernKit
 
         def self.normalize_runtime(value)
           return nil if value.nil?
-          return value if value.is_a?(TavernKit::Runtime::Base)
+          return value if value.is_a?(TavernKit::PromptBuilder::Context)
 
-          raise ArgumentError, "runtime must be a Hash or TavernKit::Runtime::Base" unless value.is_a?(Hash)
+          raise ArgumentError, "runtime must be a Hash or TavernKit::PromptBuilder::Context" unless value.is_a?(Hash)
 
           value.each_key do |key|
             raise ArgumentError, "runtime keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
           end
 
-          TavernKit::Runtime::Base.new(value, type: :vibe_tavern)
+          TavernKit::PromptBuilder::Context.new(value, type: :vibe_tavern)
         end
         private_class_method :normalize_runtime
 
-        def self.configure_pipeline(pipeline, middleware_options:, language_policy_config:)
+        def self.configure_pipeline(pipeline, step_options:, language_policy_config:)
           raise ArgumentError, "pipeline is required" if pipeline.nil?
-          raise ArgumentError, "pipeline must be a TavernKit::Prompt::Pipeline" unless pipeline.is_a?(TavernKit::Prompt::Pipeline)
+          raise ArgumentError, "pipeline must be a TavernKit::PromptBuilder::Pipeline" unless pipeline.is_a?(TavernKit::PromptBuilder::Pipeline)
 
-          opts = normalize_middleware_options(middleware_options)
+          opts = normalize_step_options(step_options)
           language_policy_options = opts.fetch(:language_policy, {}).dup
           language_policy_options[:config] = language_policy_config
           opts[:language_policy] = language_policy_options
 
           p = pipeline.dup
-          opts.each do |stage, options|
-            p.configure(stage, **options)
+          opts.each do |step, options|
+            p.configure_step(step, **options)
           end
           p
         end
         private_class_method :configure_pipeline
 
-        def self.normalize_middleware_options(value)
+        def self.normalize_step_options(value)
           return {} if value.nil?
-          raise ArgumentError, "middleware_options must be a Hash" unless value.is_a?(Hash)
+          raise ArgumentError, "step_options must be a Hash" unless value.is_a?(Hash)
 
           value.each_with_object({}) do |(name, options), out|
             stage = name.to_s.strip.downcase.tr("-", "_").to_sym
-            raise ArgumentError, "middleware_options.#{name} must be a Hash" unless options.is_a?(Hash)
+            raise ArgumentError, "step_options.#{name} must be a Hash" unless options.is_a?(Hash)
 
             options.each_key do |key|
               unless key.is_a?(Symbol)
-                raise ArgumentError, "middleware_options.#{name} keys must be Symbols (got #{key.class})"
+                raise ArgumentError, "step_options.#{name} keys must be Symbols (got #{key.class})"
               end
             end
 
             out[stage] = options.dup
           end
         end
-        private_class_method :normalize_middleware_options
+        private_class_method :normalize_step_options
 
         def self.normalize_llm_options_defaults(value)
           h = value.nil? ? {} : value

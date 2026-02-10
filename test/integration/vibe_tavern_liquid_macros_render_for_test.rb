@@ -5,9 +5,9 @@ class VibeTavernLiquidMacrosRenderForTest < ActiveSupport::TestCase
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)
 
-    runtime = TavernKit::Runtime::Base.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
+    runtime = TavernKit::PromptBuilder::Context.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
 
-    ctx = TavernKit::Prompt::Context.new(runtime: runtime, variables_store: store)
+    ctx = TavernKit::PromptBuilder::Context.new(runtime: runtime, variables_store: store)
 
     out =
       TavernKit::VibeTavern::LiquidMacros.render_for(

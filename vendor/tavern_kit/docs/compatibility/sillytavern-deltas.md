@@ -365,7 +365,7 @@ ST injects known extension prompts into `main`'s collection:
 - `smartContext` (from `chromadb`)
 - `personaDescription` (if position is IN_PROMPT)
 
-**Impact:** TavernKit's middleware chain should have injection points for
+**Impact:** TavernKit's step chain should have injection points for
 extensions. This maps cleanly to the InjectionRegistry pattern.
 
 ### 3.6 Message Class Multimodal Support
@@ -377,7 +377,7 @@ ST's `Message` class supports:
 
 Old docs: did not mention multimodal support.
 
-**Impact:** TavernKit's `Prompt::Message` should support multimodal content
+**Impact:** TavernKit's `PromptBuilder::Message` should support multimodal content
 (at minimum images). Lower priority than the core text-only prompt path, but
 worth noting for future API design.
 
@@ -681,7 +681,7 @@ shouldAddPrompt = messagesTillInsertion == 0
 When `interval=1`: Always insert.
 When `interval=N`: Insert every N user messages.
 
-**Impact:** TavernKit's `SillyTavern::Middleware::Injection` needs
+**Impact:** TavernKit's `SillyTavern::PromptBuilder::Steps::Injection` needs
 interval-based author's note insertion with character-specific overrides.
 The `Preset` must carry author's note defaults.
 
@@ -778,7 +778,7 @@ extension_prompts[key] = {
    by role, injects at message boundaries
 
 **Impact:** TavernKit's `SillyTavern::InjectionRegistry` maps
-directly to this framework. The `Middleware::Injection` stage consumes
+directly to this framework. The `PromptBuilder::Steps::Injection` step consumes
 registered extension prompts and injects them at the correct positions.
 
 ---
@@ -839,7 +839,7 @@ Not added for impersonate-type requests.
 
 **Impact:** TavernKit's `SillyTavern::GroupContext` must implement
 activation strategies, generation modes, and card merging. The
-`Middleware::PinnedGroups` stage handles group-specific prompt slots.
+`PromptBuilder::Steps::PinnedGroups` step handles group-specific prompt slots.
 
 ---
 
@@ -894,7 +894,7 @@ Impersonate mode:
 Only applied when `chat_completion_source === 'claude'` and not in
 continue+prefill mode.
 
-**Impact:** TavernKit's `SillyTavern::Middleware::PlanAssembly` needs
+**Impact:** TavernKit's `SillyTavern::PromptBuilder::Steps::PlanAssembly` needs
 continue/impersonate mode awareness. The `Preset` must carry nudge prompts,
 postfix config, and prefill settings.
 

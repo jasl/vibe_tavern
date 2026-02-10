@@ -976,7 +976,7 @@ run_task =
             result =
               directives_runner.run(
                 system: scenario[:system],
-                history: [TavernKit::Prompt::Message.new(role: :user, content: scenario[:user])],
+                history: [TavernKit::PromptBuilder::Message.new(role: :user, content: scenario[:user])],
                 structured_output_options: structured_output_options,
                 result_validator: semantic_repair ? scenario[:assert] : nil,
               )

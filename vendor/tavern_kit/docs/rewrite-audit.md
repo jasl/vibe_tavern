@@ -78,7 +78,7 @@ Evidence:
 ### Prompt orchestration pipeline
 
 Delivered:
-- 9-stage middleware chain, HookRegistry, InjectionRegistry, GroupContext
+- 9-step pipeline, HookRegistry, InjectionRegistry, GroupContext
 - Parity-critical ST behaviors pinned by contract tests:
   - in-chat injection ordering/depth
   - continue + continue_prefill displacement
@@ -97,7 +97,7 @@ Delivered:
 - Runtime contract (`ctx.runtime`), CBS engine + macros + environment
 - Lorebook engine + decorator parser
 - Template cards, regex scripts, triggers (prompt-building-safe effects)
-- Memory integration surface (interface + middleware hooks; algorithms app-owned)
+- Memory integration surface (interface + step hooks; algorithms app-owned)
 - RisuAI pipeline + `RisuAI.build`
 
 Evidence:

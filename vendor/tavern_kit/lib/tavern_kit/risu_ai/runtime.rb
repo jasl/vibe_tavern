@@ -7,7 +7,7 @@ module TavernKit
     # This is the synchronization boundary between an app (chat state, settings)
     # and prompt building. Middlewares should assume `ctx.runtime` is set once
     # at pipeline entry and not replaced.
-    class Runtime < TavernKit::Runtime::Base
+    class Runtime < TavernKit::PromptBuilder::Context
       TYPE = :risuai
 
       def self.build(raw, context: nil, strict: false, id: nil)

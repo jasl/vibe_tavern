@@ -726,7 +726,7 @@ process_task =
       prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
 
       user_text = scenario.fetch(:user_text).call(language_policy_target_lang || "")
-      history = [TavernKit::Prompt::Message.new(role: :user, content: user_text)]
+      history = [TavernKit::PromptBuilder::Message.new(role: :user, content: user_text)]
 
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       retry_attempts_used = 0

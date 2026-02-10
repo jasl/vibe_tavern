@@ -17,7 +17,7 @@ Scope:
 TavernKit is a CPU-bound prompt builder:
 
 ```
-app state + content  ->  (TavernKit pipeline)  ->  Prompt::Plan  ->  dialect messages
+app state + content  ->  (TavernKit pipeline)  ->  PromptBuilder::Plan  ->  dialect messages
 ```
 
 The Rails app owns:
@@ -29,7 +29,7 @@ The Rails app owns:
 TavernKit owns:
 - parsing/normalizing supported prompt-building formats
 - macro expansion + lore activation + injection + trimming/budgeting
-- producing a deterministic `Prompt::Plan`
+- producing a deterministic `PromptBuilder::Plan`
 
 ## What Rails Should Persist
 
@@ -67,7 +67,7 @@ Rule of thumb:
 ## Chat History (Message Contract)
 
 `history` can be `nil`, an `Array`, an `Enumerable`, or a `TavernKit::ChatHistory::Base`.
-Each message is recommended to be a `TavernKit::Prompt::Message`, but can also be a Hash
+Each message is recommended to be a `TavernKit::PromptBuilder::Message`, but can also be a Hash
 or a duck-typed object that responds to `role` and `content`.
 
 Ordering matters: `history` must be chronological (oldest -> newest).
@@ -109,7 +109,7 @@ end
 ## Default Prompt Build (VibeTavern)
 
 ```ruby
-instrumenter = Rails.env.development? ? TavernKit::Prompt::Instrumenter::TraceCollector.new : nil
+instrumenter = Rails.env.development? ? TavernKit::PromptBuilder::Instrumenter::TraceCollector.new : nil
 
 plan =
   TavernKit::VibeTavern.build do
@@ -118,7 +118,7 @@ plan =
     character character_obj
     user user_obj
 
-    runtime TavernKit::Runtime::Base.build(
+    runtime TavernKit::PromptBuilder::Context.build(
       { chat_index: chat_index, message_index: message_index },
       type: :app,
       id: chat_id,
@@ -164,7 +164,7 @@ Notes:
 
   ```ruby
   toggles = json_toggles.to_h.transform_keys { |k| TavernKit::Utils.underscore(k).to_sym }
-  runtime = TavernKit::Runtime::Base.build({ toggles: toggles }, type: :app, id: chat.id)
+  runtime = TavernKit::PromptBuilder::Context.build({ toggles: toggles }, type: :app, id: chat.id)
   ```
 
 ## Extending / Adding App-owned Pipelines
@@ -175,11 +175,11 @@ them app-owned and call TavernKit with an explicit `pipeline:`:
 ```ruby
 # lib/prompt_building/pipeline.rb (app-owned)
 module PromptBuilding
-  Pipeline = TavernKit::Prompt::Pipeline.new do
-    # Compose your own middleware chain here (and your own macro system if desired).
+  Pipeline = TavernKit::PromptBuilder::Pipeline.new do
+    # Compose your own step chain here (and your own macro system if desired).
     #
     # Example:
-    # use MyApp::PromptBuilding::Middleware::Prepare, name: :prepare
+    # use MyApp::PromptBuilding::PromptBuilder::Steps::Prepare, name: :prepare
   end
 end
 ```
@@ -228,7 +228,7 @@ Recommended env-based switches:
 Use this when you explicitly want ST behavior parity.
 
 ```ruby
-instrumenter = Rails.env.development? ? TavernKit::Prompt::Instrumenter::TraceCollector.new : nil
+instrumenter = Rails.env.development? ? TavernKit::PromptBuilder::Instrumenter::TraceCollector.new : nil
 
 plan =
   TavernKit::SillyTavern.build do
@@ -239,7 +239,7 @@ plan =
     preset st_preset
     lore_books [global_lore, character_lore]
 
-    runtime TavernKit::Runtime::Base.build(
+    runtime TavernKit::PromptBuilder::Context.build(
       { chat_index: chat_index, message_index: message_index },
       type: :app,
       id: chat_id,
@@ -276,7 +276,7 @@ plan =
     preset risu_preset_hash # contains `promptTemplate` (or `prompt_template`)
     lore_books [risu_lorebook]
 
-    runtime TavernKit::Runtime::Base.build(
+    runtime TavernKit::PromptBuilder::Context.build(
       {
         chat_index: chat_index,
         message_index: message_index,

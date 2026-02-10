@@ -4,7 +4,7 @@ require "digest/sha1"
 require "json"
 
 module TavernKit
-  # Core budget enforcement for Prompt::Block arrays.
+  # Core budget enforcement for PromptBuilder::Block arrays.
   #
   # Trimming is done by disabling removable blocks until the prompt fits
   # within the token budget. This is intentionally provider-agnostic and
@@ -96,7 +96,7 @@ module TavernKit
 
       # Rebuild the full blocks array using a TrimResult (preserves original order).
       #
-      # @return [Array<Prompt::Block>]
+      # @return [Array<PromptBuilder::Block>]
       def apply(blocks, result)
         by_id = (Array(result.kept) + Array(result.evicted)).to_h { |b| [b.id, b] }
         Array(blocks).map { |b| by_id.fetch(b.id, b) }

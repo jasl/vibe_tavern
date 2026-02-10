@@ -25,7 +25,7 @@ and what remains as explicit decisions/backlogs.
   removed from the public surface.
 - **Runtime** is application-owned per-build state (chat indices, toggles,
   metadata). It is set once on `ctx.runtime` and must not be replaced during
-  middleware execution.
+  step execution.
 
 ## Security hardening
 

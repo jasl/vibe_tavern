@@ -1,0 +1,28 @@
+# frozen_string_literal: true
+
+module TavernKit
+  module RisuAI
+    module PromptBuilder
+      module Steps
+      # Assemble prompt blocks from template + groups.
+      class TemplateAssembly < TavernKit::PromptBuilder::Step
+        private
+
+        def before(ctx)
+          template = ctx[:risuai_template]
+          groups = ctx[:risuai_groups]
+
+          template = [] unless template.is_a?(Array)
+          groups = {} unless groups.is_a?(Hash)
+
+          ctx.blocks = TavernKit::RisuAI::TemplateCards.assemble(
+            template: template,
+            groups: groups,
+            lore_entries: Array(ctx.lore_result&.activated_entries),
+          )
+        end
+      end
+      end
+    end
+  end
+end

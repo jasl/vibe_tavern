@@ -36,9 +36,9 @@ class InChatInjectionContractTest < Minitest::Test
     entries = registry.each.to_a
 
     history = [
-      TavernKit::Prompt::Message.new(role: :user, content: "m1"),
-      TavernKit::Prompt::Message.new(role: :assistant, content: "m2"),
-      TavernKit::Prompt::Message.new(role: :user, content: "m3"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "m1"),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "m2"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "m3"),
     ]
 
     out = TavernKit::SillyTavern::InChatInjector.inject(history, entries, generation_type: :normal)
@@ -80,9 +80,9 @@ class InChatInjectionContractTest < Minitest::Test
     entries = registry.each.to_a
 
     history = [
-      TavernKit::Prompt::Message.new(role: :user, content: "m1"),
-      TavernKit::Prompt::Message.new(role: :assistant, content: "m2"),
-      TavernKit::Prompt::Message.new(role: :user, content: "m3"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "m1"),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "m2"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "m3"),
     ]
 
     out = TavernKit::SillyTavern::InChatInjector.inject(history, entries, generation_type: :continue)
@@ -110,9 +110,9 @@ class InChatInjectionContractTest < Minitest::Test
     entries = registry.each.to_a
 
     history = [
-      TavernKit::Prompt::Message.new(role: :user, content: "m1"),
-      TavernKit::Prompt::Message.new(role: :assistant, content: "m2"),
-      TavernKit::Prompt::Message.new(role: :user, content: "m3"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "m1"),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "m2"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "m3"),
     ]
 
     out = TavernKit::SillyTavern::InChatInjector.inject(
@@ -144,17 +144,17 @@ class InChatInjectionContractTest < Minitest::Test
     # as separate messages per (order, role). Extension prompts are appended into
     # the order=100 group per role.
     history = [
-      TavernKit::Prompt::Message.new(role: :user, content: "m1"),
-      TavernKit::Prompt::Message.new(role: :assistant, content: "m2"),
-      TavernKit::Prompt::Message.new(role: :user, content: "m3"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "m1"),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "m2"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "m3"),
     ]
 
     prompt_entries = [
-      TavernKit::Prompt::PromptEntry.new(id: "p100a", pinned: false, role: :assistant, position: :in_chat, depth: 1, order: 100, content: "PM100 AST"),
-      TavernKit::Prompt::PromptEntry.new(id: "p100s1", pinned: false, role: :system, position: :in_chat, depth: 1, order: 100, content: "PM100 SYS 1"),
-      TavernKit::Prompt::PromptEntry.new(id: "p100s2", pinned: false, role: :system, position: :in_chat, depth: 1, order: 100, content: "PM100 SYS 2"),
-      TavernKit::Prompt::PromptEntry.new(id: "p200a", pinned: false, role: :assistant, position: :in_chat, depth: 1, order: 200, content: "PM200 AST"),
-      TavernKit::Prompt::PromptEntry.new(id: "p200s", pinned: false, role: :system, position: :in_chat, depth: 1, order: 200, content: "PM200 SYS"),
+      TavernKit::PromptBuilder::PromptEntry.new(id: "p100a", pinned: false, role: :assistant, position: :in_chat, depth: 1, order: 100, content: "PM100 AST"),
+      TavernKit::PromptBuilder::PromptEntry.new(id: "p100s1", pinned: false, role: :system, position: :in_chat, depth: 1, order: 100, content: "PM100 SYS 1"),
+      TavernKit::PromptBuilder::PromptEntry.new(id: "p100s2", pinned: false, role: :system, position: :in_chat, depth: 1, order: 100, content: "PM100 SYS 2"),
+      TavernKit::PromptBuilder::PromptEntry.new(id: "p200a", pinned: false, role: :assistant, position: :in_chat, depth: 1, order: 200, content: "PM200 AST"),
+      TavernKit::PromptBuilder::PromptEntry.new(id: "p200s", pinned: false, role: :system, position: :in_chat, depth: 1, order: 200, content: "PM200 SYS"),
     ]
 
     injects = [

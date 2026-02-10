@@ -9,7 +9,7 @@ module TavernKit
       # compression algorithms).
       class Base
         # @param input [MemoryInput]
-        # @param context [Prompt::Context]
+        # @param context [PromptBuilder::Context]
         # @return [MemoryResult]
         def integrate(input, context:) = raise NotImplementedError
       end

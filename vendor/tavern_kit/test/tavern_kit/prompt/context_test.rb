@@ -2,107 +2,76 @@
 
 require "test_helper"
 
-class TavernKit::Prompt::ContextTest < Minitest::Test
+class TavernKit::PromptBuilder::ContextTest < Minitest::Test
   def test_default_values
-    ctx = TavernKit::Prompt::Context.new
-    assert_nil ctx.character
-    assert_nil ctx.user
-    assert_nil ctx.history
-    assert_nil ctx.preset
-    assert_equal :normal, ctx.generation_type
-    assert_equal [], ctx.lore_books
-    assert_equal({}, ctx.outlets)
-    assert_equal({}, ctx.pinned_groups)
-    assert_equal [], ctx.blocks
-    assert_equal false, ctx.strict
-    assert_equal false, ctx.strict?
-    assert_nil ctx.instrumenter
-    assert_nil ctx.current_stage
-    assert_equal [], ctx.warnings
-    assert_equal({}, ctx.metadata)
+    context = TavernKit::PromptBuilder::Context.new
+
+    assert_nil context.type
+    assert_nil context.id
+    assert_equal({}, context.to_h)
+    assert_equal({}, context.module_configs)
   end
 
-  def test_initialize_with_attributes
-    user = TavernKit::User.new(name: "Alice")
-    ctx = TavernKit::Prompt::Context.new(user: user, user_message: "Hello!")
-    assert_equal user, ctx.user
-    assert_equal "Hello!", ctx.user_message
+  def test_build_normalizes_hash_keys
+    context = TavernKit::PromptBuilder::Context.build({ "chatIndex" => 1, message_index: 2 }, type: :app, id: 42)
+
+    assert_equal :app, context.type
+    assert_equal "42", context.id
+    assert_equal({ chat_index: 1, message_index: 2 }, context.to_h)
+    assert_equal 1, context[:chat_index]
   end
 
-  def test_unknown_keys_go_to_metadata
-    ctx = TavernKit::Prompt::Context.new(custom_key: "value")
-    assert_equal "value", ctx[:custom_key]
+  def test_new_normalizes_hash_keys
+    context = TavernKit::PromptBuilder::Context.new({ "chatIndex" => 1 })
+    assert_equal({ chat_index: 1 }, context.to_h)
   end
 
-  def test_metadata_access
-    ctx = TavernKit::Prompt::Context.new
-    ctx[:key] = "value"
-    assert_equal "value", ctx[:key]
-    assert ctx.key?(:key)
-    assert_equal "value", ctx.fetch(:key)
+  def test_blank_keys_are_dropped
+    context = TavernKit::PromptBuilder::Context.build({ nil => 1, "" => 2, " " => 3, "ok" => 4 })
+    assert_equal({ ok: 4 }, context.to_h)
   end
 
-  def test_warn_collects_warnings
-    ctx = TavernKit::Prompt::Context.new(warning_handler: nil)
-    ctx.warn("test warning")
-    assert_equal ["test warning"], ctx.warnings
+  def test_module_configs_from_argument_override_data
+    context =
+      TavernKit::PromptBuilder::Context.new(
+        { module_configs: { ignored: { enabled: true } } },
+        module_configs: {
+          language_policy: { enabled: true },
+        },
+      )
+
+    assert_equal({ language_policy: { enabled: true } }, context.module_configs)
+    refute context.key?(:module_configs)
   end
 
-  def test_warn_in_strict_mode
-    ctx = TavernKit::Prompt::Context.new(strict: true, warning_handler: nil)
-    assert_equal true, ctx.strict?
-    assert_raises(TavernKit::StrictModeError) do
-      ctx.warn("strict error")
-    end
-    assert_equal ["strict error"], ctx.warnings
+  def test_module_configs_are_normalized
+    context =
+      TavernKit::PromptBuilder::Context.new(
+        module_configs: {
+          "language-policy" => { enabled: true },
+        },
+      )
+
+    assert_equal({ language_policy: { enabled: true } }, context.module_configs)
   end
 
-  def test_validate_raises_without_character
-    ctx = TavernKit::Prompt::Context.new(user: TavernKit::User.new(name: "Alice"))
-    assert_raises(ArgumentError, /character/) { ctx.validate! }
+  def test_module_configs_require_symbol_keys
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::PromptBuilder::Context.new(
+          module_configs: {
+            language_policy: { "enabled" => true },
+          },
+        )
+      end
+
+    assert_match(/must be Symbols/, error.message)
   end
 
-  def test_validate_raises_without_user
-    char = TavernKit::Character.create(name: "Test")
-    ctx = TavernKit::Prompt::Context.new(character: char)
-    assert_raises(ArgumentError, /user/) { ctx.validate! }
-  end
-
-  def test_validate_passes_with_both
-    char = TavernKit::Character.create(name: "Test")
-    user = TavernKit::User.new(name: "Alice")
-    ctx = TavernKit::Prompt::Context.new(character: char, user: user)
-    assert_equal ctx, ctx.validate!
-  end
-
-  def test_dup_creates_independent_copy
-    ctx = TavernKit::Prompt::Context.new(warning_handler: nil)
-    ctx.warn("original")
-    ctx.macro_vars = { foo: "bar" }
-    ctx.pinned_groups["chat_history"] = [TavernKit::Prompt::Block.new(role: :user, content: "hi")]
-    copy = ctx.dup
-    copy.warn("copy")
-    copy.macro_vars[:foo] = "changed"
-    copy.pinned_groups["chat_history"] << TavernKit::Prompt::Block.new(role: :assistant, content: "yo")
-
-    assert_equal ["original"], ctx.warnings
-    assert_equal ["original", "copy"], copy.warnings
-    assert_equal "bar", ctx.macro_vars[:foo]
-    assert_equal "changed", copy.macro_vars[:foo]
-    assert_equal 1, ctx.pinned_groups["chat_history"].length
-    assert_equal 2, copy.pinned_groups["chat_history"].length
-  end
-
-  def test_variables_store_helpers
-    ctx = TavernKit::Prompt::Context.new
-    assert_nil ctx.variables_store
-
-    ctx.set_variable("x", "1")
-    assert_kind_of TavernKit::VariablesStore::InMemory, ctx.variables_store
-    assert_equal "1", ctx.variables_store.get("x", scope: :local)
-
-    ctx.set_variables({ y: 2, z: "ok" }, scope: :global)
-    assert_equal 2, ctx.variables_store.get("y", scope: :global)
-    assert_equal "ok", ctx.variables_store.get("z", scope: :global)
+  def test_metadata_reader_helpers
+    context = TavernKit::PromptBuilder::Context.new(chat_index: 123)
+    assert_equal 123, context.fetch(:chat_index)
+    assert context.key?(:chat_index)
+    assert_nil context[:missing]
   end
 end

@@ -2,8 +2,8 @@
 
 require "test_helper"
 
-class TavernKit::Prompt::TraceTest < Minitest::Test
-  class WarnA < TavernKit::Prompt::Middleware::Base
+class TavernKit::PromptBuilder::TraceTest < Minitest::Test
+  class WarnA < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
@@ -12,7 +12,7 @@ class TavernKit::Prompt::TraceTest < Minitest::Test
     end
   end
 
-  class WarnB < TavernKit::Prompt::Middleware::Base
+  class WarnB < TavernKit::PromptBuilder::Step
     private
 
     def before(ctx)
@@ -20,7 +20,7 @@ class TavernKit::Prompt::TraceTest < Minitest::Test
     end
   end
 
-  class Boom < TavernKit::Prompt::Middleware::Base
+  class Boom < TavernKit::PromptBuilder::Step
     private
 
     def before(_ctx)
@@ -29,16 +29,16 @@ class TavernKit::Prompt::TraceTest < Minitest::Test
   end
 
   def test_trace_collector_records_stages_and_warnings
-    collector = TavernKit::Prompt::Instrumenter::TraceCollector.new
-    ctx = TavernKit::Prompt::Context.new(warning_handler: nil)
-    ctx.instrumenter = collector
+    collector = TavernKit::PromptBuilder::Instrumenter::TraceCollector.new
+    state = TavernKit::PromptBuilder::State.new(warning_handler: nil)
+    state.instrumenter = collector
 
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use WarnA, name: :a
-      use WarnB, name: :b
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step WarnA, name: :a
+      use_step WarnB, name: :b
     end
 
-    pipeline.call(ctx)
+    pipeline.call(state)
 
     trace = collector.to_trace(fingerprint: "fp")
     assert_equal [:a, :b], trace.stages.map(&:name)
@@ -48,16 +48,16 @@ class TavernKit::Prompt::TraceTest < Minitest::Test
   end
 
   def test_pipeline_error_wraps_stage_and_preserves_cause
-    collector = TavernKit::Prompt::Instrumenter::TraceCollector.new
-    ctx = TavernKit::Prompt::Context.new(warning_handler: nil)
-    ctx.instrumenter = collector
+    collector = TavernKit::PromptBuilder::Instrumenter::TraceCollector.new
+    state = TavernKit::PromptBuilder::State.new(warning_handler: nil)
+    state.instrumenter = collector
 
-    pipeline = TavernKit::Prompt::Pipeline.new do
-      use WarnA, name: :a
-      use Boom, name: :boom
+    pipeline = TavernKit::PromptBuilder::Pipeline.new do
+      use_step WarnA, name: :a
+      use_step Boom, name: :boom
     end
 
-    error = assert_raises(TavernKit::PipelineError) { pipeline.call(ctx) }
+    error = assert_raises(TavernKit::PipelineError) { pipeline.call(state) }
     assert_equal :boom, error.stage
     assert_equal RuntimeError, error.cause.class
 

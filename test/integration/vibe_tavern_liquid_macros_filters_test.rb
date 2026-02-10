@@ -14,8 +14,8 @@ class VibeTavernLiquidMacrosFiltersTest < ActiveSupport::TestCase
   end
 
   test "pick chooses deterministically based on runtime message_index + rng_word" do
-    runtime = TavernKit::Runtime::Base.build({ message_index: 5, rng_word: "seed" }, type: :app)
-    ctx = TavernKit::Prompt::Context.new(runtime: runtime)
+    runtime = TavernKit::PromptBuilder::Context.build({ message_index: 5, rng_word: "seed" }, type: :app)
+    ctx = TavernKit::PromptBuilder::Context.new(runtime: runtime)
     assigns = TavernKit::VibeTavern::LiquidMacros::Assigns.build(ctx)
 
     out =
@@ -29,7 +29,7 @@ class VibeTavernLiquidMacrosFiltersTest < ActiveSupport::TestCase
   end
 
   test "pick works on array input and supports escaped commas" do
-    runtime = TavernKit::Runtime::Base.build({ message_index: 1, rng_word: "seed" }, type: :app)
+    runtime = TavernKit::PromptBuilder::Context.build({ message_index: 1, rng_word: "seed" }, type: :app)
     assigns = { "runtime" => { "message_index" => 1, "rng_word" => "seed" } }
 
     out =
@@ -50,7 +50,7 @@ class VibeTavernLiquidMacrosFiltersTest < ActiveSupport::TestCase
   end
 
   test "rollp is deterministic and uses runtime seeds" do
-    runtime = TavernKit::Runtime::Base.build({ message_index: 5, rng_word: "seed" }, type: :app)
+    runtime = TavernKit::PromptBuilder::Context.build({ message_index: 5, rng_word: "seed" }, type: :app)
     assigns = { "runtime" => { "message_index" => 5, "rng_word" => "seed" } }
 
     out =

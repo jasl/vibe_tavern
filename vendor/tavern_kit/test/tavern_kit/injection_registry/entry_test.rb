@@ -34,10 +34,10 @@ class TavernKit::InjectionRegistry::EntryTest < Minitest::Test
       filter: ->(ctx) { ctx[:ok] == true },
     )
 
-    ctx = TavernKit::Prompt::Context.new(ok: true)
+    ctx = TavernKit::PromptBuilder::Context.new(ok: true)
     assert_equal true, entry.active_for?(ctx)
 
-    ctx = TavernKit::Prompt::Context.new(ok: false)
+    ctx = TavernKit::PromptBuilder::Context.new(ok: false)
     assert_equal false, entry.active_for?(ctx)
   end
 end

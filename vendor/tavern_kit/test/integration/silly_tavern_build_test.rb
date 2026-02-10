@@ -33,7 +33,7 @@ class SillyTavernBuildTest < Minitest::Test
         dialect :openai
       end
 
-    assert_instance_of TavernKit::Prompt::Plan, plan
+    assert_instance_of TavernKit::PromptBuilder::Plan, plan
     assert plan.enabled_blocks.any?
     assert plan.enabled_blocks.any? { |b| b.content.include?("Hello!") }
   end

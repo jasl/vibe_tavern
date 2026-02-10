@@ -21,7 +21,7 @@ class TavernKit::SillyTavern::HookRegistryTest < Minitest::Test
       calls << :after_1
     end
 
-    ctx = TavernKit::Prompt::Context.new
+    ctx = TavernKit::PromptBuilder::Context.new
     registry.run_before_build(ctx)
     registry.run_after_build(ctx)
 

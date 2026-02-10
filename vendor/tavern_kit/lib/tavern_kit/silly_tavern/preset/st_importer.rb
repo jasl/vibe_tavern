@@ -262,7 +262,7 @@ module TavernKit
           enabled = Coerce.bool(prompt_data["enabled"], default: true) if enabled.nil? && prompt_data.key?("enabled")
           enabled = true if enabled.nil?
 
-          Prompt::PromptEntry.new(
+          TavernKit::PromptBuilder::PromptEntry.new(
             id: normalized_id,
             name: prompt_data["name"] || normalized_id,
             enabled: enabled,

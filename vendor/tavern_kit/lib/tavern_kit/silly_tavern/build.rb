@@ -11,9 +11,9 @@ module TavernKit
       # prompts, while still allowing per-call pipeline customization via the DSL.
       def build(**kwargs, &block)
         if block
-          TavernKit::Prompt::DSL.build(pipeline: Pipeline, &block)
+          TavernKit::PromptBuilder.build(pipeline: Pipeline, &block)
         else
-          dsl = TavernKit::Prompt::DSL.new(pipeline: Pipeline)
+          dsl = TavernKit::PromptBuilder.new(pipeline: Pipeline)
           kwargs.each do |key, value|
             dsl.public_send(key, value) if dsl.respond_to?(key)
           end

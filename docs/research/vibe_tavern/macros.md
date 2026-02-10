@@ -277,7 +277,7 @@ Important:
 
 ```ruby
 toggles = json_toggles.to_h.transform_keys { |k| TavernKit::Utils.underscore(k).to_sym }
-runtime = TavernKit::Runtime::Base.build({ toggles: toggles }, type: :app)
+runtime = TavernKit::PromptBuilder::Context.build({ toggles: toggles }, type: :app)
 ```
 
 Helper:

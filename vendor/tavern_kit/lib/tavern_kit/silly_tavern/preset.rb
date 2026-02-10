@@ -161,7 +161,7 @@ module TavernKit
           nil
         else
           Array(prompt_entries).filter_map do |entry|
-            entry.is_a?(Prompt::PromptEntry) ? entry : Prompt::PromptEntry.from_hash(entry)
+            entry.is_a?(TavernKit::PromptBuilder::PromptEntry) ? entry : TavernKit::PromptBuilder::PromptEntry.from_hash(entry)
           end.freeze
         end
 
@@ -266,23 +266,23 @@ module TavernKit
       # 3) context markers (chat_start + example_separator, if context.use_stop_strings)
       # 4) custom stops + ephemeral stops
       #
-      # @param context [Prompt::Context]
+      # @param context [TavernKit::PromptBuilder::State, TavernKit::PromptBuilder::Context]
       # @param macro_expander [#call, nil] optional macro expander
       # @return [Array<String>]
       def stopping_strings(context, macro_expander: nil)
         ctx = context
 
-        user_name = ctx&.user&.name&.to_s
+        user_name = context_get(ctx, :user)&.name&.to_s
         user_name = "User" if user_name.nil? || user_name.strip.empty?
 
-        char_name = ctx&.character&.name&.to_s
+        char_name = context_get(ctx, :character)&.name&.to_s
         char_name = "Assistant" if char_name.nil? || char_name.strip.empty?
 
-        generation_type = ctx&.generation_type&.to_sym || :normal
+        generation_type = context_get(ctx, :generation_type)&.to_sym || :normal
         is_impersonate = generation_type == :impersonate
         is_continue = generation_type == :continue
 
-        group_names = extract_group_member_names(ctx&.group, exclude: char_name)
+        group_names = extract_group_member_names(context_get(ctx, :group), exclude: char_name)
 
         result = []
 
@@ -294,7 +294,7 @@ module TavernKit
           result << (is_impersonate ? char_string : user_string)
           result << user_string
 
-          if is_continue && last_message_from_user?(ctx&.history)
+          if is_continue && last_message_from_user?(context_get(ctx, :history))
             result << char_string
           end
 
@@ -330,7 +330,7 @@ module TavernKit
 
         # 4) Custom + ephemeral stopping strings
         result.concat(custom_stops(macro_expander: macro_expander))
-        result.concat(Array(ctx&.[](:ephemeral_stopping_strings)))
+        result.concat(Array(context_get(ctx, :ephemeral_stopping_strings)))
 
         result.unshift("\n") if single_line == true
 
@@ -347,27 +347,27 @@ module TavernKit
 
       def self.default_prompt_entries
         @default_prompt_entries ||= [
-          Prompt::PromptEntry.new(id: "main_prompt", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "world_info_before_char_defs", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "persona_description", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "character_description", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "character_personality", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "scenario", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "enhance_definitions", pinned: true, role: :system, enabled: false),
-          Prompt::PromptEntry.new(id: "auxiliary_prompt", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "world_info_after_char_defs", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "world_info_before_example_messages", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "chat_examples", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "world_info_after_example_messages", pinned: true, role: :system),
-          Prompt::PromptEntry.new(
+          TavernKit::PromptBuilder::PromptEntry.new(id: "main_prompt", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "world_info_before_char_defs", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "persona_description", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "character_description", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "character_personality", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "scenario", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "enhance_definitions", pinned: true, role: :system, enabled: false),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "auxiliary_prompt", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "world_info_after_char_defs", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "world_info_before_example_messages", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "chat_examples", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "world_info_after_example_messages", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(
             id: "authors_note",
             pinned: true,
             role: TavernKit::SillyTavern::Preset::DEFAULT_AUTHORS_NOTE_ROLE,
             position: TavernKit::SillyTavern::Preset::DEFAULT_AUTHORS_NOTE_POSITION,
             depth: TavernKit::SillyTavern::Preset::DEFAULT_AUTHORS_NOTE_DEPTH,
           ),
-          Prompt::PromptEntry.new(id: "chat_history", pinned: true, role: :system),
-          Prompt::PromptEntry.new(id: "post_history_instructions", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "chat_history", pinned: true, role: :system),
+          TavernKit::PromptBuilder::PromptEntry.new(id: "post_history_instructions", pinned: true, role: :system),
         ]
       end
 
@@ -432,6 +432,18 @@ module TavernKit
 
           n
         end
+      end
+
+      def context_get(ctx, key)
+        return nil if ctx.nil?
+
+        if ctx.respond_to?(key)
+          ctx.public_send(key)
+        elsif ctx.respond_to?(:[])
+          ctx[key]
+        end
+      rescue NoMethodError
+        ctx.respond_to?(:[]) ? ctx[key] : nil
       end
 
       def last_message_from_user?(history)

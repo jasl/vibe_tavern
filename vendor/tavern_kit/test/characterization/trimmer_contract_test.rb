@@ -15,25 +15,25 @@ class TrimmerContractTest < Minitest::Test
     estimator = CharEstimator.new
 
     blocks = [
-      TavernKit::Prompt::Block.new(
+      TavernKit::PromptBuilder::Block.new(
         role: :user,
         content: "ex1-u",
         token_budget_group: :examples,
         metadata: { eviction_bundle: "ex1" },
       ),
-      TavernKit::Prompt::Block.new(
+      TavernKit::PromptBuilder::Block.new(
         role: :assistant,
         content: "ex1-a",
         token_budget_group: :examples,
         metadata: { eviction_bundle: "ex1" },
       ),
-      TavernKit::Prompt::Block.new(
+      TavernKit::PromptBuilder::Block.new(
         role: :user,
         content: "ex2-u",
         token_budget_group: :examples,
         metadata: { eviction_bundle: "ex2" },
       ),
-      TavernKit::Prompt::Block.new(
+      TavernKit::PromptBuilder::Block.new(
         role: :assistant,
         content: "ex2-a",
         token_budget_group: :examples,
@@ -66,9 +66,9 @@ class TrimmerContractTest < Minitest::Test
     estimator = CharEstimator.new
 
     blocks = [
-      TavernKit::Prompt::Block.new(role: :user, content: "u1", token_budget_group: :history),
-      TavernKit::Prompt::Block.new(role: :assistant, content: "a1", token_budget_group: :history),
-      TavernKit::Prompt::Block.new(role: :user, content: "u2", token_budget_group: :history),
+      TavernKit::PromptBuilder::Block.new(role: :user, content: "u1", token_budget_group: :history),
+      TavernKit::PromptBuilder::Block.new(role: :assistant, content: "a1", token_budget_group: :history),
+      TavernKit::PromptBuilder::Block.new(role: :user, content: "u2", token_budget_group: :history),
     ]
 
     # Budget small enough that at least one history block must be evicted.
@@ -87,7 +87,7 @@ class TrimmerContractTest < Minitest::Test
     estimator = CharEstimator.new
 
     blocks = [
-      TavernKit::Prompt::Block.new(
+      TavernKit::PromptBuilder::Block.new(
         role: :system,
         content: "mandatory",
         removable: false,

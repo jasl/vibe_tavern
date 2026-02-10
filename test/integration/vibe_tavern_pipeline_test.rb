@@ -3,8 +3,8 @@ require "test_helper"
 class VibeTavernPipelineTest < ActiveSupport::TestCase
   test "builds a minimal plan with history + user message" do
     history = [
-      TavernKit::Prompt::Message.new(role: :user, content: "Hi"),
-      TavernKit::Prompt::Message.new(
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "Hi"),
+      TavernKit::PromptBuilder::Message.new(
         role: :assistant,
         content: "Hello!",
         metadata: { tool_calls: [{ id: "call_1", type: "function" }] },
@@ -58,12 +58,12 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     assert_equal "Hello.", msgs[1][:content]
   end
 
-  test "allows overriding the default system text builder via pipeline middleware options" do
+  test "allows overriding the default system text builder via pipeline step options" do
     character = TavernKit::Character.create(name: "Seraphina", system_prompt: "SYS")
     user = TavernKit::User.new(name: "J", persona: "I like cats")
 
     pipeline = TavernKit::VibeTavern::Pipeline.dup
-    pipeline.configure(
+    pipeline.configure_step(
       :plan_assembly,
       default_system_text_builder: lambda do |ctx|
         "Custom System: #{ctx.character.name} / #{ctx.user.name}"
@@ -71,7 +71,7 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     )
 
     plan =
-      TavernKit::Prompt::DSL.build(pipeline: pipeline) do
+      TavernKit::PromptBuilder.build(pipeline: pipeline) do
         character character
         user user
         message "Hello."
@@ -90,7 +90,7 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)
 
-    runtime = TavernKit::Runtime::Base.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
+    runtime = TavernKit::PromptBuilder::Context.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
     character = TavernKit::Character.create(name: "Seraphina", nickname: "Sera")
 
     plan =
@@ -131,8 +131,8 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     character = TavernKit::Character.create(name: "Seraphina", post_history_instructions: "PHI")
 
     history = [
-      TavernKit::Prompt::Message.new(role: :assistant, content: "Earlier..."),
-      TavernKit::Prompt::Message.new(role: :user, content: "Ok."),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "Earlier..."),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "Ok."),
     ]
 
     plan =
@@ -166,7 +166,7 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     character = TavernKit::Character.create(name: "Seraphina", post_history_instructions: "PHI")
 
     history = [
-      TavernKit::Prompt::Message.new(role: :assistant, content: "Earlier..."),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "Earlier..."),
     ]
 
     plan =
@@ -208,7 +208,7 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   test "inserts a language policy system block after post_history_instructions and before the user message when enabled" do
     runtime = { language_policy: { enabled: true, target_lang: "zh-cn" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
-    pipeline.configure(
+    pipeline.configure_step(
       :language_policy,
       config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
     )
@@ -216,12 +216,12 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     character = TavernKit::Character.create(name: "Seraphina", post_history_instructions: "PHI")
 
     history = [
-      TavernKit::Prompt::Message.new(role: :assistant, content: "Earlier..."),
-      TavernKit::Prompt::Message.new(role: :user, content: "Ok."),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "Earlier..."),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "Ok."),
     ]
 
     plan =
-      TavernKit::Prompt::DSL.build(pipeline: pipeline) do
+      TavernKit::PromptBuilder.build(pipeline: pipeline) do
         character character
         meta :system_template, nil
         runtime runtime
@@ -252,13 +252,13 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   test "canonicalizes base language tags (ja -> ja-JP) for target_lang allowlist checks" do
     runtime = { language_policy: { enabled: true, target_lang: "ja" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
-    pipeline.configure(
+    pipeline.configure_step(
       :language_policy,
       config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
     )
 
     plan =
-      TavernKit::Prompt::DSL.build(pipeline: pipeline) do
+      TavernKit::PromptBuilder.build(pipeline: pipeline) do
         meta :system_template, nil
         runtime runtime
         message "Hello."
@@ -270,10 +270,10 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     assert_includes lp[:content], "Respond in: ja-JP"
   end
 
-  test "allows overriding the language policy text builder via pipeline middleware options" do
+  test "allows overriding the language policy text builder via pipeline step options" do
     runtime = { language_policy: { enabled: true, target_lang: "zh-CN", style_hint: "casual" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
-    pipeline.configure(
+    pipeline.configure_step(
       :language_policy,
       config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
       policy_text_builder: lambda do |target_lang, style_hint:, special_tags:|
@@ -282,7 +282,7 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     )
 
     plan =
-      TavernKit::Prompt::DSL.build(pipeline: pipeline) do
+      TavernKit::PromptBuilder.build(pipeline: pipeline) do
         meta :system_template, nil
         runtime runtime
         message "Hello."
@@ -297,13 +297,13 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   test "does not insert a language policy block when disabled" do
     runtime = { language_policy: { enabled: false, target_lang: "zh-CN" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
-    pipeline.configure(
+    pipeline.configure_step(
       :language_policy,
       config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
     )
 
     plan =
-      TavernKit::Prompt::DSL.build(pipeline: pipeline) do
+      TavernKit::PromptBuilder.build(pipeline: pipeline) do
         meta :system_template, nil
         runtime runtime
         message "Hello."
@@ -314,22 +314,22 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "normalizes runtime input once and ensures variables_store exists" do
-    ctx = TavernKit::Prompt::Context.new(user_message: "Hello")
-    ctx[:runtime] = { "chatIndex" => 1, :message_index => 2 }
+    state = TavernKit::PromptBuilder::State.new(user_message: "Hello")
+    state[:runtime] = { "chatIndex" => 1, :message_index => 2 }
 
-    TavernKit::VibeTavern::Pipeline.call(ctx)
+    TavernKit::VibeTavern::Pipeline.call(state)
 
-    assert_instance_of TavernKit::Runtime::Base, ctx.runtime
-    assert_equal :app, ctx.runtime.type
-    assert_equal 1, ctx.runtime[:chat_index]
-    assert_equal 2, ctx.runtime[:message_index]
+    assert_instance_of TavernKit::PromptBuilder::Context, state.runtime
+    assert_equal :app, state.runtime.type
+    assert_equal 1, state.runtime[:chat_index]
+    assert_equal 2, state.runtime[:message_index]
 
-    assert_instance_of TavernKit::VariablesStore::InMemory, ctx.variables_store
+    assert_instance_of TavernKit::VariablesStore::InMemory, state.variables_store
   end
 
   test "token_estimation runtime config can set model_hint and token_estimator registry" do
-    ctx = TavernKit::Prompt::Context.new(user_message: "Hello")
-    ctx[:runtime] = {
+    state = TavernKit::PromptBuilder::State.new(user_message: "Hello")
+    state[:runtime] = {
       token_estimation: {
         model_hint: "llama-3.1",
         registry: {
@@ -338,34 +338,34 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
       },
     }
 
-    TavernKit::VibeTavern::Pipeline.call(ctx)
+    TavernKit::VibeTavern::Pipeline.call(state)
 
-    assert_equal "llama-3.1", ctx[:model_hint]
-    assert_equal :runtime, ctx[:model_hint_source]
-    assert_equal :runtime_registry, ctx[:token_estimator_source]
+    assert_equal "llama-3.1", state[:model_hint]
+    assert_equal :runtime, state[:model_hint_source]
+    assert_equal :runtime_registry, state[:token_estimator_source]
 
-    info = ctx.token_estimator.describe(model_hint: ctx[:model_hint])
+    info = state.token_estimator.describe(model_hint: state[:model_hint])
     assert_equal "heuristic", info[:backend]
     assert_equal true, info[:registry]
   end
 
   test "sets model_hint from default_model_hint when explicit hint is absent" do
-    ctx = TavernKit::Prompt::Context.new(user_message: "Hello")
-    ctx[:default_model_hint] = "gpt-4"
+    state = TavernKit::PromptBuilder::State.new(user_message: "Hello")
+    state[:default_model_hint] = "gpt-4"
 
-    TavernKit::VibeTavern::Pipeline.call(ctx)
+    TavernKit::VibeTavern::Pipeline.call(state)
 
-    assert_equal "gpt-4", ctx[:model_hint]
-    assert_equal :default, ctx[:model_hint_source]
+    assert_equal "gpt-4", state[:model_hint]
+    assert_equal :default, state[:model_hint_source]
   end
 
   test "explicit model_hint wins over token_estimation runtime hint" do
-    ctx = TavernKit::Prompt::Context.new(user_message: "Hello")
-    ctx[:model_hint] = "explicit"
-    ctx[:runtime] = { token_estimation: { model_hint: "runtime" } }
+    state = TavernKit::PromptBuilder::State.new(user_message: "Hello")
+    state[:model_hint] = "explicit"
+    state[:runtime] = { token_estimation: { model_hint: "runtime" } }
 
-    TavernKit::VibeTavern::Pipeline.call(ctx)
+    TavernKit::VibeTavern::Pipeline.call(state)
 
-    assert_equal "explicit", ctx[:model_hint]
+    assert_equal "explicit", state[:model_hint]
   end
 end

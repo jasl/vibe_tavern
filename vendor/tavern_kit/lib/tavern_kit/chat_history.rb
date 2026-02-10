@@ -5,7 +5,7 @@ module TavernKit
     # Minimal chat history contract used by prompt-building.
     #
     # - Enumerable yielding messages in chronological order (oldest -> newest)
-    # - Messages should be Prompt::Message (recommended), or duck-type as
+    # - Messages should be PromptBuilder::Message (recommended), or duck-type as
     #   { role:, content: } (hash keys may be String or Symbol).
     class Base
       include Enumerable
@@ -85,7 +85,7 @@ module TavernKit
       end
 
       def coerce_message(value)
-        return value if value.is_a?(TavernKit::Prompt::Message)
+        return value if value.is_a?(TavernKit::PromptBuilder::Message)
 
         if value.is_a?(Hash)
           h = TavernKit::Utils::HashAccessor.wrap(value)
@@ -99,7 +99,7 @@ module TavernKit
           raise ArgumentError, "message.role is required" if role.nil?
           raise ArgumentError, "message.content is required" if content.nil?
 
-          return TavernKit::Prompt::Message.new(
+          return TavernKit::PromptBuilder::Message.new(
             role: role.to_s.downcase.to_sym,
             content: content.to_s,
             name: name&.to_s,
@@ -110,7 +110,7 @@ module TavernKit
         end
 
         if value.respond_to?(:role) && value.respond_to?(:content)
-          return TavernKit::Prompt::Message.new(
+          return TavernKit::PromptBuilder::Message.new(
             role: value.role.to_s.downcase.to_sym,
             content: value.content.to_s,
             name: value.respond_to?(:name) ? value.name&.to_s : nil,
@@ -120,7 +120,7 @@ module TavernKit
           )
         end
 
-        raise ArgumentError, "Unsupported message: #{value.class}. Expected Prompt::Message, Hash, or duck-typed message."
+        raise ArgumentError, "Unsupported message: #{value.class}. Expected PromptBuilder::Message, Hash, or duck-typed message."
       end
     end
   end

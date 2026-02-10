@@ -48,8 +48,8 @@ module TavernKit
         include_message_metadata_tokens: false,
         include_metadata_details: false
       )
-        unless plan.is_a?(TavernKit::Prompt::Plan)
-          raise ArgumentError, "plan must be a TavernKit::Prompt::Plan"
+        unless plan.is_a?(TavernKit::PromptBuilder::Plan)
+          raise ArgumentError, "plan must be a TavernKit::PromptBuilder::Plan"
         end
 
         inspect_messages(
@@ -160,7 +160,7 @@ module TavernKit
 
       def normalize_message(message)
         case message
-        when TavernKit::Prompt::Message
+        when TavernKit::PromptBuilder::Message
           {
             role: message.role,
             content: message.content,
@@ -190,7 +190,7 @@ module TavernKit
 
           { role: role, content: content, metadata: metadata }
         else
-          raise ArgumentError, "message must be a TavernKit::Prompt::Message or a Hash"
+          raise ArgumentError, "message must be a TavernKit::PromptBuilder::Message or a Hash"
         end
       end
 

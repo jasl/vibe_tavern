@@ -200,7 +200,7 @@ See:
 
 ## 8. Dialects / Tool Use (Core)
 
-TavernKit provides provider payload conversion via `TavernKit::Dialects`.
+TavernKit provides provider payload conversion via `TavernKit::PromptBuilder::Dialects`.
 
 | Dialect | ST | TavernKit |
 |---------|----|-----------|

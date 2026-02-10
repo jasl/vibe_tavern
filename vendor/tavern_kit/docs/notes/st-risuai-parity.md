@@ -282,5 +282,5 @@ Further details live in:
 High-level scope map:
 
 - Core: prompt pipeline framework, contracts, dialect conversion, trimming, ingest.
-- SillyTavern: ST preset/instruct/context template, World Info engine, macro engines, middleware chain.
+- SillyTavern: ST preset/instruct/context template, World Info engine, macro engines, step chain.
 - RisuAI: CBS engine/macros, lorebook engine/decorators, template cards, regex scripts, triggers.

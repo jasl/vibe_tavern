@@ -19,8 +19,8 @@ class PromptRunnerTest < Minitest::Test
     runner_config = build_runner_config
 
     history = [
-      TavernKit::Prompt::Message.new(role: :user, content: "hi"),
-      TavernKit::Prompt::Message.new(
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "hi"),
+      TavernKit::PromptBuilder::Message.new(
         role: :assistant,
         content: "",
         metadata: {
@@ -59,7 +59,7 @@ class PromptRunnerTest < Minitest::Test
     prompt_request =
       runner.build_request(
         runner_config: runner_config,
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: { top_p: 0.9 },
       )
 
@@ -92,7 +92,7 @@ class PromptRunnerTest < Minitest::Test
     assert_raises(ArgumentError) do
       runner.build_request(
         runner_config: runner_config,
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: { stream: true },
       )
     end
@@ -105,7 +105,7 @@ class PromptRunnerTest < Minitest::Test
     assert_raises(ArgumentError) do
       runner.build_request(
         runner_config: runner_config,
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: {
           tools: [{ type: "function", function: { name: "state_get", parameters: { type: "object", properties: {} } } }],
           response_format: { type: "json_object" },
@@ -154,7 +154,7 @@ class PromptRunnerTest < Minitest::Test
     prompt_request =
       runner.build_request(
         runner_config: runner_config,
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         response_transforms: ["assistant_function_call_to_tool_calls"],
       )
 
@@ -217,7 +217,7 @@ class PromptRunnerTest < Minitest::Test
     prompt_request =
       runner.build_request(
         runner_config: runner_config,
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
       )
 
     result = runner.perform(prompt_request)
@@ -283,7 +283,7 @@ class PromptRunnerTest < Minitest::Test
     prompt_request =
       runner.build_request(
         runner_config: runner_config,
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
       )
 
     deltas = []
@@ -302,7 +302,7 @@ class PromptRunnerTest < Minitest::Test
     prompt_request =
       runner.build_request(
         runner_config: runner_config,
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: {
           tools: [{ type: "function", function: { name: "state_get", parameters: { type: "object", properties: {} } } }],
           tool_choice: "auto",
@@ -319,7 +319,7 @@ class PromptRunnerTest < Minitest::Test
     prompt_request =
       runner.build_request(
         runner_config: runner_config,
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: { max_tokens: 10, response_format: { type: "json_object" } },
       )
 

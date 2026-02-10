@@ -109,12 +109,12 @@ module TavernKit
 
         def normalize_history_message(message)
           case message
-          when TavernKit::Prompt::Message
+          when TavernKit::PromptBuilder::Message
             { role: message.role, data: message.content.to_s }
-          when TavernKit::Prompt::Block
+          when TavernKit::PromptBuilder::Block
             { role: message.role, data: message.content.to_s }
           when Hash
-            h = TavernKit::Runtime::Base.normalize(message)
+            h = TavernKit::PromptBuilder::Context.normalize(message)
             role = h[:role]
             data = h[:data] || h[:content] || h[:text] || ""
             { role: role, data: data.to_s }

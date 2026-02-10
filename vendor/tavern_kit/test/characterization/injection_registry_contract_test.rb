@@ -23,13 +23,13 @@ class InjectionRegistryContractTest < Minitest::Test
     registry = TavernKit::SillyTavern::InjectionRegistry.from_st_json(fixture)
     delta = registry.each.find { |e| e.id == "delta" }
 
-    ctx = TavernKit::Prompt::Context.new
+    ctx = TavernKit::PromptBuilder::State.new
     ctx.warning_handler = nil
 
     assert delta.active_for?(ctx)
     assert_includes ctx.warnings.first, "Unsupported ST filter closure ignored"
 
-    strict_ctx = TavernKit::Prompt::Context.new
+    strict_ctx = TavernKit::PromptBuilder::State.new
     strict_ctx.warning_handler = nil
     strict_ctx.strict = true
 

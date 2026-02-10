@@ -7,7 +7,7 @@ class VibeTavernOutputTagsTest < ActiveSupport::TestCase
 
   def build_config(output_tags_hash)
     runtime =
-      TavernKit::Runtime::Base.build(
+      TavernKit::PromptBuilder::Context.build(
         { output_tags: output_tags_hash },
         type: :app,
       )

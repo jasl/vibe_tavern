@@ -7,8 +7,8 @@ require "simple_inference"
 require "tavern_kit"
 
 # App-owned pipeline (loaded manually for DB-free tests).
-require_relative "../../lib/tavern_kit/vibe_tavern/middleware/prepare"
-require_relative "../../lib/tavern_kit/vibe_tavern/middleware/plan_assembly"
+require_relative "../../lib/tavern_kit/vibe_tavern/prompt_builder/steps/prepare"
+require_relative "../../lib/tavern_kit/vibe_tavern/prompt_builder/steps/plan_assembly"
 require_relative "../../lib/tavern_kit/vibe_tavern/pipeline"
 require_relative "../../lib/tavern_kit/vibe_tavern"
 

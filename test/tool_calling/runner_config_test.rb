@@ -42,7 +42,7 @@ class RunnerConfigTest < Minitest::Test
     assert_equal :strip, config.rules.first.action
   end
 
-  def test_build_merges_middleware_options_with_injected_language_policy_config
+  def test_build_merges_step_options_with_injected_language_policy_config
     custom_builder =
       lambda do |_target_lang, style_hint:, special_tags:|
         "custom #{style_hint.inspect} #{special_tags.inspect}"
@@ -53,7 +53,7 @@ class RunnerConfigTest < Minitest::Test
         provider: "openrouter",
         model: "test-model",
         runtime: { language_policy: { enabled: true, target_lang: "zh-CN" } },
-        middleware_options: { language_policy: { policy_text_builder: custom_builder } },
+        step_options: { language_policy: { policy_text_builder: custom_builder } },
       )
 
     stage = runner_config.pipeline[:language_policy]

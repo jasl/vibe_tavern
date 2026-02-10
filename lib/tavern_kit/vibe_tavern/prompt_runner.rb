@@ -79,12 +79,12 @@ module TavernKit
           if system_text.empty?
             history
           else
-            [TavernKit::Prompt::Message.new(role: :system, content: system_text)] + history
+            [TavernKit::PromptBuilder::Message.new(role: :system, content: system_text)] + history
           end
 
         llm_options = deep_merge_hashes(runner_config.llm_options_defaults, normalize_llm_options(llm_options))
         plan =
-          TavernKit::Prompt::DSL.build(pipeline: runner_config.pipeline) do
+          TavernKit::PromptBuilder.build(pipeline: runner_config.pipeline) do
             history build_history
             runtime runtime if runtime
             variables_store variables_store if variables_store

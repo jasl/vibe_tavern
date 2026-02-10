@@ -15,11 +15,11 @@ Some features are owned by the application (or a consumer layer) but need a
 consistent way to register their rules/handlers into shared infrastructure.
 
 Example:
-- A middleware introduces a semantic tag (e.g. `<lang code="...">...</lang>`)
+- A step introduces a semantic tag (e.g. `<lang code="...">...</lang>`)
 - The output post-processor must understand that tag, but the post-processor
   should remain generic and extensible.
 
-Load hooks let the middleware register its rules into an app-owned registry at
+Load hooks let the step register its rules into an app-owned registry at
 initialization time.
 
 ## API
@@ -56,9 +56,9 @@ platform pipelines like SillyTavern).
 
 Key difference:
 - **Load hooks**: run at initialization time to register wiring/handlers.
-- **HookRegistry**: runs during prompt building on a per-request `Prompt::Context`.
+- **HookRegistry**: runs during prompt building on a per-request `PromptBuilder::State`.
 
-If you need to mutate prompt construction per-request, use pipeline middleware
+If you need to mutate prompt construction per-request, use pipeline steps
 or `HookRegistry`. If you need to register capabilities/handlers once, use load
 hooks.
 
@@ -71,7 +71,7 @@ infra = MyInfra.new(output_tags_registry: MyRegistry.new)
 TavernKit.run_load_hooks(:my_scope, infra)
 ```
 
-Middleware registers its rules:
+Step registers its rules:
 
 ```ruby
 TavernKit.on_load(:my_scope, id: :"my_feature.register") do |infra|

@@ -2,7 +2,7 @@
 
 TavernKit is a CPU-bound prompt builder. It parses/normalizes supported inputs,
 expands macros, activates lore, performs prompt injection and trimming, and
-produces a deterministic `Prompt::Plan` that can be converted into provider
+produces a deterministic `PromptBuilder::Plan` that can be converted into provider
 "dialect" message payloads.
 
 TavernKit is not a UI framework, a persistence layer, or a provider client.
@@ -11,8 +11,8 @@ TavernKit is not a UI framework, a persistence layer, or a provider client.
 
 ```
 TavernKit (Core)
-├── Value objects (Character, Lore::*, Prompt::*)
-├── Pipeline framework (Pipeline, Middleware::Base, Context, DSL)
+├── Value objects (Character, Lore::*, PromptBuilder::*)
+├── PromptBuilder framework (PromptBuilder, Pipeline, Step, Context, State)
 ├── Interface protocols (Lore::Engine::Base, Macro::Engine::Base, etc)
 ├── Platform-agnostic utilities (TokenEstimator, Trimmer, Dialects, stores)
 └── Ingest (PNG/APNG/BYAF/CHARX) -> Bundle (character + optional assets)
@@ -20,13 +20,13 @@ TavernKit (Core)
 TavernKit::SillyTavern
 ├── ST preset/instruct/template config
 ├── ST lore engine + macro engines
-└── ST middleware chain + build() convenience
+└── ST step chain + build() convenience
 
 TavernKit::RisuAI
 ├── CBS engine + macros
 ├── Lorebook engine + decorators
 ├── Template cards / regex scripts / triggers
-└── RisuAI middleware chain + build() convenience
+└── RisuAI step chain + build() convenience
 ```
 
 ## Key Rules

@@ -96,7 +96,7 @@ module TavernKit
 
       # Convenience: render using a prompt-building Context.
       #
-      # @param ctx [TavernKit::Prompt::Context]
+      # @param ctx [TavernKit::PromptBuilder::Context]
       # @param text [String]
       def render_for(ctx, text, strict: nil, on_error: :passthrough, registers: {})
         strict = strict.nil? ? (ctx.respond_to?(:strict?) ? ctx.strict? : false) : strict

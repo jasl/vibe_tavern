@@ -4,7 +4,7 @@ module TavernKit
   module SillyTavern
     # Simple in-memory hook registry.
     #
-    # Hooks are intentionally low-level and receive Prompt::Context directly.
+    # Hooks are intentionally low-level and receive PromptBuilder::Context directly.
     class HookRegistry < TavernKit::HookRegistry::Base
       def initialize
         @before = []

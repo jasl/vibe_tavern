@@ -8,11 +8,11 @@ module TavernKit
       # Assemble a prompt from a RisuAI promptTemplate.
       #
       # @param template [Array<Hash>] promptTemplate items
-      # @param groups [Hash{Symbol,String => Array<Prompt::Message,Hash>}] prebuilt sections
+      # @param groups [Hash{Symbol,String => Array<PromptBuilder::Message,Hash>}] prebuilt sections
       #   Supported keys (by default mapping):
       #   - :persona, :description, :lorebook, :authornote, :post_everything, :chats
       # @param lore_entries [Array<Lore::Entry>] activated lore entries (RisuAI::Lore::Engine)
-      # @return [Array<Prompt::Block>]
+      # @return [Array<PromptBuilder::Block>]
       def assemble(template:, groups:, lore_entries: [])
         template = normalize_template(template)
         groups = normalize_groups(groups)
@@ -49,7 +49,7 @@ module TavernKit
           when "cache"
             # Cache markers are represented as zero-length blocks with metadata.
             # (Dialect/request layers can interpret these.)
-            blocks << TavernKit::Prompt::Block.new(
+            blocks << TavernKit::PromptBuilder::Block.new(
               role: :system,
               content: "",
               enabled: true,
@@ -93,16 +93,16 @@ module TavernKit
       def normalize_message_list(value)
         Array(value).filter_map do |m|
           case m
-          when TavernKit::Prompt::Block
+          when TavernKit::PromptBuilder::Block
             m
-          when TavernKit::Prompt::Message
+          when TavernKit::PromptBuilder::Message
             m
           when Hash
             h = normalize_hash_keys(m)
             role = h[:role].to_s
             role = "assistant" if role == "bot" || role == "char"
             content = h[:content] || h[:data] || ""
-            TavernKit::Prompt::Message.new(role: role.to_sym, content: content.to_s)
+            TavernKit::PromptBuilder::Message.new(role: role.to_sym, content: content.to_s)
           else
             nil
           end
@@ -183,7 +183,7 @@ module TavernKit
         role = meta.fetch("role", "system").to_s
         role = "assistant" if role == "bot" || role == "char"
 
-        TavernKit::Prompt::Message.new(role: role.to_sym, content: entry.content.to_s)
+        TavernKit::PromptBuilder::Message.new(role: role.to_sym, content: entry.content.to_s)
       end
 
       def apply_description_lore(base, desc_actives)
@@ -191,7 +191,7 @@ module TavernKit
         Array(desc_actives).each do |h|
           pos = h[:pos].to_s
           m = h[:msg]
-          next unless m.is_a?(TavernKit::Prompt::Message)
+          next unless m.is_a?(TavernKit::PromptBuilder::Message)
 
           if pos == "before_desc"
             list.unshift(m)
@@ -214,7 +214,7 @@ module TavernKit
         text = position_parser(text, loc: loc, injection_map: injection_map, position_map: position_map)
 
         [
-          TavernKit::Prompt::Block.new(
+          TavernKit::PromptBuilder::Block.new(
             role: role.to_sym,
             content: text,
             token_budget_group: :system,
@@ -247,10 +247,10 @@ module TavernKit
           slot = item.respond_to?(:content) ? item.content.to_s : ""
           content = inner2.gsub("{{slot}}", slot)
 
-          if item.is_a?(TavernKit::Prompt::Block)
+          if item.is_a?(TavernKit::PromptBuilder::Block)
             item.with(content: content)
           else
-            TavernKit::Prompt::Block.new(
+            TavernKit::PromptBuilder::Block.new(
               role: role.to_sym,
               content: content,
               token_budget_group: token_budget_group_for_typed(type),
@@ -272,17 +272,17 @@ module TavernKit
             position_parser(inner.to_s, loc: "authornote", injection_map: injection_map, position_map: position_map)
           end
 
-        base = list.any? ? list : [TavernKit::Prompt::Message.new(role: :system, content: default_text)]
+        base = list.any? ? list : [TavernKit::PromptBuilder::Message.new(role: :system, content: default_text)]
 
         base.map do |item|
           role = item.respond_to?(:role) ? item.role : :system
           slot = item.respond_to?(:content) ? item.content.to_s : ""
           content = inner2.gsub("{{slot}}", slot)
 
-          if item.is_a?(TavernKit::Prompt::Block)
+          if item.is_a?(TavernKit::PromptBuilder::Block)
             item.with(content: content)
           else
-            TavernKit::Prompt::Block.new(
+            TavernKit::PromptBuilder::Block.new(
               role: role.to_sym,
               content: content,
               token_budget_group: :system,
@@ -334,7 +334,7 @@ module TavernKit
         while i < parts.length
           role = parts[i].to_s
           content = parts[i + 1].to_s.strip
-          out << TavernKit::Prompt::Message.new(role: role.to_sym, content: content)
+          out << TavernKit::PromptBuilder::Message.new(role: role.to_sym, content: content)
           i += 2
         end
 
@@ -376,11 +376,11 @@ module TavernKit
       end
 
       def coerce_to_block(item, token_budget_group:, metadata:)
-        return item if item.is_a?(TavernKit::Prompt::Block)
+        return item if item.is_a?(TavernKit::PromptBuilder::Block)
 
-        message = item.is_a?(TavernKit::Prompt::Message) ? item : TavernKit::ChatHistory.coerce_message(item)
+        message = item.is_a?(TavernKit::PromptBuilder::Message) ? item : TavernKit::ChatHistory.coerce_message(item)
 
-        TavernKit::Prompt::Block.new(
+        TavernKit::PromptBuilder::Block.new(
           role: message.role,
           content: message.content.to_s,
           token_budget_group: token_budget_group,
@@ -402,7 +402,7 @@ module TavernKit
         end
         return h if snake_symbol
 
-        TavernKit::Runtime::Base.normalize(h)
+        TavernKit::PromptBuilder::Context.normalize(h)
       end
     end
   end

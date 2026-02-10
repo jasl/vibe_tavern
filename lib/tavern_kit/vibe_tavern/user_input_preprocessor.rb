@@ -16,7 +16,7 @@ module TavernKit
         # @param text [String]
         # @param variables_store [TavernKit::VariablesStore::Base]
         # @param assigns [Hash] Liquid assigns
-        # @param runtime [TavernKit::Runtime::Base, nil] used for toggle lookup
+        # @param runtime [TavernKit::PromptBuilder::Context, nil] used for toggle lookup
         # @param enabled [Boolean, nil] override toggle lookup
         def call(text, variables_store:, assigns: {}, runtime: nil, enabled: nil, strict: false, on_error: :passthrough, registers: {})
           enabled = enabled.nil? ? enabled_from_runtime(runtime) : enabled

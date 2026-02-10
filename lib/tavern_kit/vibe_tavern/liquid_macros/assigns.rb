@@ -12,7 +12,7 @@ module TavernKit
 
         # Build Liquid assigns from a prompt-building Context.
         #
-        # @param ctx [TavernKit::Prompt::Context]
+        # @param ctx [TavernKit::PromptBuilder::Context]
         # @return [Hash{String => Object}]
         def build(ctx)
           character = ctx.respond_to?(:character) ? ctx.character : nil
@@ -42,11 +42,12 @@ module TavernKit
 
         def runtime_from(ctx)
           runtime = ctx.respond_to?(:runtime) ? ctx.runtime : nil
-          return runtime if runtime
+          return runtime if runtime.is_a?(TavernKit::PromptBuilder::Context)
+          return TavernKit::PromptBuilder::Context.build(runtime, type: :app) if runtime.is_a?(Hash)
 
           return nil unless ctx.respond_to?(:key?) && ctx.key?(:runtime)
 
-          TavernKit::Runtime::Base.build(ctx[:runtime], type: :app)
+          TavernKit::PromptBuilder::Context.build(ctx[:runtime], type: :app)
         end
         private_class_method :runtime_from
 

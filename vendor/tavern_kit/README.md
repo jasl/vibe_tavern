@@ -11,7 +11,7 @@ into a provider-ready prompt plan and message payloads, with platform layers for
 ## Scope
 
 In scope:
-- prompt pipeline / middleware stages
+- step-based prompt pipeline
 - macro expansion
 - lorebook scanning + injection
 - trimming / budgeting
@@ -66,8 +66,8 @@ world_info = TavernKit::SillyTavern::Lore::WorldInfoImporter.load_hash(world_inf
 
 history = TavernKit::ChatHistory::InMemory.new(
   [
-    TavernKit::Prompt::Message.new(role: :user, content: "Hi!"),
-    TavernKit::Prompt::Message.new(role: :assistant, content: "Hello!"),
+    TavernKit::PromptBuilder::Message.new(role: :user, content: "Hi!"),
+    TavernKit::PromptBuilder::Message.new(role: :assistant, content: "Hello!"),
   ],
 )
 
@@ -88,7 +88,7 @@ fingerprint = plan.fingerprint(dialect: :openai)
 ### RisuAI-style prompt building
 
 RisuAI pipelines are driven by a RisuAI preset hash (including `promptTemplate`)
-and app-owned runtime state (`ctx.runtime`) for parity-sensitive fields.
+and app-owned runtime state (`state.runtime`) for parity-sensitive fields.
 
 ```ruby
 require "json"
@@ -151,9 +151,9 @@ limits (entry count/size/total budget/path traversal/compression ratio).
 Two pieces of state commonly need to stay in sync between your app and the
 pipeline:
 
-- `ctx.runtime`: application-owned, per-build snapshot (chat indices, toggles,
+- `state.runtime`: application-owned, per-build snapshot (chat indices, toggles,
   metadata). Set once at pipeline entry; must not be replaced mid-pipeline.
-- `ctx.variables_store`: application-owned, session-level store (ST `var` +
+- `state.variables_store`: application-owned, session-level store (ST `var` +
   `globalvar`, plus RisuAI extensions). Persist it across turns within a chat.
 
 See `docs/core-interface-design.md` for the full contract and
@@ -162,7 +162,7 @@ See `docs/core-interface-design.md` for the full contract and
 ## Debugging / Strict mode
 
 - `strict true` is intended for tests/debugging (fail-fast on warnings).
-- `instrumenter TavernKit::Prompt::Instrumenter::TraceCollector.new` enables
+- `instrumenter TavernKit::PromptBuilder::Instrumenter::TraceCollector.new` enables
   detailed stage traces and is meant for development only.
 
 See `docs/pipeline-observability.md`.

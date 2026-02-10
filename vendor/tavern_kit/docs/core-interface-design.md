@@ -37,10 +37,10 @@ its own configuration parsing.
 | Macro/CBS Engine | **High** | `#expand(text, vars)` too narrow; needs `environment:` parameter object |
 | Lore Engine | **Medium-High** | `#scan(text, books:, budget:)` too narrow; needs `ScanInput` parameter object |
 | VariablesStore | **Medium** | Missing `temp`/`function_arg` scopes for RisuAI |
-| Prompt::Block | **Low** | Implemented in Core: flexible role/points/groups + `removable` flag |
-| Prompt::Message | **Low** | Implemented in Core: `attachments`/`metadata` passthrough fields |
+| PromptBuilder::Block | **Low** | Implemented in Core: flexible role/points/groups + `removable` flag |
+| PromptBuilder::Message | **Low** | Implemented in Core: `attachments`/`metadata` passthrough fields |
 | Trimmer | **Low** | Needs pluggable strategy (`:group_order` vs `:priority`) |
-| Pipeline/Middleware | **None** | Fully platform-agnostic; no changes needed |
+| Pipeline/Step | **None** | Fully platform-agnostic; no changes needed |
 | TokenEstimator | **Low** | Pluggable adapter interface; optional `model_hint:` |
 | Character/Card | **None** | `extensions` hash is the forward-compat surface; unknown keys outside extensions may be dropped |
 
@@ -174,7 +174,7 @@ Preferred options:
   - Keep `extensions` as a String-keyed Hash (passthrough contract).
 - **Mixed-key feature flags / config hashes:** `Utils::HashAccessor.wrap(hash)` to read alternative spellings
   without sprinkling manual fallbacks.
-- **Runtime/app-state contract:** `Runtime::Base.normalize(raw)` to canonicalize keys into
+- **Runtime/app-state contract:** `PromptBuilder::Context.build(raw, type: :app)` to canonicalize keys into
   snake_case Symbols (because runtime keys are TavernKit-owned).
 
 ---
@@ -331,7 +331,7 @@ ActiveRecord-backed iterators.
 **Contract (Core):**
 - `ChatHistory::Base` includes `Enumerable`.
 - `#each` yields messages in **chronological order** (oldest -> newest).
-- Yielded messages should be `Prompt::Message` (recommended) or at least duck-
+- Yielded messages should be `PromptBuilder::Message` (recommended) or at least duck-
   type as `{ role:, content: }`.
 
 ```ruby
@@ -354,7 +354,7 @@ end
 **Message model contract (Core):**
 - Required: `role: Symbol`, `content: String`
 - Optional: `name: String`, `send_date: Time/Date/DateTime/Numeric/String`
-- Optional ST/RisuAI state lives in `Prompt::Message#metadata` (e.g., swipe
+- Optional ST/RisuAI state lives in `PromptBuilder::Message#metadata` (e.g., swipe
   info, provider/tool-call passthrough, app-specific IDs).
 
 Core and platform layers may derive "message id" semantics from the **index in
@@ -365,7 +365,7 @@ identifier via `message.metadata[:id]`.
 to avoid materializing the full history (ActiveRecord windowing).
 
 **Ergonomics:** Core should provide `ChatHistory.wrap(input)` to accept nil,
-arrays, or enumerable-like inputs and coerce hashes into `Prompt::Message`.
+arrays, or enumerable-like inputs and coerce hashes into `PromptBuilder::Message`.
 
 ---
 
@@ -419,7 +419,7 @@ Core contract should support:
 
 ---
 
-### 5. Prompt::Block Validation Relaxation
+### 5. PromptBuilder::Block Validation Relaxation
 
 Relax validation for cross-platform support:
 
@@ -444,7 +444,7 @@ Relax validation for cross-platform support:
 
 ---
 
-### 6. Prompt::Message Forward Compatibility
+### 6. PromptBuilder::Message Forward Compatibility
 
 Reserve optional fields for multimodal and metadata passthrough:
 - `multimodals` / `attachments` (images/audio/video payloads)
@@ -610,24 +610,24 @@ Options:
 Core API uses a **symbol dialect selector**:
 
 - `Plan#to_messages(dialect: :openai, **opts)` (default: `:openai`)
-- Dialect conversion should be implemented as `TavernKit::Dialects.convert(messages, dialect:, **opts)`
+- Dialect conversion should be implemented as `TavernKit::PromptBuilder::Dialects.convert(messages, dialect:, **opts)`
 
 This keeps the public surface small and matches how Rails app callers typically
 switch providers.
 
 **Extensibility (low ceremony):**
-- Downstream apps can add a custom dialect by extending the `TavernKit::Dialects`
+- Downstream apps can add a custom dialect by extending the `TavernKit::PromptBuilder::Dialects`
   registry/case statement once it lands (no need to thread a dialect object
   through the entire build).
 
 ---
 
-### 9. Prompt::Context
+### 9. PromptBuilder::State
 
-`Prompt::Context` is a **mutable build workspace** that flows through the
-middleware pipeline. Middlewares mutate `ctx` directly; branching/what-if is
-done via `ctx.dup` (shallow copy). Output value objects (`Prompt::Block`,
-`Prompt::Message`, `Prompt::Plan`) should remain immutable.
+`PromptBuilder::State` is a **mutable build workspace** that flows through the
+step pipeline. Steps mutate `ctx` directly; branching/what-if is
+done via `ctx.dup` (shallow copy). Output value objects (`PromptBuilder::Block`,
+`PromptBuilder::Message`, `PromptBuilder::Plan`) should remain immutable.
 
 Note: output immutability is currently **shallow**. Objects are frozen, but
 nested values may still be mutable depending on construction. Treat nested
@@ -660,16 +660,16 @@ it is critical to understand:
 Core should provide optional instrumentation with **no ActiveSupport
 dependency**:
 
-- `Prompt::Instrumenter` interface (callable) receives events:
-  `:middleware_start`, `:middleware_finish`, `:middleware_error`, `:warning`,
+- `PromptBuilder::Instrumenter` interface (callable) receives events:
+  `:step_start`, `:step_finish`, `:step_error`, `:warning`,
   `:stat`, plus budget/trim events.
-- `Prompt::Trace` value object collects stage timings and key counters
+- `PromptBuilder::Trace` value object collects step timings and key counters
   (block counts, token estimates, warnings, evictions) and a stable prompt
   fingerprint derived from final output messages (excluding random block ids).
 - Blocks should carry provenance in `block.metadata[:source]` (e.g.,
   `{ stage: :lore, id: "wi:entry_123" }`) so traces and trim reports can explain
   *why* content exists in the final prompt.
-- Middleware exceptions should be wrapped as a `PipelineError` that includes
+- Step exceptions should be wrapped as a `PipelineError` that includes
   the failing stage name and original error to make production debugging
   actionable.
 
@@ -682,7 +682,7 @@ module TavernKit
   module Prompt
     # Per-stage trace record.
     TraceStage = Data.define(
-      :name,             # Symbol - middleware/stage name
+      :name,             # Symbol - step name
       :duration_ms,      # Float - execution time
       :stats,            # Hash - stage-specific counters (symbol keys)
       :warnings          # Array<String> - warnings emitted during this stage
@@ -724,39 +724,39 @@ module TavernKit
           @warnings = []
           @stage_warnings = Hash.new { |h, k| h[k] = [] }
           @stage_stats = Hash.new { |h, k| h[k] = {} }
-          @current_stage = nil
+          @current_step = nil
           @stage_start = nil
         end
 
         def call(event, **payload)
           case event
-          when :middleware_start
-            @current_stage = payload[:name]
+          when :step_start
+            @current_step = payload[:name]
             @stage_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-            @stage_warnings[@current_stage] = []
-            @stage_stats[@current_stage] = {}
-          when :middleware_finish
+            @stage_warnings[@current_step] = []
+            @stage_stats[@current_step] = {}
+          when :step_finish
             duration = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - @stage_start) * 1000
             @stages << TraceStage.new(
-              name: @current_stage,
+              name: @current_step,
               duration_ms: duration,
-              stats: @stage_stats[@current_stage].merge(payload[:stats] || {}),
-              warnings: @stage_warnings[@current_stage].dup
+              stats: @stage_stats[@current_step].merge(payload[:stats] || {}),
+              warnings: @stage_warnings[@current_step].dup
             )
           when :warning
             @warnings << payload[:message]
-            stage = payload[:stage] || @current_stage
+            stage = payload[:stage] || @current_step
             @stage_warnings[stage] << payload[:message] if stage
           when :stat
-            stage = payload[:stage] || @current_stage
+            stage = payload[:stage] || @current_step
             key = payload[:key]
             @stage_stats[stage][key.to_sym] = payload[:value] if stage && key
-          when :middleware_error
+          when :step_error
             @stages << TraceStage.new(
-              name: @current_stage,
+              name: @current_step,
               duration_ms: 0,
-              stats: @stage_stats[@current_stage].merge(error: payload[:error].class.name),
-              warnings: @stage_warnings[@current_stage].dup
+              stats: @stage_stats[@current_step].merge(error: payload[:error].class.name),
+              warnings: @stage_warnings[@current_step].dup
             )
           end
         end
@@ -780,13 +780,13 @@ end
 **Debug switch (Core):**
 - `context.instrumenter` is `nil` by default (production).
 - Debug builds set `context.instrumenter = Instrumenter::TraceCollector.new`.
-- Middleware authors can emit stage-local stats via `ctx.instrument(:stat, key: ..., value: ...)`
+- Step authors can emit stage-local stats via `ctx.instrument(:stat, key: ..., value: ...)`
   (and optionally `stage:` when emitting from nested helpers).
-- Provide a helper that supports lazy payload evaluation so middleware authors
+- Provide a helper that supports lazy payload evaluation so step authors
   can attach expensive debug data without impacting production:
 
 ```ruby
-class TavernKit::Prompt::Context
+class TavernKit::PromptBuilder::Context
   attr_accessor :instrumenter
 
   def instrument(event, **payload)
@@ -803,16 +803,16 @@ end
 
 #### 10b. Integration with Context#warnings
 
-`Prompt::Context#warn` should emit to both the warnings array AND the
+`PromptBuilder::State#warn` should emit to both the warnings array AND the
 instrumenter (if present):
 
 ```ruby
-class TavernKit::Prompt::Context
+class TavernKit::PromptBuilder::Context
   def warn(message)
     msg = message.to_s
     @warnings << msg
 
-    instrument(:warning, message: msg, stage: @current_stage)
+    instrument(:warning, message: msg, stage: @current_step)
 
     if @strict
       raise TavernKit::StrictModeError, msg
@@ -969,7 +969,7 @@ end
 | **Unmatched placeholders after expansion** | `raise UnconsumedMacroError` | `warn` | Quality issue but recoverable |
 | **Missing required context** (no character) | `raise ArgumentError` | `raise ArgumentError` | Cannot proceed without data |
 | **Invalid card format** | `raise InvalidCardError` | `raise InvalidCardError` | Cannot parse, unrecoverable |
-| **Middleware exception** | `raise PipelineError` | `raise PipelineError` | Always fatal, wrap with stage info |
+| **Step exception** | `raise PipelineError` | `raise PipelineError` | Always fatal, wrap with stage info |
 | **Token budget exceeded** | `raise TokenBudgetExceeded` | Trim + `warn` | Recoverable via trimming |
 | **Invalid preset field value** | `raise InvalidPresetError` | `warn` + use default | Config error, but can continue |
 | **Lore entry parse error** | `raise LoreParseError` | `warn` + skip entry | One bad entry shouldn't kill build |
@@ -988,7 +988,7 @@ def warn(message)
   msg = message.to_s
   @warnings << msg
 
-  instrument(:warning, message: msg, stage: @current_stage)
+  instrument(:warning, message: msg, stage: @current_step)
   raise TavernKit::StrictModeError, msg if @strict
   effective_warning_handler&.call(msg)
   nil
@@ -1006,28 +1006,28 @@ end
 
 #### 11d. Pipeline Error Wrapping
 
-Middleware exceptions should always be wrapped to include stage context:
+Step exceptions should always be wrapped to include stage context:
 
 ```ruby
-# Rack-style middleware chain: wrap errors at the stage boundary.
-class TavernKit::Prompt::Middleware::Base
+# Rack-style step chain: wrap errors at the step boundary.
+class TavernKit::PromptBuilder::Step
   def call(ctx)
-    stage = self.class.middleware_name
-    ctx.instance_variable_set(:@current_stage, stage)
+    stage = self.class.step_name
+    ctx.instance_variable_set(:@current_step, stage)
 
-    ctx.instrument(:middleware_start, name: stage)
+    ctx.instrument(:step_start, name: stage)
 
     before(ctx)
     @app.call(ctx)
     after(ctx)
 
-    ctx.instrument(:middleware_finish, name: stage, stats: {})
+    ctx.instrument(:step_finish, name: stage, stats: {})
     ctx
   rescue StandardError => e
-    ctx.instrument(:middleware_error, name: stage, error: e)
+    ctx.instrument(:step_error, name: stage, error: e)
     raise TavernKit::PipelineError.new(e.message, stage: stage), cause: e
   ensure
-    ctx.instance_variable_set(:@current_stage, nil)
+    ctx.instance_variable_set(:@current_step, nil)
   end
 end
 ```

@@ -63,7 +63,7 @@
 - Data Bank / vector matching are **interfaces only** in TavernKit; I/O stays
   in the application layer.
 - ST/RisuAI-specific fields live in `extensions`; platform layers interpret them.
-- Core `Prompt::Message` should reserve optional multimodal/metadata fields.
+- Core `PromptBuilder::Message` should reserve optional multimodal/metadata fields.
 
 ## Next Steps (proposed)
 - Deep-dive `resources/tavern_kit/ARCHITECTURE.md` and Playground models/services.
@@ -81,7 +81,7 @@
 - **JSON strategy**: Option C is the chosen direction (fork EasyTalk + ActiveModel::Type integration; preserve nested schemas).
 - **Rewrite phases (proposed)**:
   1. Gem foundation: core models + Character Card V2/V3 + PNG read/write + basic macros.
-  2. Prompt pipeline: middleware architecture + Prompt Manager + output dialects.
+  2. Prompt pipeline: step architecture + Prompt Manager + output dialects.
   3. Advanced features: full macro pack + World Info engine + context trimming.
   4. Rails integration: EasyTalk wiring + core models + PromptBuilder + API.
   5. Frontend/streaming: ActionCable + UI import/export + settings.

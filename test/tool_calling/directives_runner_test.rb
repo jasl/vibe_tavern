@@ -66,7 +66,7 @@ class DirectivesRunnerTest < Minitest::Test
     result =
       runner.run(
         system: "SYS",
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
       )
 
     assert_equal true, result[:ok]
@@ -129,7 +129,7 @@ class DirectivesRunnerTest < Minitest::Test
     assert_raises(ArgumentError) do
       runner.run(
         system: "SYS",
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
       )
     end
   end
@@ -168,7 +168,7 @@ class DirectivesRunnerTest < Minitest::Test
     result =
       runner.run(
         system: "SYS",
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
       )
 
     assert_equal true, result[:ok]
@@ -209,7 +209,7 @@ class DirectivesRunnerTest < Minitest::Test
     result =
       runner.run(
         system: "SYS",
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
       )
 
     assert_equal true, result[:ok]
@@ -267,7 +267,7 @@ class DirectivesRunnerTest < Minitest::Test
     result =
       runner.run(
         system: "SYS",
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: { temperature: 0 },
       )
 
@@ -324,7 +324,7 @@ class DirectivesRunnerTest < Minitest::Test
     result =
       runner.run(
         system: "SYS",
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: { temperature: 0 },
       )
 
@@ -376,7 +376,7 @@ class DirectivesRunnerTest < Minitest::Test
     result =
       runner.run(
         system: "SYS",
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: { temperature: 0 },
         result_validator: result_validator,
       )
@@ -433,7 +433,7 @@ class DirectivesRunnerTest < Minitest::Test
     result =
       runner.run(
         system: "SYS",
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
         llm_options: { temperature: 0 },
       )
 
@@ -472,7 +472,7 @@ class DirectivesRunnerTest < Minitest::Test
 
     result =
       runner.run(
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
       )
 
     assert_equal true, result[:ok]
@@ -520,7 +520,7 @@ class DirectivesRunnerTest < Minitest::Test
 
     result =
       runner.run(
-        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
       )
 
     assert_equal true, result[:ok]

@@ -11,8 +11,8 @@ class DialectsContractTest < Minitest::Test
     expected = JSON.parse(File.read(File.join(FIXTURES_DIR, "openai_tool_calls.json")))
 
     messages = [
-      TavernKit::Prompt::Message.new(role: :user, content: "What's the weather in Boston?"),
-      TavernKit::Prompt::Message.new(
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "What's the weather in Boston?"),
+      TavernKit::PromptBuilder::Message.new(
         role: :assistant,
         content: "",
         metadata: {
@@ -28,14 +28,14 @@ class DialectsContractTest < Minitest::Test
           ],
         },
       ),
-      TavernKit::Prompt::Message.new(
+      TavernKit::PromptBuilder::Message.new(
         role: :tool,
         content: "{\"temp_f\":32}",
         metadata: { tool_call_id: "call_123" },
       ),
     ]
 
-    output = TavernKit::Dialects.convert(messages, dialect: :openai)
+    output = TavernKit::PromptBuilder::Dialects.convert(messages, dialect: :openai)
     assert_equal expected, JSON.parse(JSON.generate(output))
   end
 
@@ -43,9 +43,9 @@ class DialectsContractTest < Minitest::Test
     expected = JSON.parse(File.read(File.join(FIXTURES_DIR, "anthropic_tool_use.json")))
 
     messages = [
-      TavernKit::Prompt::Message.new(role: :system, content: "You are a helpful assistant."),
-      TavernKit::Prompt::Message.new(role: :user, content: "What's the weather in Boston?"),
-      TavernKit::Prompt::Message.new(
+      TavernKit::PromptBuilder::Message.new(role: :system, content: "You are a helpful assistant."),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "What's the weather in Boston?"),
+      TavernKit::PromptBuilder::Message.new(
         role: :assistant,
         content: "",
         metadata: {
@@ -61,14 +61,14 @@ class DialectsContractTest < Minitest::Test
           ],
         },
       ),
-      TavernKit::Prompt::Message.new(
+      TavernKit::PromptBuilder::Message.new(
         role: :tool,
         content: "{\"temp_f\":32}",
         metadata: { tool_call_id: "toolu_123" },
       ),
     ]
 
-    output = TavernKit::Dialects.convert(messages, dialect: :anthropic)
+    output = TavernKit::PromptBuilder::Dialects.convert(messages, dialect: :anthropic)
     assert_equal expected, JSON.parse(JSON.generate(output))
   end
 end

@@ -87,13 +87,13 @@ Acceptance:
 
 ### 8) Extract `VibeTavern::PromptRunner` (single request boundary)
 
-- [x] Add `TavernKit::VibeTavern::PromptRunner` to build a `Prompt::Plan`, apply outbound/inbound transforms, and perform one OpenAI-compatible request.
+- [x] Add `TavernKit::VibeTavern::PromptRunner` to build a `PromptBuilder::Plan`, apply outbound/inbound transforms, and perform one OpenAI-compatible request.
 - [x] Refactor `ToolCalling::ToolLoopRunner` to delegate its per-turn LLM request to `PromptRunner` (tool orchestration remains in `ToolLoopRunner`).
 - [x] Keep event emission contract stable (eval progress printer should not need changes).
 - [x] Add tests for `PromptRunner` and ensure existing tool loop tests still pass.
 
 Acceptance:
-- `ToolLoopRunner` no longer constructs the `Prompt::Plan` directly.
+- `ToolLoopRunner` no longer constructs the `PromptBuilder::Plan` directly.
 - `PromptRunner` can be used for a tool-disabled single-turn request (chat-only).
 
 ### 9) Improve baseline tolerance (without json repair)

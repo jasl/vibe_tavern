@@ -16,11 +16,11 @@ class TavernKit::DialectsTest < Minitest::Test
     ]
 
     messages = [
-      TavernKit::Prompt::Message.new(role: :assistant, content: "ok", metadata: { tool_calls: tool_calls, signature: "sig" }),
-      TavernKit::Prompt::Message.new(role: :tool, content: "3", metadata: { tool_call_id: "call_1" }),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "ok", metadata: { tool_calls: tool_calls, signature: "sig" }),
+      TavernKit::PromptBuilder::Message.new(role: :tool, content: "3", metadata: { tool_call_id: "call_1" }),
     ]
 
-    out = TavernKit::Dialects.convert(messages, dialect: :openai)
+    out = TavernKit::PromptBuilder::Dialects.convert(messages, dialect: :openai)
     assert_equal 2, out.size
 
     assert_equal "assistant", out[0][:role]
@@ -35,8 +35,8 @@ class TavernKit::DialectsTest < Minitest::Test
 
   def test_anthropic_separates_system_and_maps_tool_use_and_tool_result
     messages = [
-      TavernKit::Prompt::Message.new(role: :system, content: "SYS"),
-      TavernKit::Prompt::Message.new(
+      TavernKit::PromptBuilder::Message.new(role: :system, content: "SYS"),
+      TavernKit::PromptBuilder::Message.new(
         role: :assistant,
         content: "Hello",
         metadata: {
@@ -49,10 +49,10 @@ class TavernKit::DialectsTest < Minitest::Test
           ],
         },
       ),
-      TavernKit::Prompt::Message.new(role: :tool, content: "1", metadata: { tool_call_id: "call_1" }),
+      TavernKit::PromptBuilder::Message.new(role: :tool, content: "1", metadata: { tool_call_id: "call_1" }),
     ]
 
-    out = TavernKit::Dialects.convert(messages, dialect: :anthropic)
+    out = TavernKit::PromptBuilder::Dialects.convert(messages, dialect: :anthropic)
     assert_equal "SYS", out.fetch(:system)
 
     out_messages = out.fetch(:messages)
@@ -79,37 +79,37 @@ class TavernKit::DialectsTest < Minitest::Test
 
   def test_other_dialects_have_expected_shapes
     msgs = [
-      TavernKit::Prompt::Message.new(role: :system, content: "S"),
-      TavernKit::Prompt::Message.new(role: :user, content: "U"),
-      TavernKit::Prompt::Message.new(role: :assistant, content: "A"),
+      TavernKit::PromptBuilder::Message.new(role: :system, content: "S"),
+      TavernKit::PromptBuilder::Message.new(role: :user, content: "U"),
+      TavernKit::PromptBuilder::Message.new(role: :assistant, content: "A"),
     ]
 
-    google = TavernKit::Dialects.convert(msgs, dialect: :google)
+    google = TavernKit::PromptBuilder::Dialects.convert(msgs, dialect: :google)
     assert_kind_of Hash, google
     assert google.key?(:contents)
 
-    cohere = TavernKit::Dialects.convert(msgs, dialect: :cohere)
+    cohere = TavernKit::PromptBuilder::Dialects.convert(msgs, dialect: :cohere)
     assert_kind_of Hash, cohere
     assert_kind_of Array, cohere.fetch(:chat_history)
 
-    ai21 = TavernKit::Dialects.convert(msgs, dialect: :ai21)
+    ai21 = TavernKit::PromptBuilder::Dialects.convert(msgs, dialect: :ai21)
     assert_kind_of Array, ai21
     assert_equal "system", ai21[0].fetch(:role)
 
-    mistral = TavernKit::Dialects.convert(msgs, dialect: :mistral)
+    mistral = TavernKit::PromptBuilder::Dialects.convert(msgs, dialect: :mistral)
     assert_kind_of Array, mistral
 
-    xai = TavernKit::Dialects.convert(msgs, dialect: :xai)
+    xai = TavernKit::PromptBuilder::Dialects.convert(msgs, dialect: :xai)
     assert_kind_of Array, xai
 
-    text = TavernKit::Dialects.convert(msgs, dialect: :text)
+    text = TavernKit::PromptBuilder::Dialects.convert(msgs, dialect: :text)
     assert_kind_of Hash, text
     assert_equal "S\nU\nA", text.fetch(:prompt)
   end
 
   def test_unknown_dialect_raises
     assert_raises(ArgumentError) do
-      TavernKit::Dialects.convert([], dialect: :nope)
+      TavernKit::PromptBuilder::Dialects.convert([], dialect: :nope)
     end
   end
 end

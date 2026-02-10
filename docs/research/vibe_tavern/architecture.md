@@ -33,7 +33,7 @@ To keep call sites consistent, we use a single entrypoint object:
 
 `RunnerConfig` is responsible for:
 - accepting a request-scoped `runtime` snapshot (Symbol keys)
-- building a per-run configured pipeline (middleware options)
+- building a per-run configured pipeline (step options)
 - normalizing `llm_options_defaults` (Symbol keys; reserved keys rejected)
 - parsing module-local configs:
   - `ToolCalling::Config`
@@ -53,7 +53,7 @@ Examples:
 
 ### 1) Prompt building (DSL → messages)
 
-`TavernKit::VibeTavern` builds a `Prompt::Plan` from:
+`TavernKit::VibeTavern` builds a `PromptBuilder::Plan` from:
 - `history` (messages)
 - `runtime` (request-scoped config snapshot)
 - `variables_store` (session-scoped state)
@@ -69,7 +69,7 @@ Key property:
 `lib/tavern_kit/vibe_tavern/prompt_runner.rb`
 
 Responsibilities:
-- build request body from `Prompt::Plan`
+- build request body from `PromptBuilder::Plan`
 - apply outbound `MessageTransforms` and inbound `ResponseTransforms`
 - send one OpenAI-compatible request via `SimpleInference`
 - (optional) stream chat-only responses via `PromptRunner#perform_stream`
