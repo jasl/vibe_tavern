@@ -15,7 +15,7 @@ class PresetsTest < Minitest::Test
     b =
       TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(
         tool_allowlist: "state_patch",
-        request_overrides: { "provider" => { order: ["p2"] }, "top_p" => 0.9 },
+        request_overrides: { provider: { order: ["p2"] }, top_p: 0.9 },
       )
 
     merged = TavernKit::VibeTavern::ToolCalling::Presets.merge(a, b)

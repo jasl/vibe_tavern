@@ -863,12 +863,26 @@ run_task =
         timeout: client_timeout,
       )
 
+    runtime_inputs = { directives: directives_preset }
+    if language_policy_enabled && language_policy_target_lang
+      runtime_inputs[:language_policy] = {
+        enabled: true,
+        target_lang: language_policy_target_lang,
+      }
+    end
+
+    runner_config =
+      TavernKit::VibeTavern::RunnerConfig.build(
+        provider: "openrouter",
+        model: model,
+        runtime: runtime_inputs,
+        llm_options_defaults: llm_options_defaults,
+      )
+
     directives_runner =
       TavernKit::VibeTavern::Directives::Runner.build(
         client: client,
-        model: model,
-        llm_options_defaults: llm_options_defaults,
-        preset: directives_preset,
+        runner_config: runner_config,
       )
 
     directives_registry =
@@ -959,21 +973,10 @@ run_task =
           result = nil
 
           begin
-            runtime =
-              if language_policy_enabled
-                {
-                  language_policy: {
-                    enabled: true,
-                    target_lang: language_policy_target_lang,
-                  },
-                }
-              end
-
             result =
               directives_runner.run(
                 system: scenario[:system],
                 history: [TavernKit::Prompt::Message.new(role: :user, content: scenario[:user])],
-                runtime: runtime,
                 structured_output_options: structured_output_options,
                 result_validator: semantic_repair ? scenario[:assert] : nil,
               )

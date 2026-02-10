@@ -123,7 +123,7 @@ class TavernKit::PromptInspectorTest < Minitest::Test
   def test_hash_messages_treat_extra_keys_as_metadata
     estimator, tokenizer_json = build_estimator_with_hf_backend
 
-    msg = { "role" => "user", "content" => "hello 😁", "tool_calls" => [{ "id" => "1" }] }
+    msg = { role: :user, content: "hello 😁", tool_calls: [{ id: "1" }] }
 
     inspection =
       TavernKit::PromptInspector.inspect_messages(

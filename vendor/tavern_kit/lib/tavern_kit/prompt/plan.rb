@@ -40,6 +40,63 @@ module TavernKit
         freeze
       end
 
+      # Create a new Plan with updated attributes (immutable update).
+      #
+      # This is intended for middleware that needs to adjust blocks or metadata
+      # after a plan has been assembled.
+      def with(
+        blocks: @blocks,
+        outlets: @outlets,
+        lore_result: @lore_result,
+        trim_report: @trim_report,
+        greeting: @greeting,
+        greeting_index: @greeting_index,
+        warnings: @warnings,
+        trace: @trace,
+        llm_options: @llm_options
+      )
+        Plan.new(
+          blocks: blocks,
+          outlets: outlets,
+          lore_result: lore_result,
+          trim_report: trim_report,
+          greeting: greeting,
+          greeting_index: greeting_index,
+          warnings: warnings,
+          trace: trace,
+          llm_options: llm_options,
+        )
+      end
+
+      def with_blocks(blocks)
+        with(blocks: blocks)
+      end
+
+      # Append a block to the plan.
+      def append_block(block)
+        insert_at_index(blocks.size, block)
+      end
+
+      # Insert a block before the first block with the given slot.
+      #
+      # If the slot is not found, the block is appended.
+      def insert_before(slot:, block:)
+        slot = slot&.to_sym
+        idx = blocks.find_index { |b| b.slot == slot }
+        idx ||= blocks.size
+        insert_at_index(idx, block)
+      end
+
+      # Insert a block after the last block with the given slot.
+      #
+      # If the slot is not found, the block is appended.
+      def insert_after(slot:, block:)
+        slot = slot&.to_sym
+        idx = blocks.rindex { |b| b.slot == slot }
+        idx = idx ? idx + 1 : blocks.size
+        insert_at_index(idx, block)
+      end
+
       def greeting?
         !@greeting.nil?
       end
@@ -175,6 +232,16 @@ module TavernKit
         end
 
         merged
+      end
+
+      def insert_at_index(index, block)
+        unless block.is_a?(TavernKit::Prompt::Block)
+          raise ArgumentError, "block must be a TavernKit::Prompt::Block"
+        end
+
+        new_blocks = blocks.dup
+        new_blocks.insert(index, block)
+        with_blocks(new_blocks)
       end
     end
   end

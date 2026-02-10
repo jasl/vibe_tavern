@@ -167,16 +167,22 @@ module TavernKit
             metadata: message.metadata,
           }
         when Hash
-          role = (message[:role] || message["role"]).to_s
-          role = role.empty? ? :unknown : role.to_sym
+          message.each_key do |key|
+            next if key.is_a?(Symbol)
 
-          content = message.key?(:content) ? message[:content] : message["content"]
-          content = content.to_s
+            raise ArgumentError, "Hash messages must use Symbol keys (got: #{key.class})"
+          end
 
-          base_keys = %w[role content name]
+          role_raw = message.fetch(:role, :unknown)
+          role_s = role_raw.to_s.strip
+          role = role_s.empty? ? :unknown : role_s.to_sym
+
+          content = message.fetch(:content, "").to_s
+
+          base_keys = %i[role content name].freeze
           metadata =
             message.each_with_object({}) do |(k, v), out|
-              next if base_keys.include?(k.to_s)
+              next if base_keys.include?(k)
 
               out[k] = v
             end

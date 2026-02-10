@@ -14,7 +14,7 @@ class DirectivesPresetsTest < Minitest::Test
 
     b =
       TavernKit::VibeTavern::Directives::Presets.directives(
-        request_overrides: { "provider" => { order: ["p2"] }, "top_p" => 0.9 },
+        request_overrides: { provider: { order: ["p2"] }, top_p: 0.9 },
         message_transforms: ["b"],
       )
 

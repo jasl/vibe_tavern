@@ -705,13 +705,6 @@ process_task =
           read_timeout: client_read_timeout,
         )
 
-      prompt_runner =
-        TavernKit::VibeTavern::PromptRunner.new(
-          client: client,
-          model: model,
-          llm_options_defaults: llm_options_defaults,
-        )
-
       runtime = nil
       if language_policy_enabled && target_lang_raw
         lp_cfg = {
@@ -721,6 +714,16 @@ process_task =
         lp_cfg[:special_tags] = ["lang"] if scenario[:uses_lang_spans] == true
         runtime = { language_policy: lp_cfg }
       end
+
+      runner_config =
+        TavernKit::VibeTavern::RunnerConfig.build(
+          provider: "openrouter",
+          model: model,
+          runtime: runtime,
+          llm_options_defaults: llm_options_defaults,
+        )
+
+      prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
 
       user_text = scenario.fetch(:user_text).call(language_policy_target_lang || "")
       history = [TavernKit::Prompt::Message.new(role: :user, content: user_text)]
@@ -738,8 +741,8 @@ process_task =
       begin
         prompt_request =
           prompt_runner.build_request(
+            runner_config: runner_config,
             history: history,
-            runtime: runtime,
             strict: false,
           )
         injected_target_lang = LanguagePolicyEval::Util.extract_injected_target_lang(prompt_request.messages)

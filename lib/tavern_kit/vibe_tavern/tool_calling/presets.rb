@@ -320,7 +320,9 @@ module TavernKit
         private_class_method :deep_merge_tool_calling
 
         def canonical_tool_calling_key(key)
-          key.to_s.to_sym
+          raise ArgumentError, "tool_calling config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+
+          key
         end
         private_class_method :canonical_tool_calling_key
 
@@ -351,11 +353,30 @@ module TavernKit
 
         def normalize_request_overrides(value)
           return {} if value.nil?
-          return TavernKit::Utils.deep_symbolize_keys(value) if value.is_a?(Hash)
+          raise ArgumentError, "request_overrides must be a Hash" unless value.is_a?(Hash)
 
-          {}
+          assert_deep_symbol_keys!(value)
+          value
         end
         private_class_method :normalize_request_overrides
+
+        def assert_deep_symbol_keys!(value, path: "request_overrides")
+          case value
+          when Hash
+            value.each do |k, v|
+              unless k.is_a?(Symbol)
+                raise ArgumentError, "#{path} keys must be Symbols (got #{k.class})"
+              end
+
+              assert_deep_symbol_keys!(v, path: "#{path}.#{k}")
+            end
+          when Array
+            value.each_with_index do |v, idx|
+              assert_deep_symbol_keys!(v, path: "#{path}[#{idx}]")
+            end
+          end
+        end
+        private_class_method :assert_deep_symbol_keys!
 
         def deep_merge_hashes(left, right)
           out = (left.is_a?(Hash) ? left : {}).dup

@@ -89,7 +89,8 @@ module TavernKit
           out = (left.is_a?(Hash) ? left : {}).dup
 
           (right.is_a?(Hash) ? right : {}).each do |k, v|
-            key = k.to_s.to_sym
+            raise ArgumentError, "directives config keys must be Symbols (got #{k.class})" unless k.is_a?(Symbol)
+            key = k
 
             case key
             when :request_overrides, :structured_request_overrides, :prompt_only_request_overrides
@@ -143,11 +144,30 @@ module TavernKit
 
         def normalize_request_overrides(value)
           return {} if value.nil?
-          return TavernKit::Utils.deep_symbolize_keys(value) if value.is_a?(Hash)
+          raise ArgumentError, "request_overrides must be a Hash" unless value.is_a?(Hash)
 
-          {}
+          assert_deep_symbol_keys!(value)
+          value
         end
         private_class_method :normalize_request_overrides
+
+        def assert_deep_symbol_keys!(value, path: "request_overrides")
+          case value
+          when Hash
+            value.each do |k, v|
+              unless k.is_a?(Symbol)
+                raise ArgumentError, "#{path} keys must be Symbols (got #{k.class})"
+              end
+
+              assert_deep_symbol_keys!(v, path: "#{path}.#{k}")
+            end
+          when Array
+            value.each_with_index do |v, idx|
+              assert_deep_symbol_keys!(v, path: "#{path}[#{idx}]")
+            end
+          end
+        end
+        private_class_method :assert_deep_symbol_keys!
 
         def deep_merge_hashes(left, right)
           out = (left.is_a?(Hash) ? left : {}).dup

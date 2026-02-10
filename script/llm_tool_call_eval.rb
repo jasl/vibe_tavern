@@ -676,7 +676,7 @@ headers["X-Title"] = ENV["OPENROUTER_X_TITLE"] if ENV["OPENROUTER_X_TITLE"]
 base_request_overrides = {}
 
 if (route = ENV["OPENROUTER_ROUTE"].to_s.strip).length.positive?
-  base_request_overrides["route"] = route
+  base_request_overrides[:route] = route
 end
 
 if (raw = ENV["OPENROUTER_TRANSFORMS"])
@@ -690,7 +690,7 @@ if (raw = ENV["OPENROUTER_TRANSFORMS"])
       raw.split(",").map(&:strip).reject(&:empty?)
     end
 
-  base_request_overrides["transforms"] = transforms if transforms
+  base_request_overrides[:transforms] = transforms if transforms
 end
 
 provider = {}
@@ -700,14 +700,14 @@ provider = {}
 
   raw = ENV[env_key].to_s
   values = raw.split(",").map(&:strip).reject(&:empty?)
-  provider[key.downcase] = values if values.any?
+  provider[key.downcase.to_sym] = values if values.any?
 end
-base_request_overrides["provider"] = provider if provider.any?
+base_request_overrides[:provider] = provider if provider.any?
 
 if (raw = ENV["OPENROUTER_REQUEST_OVERRIDES_JSON"].to_s.strip).length.positive?
   begin
     parsed = JSON.parse(raw)
-    base_request_overrides.merge!(parsed) if parsed.is_a?(Hash)
+    base_request_overrides.merge!(deep_symbolize_keys(parsed)) if parsed.is_a?(Hash)
   rescue JSON::ParserError
     warn "Invalid OPENROUTER_REQUEST_OVERRIDES_JSON (must be a JSON object). Ignoring."
   end
@@ -1803,9 +1803,9 @@ process_task =
         # Default to sequential tool calls for stability unless the request
         # already specifies parallel_tool_calls or a scenario opts in.
         if tools_enabled &&
-            !effective_request_overrides.key?("parallel_tool_calls") &&
+            !effective_request_overrides.key?(:parallel_tool_calls) &&
             !strategy.default_parallel_tool_calls.nil?
-          effective_request_overrides["parallel_tool_calls"] = strategy.default_parallel_tool_calls
+          effective_request_overrides[:parallel_tool_calls] = strategy.default_parallel_tool_calls
         end
 
         tool_calling =
@@ -1879,16 +1879,22 @@ process_task =
               definitions: ToolCallEval.tool_definitions,
             )
 
-          runner =
-            TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-              client: client,
+          runner_config =
+            TavernKit::VibeTavern::RunnerConfig.build(
+              provider: "openrouter",
               model: model,
-              tool_executor: tool_executor,
               runtime: runtime,
+              llm_options_defaults: llm_options_defaults,
+            )
+
+          runner =
+            TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.build(
+              client: client,
+              runner_config: runner_config,
+              tool_executor: effective_tools_enabled ? tool_executor : nil,
               registry: registry,
               system: system_text,
               strict: false,
-              llm_options_defaults: llm_options_defaults,
             )
 
           ok = true
@@ -2429,7 +2435,7 @@ puts "language_policy_filter: #{raw_language_policy_filter}" unless raw_language
 puts "language_policy_matrix: #{language_policy_matrix}" if language_policy_matrix
 puts "language_policy_strict: #{language_policy_strict}" if language_policy_strict
 puts "language_policies: #{selected_language_policies.map(&:id).join(",")}"
-puts "parallel_tool_calls(default): #{base_request_overrides.fetch("parallel_tool_calls", "(provider default)")}"
+puts "parallel_tool_calls(default): #{base_request_overrides.fetch(:parallel_tool_calls, "(provider default)")}"
 puts "content_tag_tool_call_fallback_global_override: #{enable_content_tag_tool_call_fallback}"
 if best_effort_content_tag_tool_call_fallback_models.any?
   puts "best_effort_content_tag_tool_call_fallback_models: #{best_effort_content_tag_tool_call_fallback_models.join(",")}"

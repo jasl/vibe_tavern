@@ -80,8 +80,8 @@ module TavernKit
         def easy_talk(**kwargs)
           kwargs = kwargs.dup
 
-          error_code = kwargs.delete(:error_code) || kwargs.delete("error_code") || EasyTalkAdapter::DEFAULT_ERROR_CODE
-          error_format = kwargs.delete(:error_format) || kwargs.delete("error_format") || EasyTalkAdapter::DEFAULT_ERROR_FORMAT
+          error_code = kwargs.delete(:error_code) || EasyTalkAdapter::DEFAULT_ERROR_CODE
+          error_format = kwargs.delete(:error_format) || EasyTalkAdapter::DEFAULT_ERROR_FORMAT
 
           EasyTalkAdapter.new(
             models_by_type: kwargs,
