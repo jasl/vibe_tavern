@@ -87,19 +87,24 @@ module TavernKit
       end
 
       # Insert a step before another.
-      def insert_step_before(before_name, step_class, name: nil, **options)
+      def insert_step_before(before_name, name, step_class, **options)
+        unless before_name.is_a?(Symbol)
+          raise ArgumentError, "before_name must be a Symbol (got #{before_name.class})"
+        end
+
         idx = @index[before_name]
         raise ArgumentError, "Unknown step: #{before_name}" unless idx
 
-        resolved_name = resolve_name(step_class, name)
-        if @index.key?(resolved_name)
-          raise ArgumentError, "Step name already registered: #{resolved_name}"
+        unless name.is_a?(Symbol)
+          raise ArgumentError, "step name must be a Symbol (got #{name.class})"
         end
+
+        raise ArgumentError, "Step name already registered: #{name}" if @index.key?(name)
 
         entry =
           build_entry(
             step_class: step_class,
-            name: resolved_name,
+            name: name,
             options: options,
           )
         @entries.insert(idx, entry)
@@ -108,19 +113,24 @@ module TavernKit
       end
 
       # Insert a step after another.
-      def insert_step_after(after_name, step_class, name: nil, **options)
+      def insert_step_after(after_name, name, step_class, **options)
+        unless after_name.is_a?(Symbol)
+          raise ArgumentError, "after_name must be a Symbol (got #{after_name.class})"
+        end
+
         idx = @index[after_name]
         raise ArgumentError, "Unknown step: #{after_name}" unless idx
 
-        resolved_name = resolve_name(step_class, name)
-        if @index.key?(resolved_name)
-          raise ArgumentError, "Step name already registered: #{resolved_name}"
+        unless name.is_a?(Symbol)
+          raise ArgumentError, "step name must be a Symbol (got #{name.class})"
         end
+
+        raise ArgumentError, "Step name already registered: #{name}" if @index.key?(name)
 
         entry =
           build_entry(
             step_class: step_class,
-            name: resolved_name,
+            name: name,
             options: options,
           )
         @entries.insert(idx + 1, entry)
@@ -185,20 +195,6 @@ module TavernKit
       end
 
       private
-
-      def resolve_name(step_class, name)
-        return name if name
-
-        if step_class.respond_to?(:step_name)
-          step_class.step_name
-        else
-          step_class.name.split("::").last
-            .gsub(/Step$/, "")
-            .gsub(/([a-z])([A-Z])/, '\1_\2')
-            .downcase
-            .to_sym
-        end
-      end
 
       def reindex!
         @index.clear

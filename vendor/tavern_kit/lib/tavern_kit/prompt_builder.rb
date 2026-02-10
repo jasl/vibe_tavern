@@ -232,15 +232,15 @@ module TavernKit
       self
     end
 
-    def insert_step_before(before_name, step_class, name: nil, **options)
+    def insert_step_before(before_name, name, step_class, **options)
       @pipeline = @pipeline.dup
-      @pipeline.insert_step_before(before_name, step_class, name: name, **options)
+      @pipeline.insert_step_before(before_name, name, step_class, **options)
       self
     end
 
-    def insert_step_after(after_name, step_class, name: nil, **options)
+    def insert_step_after(after_name, name, step_class, **options)
       @pipeline = @pipeline.dup
-      @pipeline.insert_step_after(after_name, step_class, name: name, **options)
+      @pipeline.insert_step_after(after_name, name, step_class, **options)
       self
     end
 

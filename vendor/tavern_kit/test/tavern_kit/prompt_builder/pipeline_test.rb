@@ -113,7 +113,7 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
       use_step :alpha, AlphaStep
     end
-    pipeline.insert_step_before(:alpha, BetaStep, name: :beta)
+    pipeline.insert_step_before(:alpha, :beta, BetaStep)
 
     assert_equal [:beta, :alpha], pipeline.names
 
@@ -126,7 +126,7 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
       use_step :alpha, AlphaStep
     end
-    pipeline.insert_step_after(:alpha, BetaStep, name: :beta)
+    pipeline.insert_step_after(:alpha, :beta, BetaStep)
 
     assert_equal [:alpha, :beta], pipeline.names
   end
@@ -267,8 +267,8 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
     pipeline = TavernKit::PromptBuilder::Pipeline.empty
     assert_raises(ArgumentError) { pipeline.replace_step(:unknown, AlphaStep) }
     assert_raises(ArgumentError) { pipeline.remove_step(:unknown) }
-    assert_raises(ArgumentError) { pipeline.insert_step_before(:unknown, AlphaStep) }
-    assert_raises(ArgumentError) { pipeline.insert_step_after(:unknown, AlphaStep) }
+    assert_raises(ArgumentError) { pipeline.insert_step_before(:unknown, :beta, AlphaStep) }
+    assert_raises(ArgumentError) { pipeline.insert_step_after(:unknown, :beta, AlphaStep) }
   end
 
   def test_dup_creates_independent_copy
