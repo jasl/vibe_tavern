@@ -82,6 +82,11 @@
 !/app/assets/builds/.keep
 /public/assets
 
+# Pre-downloaded LLM tokenizers
+
+/vendor/tokenizers/*
+!/vendor/tokenizers/.keep
+
 # Gem
 /vendor/tavern_kit/.bundle/
 /vendor/tavern_kit/.yardoc

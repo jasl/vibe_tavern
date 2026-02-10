@@ -1,9 +1,0 @@
-{
-  "hint": "deepseek",
-  "hf_repo": "deepseek-ai/DeepSeek-V3-0324",
-  "revision": "main",
-  "url": "https://huggingface.co/deepseek-ai/DeepSeek-V3-0324/resolve/main/tokenizer.json",
-  "etag": "W/\"51083c600ec00c7f57ae1af7fef7108c52ce7376\"",
-  "x_repo_commit": "e9b33add76883f293d6bf61f6bd89b497e80e335",
-  "downloaded_at": "2026-02-09T20:54:29Z"
-}
