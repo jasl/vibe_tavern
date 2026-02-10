@@ -86,7 +86,7 @@ to see the trace/attempts (and the exact failure category).
 - For roleplay, use `<lang code="...">...</lang>` spans when you need a
   character to speak in a different language than the user’s target language.
   Keep these tags out of the final UI by enabling the output tag transformer
-  (`runtime[:output_tags]`).
+  (`context[:output_tags]`).
 
 ## Reducing eval flakiness
 

@@ -30,13 +30,13 @@ class TavernKit::PromptBuilderTest < Minitest::Test
 
   def simple_pipeline
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step SimplePlanStep, name: :simple
+      use_step :simple, SimplePlanStep
     end
   end
 
   def dialect_pipeline
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step DialectPlanStep, name: :dialect
+      use_step :dialect, DialectPlanStep
     end
   end
 
@@ -65,6 +65,56 @@ class TavernKit::PromptBuilderTest < Minitest::Test
 
     assert_kind_of TavernKit::PromptBuilder::Plan, plan
     assert_equal "Hello!", plan.blocks.first.content
+  end
+
+  def test_builder_accepts_keyword_inputs
+    pipeline = simple_pipeline
+    char = TavernKit::Character.create(name: "Test")
+    user = TavernKit::User.new(name: "Alice")
+
+    dsl =
+      TavernKit::PromptBuilder.new(
+        pipeline: pipeline,
+        character: char,
+        user: user,
+        message: "Hello!",
+        strict: true,
+      )
+
+    assert_equal char, dsl.state.character
+    assert_equal user, dsl.state.user
+    assert_equal "Hello!", dsl.state.user_message
+    assert_equal true, dsl.state.strict
+  end
+
+  def test_builder_rejects_unknown_keyword_input
+    pipeline = simple_pipeline
+
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::PromptBuilder.new(pipeline: pipeline, typo_key: true)
+      end
+    assert_match(/unknown PromptBuilder input key/, error.message)
+  end
+
+  def test_builder_configs_merges_into_context_module_configs
+    pipeline = simple_pipeline
+    context = TavernKit::PromptBuilder::Context.new(module_configs: { alpha: { enabled: true } })
+
+    dsl =
+      TavernKit::PromptBuilder.new(
+        pipeline: pipeline,
+        context: context,
+        configs: { language_policy: { enabled: true } },
+      )
+
+    assert_equal(
+      {
+        alpha: { enabled: true },
+        language_policy: { enabled: true },
+      },
+      dsl.state.context.module_configs,
+    )
   end
 
   def test_builder_setters_return_self
@@ -125,7 +175,7 @@ class TavernKit::PromptBuilderTest < Minitest::Test
     dsl.build
 
     trace = collector.to_trace(fingerprint: "fp")
-    assert_equal [:simple], trace.stages.map(&:name)
+    assert_equal [:simple], trace.steps.map(&:name)
   end
 
   def test_builder_macro_vars
@@ -165,6 +215,39 @@ class TavernKit::PromptBuilderTest < Minitest::Test
     dsl.set_variables({ y: 2 }, scope: :global)
     assert_same store, dsl.state.variables_store
     assert_equal 2, store.get("y", scope: :global)
+  end
+
+  def test_builder_context_sets_input_context
+    pipeline = simple_pipeline
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
+    context = { "chatIndex" => 7 }
+
+    dsl.context(context)
+
+    assert_instance_of TavernKit::PromptBuilder::Context, dsl.input_context
+    assert_same dsl.input_context, dsl.state.context
+    assert_equal 7, dsl.state.context[:chat_index]
+    refute dsl.state.key?(:chat_index)
+  end
+
+  def test_builder_context_assignment_replaces_previous_context
+    pipeline = simple_pipeline
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline)
+
+    dsl.context(chat_index: 9)
+    dsl.context(TavernKit::PromptBuilder::Context.new(user_message: "hello"))
+
+    assert_nil dsl.state.context[:chat_index]
+    assert_equal "hello", dsl.state.context[:user_message]
+  end
+
+  def test_initialize_with_context_does_not_project_context_to_state_metadata
+    pipeline = simple_pipeline
+    context = TavernKit::PromptBuilder::Context.new(chat_index: 11)
+    dsl = TavernKit::PromptBuilder.new(pipeline: pipeline, context: context)
+
+    assert_equal 11, dsl.state.context[:chat_index]
+    refute dsl.state.key?(:chat_index)
   end
 
   def test_tavern_kit_build_requires_pipeline

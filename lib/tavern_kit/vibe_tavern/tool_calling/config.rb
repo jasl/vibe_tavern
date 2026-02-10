@@ -36,15 +36,15 @@ module TavernKit
             tool_use_mode != :disabled
           end
 
-          def self.from_runtime(runtime, provider:, model: nil)
+          def self.from_context(context, provider:, model: nil)
             base =
               TavernKit::VibeTavern::ToolCalling::Presets.for(
                 provider: provider,
                 model: model,
               )
 
-            raw = runtime&.[](:tool_calling)
-            raise ArgumentError, "runtime[:tool_calling] must be a Hash" unless raw.nil? || raw.is_a?(Hash)
+            raw = context&.[](:tool_calling)
+            raise ArgumentError, "context[:tool_calling] must be a Hash" unless raw.nil? || raw.is_a?(Hash)
 
             merged =
               TavernKit::VibeTavern::ToolCalling::Presets.merge(
@@ -57,7 +57,7 @@ module TavernKit
 
           def self.build_from_hash(raw)
             raise ArgumentError, "tool_calling config must be a Hash" unless raw.is_a?(Hash)
-            assert_symbol_keys!(raw)
+            TavernKit::Utils.assert_symbol_keys!(raw, path: "tool_calling config")
 
             tool_use_mode = raw.fetch(:tool_use_mode, :relaxed)
             tool_use_mode = tool_use_mode.to_s.strip.downcase.tr("-", "_").to_sym
@@ -91,9 +91,7 @@ module TavernKit
             tool_call_transforms = normalize_string_array(raw.fetch(:tool_call_transforms, nil))
             tool_result_transforms = normalize_string_array(raw.fetch(:tool_result_transforms, nil))
 
-            request_overrides = raw.fetch(:request_overrides, {})
-            raise ArgumentError, "tool_calling.request_overrides must be a Hash" unless request_overrides.is_a?(Hash)
-            assert_symbol_keys!(request_overrides)
+            request_overrides = TavernKit::Utils.normalize_symbol_keyed_hash(raw.fetch(:request_overrides, {}), path: "tool_calling.request_overrides")
 
             reserved = %i[model messages tools tool_choice response_format].freeze
             request_overrides = request_overrides.reject { |k, _v| reserved.include?(k) }
@@ -155,11 +153,7 @@ module TavernKit
           private_class_method :positive_int_or_default
 
           def self.normalize_string_list(value)
-            list =
-              Array(value)
-                .map { |v| v.to_s.strip }
-                .reject(&:empty?)
-            list.empty? ? nil : list
+            TavernKit::Utils.normalize_string_list(value)
           end
           private_class_method :normalize_string_list
 
@@ -167,13 +161,6 @@ module TavernKit
             Array(value).map { |v| v.to_s.strip }.reject(&:empty?)
           end
           private_class_method :normalize_string_array
-
-          def self.assert_symbol_keys!(hash)
-            hash.each_key do |k|
-              raise ArgumentError, "config keys must be Symbols (got #{k.class})" unless k.is_a?(Symbol)
-            end
-          end
-          private_class_method :assert_symbol_keys!
         end
     end
   end

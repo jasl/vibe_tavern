@@ -117,9 +117,9 @@ Core text fields:
 - `system_prompt`, `post_history_instructions`
 - `mes_examples`
 
-Runtime snapshot (read-only):
-- `runtime` (Hash with **string keys**)
-- `chat_index`, `message_index`, `model`, `role` (top-level conveniences; sourced from runtime)
+Context snapshot (read-only):
+- `context` (Hash with **string keys**)
+- `chat_index`, `message_index`, `model`, `role` (top-level conveniences; sourced from context)
 
 Notes:
 - History is intentionally not exposed yet. When/if we expose it, it will be
@@ -202,7 +202,7 @@ Deterministic RNG (prompt-building safe):
 {{ "hello" | hash }} {# alias #}
 ```
 
-- `pick` — deterministic pick based on runtime seeds:
+- `pick` — deterministic pick based on context seeds:
 
 ```liquid
 {{ "a,b,c" | pick }}
@@ -210,8 +210,8 @@ Deterministic RNG (prompt-building safe):
 ```
 
 Seeds used by default:
-- `runtime.message_index` (as the deterministic counter; defaults to `0`)
-- `runtime.rng_word` (as the deterministic seed word; falls back to `char`, then `"0"`)
+- `context.message_index` (as the deterministic counter; defaults to `0`)
+- `context.rng_word` (as the deterministic seed word; falls back to `char`, then `"0"`)
 
 Dice:
 
@@ -224,13 +224,13 @@ Dice:
 Time/date helpers (UTC):
 
 These filters accept epoch milliseconds (preferred) or seconds as input.
-For deterministic builds, inject `runtime.now_ms` from the app.
+For deterministic builds, inject `context.now_ms` from the app.
 
 ```liquid
-{{ runtime.now_ms | unixtime }}  {# -> "1700000000" #}
-{{ runtime.now_ms | isodate }}   {# -> "2023-11-14" #}
-{{ runtime.now_ms | isotime }}   {# -> "22:13:20" #}
-{{ runtime.now_ms | datetimeformat: "YYYY-MM-DD HH:mm:ss" }}
+{{ context.now_ms | unixtime }}  {# -> "1700000000" #}
+{{ context.now_ms | isodate }}   {# -> "2023-11-14" #}
+{{ context.now_ms | isotime }}   {# -> "22:13:20" #}
+{{ context.now_ms | datetimeformat: "YYYY-MM-DD HH:mm:ss" }}
 ```
 
 `datetimeformat` supports a Moment-ish subset:
@@ -268,20 +268,20 @@ apply it at the app layer **before persistence** (so what you store is what
 you later show and feed back into prompt history).
 
 We standardize on a simple toggle:
-- `runtime[:toggles][:expand_user_input_macros]` (default: `false`)
+- `context[:toggles][:expand_user_input_macros]` (default: `false`)
 
 Important:
-- `runtime[:toggles]` must use **snake_case symbol keys**.
-  We do not auto-normalize nested hashes inside runtime. If you load toggles
-  from JSON, normalize keys before building runtime:
+- `context[:toggles]` must use **snake_case symbol keys**.
+  We do not auto-normalize nested hashes inside context. If you load toggles
+  from JSON, normalize keys before building context:
 
 ```ruby
 toggles = json_toggles.to_h.transform_keys { |k| TavernKit::Utils.underscore(k).to_sym }
-runtime = TavernKit::PromptBuilder::Context.build({ toggles: toggles }, type: :app)
+context = TavernKit::PromptBuilder::Context.build({ toggles: toggles }, type: :app)
 ```
 
 Helper:
-- `TavernKit::VibeTavern::UserInputPreprocessor.call(text, variables_store:, runtime:, enabled: nil, strict:, on_error:)`
+- `TavernKit::VibeTavern::UserInputPreprocessor.call(text, variables_store:, context:, enabled: nil, strict:, on_error:)`
 
 Notes:
 - Enabling this means user-authored text can execute our write tags

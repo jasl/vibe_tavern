@@ -118,7 +118,7 @@ class TavernKit::TrimmerTest < Minitest::Test
         max_tokens: 80,
         reserve_tokens: 0,
         token_estimator: StaticEstimator.new,
-        stage: :trimming,
+        step: :trimming,
       )
     end
   end

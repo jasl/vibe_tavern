@@ -17,9 +17,9 @@ Guidelines:
 
 - Tool calling eval hardening + guardrails
   - Add scenario-based OpenRouter eval suite (`OPENROUTER_SCENARIOS`) + failure sample paths in the report table: `d3f0aaf`
-  - Make tool argument/output size limits runtime-configurable (`max_tool_args_bytes`, `max_tool_output_bytes`) and document them: `d3f0aaf`
-  - Add test coverage for runtime denylist masking (tools not exposed + execution blocked): `a1fc3a0`
-  - Add runtime-injected request overrides + tool_choice (provider knobs without lower-layer hacks) and document/test them: `a2cb1dd`
+  - Make tool argument/output size limits context-configurable (`max_tool_args_bytes`, `max_tool_output_bytes`) and document them: `d3f0aaf`
+  - Add test coverage for context denylist masking (tools not exposed + execution blocked): `a1fc3a0`
+  - Add context-injected request overrides + tool_choice (provider knobs without lower-layer hacks) and document/test them: `a2cb1dd`
   - Doc: record deferred provider quirks (DeepSeek reasoner `reasoning_content`, Gemini/Claude adapters) as opt-in transforms: `2b612aa`
 
 ## 2026-02-03
@@ -37,11 +37,11 @@ Guidelines:
   - Implement `LiquidMacros` with `var/global` drops + write tags (`setvar`, `incvar`, etc) + tests: `c095242`
   - Add ST-style escaped braces support and blank-line whitespace stripping + docs/tests: `ede75f0`
   - Add optional app-layer user input preprocessing toggle (default OFF): `29424df`
-    - Standard toggle: `runtime[:toggles][:expand_user_input_macros]`
+    - Standard toggle: `context[:toggles][:expand_user_input_macros]`
     - Rationale: keep prompt building deterministic and avoid implicit side effects unless explicitly enabled.
   - Pin Liquid assigns contract (`Assigns.build(ctx)`) + tests: `aa2f92f`
   - Add Liquid P0 filters (deterministic RNG + time helpers) + docs/tests: `9b9ba98`
-  - Fix Liquid runtime seed wiring; add `render_for(ctx, ...)` helper + tests: `f028797`
+  - Fix Liquid context seed wiring; add `render_for(ctx, ...)` helper + tests: `f028797`
   - Add `hash` alias for `hash7`; clarify that `history` is not exposed yet: `84f6068`
   - Add `system_template` (Liquid) to VibeTavern pipeline (optional system block) + tests/docs: `b192c51`
   - Extend VibeTavern pipeline assembly:
@@ -51,7 +51,7 @@ Guidelines:
     - tests/docs: `6c376cd`
   - Harden Liquid rendering for app-owned macros:
     - add conservative Liquid resource limits + max template size guardrail
-    - document runtime.toggles key normalization contract and lock with tests
+    - document context.toggles key normalization contract and lock with tests
     - commits: `8b5d2dd`
   - Make Liquid strict mode truly fail-fast (undefined variables/filters now raise) + tests: `9931cad`
 

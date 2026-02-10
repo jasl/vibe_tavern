@@ -98,18 +98,76 @@ Protocols:
 Recommended approach:
 - implement “target language output” as a **pipeline step** that injects
   a small **Language Policy** system block into the prompt plan.
-- keep it app-configurable via `runtime` (preferred) or prompt context metadata.
+- keep it app-configurable via `context` (preferred) or prompt context metadata.
 
 Why step:
 - it works for chat-only streaming, directives runs, and tool loop runs
   uniformly (all use `PromptRunner#build_request` → `TavernKit::VibeTavern.build`)
 - it avoids scattering “respond in X” instructions across call sites
 
-## Proposed configuration surface (runtime-owned)
+Current step config contract:
+- Each default step consumes only its own typed `Config` (see reference below).
+- Pipeline resolves typed configs via `Config.from_hash` from:
+  static step defaults + `context.module_configs[step_name]` overrides.
+- Unknown step keys in `context.module_configs` are ignored; invalid fields for
+  known step config fail-fast.
 
-Store this under the request-scoped runtime snapshot:
+## Step Config Reference (default pipeline)
 
-`runtime[:language_policy]`
+Default pipeline: `lib/tavern_kit/vibe_tavern/pipeline.rb`
+
+### `:prepare` (`Steps::Prepare`)
+
+Typed step config: `Steps::Prepare::Config` (no fields today).
+
+This step reads behavior config from context:
+
+- `context[:token_estimation]` (Hash; optional)
+  - `model_hint` (String)
+  - `token_estimator` (responds to `#estimate`)
+  - `registry` (Hash; passed to `TavernKit::TokenEstimator.new(registry: ...)`)
+
+Pitfall:
+
+- Do not put token estimation settings under `context.module_configs[:prepare]`
+  or `configs[:prepare]` (this step has no step-level config keys).
+
+### `:plan_assembly` (`Steps::PlanAssembly`)
+
+Typed step config: `Steps::PlanAssembly::Config`
+
+- `default_system_text_builder` (callable; optional; default nil)
+
+Template inputs (metadata):
+
+- `meta(:system_template, ...)`
+- `meta(:post_history_template, ...)`
+
+Pitfall:
+
+- Prefer setting callables via `RunnerConfig.build(step_options: ...)` so your
+  context stays serializable.
+
+### `:language_policy` (`Steps::LanguagePolicy`)
+
+Typed step config: `Steps::LanguagePolicy::Config`
+
+Primary configuration is context-owned (parsed by `RunnerConfig` and injected as step defaults):
+
+- `context[:language_policy]` (Hash)
+  - `enabled` (Boolean)
+  - `target_lang` (String; canonicalized + allowlisted)
+  - `style_hint` (String; optional)
+  - `special_tags` (Array<String>; optional)
+  - `policy_text_builder` (callable; optional)
+
+Per-run overrides live under `context.module_configs[:language_policy]`.
+
+## Proposed configuration surface (context-owned)
+
+Store this under the request-scoped context snapshot:
+
+`context[:language_policy]`
 
 Minimum fields (P0):
 - `enabled`: boolean
@@ -127,12 +185,12 @@ Optional fields (P1+):
 Language policy is **app-owned configuration**:
 - users set the preference in product UI/settings
 - the app computes precedence (e.g. membership > space) and injects a single
-  `target_lang` into `runtime[:language_policy]`
+  `target_lang` into `context[:language_policy]`
 - `TavernKit::VibeTavern` does not derive language preference from chat text
 
 Optional (app-side customization):
 - `policy_text_builder`: a Ruby callable (lambda/proc) that builds the injected
-  policy text. Recommended to set via pipeline step options (keeps runtime
+  policy text. Recommended to set via pipeline step options (keeps context
   serializable), e.g.:
 
 ```ruby
@@ -140,7 +198,7 @@ runner_config =
   TavernKit::VibeTavern::RunnerConfig.build(
     provider: "openrouter",
     model: "openai/gpt-5.2:nitro",
-    runtime: { language_policy: { enabled: true, target_lang: "zh-CN" } },
+    context: { language_policy: { enabled: true, target_lang: "zh-CN" } },
     step_options: {
       language_policy: {
         policy_text_builder: ->(target_lang, style_hint:, special_tags:) { "..." },
@@ -196,7 +254,7 @@ to be translated/localized. Recommended initial set:
 - HTML/XML tags and attributes: `<...>` (treat as verbatim by default)
 - Optional language spans (for mixed-language roleplay):
   - `<lang code="ja-JP">...</lang>` can be used to intentionally embed a different language
-  - App enables this by adding `"lang"` to `runtime[:language_policy][:special_tags]`
+  - App enables this by adding `"lang"` to `context[:language_policy][:special_tags]`
 - structured directives JSON (when used):
   - keys: `assistant_text`, `directives`, `type`, `payload`
   - directive types are canonical strings (not translated)
@@ -221,16 +279,16 @@ but should not be shown to end users as-is.
 
 VibeTavern supports an optional, deterministic post-pass on assistant text via:
 
-`runtime[:output_tags]`
+`context[:output_tags]`
 
-Runtime is normalized once by `RunnerConfig` into `OutputTags::Config`.
+Context is normalized once by `RunnerConfig` into `OutputTags::Config`.
 Protocol runners (`ToolLoopRunner` / `Directives::Runner`) apply:
 `OutputTags.transform(text, config: runner_config.output_tags)`.
 
 Example (strip wrappers / drop `<think>`):
 
 ```ruby
-runtime[:output_tags] = {
+context[:output_tags] = {
   enabled: true,
   rules: [
     { tag: "lang", action: :strip },  # keep inner text
@@ -243,7 +301,7 @@ runtime[:output_tags] = {
 Example (transform `<lang code="ja">...` to a renderable tag):
 
 ```ruby
-runtime[:output_tags] = {
+context[:output_tags] = {
   enabled: true,
   rules: [
     { tag: "lang", action: :rename, to: "span", attrs: { "code" => "data-lang" } },
@@ -261,7 +319,7 @@ Notes:
   being treated as a control/protocol tag by deterministic post-processing.
   - Default behavior renders escaped `<` as `&lt;` (so the literal tag stays
     visible even when the frontend allows HTML).
-  - Configure via `runtime[:output_tags][:escape_hatch]`:
+  - Configure via `context[:output_tags][:escape_hatch]`:
     - `{ enabled: true, mode: :html_entity }` (default)
     - `{ enabled: true, mode: :literal }` (for frontends that HTML-escape)
     - `{ enabled: true, mode: :keep_backslash }` (debug / preserve `\<`)
@@ -274,7 +332,7 @@ To make mixed-language roleplay spans more robust against “messy” human inpu
 deterministic sanitizer/validator for `<lang>` spans:
 
 ```ruby
-runtime[:output_tags] = {
+context[:output_tags] = {
   enabled: true,
   rules: [{ tag: "lang", action: :strip }],
   sanitizers: {
@@ -299,7 +357,7 @@ Add a new step:
 - `lib/tavern_kit/vibe_tavern/prompt_builder/steps/language_policy.rb`
 
 Pipeline insertion:
-- `lib/tavern_kit/vibe_tavern/pipeline.rb` should `use_step ...LanguagePolicy`
+- `lib/tavern_kit/vibe_tavern/pipeline.rb` should `use_step :language_policy, TavernKit::VibeTavern::PromptBuilder::Steps::LanguagePolicy`
   after `:plan_assembly` (because `PlanAssembly` finalizes `ctx.plan`).
 
 Behavior (P0):
@@ -410,7 +468,7 @@ De-risking:
 
 P0 (foundation, infra-only):
 1) Implement `PromptBuilder::Steps::LanguagePolicy` and wire it into the pipeline.
-2) Define the runtime config contract (`runtime[:language_policy]`).
+2) Define the context config contract (`context[:language_policy]`).
 3) Add deterministic tests for:
    - enabled vs disabled
    - insertion position (before user message)
@@ -481,7 +539,7 @@ Notes:
 
 ## Acceptance criteria (P0)
 
-- When `runtime[:language_policy].enabled == true`, chat responses are written
+- When `context[:language_policy].enabled == true`, chat responses are written
   in `target_lang` with natural phrasing.
 - Tool calling still works:
   - tool names and JSON keys are not localized
@@ -494,7 +552,7 @@ Notes:
 
 ## Decisions (current)
 
-- Config naming: use `runtime[:language_policy]`.
+- Config naming: use `context[:language_policy]`.
 - Language codes: strict BCP-47 allowlist (Tier 1–3 list above).
 - Tier 2: best-effort “language-shape” validation (script/character distribution),
   not semantic correctness; prefer non-streaming post-pass fallback over hard fail.
@@ -508,7 +566,7 @@ Notes:
 - Verbatim zones: treat HTML/XML tags and Markdown links/URLs as verbatim by
   default; Markdown code fences/inline code and Liquid macros are verbatim zones.
 - Special tags: support an app-injected list of additional “special tags”
-  via `runtime[:language_policy][:special_tags]`.
+  via `context[:language_policy][:special_tags]`.
 - Per-turn override: keep `target_lang` as strict app-only configuration.
 - Directives payload: keep payload app-defined, but enforce (via app-owned
   validators) that user-visible payload strings are in `target_lang`.

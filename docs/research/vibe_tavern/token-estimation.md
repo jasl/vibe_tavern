@@ -36,7 +36,7 @@ For common OSS model families (DeepSeek/Qwen/Llama/etc.), Core supports:
 - `tokenizer_path: "/abs/path/to/tokenizer.json"`
 
 This uses the `tokenizers` gem (Rust HF tokenizers bindings) to load a local
-`tokenizer.json`. There are **no runtime downloads** in Core.
+`tokenizer.json`. There are **no on-demand downloads** in Core.
 
 ## VibeTavern default integration (Rails app)
 
@@ -58,6 +58,44 @@ The VibeTavern pipeline injects these defaults in `PromptBuilder::Steps::Prepare
   and canonicalized.
 - when `ctx.token_estimator` is not explicitly set, it defaults to
   `TokenEstimation.estimator`.
+
+### Injection points (Context + Step behavior)
+
+Primary injection point for PromptRunner runs:
+
+- `context[:token_estimation]` (Hash; programmer-owned)
+
+```ruby
+context = {
+  token_estimation: {
+    # Optional: overrides model hint selection.
+    model_hint: "deepseek/deepseek-chat-v3-0324:nitro",
+
+    # Optional: override the estimator directly.
+    # token_estimator: my_estimator, # responds to #estimate
+
+    # Optional: override the registry (Core will build an estimator from it).
+    # registry: { "deepseek-v3" => { tokenizer_family: :hf_tokenizers, tokenizer_path: "/abs/..." } },
+  },
+}
+```
+
+Precedence rules applied by `:prepare`:
+
+1) `ctx[:model_hint]` when present and non-blank
+2) `context[:token_estimation][:model_hint]`
+3) `ctx[:default_model_hint]` (set by `PromptRunner` as `meta(:default_model_hint, model_id)`)
+
+Estimator selection precedence:
+
+1) `ctx.token_estimator` when already set (manual builds)
+2) `context[:token_estimation][:token_estimator]`
+3) `context[:token_estimation][:registry]` (build `TavernKit::TokenEstimator.new(registry: ...)`)
+4) default `TavernKit::VibeTavern::TokenEstimation.estimator`
+
+Actionable checklist doc:
+
+- `docs/todo/vibe_tavern/tokenizer-loading.md`
 
 ### Boot-time preload
 

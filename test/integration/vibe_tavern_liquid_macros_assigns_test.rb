@@ -16,15 +16,15 @@ class VibeTavernLiquidMacrosAssignsTest < ActiveSupport::TestCase
 
     user = TavernKit::User.new(name: "Alice", persona: "A curious adventurer")
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         { "chatIndex" => 1, "messageIndex" => 2, "model" => "gpt-x", "role" => "assistant" },
         type: :app,
       )
 
-    ctx = TavernKit::PromptBuilder::Context.new(character: character, user: user, runtime: runtime)
+    state = TavernKit::PromptBuilder::State.new(character: character, user: user, context: context)
 
-    assigns = TavernKit::VibeTavern::LiquidMacros::Assigns.build(ctx)
+    assigns = TavernKit::VibeTavern::LiquidMacros::Assigns.build(state)
 
     assert_equal "Sera", assigns["char"]
     assert_equal "Alice", assigns["user"]
@@ -41,16 +41,15 @@ class VibeTavernLiquidMacrosAssignsTest < ActiveSupport::TestCase
     assert_equal "gpt-x", assigns["model"]
     assert_equal "assistant", assigns["role"]
 
-    assert_equal({ "chat_index" => 1, "message_index" => 2, "model" => "gpt-x", "role" => "assistant" }, assigns["runtime"])
+    assert_equal({ "chat_index" => 1, "message_index" => 2, "model" => "gpt-x", "role" => "assistant" }, assigns["context"])
   end
 
-  test "derives runtime from ctx[:runtime] when ctx.runtime is not set" do
+  test "returns nil top-level context fields when context is missing" do
     ctx = TavernKit::PromptBuilder::Context.new
-    ctx[:runtime] = { "chatIndex" => 7 }
 
     assigns = TavernKit::VibeTavern::LiquidMacros::Assigns.build(ctx)
 
-    assert_equal 7, assigns["chat_index"]
-    assert_equal({ "chat_index" => 7 }, assigns["runtime"])
+    assert_nil assigns["chat_index"]
+    assert_equal({}, assigns["context"])
   end
 end

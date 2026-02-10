@@ -118,7 +118,6 @@ module TavernKit
           last_tool_ok_by_name = {}
 
           max_turns.times do |turn|
-            runtime = @runner_config.runtime
             variables_store = @variables_store
             system = @system
             strict = @strict

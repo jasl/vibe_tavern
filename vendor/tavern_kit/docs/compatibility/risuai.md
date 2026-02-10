@@ -16,7 +16,7 @@ Status legend:
 
 Scope notes (important):
 - Scope for RisuAI is **prompt building** (CBS/Lore/Templates/RegexScripts/Triggers),
-  with app-state coming from `ctx.runtime` (metadata, toggles, etc).
+  with app-state coming from `ctx.context` (metadata, toggles, etc).
 - UI rendering, storage/DB persistence, and network I/O are **application-owned**.
 
 ---
@@ -25,7 +25,7 @@ Scope notes (important):
 
 | Component | RisuAI | TavernKit | Notes |
 |----------|--------|-----------|-------|
-| Runtime contract (app-state sync) | ✅ | ✅ | `TavernKit::RisuAI::Runtime` + `PromptBuilder::State#runtime` |
+| Context contract (app-state sync) | ✅ | ✅ | `TavernKit::RisuAI::Context` + `PromptBuilder::State#context` |
 | CBS engine + macro registry | ✅ | ✅ | Prompt-building-focused; unknown macros preserved |
 | Lorebook engine (decorators + scanning) | ✅ | ✅ | Decorator-driven behavior, JS regex supported |
 | Template cards (promptTemplate) | ✅ | ✅ | Includes `stChatConvert` |
@@ -39,12 +39,12 @@ specific embedding/summarization implementation.
 
 ---
 
-## 1. Runtime Contract (App ↔ Pipeline Sync)
+## 1. Context Contract (App ↔ Pipeline Sync)
 
 RisuAI parity relies on app-provided state. TavernKit standardizes that state as
-an immutable runtime object attached to the pipeline context (`ctx.runtime`).
+an immutable context object attached to the pipeline context (`ctx.context`).
 
-Canonical input form: **snake_case symbol keys** (runtime normalizes once).
+Canonical input form: **snake_case symbol keys** (context normalizes once).
 
 | Key | Type | Required | Used for |
 |-----|------|----------|----------|
@@ -64,7 +64,7 @@ Defaults in tolerant mode (TavernKit-only):
 - `cbs_conditions: {}`
 
 See:
-- Runtime contract: `docs/core-interface-design.md` (Runtime section)
+- Context contract: `docs/core-interface-design.md` (Context section)
 
 ---
 
@@ -84,7 +84,7 @@ Implementation: `TavernKit::RisuAI::CBS::Engine` + `TavernKit::RisuAI::CBS::Macr
 | `{{// comment}}` | ✅ | ✅ | `//` tags render as empty |
 | `{{? expr}}` math shorthand | ✅ | ✅ | RPN calculator with var substitution |
 | `§`-delimited arrays | ✅ | ✅ | For `#each` / array parsing fallback |
-| Unknown macros preserved | ✅ | ✅ | Preserved for later stages |
+| Unknown macros preserved | ✅ | ✅ | Preserved for later steps |
 
 ### 2.2 Block types
 
@@ -110,7 +110,7 @@ Concrete mapping lives in:
 
 Known parity caveat:
 - Anything that depends on real UI state, storage, or network I/O must be
-  provided by the app via runtime metadata/adapters (by design).
+  provided by the app via context metadata/adapters (by design).
 
 ---
 
@@ -178,9 +178,9 @@ touch DB, show UI, or do network I/O are intentionally not implemented here.
 
 Implementation: `TavernKit::RisuAI::Pipeline`.
 
-| Stage | RisuAI | TavernKit |
+| Step | RisuAI | TavernKit |
 |-------|--------|-----------|
-| Prepare/runtime | ✅ | ✅ |
+| Prepare/context | ✅ | ✅ |
 | CBS expansion | ✅ | ✅ |
 | Lore scan | ✅ | ✅ |
 | Template assembly | ✅ | ✅ |

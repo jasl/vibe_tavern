@@ -6,13 +6,13 @@ class VibeTavernOutputTagsTest < ActiveSupport::TestCase
   end
 
   def build_config(output_tags_hash)
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         { output_tags: output_tags_hash },
         type: :app,
       )
 
-    TavernKit::VibeTavern::OutputTags::Config.from_runtime(runtime)
+    TavernKit::VibeTavern::OutputTags::Config.from_context(context)
   end
 
   test "does nothing when output tag processing is disabled" do

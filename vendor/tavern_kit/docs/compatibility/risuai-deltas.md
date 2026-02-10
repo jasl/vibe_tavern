@@ -24,7 +24,7 @@ RisuAI source.
 | `src/ts/cbs.ts` | 2,480 | CBS macro engine (130+ registered functions) |
 | `src/ts/parser.svelte.ts` | 1,875 | Message parser + CBS evaluation pipeline |
 | `src/ts/process/lorebook.svelte.ts` | ~600 | Lorebook activation + decoration + budget |
-| `src/ts/process/index.svelte.ts` | ~1,900 | Main chat processing pipeline (4 stages) |
+| `src/ts/process/index.svelte.ts` | ~1,900 | Main chat processing pipeline (4 steps) |
 | `src/ts/process/prompt.ts` | ~150 | Prompt item type definitions |
 | `src/ts/process/templates/templates.ts` | ~200 | Template presets + position parser |
 | `src/ts/process/scripts.ts` | ~400 | Regex script execution engine |
@@ -257,7 +257,7 @@ Additional:
 
 ### 1.11 Metadata Macro
 
-`{{metadata::key}}` provides runtime introspection:
+`{{metadata::key}}` provides context introspection:
 
 - `mobile`, `local`, `node` -- platform booleans
 - `version`, `major` -- version info
@@ -470,9 +470,9 @@ Templates support `{{position::name}}` placeholders for dynamic injection:
 
 Lore entries with `@position` decorator inject into these slots.
 
-### 3.3 Four-Stage Pipeline
+### 3.3 Four-Step Pipeline
 
-**Stage 1: Prompt Preparation** (index.svelte.ts:295-563)
+**Step 1: Prompt Preparation** (index.svelte.ts:295-563)
 - Load lorebooks, apply decorators
 - Separate by position type (depth, description, etc.)
 - Build `unformated` object with 10 categories:
@@ -481,12 +481,12 @@ Lore entries with `@position` decorator inject into these slots.
 - Apply position parser for custom injection points
 - Tokenize all content
 
-**Stage 2: Memory Integration** (index.svelte.ts:957-1043)
+**Step 2: Memory Integration** (index.svelte.ts:957-1043)
 - Choose algorithm: HypaMemory V1/V2/V3, or SupaMemory
 - Compress old messages into memory summaries
 - Update token counts
 
-**Stage 3: Final Formatting** (index.svelte.ts:1110-1385)
+**Step 3: Final Formatting** (index.svelte.ts:1110-1385)
 - Apply promptTemplate ordering (or legacy formatting order)
 - Process special prompt types
 - Apply position parser
@@ -494,7 +494,7 @@ Lore entries with `@position` decorator inject into these slots.
 - Token recheck: remove removable entries if over budget
 - Apply Lua edit triggers
 
-**Stage 4: API Request & Response** (index.svelte.ts:1439-1936)
+**Step 4: API Request & Response** (index.svelte.ts:1439-1936)
 - Send formatted prompt to API
 - Handle streaming/non-streaming responses
 - Process response scripts/formatting
@@ -867,7 +867,7 @@ provider + googleClaudeTokenizing + modelTokenizer + pluginTokenizer`.
 
 ### 8.2 Integration
 
-Memory is processed in Stage 2 of the pipeline. Compressed data stored in
+Memory is processed in Step 2 of the pipeline. Compressed data stored in
 `Chat.supaMemoryData`, `Chat.hypaV2Data`, or `Chat.hypaV3Data`.
 
 When memory is enabled, old messages are compressed into summaries that fit
@@ -945,7 +945,7 @@ Regex scripts (modify input)
   ↓
 CBS parser ({{macro}} substitution)
   ↓
-AI request (Stage 3-4 of prompt pipeline)
+AI request (Step 3-4 of prompt pipeline)
   ↓
 AI response
   ↓

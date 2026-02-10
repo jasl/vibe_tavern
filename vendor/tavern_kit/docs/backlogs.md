@@ -23,7 +23,7 @@ etc.) without introducing UI/HTML into model-bound prompt building.
 - Model-bound sanitization / separation helpers (Core/RisuAI) to ensure UI does
   not leak into prompt output (optionally preserve placeholders for post-pass).
 - Hand-authored examples / PoC showing an interactive guide + VN-like branching
-  using `directives` + runtime synchronization.
+  using `directives` + context synchronization.
 
 ## Format Support (Deferred)
 
@@ -43,9 +43,9 @@ assets lazily; downstream apps decide how to store/import assets.
 - Plugin system / Lua hooks (explicitly app-owned in this repo).
 - Optional adapters for UI/DB/network trigger effects (TavernKit stays prompt-building-focused).
 
-## Runtime Data Store Unification (Deferred)
+## Context Data Store Unification (Deferred)
 
-- Evaluate unifying `runtime.metadata` / `runtime.toggles` into store-like,
+- Evaluate unifying `context.metadata` / `context.toggles` into store-like,
   read-only scopes (currently plain Hashes by design).
 
 ## Regex Timeouts (Not Planned)

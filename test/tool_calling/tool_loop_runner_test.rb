@@ -180,7 +180,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace:,
     registry: build_registry,
     tool_use_mode: nil,
-    runtime: nil,
+    context: nil,
     parallel_tool_calls: true,
     fix_empty_final: nil,
     tool_calling_fallback_retry_count: nil,
@@ -188,16 +188,16 @@ class ToolLoopRunnerTest < Minitest::Test
     strict: false,
     system: nil
   )
-    runtime_hash =
-      case runtime
+    context_hash =
+      case context
       when nil
         {}
       when TavernKit::PromptBuilder::Context
-        runtime.to_h
+        context.to_h
       when Hash
-        runtime
+        context
       else
-        raise ArgumentError, "runtime must be a Hash or TavernKit::PromptBuilder::Context"
+        raise ArgumentError, "context must be a Hash or TavernKit::PromptBuilder::Context"
       end
 
     base_tool_calling =
@@ -211,7 +211,7 @@ class ToolLoopRunnerTest < Minitest::Test
     tool_calling =
       TavernKit::VibeTavern::ToolCalling::Presets.merge(
         base_tool_calling,
-        runtime_hash.fetch(:tool_calling, {}),
+        context_hash.fetch(:tool_calling, {}),
         overrides,
       )
 
@@ -234,7 +234,7 @@ class ToolLoopRunnerTest < Minitest::Test
       TavernKit::VibeTavern::RunnerConfig.build(
         provider: "openrouter",
         model: model,
-        runtime: runtime_hash.merge(tool_calling: tool_calling),
+        context: context_hash.merge(tool_calling: tool_calling),
         llm_options_defaults: llm_options_defaults,
       )
 
@@ -622,8 +622,8 @@ class ToolLoopRunnerTest < Minitest::Test
 
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runtime = { tool_calling: { request_overrides: { parallel_tool_calls: false } } }
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    context = { tool_calling: { request_overrides: { parallel_tool_calls: false } } }
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
 
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -811,7 +811,7 @@ class ToolLoopRunnerTest < Minitest::Test
     refute params.dig("properties", "nested").key?("required")
   end
 
-  def test_runtime_request_overrides_are_merged_and_reserved_keys_are_ignored
+  def test_context_request_overrides_are_merged_and_reserved_keys_are_ignored
     requests = []
 
     adapter =
@@ -833,7 +833,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -853,7 +853,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, context: context)
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
     req = JSON.parse(requests[0][:body])
@@ -906,7 +906,7 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_in_delta 0.7, req.fetch("temperature"), 0.0001
   end
 
-  def test_runtime_tool_choice_overrides_default
+  def test_context_tool_choice_overrides_default
     requests = []
 
     adapter =
@@ -928,7 +928,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -939,7 +939,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, context: context)
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
     req = JSON.parse(requests[0][:body])
@@ -1097,7 +1097,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -1108,7 +1108,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_use_mode: :relaxed, context: context)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -1732,7 +1732,7 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -1744,7 +1744,7 @@ class ToolLoopRunnerTest < Minitest::Test
 
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -1888,7 +1888,7 @@ class ToolLoopRunnerTest < Minitest::Test
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -1898,7 +1898,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
 
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -2082,7 +2082,7 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2095,7 +2095,7 @@ class ToolLoopRunnerTest < Minitest::Test
 
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, fix_empty_final: true)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, fix_empty_final: true)
 
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
@@ -2133,7 +2133,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2155,7 +2155,7 @@ class ToolLoopRunnerTest < Minitest::Test
       TavernKit::PromptBuilder::Message.new(role: :assistant, content: "", metadata: { tool_calls: tool_calls }),
     ]
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     runner.run(user_text: "hello", history: history)
 
     req = JSON.parse(requests[0][:body])
@@ -2190,7 +2190,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2212,7 +2212,7 @@ class ToolLoopRunnerTest < Minitest::Test
       TavernKit::PromptBuilder::Message.new(role: :assistant, content: "", metadata: { tool_calls: tool_calls }),
     ]
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     runner.run(user_text: "hello", history: history)
 
     req = JSON.parse(requests[0][:body])
@@ -2247,7 +2247,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2269,7 +2269,7 @@ class ToolLoopRunnerTest < Minitest::Test
       TavernKit::PromptBuilder::Message.new(role: :assistant, content: "", metadata: { tool_calls: tool_calls }),
     ]
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     runner.run(user_text: "hello", history: history)
 
     req = JSON.parse(requests[0][:body])
@@ -2305,7 +2305,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2315,7 +2315,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     runner.run(user_text: "hello")
 
     req = JSON.parse(requests[0][:body])
@@ -2378,7 +2378,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2388,7 +2388,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
     assert_equal "Done.", result[:assistant_text]
@@ -2457,7 +2457,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2467,7 +2467,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
     assert_equal "Done.", result[:assistant_text]
@@ -2597,7 +2597,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2607,7 +2607,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
     assert_equal "Done.", result[:assistant_text]
@@ -2665,7 +2665,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2675,7 +2675,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
     assert_equal 1, requests.length
@@ -2725,7 +2725,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           output_tags: { enabled: false, escape_hatch: { enabled: true, mode: :html_entity } },
@@ -2736,7 +2736,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
     assert_equal 1, requests.length
@@ -2815,9 +2815,9 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime = TavernKit::PromptBuilder::Context.build({ tool_calling: { tool_call_transforms: [] } }, type: :app)
+    context = TavernKit::PromptBuilder::Context.build({ tool_calling: { tool_call_transforms: [] } }, type: :app)
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 
     assert_equal "Done.", result[:assistant_text]
@@ -2878,9 +2878,9 @@ class ToolLoopRunnerTest < Minitest::Test
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
     tool_calling = TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling
-    runtime = TavernKit::PromptBuilder::Context.build({ tool_calling: tool_calling }, type: :app)
+    context = TavernKit::PromptBuilder::Context.build({ tool_calling: tool_calling }, type: :app)
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
     req2 = JSON.parse(requests[1][:body])
@@ -2944,7 +2944,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -2954,7 +2954,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
     req2 = JSON.parse(requests[1][:body])
@@ -3022,7 +3022,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -3032,7 +3032,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
     runner.run(user_text: "workspace_id=#{workspace.id}")
 
     req2 = JSON.parse(requests[1][:body])
@@ -3067,7 +3067,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -3089,7 +3089,7 @@ class ToolLoopRunnerTest < Minitest::Test
       TavernKit::PromptBuilder::Message.new(role: :assistant, content: "", metadata: { tool_calls: tool_calls }),
     ]
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, strict: true)
 
     assert_raises(ArgumentError) do
       runner.run(user_text: "hello", history: history)
@@ -3097,7 +3097,7 @@ class ToolLoopRunnerTest < Minitest::Test
   end
 
   def test_unknown_tool_transform_raises_in_strict_mode
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -3116,7 +3116,7 @@ class ToolLoopRunnerTest < Minitest::Test
       end.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, strict: true)
 
     assert_raises(ArgumentError) do
       runner.run(user_text: "hello")
@@ -3145,7 +3145,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -3155,7 +3155,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, strict: true)
 
     assert_raises(ArgumentError) do
       runner.run(user_text: "hello")
@@ -3199,7 +3199,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -3209,7 +3209,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, strict: true)
 
     assert_raises(ArgumentError) do
       runner.run(user_text: "hello")
@@ -3255,7 +3255,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -3265,7 +3265,7 @@ class ToolLoopRunnerTest < Minitest::Test
         type: :app,
       )
 
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, strict: true)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, strict: true)
 
     assert_raises(ArgumentError) do
       runner.run(user_text: "hello")
@@ -3324,7 +3324,7 @@ class ToolLoopRunnerTest < Minitest::Test
     assert_nil req1["tool_choice"]
   end
 
-  def test_tool_use_can_be_disabled_via_runtime
+  def test_tool_use_can_be_disabled_via_context
     requests = []
 
     adapter =
@@ -3360,11 +3360,11 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    runtime = TavernKit::PromptBuilder::Context.build({ tool_calling: { tool_use_mode: :disabled } }, type: :app)
+    context = TavernKit::PromptBuilder::Context.build({ tool_calling: { tool_use_mode: :disabled } }, type: :app)
 
     workspace = ToolCallEvalTestWorkspace.new
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
 
     result = runner.run(user_text: "hello")
     assert_equal "Done.", result[:assistant_text]
@@ -3491,7 +3491,7 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -3504,7 +3504,7 @@ class ToolLoopRunnerTest < Minitest::Test
 
     workspace = ToolCallEvalTestWorkspace.new(draft: { "big" => ("x" * 5_000) })
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, tool_use_mode: :enforced)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, tool_use_mode: :enforced)
 
     error = assert_raises(TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError) do
       runner.run(user_text: "workspace_id=#{workspace.id}")
@@ -3585,7 +3585,7 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    runtime =
+    context =
       TavernKit::PromptBuilder::Context.build(
         {
           tool_calling: {
@@ -3598,7 +3598,7 @@ class ToolLoopRunnerTest < Minitest::Test
 
     workspace = ToolCallEvalTestWorkspace.new(draft: { "big" => ("x" * 5_000) })
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = build_runner(client: client, model: "test-model", workspace: workspace, runtime: runtime, tool_use_mode: :enforced)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, tool_use_mode: :enforced)
 
     result = runner.run(user_text: "workspace_id=#{workspace.id}")
 

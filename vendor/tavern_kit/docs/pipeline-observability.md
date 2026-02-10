@@ -21,14 +21,25 @@ Scope:
 
 `Pipeline#call` always executes on `State`.
 
-### 2) Runtime payload contract
+### 2) Context payload contract
 
-`state.runtime` is the application-owned per-build runtime payload.
+`state.context` is the application-owned per-build context payload.
 
-- Runtime can be a typed runtime object (e.g. RisuAI runtime contract) or a
+- Context can be a typed context object (e.g. `RisuAI::Context`) or a
   `PromptBuilder::Context` generated from a Hash.
-- Runtime is passed from app/runner to steps; steps should treat it as
+- Context is passed from app/runner to steps; steps should treat it as
   read-mostly input and avoid replacing it after normalization.
+- Context should not be stored in state metadata (`state[:context]`) as a
+  fallback path.
+
+### 2.1) Step config resolution contract
+
+- Step defaults are defined at pipeline wiring time (`use_step ...` options).
+- Per-run overrides are supplied via `context.module_configs[step_name]`.
+- `Pipeline` deep-merges defaults + overrides and then resolves typed config
+  via step-local parser (`Step::Config.from_hash` or step-specific builder).
+- Unknown step keys in `context.module_configs` are ignored.
+- Known step config parse errors are treated as programmer errors (fail-fast).
 
 ### 3) Warnings are first-class
 

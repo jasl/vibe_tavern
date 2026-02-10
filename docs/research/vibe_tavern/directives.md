@@ -27,6 +27,14 @@ Related (separate protocol):
 - Tool calling (multi-turn, side effects): `docs/research/vibe_tavern/tool-calling.md`
 - Architecture overview: `docs/research/vibe_tavern/architecture.md`
 
+Prompt-build boundary (current):
+- Directives runners are protocol-layer components and do not parse prompt step
+  config directly.
+- Prompt step config is resolved by `PromptBuilder::Pipeline` using:
+  static step defaults + `context.module_configs` overrides.
+- Step-level config parsing is typed (`Step::Config.from_hash`) and fail-fast
+  for known step config errors.
+
 ## Conclusions (current)
 
 - Prefer `json_schema` (then `json_object`) for reliability; treat `prompt_only` as a last resort.
@@ -235,6 +243,11 @@ Fallbacks (when unsupported or invalid output):
    satisfy a caller-defined requirement (e.g. missing a required directive type),
    treat it as invalid and retry/fallback.
 
+Capability gate (current implementation):
+- Before attempting a mode, runner checks `RunnerConfig.capabilities`.
+- Unsupported structured modes are skipped with a structured attempt record
+  (`CAPABILITY_UNSUPPORTED`) instead of sending doomed requests.
+
 Key requirement: **flow continues**.
 - Runners do not crash on invalid JSON; they return categorized errors and either:
   - empty `directives` with a best-effort `assistant_text`, or
@@ -364,7 +377,7 @@ runner_config =
   TavernKit::VibeTavern::RunnerConfig.build(
     provider: "openrouter",
     model: model,
-    runtime: { directives: preset },
+    context: { directives: preset },
     llm_options_defaults: { temperature: 0.7 },
   )
 

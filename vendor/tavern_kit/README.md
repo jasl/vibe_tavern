@@ -2,7 +2,7 @@
 
 TavernKit is a Ruby prompt-building toolkit for LLM chat applications.
 
-It focuses on turning app-owned inputs (character/user/history/preset/lore/runtime)
+It focuses on turning app-owned inputs (character/user/history/preset/lore/context)
 into a provider-ready prompt plan and message payloads, with platform layers for:
 
 - **SillyTavern** (`TavernKit::SillyTavern`)
@@ -88,7 +88,7 @@ fingerprint = plan.fingerprint(dialect: :openai)
 ### RisuAI-style prompt building
 
 RisuAI pipelines are driven by a RisuAI preset hash (including `promptTemplate`)
-and app-owned runtime state (`state.runtime`) for parity-sensitive fields.
+and app-owned context state (`state.context`) for parity-sensitive fields.
 
 ```ruby
 require "json"
@@ -96,7 +96,7 @@ require "tavern_kit"
 
 risu_preset = JSON.parse(File.read("my_risu_preset.json"))
 
-runtime_input = {
+context_input = {
   chat_index: 123,
   message_index: 50,
   rng_word: "stable-seed",
@@ -110,7 +110,7 @@ plan =
     character character
     user TavernKit::User.new(name: "You")
     history history
-    runtime runtime_input
+    context context_input
     message "Hello."
   end
 
@@ -118,10 +118,19 @@ payload = plan.to_messages(dialect: :openai)
 ```
 
 Notes:
-- Runtime input accepts string/camelCase keys; it is normalized once at pipeline
+- Context input accepts string/camelCase keys; it is normalized once at pipeline
   entry. Internal code relies on canonical snake_case symbol keys.
+- `PromptBuilder.new(..., configs: {...})` can provide per-step config
+  overrides via `context.module_configs` while keeping context as the single
+  external input source.
 - `variables_store` is session-level state; persist it per chat (do not share
   across concurrent chats).
+
+PromptBuilder input contract:
+- Fixed keyword inputs are strict (`character`, `user`, `history`, `message`,
+  `preset`, `dialect`, `strict`, `llm_options`, etc.).
+- Unknown input keys fail fast (`ArgumentError`).
+- Step config parsing is step-owned and typed (`Step::Config.from_hash`).
 
 ## File ingestion (PNG / CHARX / BYAF)
 
@@ -146,12 +155,12 @@ end
 ZIP-based formats are read through `TavernKit::Archive::ZipReader` which enforces
 limits (entry count/size/total budget/path traversal/compression ratio).
 
-## Runtime + VariablesStore (app/pipeline synchronization)
+## Context + VariablesStore (app/pipeline synchronization)
 
 Two pieces of state commonly need to stay in sync between your app and the
 pipeline:
 
-- `state.runtime`: application-owned, per-build snapshot (chat indices, toggles,
+- `state.context`: application-owned, per-build snapshot (chat indices, toggles,
   metadata). Set once at pipeline entry; must not be replaced mid-pipeline.
 - `state.variables_store`: application-owned, session-level store (ST `var` +
   `globalvar`, plus RisuAI extensions). Persist it across turns within a chat.
@@ -163,7 +172,7 @@ See `docs/core-interface-design.md` for the full contract and
 
 - `strict true` is intended for tests/debugging (fail-fast on warnings).
 - `instrumenter TavernKit::PromptBuilder::Instrumenter::TraceCollector.new` enables
-  detailed stage traces and is meant for development only.
+  detailed step traces and is meant for development only.
 
 See `docs/pipeline-observability.md`.
 

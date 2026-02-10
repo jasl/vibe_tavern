@@ -5,7 +5,7 @@ multi-turn tool use reliable across OpenAI-compatible providers and models.
 
 Focus (now):
 - deterministic tool loop behavior (CI tests)
-- explicit configuration surface (runtime + presets)
+- explicit configuration surface (context + presets)
 - multi-model/provider evaluation harness (optional, OpenRouter)
 
 Out of scope (for now):
@@ -141,7 +141,7 @@ Compatibility hooks (opt-in):
 
 ### Tool use mode
 
-`runtime[:tool_calling][:tool_use_mode]`:
+`context[:tool_calling][:tool_use_mode]`:
 
 - `enforced`: require at least one tool call in the run
 - `relaxed`: best-effort; runs can succeed with zero tool calls
@@ -149,7 +149,7 @@ Compatibility hooks (opt-in):
 
 ### Tool failure policy (enforced mode)
 
-`runtime[:tool_calling][:tool_failure_policy]`:
+`context[:tool_calling][:tool_failure_policy]`:
 
 - `fatal` (default): fail the run if any tool ends with `ok=false`
 - `tolerated`: allow tool failures, but require at least one successful tool result (`ok=true`)
@@ -158,14 +158,14 @@ Compatibility hooks (opt-in):
 
 To reduce model variance and prevent context bloat:
 
-- `runtime[:tool_calling][:max_tool_args_bytes]` (default: `200_000`)
+- `context[:tool_calling][:max_tool_args_bytes]` (default: `200_000`)
   - oversized args are rejected before tool execution (`ARGUMENTS_TOO_LARGE`)
-- `runtime[:tool_calling][:max_tool_output_bytes]` (default: `200_000`)
+- `context[:tool_calling][:max_tool_output_bytes]` (default: `200_000`)
   - oversized tool outputs are replaced with a compact failure (`TOOL_OUTPUT_TOO_LARGE`)
 
 ### Per-turn tool call limit (optional)
 
-`runtime[:tool_calling][:max_tool_calls_per_turn]` (Integer):
+`context[:tool_calling][:max_tool_calls_per_turn]` (Integer):
 
 - if set, only the first N tool calls in a single assistant message are executed
 - the rest are ignored and recorded in the trace/events (`ignored_tool_calls_count`)
@@ -179,17 +179,17 @@ Stability-first default:
 Some providers occasionally return an empty final assistant message even after
 successful tool calls.
 
-- `runtime[:tool_calling][:fix_empty_final]` (default: `true`) can do a finalization retry
+- `context[:tool_calling][:fix_empty_final]` (default: `true`) can do a finalization retry
 - by default, that retry **does not send tools** (to avoid accidental re-calls)
-  - override: `runtime[:tool_calling][:fix_empty_final_disable_tools]=false`
+  - override: `context[:tool_calling][:fix_empty_final_disable_tools]=false`
 
-## Configuration surface (runtime + presets)
+## Configuration surface (context + presets)
 
-The source of truth is `runtime[:tool_calling]` (Hash). Presets are optional
+The source of truth is `context[:tool_calling]` (Hash). Presets are optional
 sugar to compose settings explicitly:
 
 ```ruby
-runtime_tool_calling =
+context_tool_calling =
   TavernKit::VibeTavern::ToolCalling::Presets.for(
     provider: "openrouter",
     model: model,
@@ -198,7 +198,7 @@ runtime_tool_calling =
 
 Provider/model request overrides:
 
-- `runtime[:tool_calling][:request_overrides]` is merged into the OpenAI-compatible request body.
+- `context[:tool_calling][:request_overrides]` is merged into the OpenAI-compatible request body.
 - Reserved keys are ignored to avoid cross-layer ownership bugs:
   `model`, `messages`, `tools`, `tool_choice`, `response_format`
 

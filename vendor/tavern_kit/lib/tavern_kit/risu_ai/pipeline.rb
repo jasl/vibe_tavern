@@ -12,13 +12,13 @@ module TavernKit
   module RisuAI
     # Default RisuAI prompt-builder step chain.
     Pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::RisuAI::PromptBuilder::Steps::Prepare, name: :prepare
-      use_step TavernKit::RisuAI::PromptBuilder::Steps::Memory, name: :memory
-      use_step TavernKit::RisuAI::PromptBuilder::Steps::TemplateAssembly, name: :template_assembly
-      use_step TavernKit::RisuAI::PromptBuilder::Steps::CBS, name: :cbs
-      use_step TavernKit::RisuAI::PromptBuilder::Steps::RegexScripts, name: :regex_scripts
-      use_step TavernKit::RisuAI::PromptBuilder::Steps::Triggers, name: :triggers
-      use_step TavernKit::RisuAI::PromptBuilder::Steps::PlanAssembly, name: :plan_assembly
+      use_step :prepare, TavernKit::RisuAI::PromptBuilder::Steps::Prepare
+      use_step :memory, TavernKit::RisuAI::PromptBuilder::Steps::Memory
+      use_step :template_assembly, TavernKit::RisuAI::PromptBuilder::Steps::TemplateAssembly
+      use_step :cbs, TavernKit::RisuAI::PromptBuilder::Steps::CBS
+      use_step :regex_scripts, TavernKit::RisuAI::PromptBuilder::Steps::RegexScripts
+      use_step :triggers, TavernKit::RisuAI::PromptBuilder::Steps::Triggers
+      use_step :plan_assembly, TavernKit::RisuAI::PromptBuilder::Steps::PlanAssembly
     end
   end
 end

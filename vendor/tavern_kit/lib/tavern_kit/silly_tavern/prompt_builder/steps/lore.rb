@@ -6,7 +6,7 @@ module TavernKit
       module Steps
       # ST World Info orchestration.
       #
-      # Stage contract is pinned in `docs/contracts/prompt-orchestration.md`.
+      # Step contract is pinned in `docs/contracts/prompt-orchestration.md`.
       class Lore < TavernKit::PromptBuilder::Step
         private
 
@@ -53,8 +53,8 @@ module TavernKit
           ctx.outlets = build_outlets(ctx.lore_result)
 
           if ctx.instrumenter
-            ctx.instrument(:stat, stage: :lore, key: :world_info_activated, value: ctx.lore_result.activated_entries.size)
-            ctx.instrument(:stat, stage: :lore, key: :world_info_tokens, value: ctx.lore_result.total_tokens)
+            ctx.instrument(:stat, step: :lore, key: :world_info_activated, value: ctx.lore_result.activated_entries.size)
+            ctx.instrument(:stat, step: :lore, key: :world_info_tokens, value: ctx.lore_result.total_tokens)
           end
         end
 

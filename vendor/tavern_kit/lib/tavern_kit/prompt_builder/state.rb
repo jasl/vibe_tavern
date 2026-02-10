@@ -111,7 +111,6 @@ module TavernKit
         @metadata = {}
         @instrumenter = nil
         @current_step = nil
-        @runtime = nil
         @lore_books = []
         @forced_world_info_activations = []
         @outlets = {}
@@ -132,14 +131,6 @@ module TavernKit
       end
 
       def strict? = @strict == true
-
-      def runtime
-        @runtime
-      end
-
-      def runtime=(value)
-        @runtime = value.is_a?(Hash) ? TavernKit::PromptBuilder::Context.build(value, type: :app) : value
-      end
 
       def context=(value)
         unless value.nil? || value.is_a?(TavernKit::PromptBuilder::Context)
@@ -207,7 +198,6 @@ module TavernKit
         copy.instance_variable_set(:@scan_context, @scan_context&.dup)
         copy.instance_variable_set(:@scan_injects, @scan_injects&.dup)
         copy.instance_variable_set(:@chat_scan_messages, @chat_scan_messages&.dup)
-        copy.instance_variable_set(:@runtime, @runtime)
         copy
       end
 
@@ -242,35 +232,18 @@ module TavernKit
 
       # Access arbitrary metadata.
       def [](key)
-        runtime_key = key.to_sym == :runtime
-        return @runtime if runtime_key && !@runtime.nil?
-        return @metadata[:runtime] if runtime_key
-
         @metadata[key]
       end
 
       def []=(key, value)
-        if key.to_sym == :runtime
-          self.runtime = value
-          return value
-        end
-
         @metadata[key] = value
       end
 
       def key?(key)
-        runtime_key = key.to_sym == :runtime
-        return true if runtime_key && !@runtime.nil?
-        return @metadata.key?(:runtime) if runtime_key
-
         @metadata.key?(key)
       end
 
       def fetch(key, default = nil, &block)
-        runtime_key = key.to_sym == :runtime
-        return @runtime if runtime_key && !@runtime.nil?
-        return @metadata[:runtime] if runtime_key && @metadata.key?(:runtime)
-
         @metadata.fetch(key, default, &block)
       end
 

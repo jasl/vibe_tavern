@@ -37,11 +37,11 @@ module TavernKit
           :special_tags,
           :policy_text_builder,
         ) do
-          def self.from_runtime(runtime)
-            raw = runtime&.[](:language_policy)
+          def self.from_context(context)
+            raw = context&.[](:language_policy)
             return new(enabled: false, target_lang: nil, style_hint: nil, special_tags: [], policy_text_builder: nil) if raw.nil?
 
-            raise ArgumentError, "runtime[:language_policy] must be a Hash" unless raw.is_a?(Hash)
+            raise ArgumentError, "context[:language_policy] must be a Hash" unless raw.is_a?(Hash)
             raw.each_key do |k|
               raise ArgumentError, "language_policy config keys must be Symbols (got #{k.class})" unless k.is_a?(Symbol)
             end

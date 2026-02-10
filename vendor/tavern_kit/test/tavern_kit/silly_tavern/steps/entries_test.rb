@@ -18,8 +18,8 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::EntriesTest < Minitest::Test
 
   def run_entries(ctx)
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Entries, name: :entries
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :entries, TavernKit::SillyTavern::PromptBuilder::Steps::Entries
     end.call(ctx)
   end
 

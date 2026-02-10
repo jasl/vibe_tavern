@@ -5,13 +5,63 @@ require_relative "test_helper"
 require_relative "../../lib/tavern_kit/vibe_tavern/prompt_runner"
 
 class PromptRunnerTest < Minitest::Test
-  def build_runner_config(runtime: nil, llm_options_defaults: nil, provider: "openrouter", model: "test-model")
-    TavernKit::VibeTavern::RunnerConfig.build(
-      provider: provider,
-      model: model,
-      runtime: runtime,
-      llm_options_defaults: llm_options_defaults,
-    )
+  def build_runner_config(
+    context: nil,
+    llm_options_defaults: nil,
+    provider: "openrouter",
+    model: "test-model",
+    capabilities_overrides: nil
+  )
+    config =
+      TavernKit::VibeTavern::RunnerConfig.build(
+        provider: provider,
+        model: model,
+        context: context,
+        llm_options_defaults: llm_options_defaults,
+      )
+
+    return config unless capabilities_overrides.is_a?(Hash)
+
+    capabilities = config.capabilities.with(**capabilities_overrides)
+    config.with(capabilities: capabilities)
+  end
+
+  def test_prompt_runner_rejects_tools_when_capability_is_disabled
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
+    runner_config =
+      build_runner_config(
+        capabilities_overrides: { supports_tools: false },
+      )
+
+    error =
+      assert_raises(ArgumentError) do
+        runner.build_request(
+          runner_config: runner_config,
+          history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+          llm_options: {
+            tools: [{ type: "function", function: { name: "state_get", parameters: { type: "object", properties: {} } } }],
+          },
+        )
+      end
+
+    assert_includes error.message, "does not support tools"
+  end
+
+  def test_prompt_runner_perform_stream_rejects_when_streaming_capability_is_disabled
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
+    runner_config =
+      build_runner_config(
+        capabilities_overrides: { supports_streaming: false },
+      )
+
+    prompt_request =
+      runner.build_request(
+        runner_config: runner_config,
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+      )
+
+    error = assert_raises(ArgumentError) { runner.perform_stream(prompt_request) { |_| nil } }
+    assert_includes error.message, "does not support streaming"
   end
 
   def test_prompt_runner_build_request_includes_system_message_and_applies_message_transforms
@@ -201,7 +251,7 @@ class PromptRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    runtime =
+    context =
       {
         output_tags: {
           enabled: true,
@@ -212,7 +262,7 @@ class PromptRunnerTest < Minitest::Test
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
     runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
-    runner_config = build_runner_config(runtime: runtime)
+    runner_config = build_runner_config(context: context)
 
     prompt_request =
       runner.build_request(

@@ -69,7 +69,7 @@ class VibeTavernTokenEstimationTest < ActiveSupport::TestCase
 
     pipeline =
       TavernKit::PromptBuilder::Pipeline.new do
-        use_step TavernKit::VibeTavern::PromptBuilder::Steps::Prepare, name: :prepare
+        use_step :prepare, TavernKit::VibeTavern::PromptBuilder::Steps::Prepare
       end
 
     pipeline.call(ctx)

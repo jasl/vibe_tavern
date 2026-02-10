@@ -11,7 +11,8 @@ module TavernKit
       PromptRequest =
         Data.define(
           :plan,
-          :runtime,
+          :context,
+          :capabilities,
           :messages,
           :options,
           :request,
@@ -21,7 +22,8 @@ module TavernKit
         ) do
           def initialize(
             plan:,
-            runtime:,
+            context:,
+            capabilities:,
             messages:,
             options:,
             request:,
@@ -31,7 +33,8 @@ module TavernKit
           )
             super(
               plan: plan,
-              runtime: runtime,
+              context: context,
+              capabilities: capabilities,
               messages: messages,
               options: options,
               request: request,
@@ -74,7 +77,7 @@ module TavernKit
         history = Array(history)
 
         system_text = system.to_s
-        runtime = runner_config.runtime
+        context = runner_config.context
         build_history =
           if system_text.empty?
             history
@@ -82,11 +85,10 @@ module TavernKit
             [TavernKit::PromptBuilder::Message.new(role: :system, content: system_text)] + history
           end
 
-        llm_options = deep_merge_hashes(runner_config.llm_options_defaults, normalize_llm_options(llm_options))
+        llm_options = TavernKit::Utils.deep_merge_hashes(runner_config.llm_options_defaults, normalize_llm_options(llm_options))
         plan =
-          TavernKit::PromptBuilder.build(pipeline: runner_config.pipeline) do
+          TavernKit::PromptBuilder.build(pipeline: runner_config.pipeline, context: context) do
             history build_history
-            runtime runtime if runtime
             variables_store variables_store if variables_store
             llm_options llm_options unless llm_options.empty?
             strict strict
@@ -105,9 +107,10 @@ module TavernKit
 
         tools_present = request.key?(:tools) || request.key?(:tool_choice)
         TavernKit::VibeTavern::Preflight.validate_request!(
+          capabilities: runner_config.capabilities,
           stream: request.fetch(:stream, false) == true,
           tools: tools_present,
-          response_format: request.key?(:response_format),
+          response_format: request.fetch(:response_format, nil),
         )
 
         message_transforms = Array(message_transforms).map(&:to_s).map(&:strip).reject(&:empty?)
@@ -123,7 +126,8 @@ module TavernKit
 
         PromptRequest.new(
           plan: plan,
-          runtime: runtime,
+          context: context,
+          capabilities: runner_config.capabilities,
           messages: messages,
           options: options,
           request: request,
@@ -181,6 +185,11 @@ module TavernKit
 
         if req.key?(:response_format)
           raise ArgumentError, "PromptRunner#perform_stream does not support response_format; use #perform instead"
+        end
+
+        capabilities = prompt_request.capabilities
+        if capabilities && !capabilities.supports_streaming
+          raise ArgumentError, "provider/model does not support streaming"
         end
 
         unless @client.respond_to?(:chat)
@@ -241,7 +250,7 @@ module TavernKit
         h = value.nil? ? {} : value
         raise ArgumentError, "llm_options must be a Hash" unless h.is_a?(Hash)
 
-        assert_symbol_keys!(h)
+        TavernKit::Utils.assert_symbol_keys!(h, path: "llm_options")
 
         # Streaming is an execution mode, not a request option in this layer.
         # Use PromptRunner#perform_stream for streaming chat-only runs.
@@ -252,24 +261,6 @@ module TavernKit
         h.delete(:model)
         h.delete(:messages)
         h
-      end
-
-      def assert_symbol_keys!(hash)
-        hash.each_key do |key|
-          raise ArgumentError, "Hash keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
-        end
-      end
-
-      def deep_merge_hashes(left, right)
-        out = (left.is_a?(Hash) ? left : {}).dup
-        (right.is_a?(Hash) ? right : {}).each do |key, value|
-          if out[key].is_a?(Hash) && value.is_a?(Hash)
-            out[key] = deep_merge_hashes(out[key], value)
-          else
-            out[key] = value
-          end
-        end
-        out
       end
     end
   end

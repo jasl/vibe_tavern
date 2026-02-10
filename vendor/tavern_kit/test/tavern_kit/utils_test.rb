@@ -21,6 +21,86 @@ class TavernKit::UtilsTest < Minitest::Test
     assert_equal({ "name" => "Test", "nested" => { "key" => "value" } }, result)
   end
 
+  def test_normalize_symbol_keyed_hash
+    assert_equal({}, TavernKit::Utils.normalize_symbol_keyed_hash(nil, path: "cfg"))
+
+    input = { a: { b: 1 } }
+    normalized = TavernKit::Utils.normalize_symbol_keyed_hash(input, path: "cfg")
+    assert_same input, normalized
+  end
+
+  def test_normalize_symbol_keyed_hash_rejects_non_hash
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::Utils.normalize_symbol_keyed_hash("nope", path: "cfg")
+      end
+    assert_includes error.message, "cfg must be a Hash"
+  end
+
+  def test_assert_deep_symbol_keys_bubbles_path
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::Utils.assert_deep_symbol_keys!({ a: { "b" => 1 } }, path: "cfg")
+      end
+    assert_includes error.message, "cfg.a keys must be Symbols"
+  end
+
+  def test_assert_symbol_keys_rejects_non_hash
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::Utils.assert_symbol_keys!("nope", path: "cfg")
+      end
+    assert_includes error.message, "cfg must be a Hash"
+  end
+
+  def test_assert_symbol_keys_rejects_non_symbol_keys
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::Utils.assert_symbol_keys!({ "a" => 1 }, path: "cfg")
+      end
+    assert_includes error.message, "cfg keys must be Symbols"
+  end
+
+  def test_normalize_request_overrides
+    assert_equal({}, TavernKit::Utils.normalize_request_overrides(nil))
+
+    input = { a: { b: 1 } }
+    normalized = TavernKit::Utils.normalize_request_overrides(input)
+    assert_same input, normalized
+
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::Utils.normalize_request_overrides({ "a" => 1 })
+      end
+    assert_includes error.message, "request_overrides keys must be Symbols"
+  end
+
+  def test_normalize_string_list
+    assert_nil TavernKit::Utils.normalize_string_list(nil)
+    assert_nil TavernKit::Utils.normalize_string_list([])
+    assert_nil TavernKit::Utils.normalize_string_list([" ", ""])
+
+    assert_equal ["a"], TavernKit::Utils.normalize_string_list("a")
+    assert_equal ["a"], TavernKit::Utils.normalize_string_list(["a"])
+    assert_equal ["a", "b"], TavernKit::Utils.normalize_string_list(["a", "  b  "])
+  end
+
+  def test_explicit_empty_string_list
+    assert TavernKit::Utils.explicit_empty_string_list?("")
+    assert TavernKit::Utils.explicit_empty_string_list?(" , ")
+    assert TavernKit::Utils.explicit_empty_string_list?([])
+    assert TavernKit::Utils.explicit_empty_string_list?([" ", ""])
+    refute TavernKit::Utils.explicit_empty_string_list?(nil)
+    refute TavernKit::Utils.explicit_empty_string_list?("a")
+  end
+
+  def test_merge_string_list
+    assert_nil TavernKit::Utils.merge_string_list(["a"], nil)
+    assert_equal [], TavernKit::Utils.merge_string_list(["a"], "")
+    assert_equal ["a"], TavernKit::Utils.merge_string_list(nil, ["a"])
+    assert_equal ["a", "b"], TavernKit::Utils.merge_string_list(["a"], ["b", "a"])
+  end
+
   def test_presence_with_value
     assert_equal "hello", TavernKit::Utils.presence("hello")
   end

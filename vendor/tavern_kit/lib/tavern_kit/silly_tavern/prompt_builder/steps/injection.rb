@@ -4,7 +4,7 @@ module TavernKit
   module SillyTavern
     module PromptBuilder
       module Steps
-      # ST injection stage (extension prompts + Author's Note + persona).
+      # ST injection step (extension prompts + Author's Note + persona).
       class Injection < TavernKit::PromptBuilder::Step
         private
 

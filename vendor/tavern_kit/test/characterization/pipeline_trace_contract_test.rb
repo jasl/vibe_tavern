@@ -5,7 +5,7 @@ require "test_helper"
 class PipelineTraceContractTest < Minitest::Test
   # Contract reference:
   # - docs/pipeline-observability.md (TraceCollector semantics)
-  EXPECTED_STAGE_NAMES = %i[
+  EXPECTED_STEP_NAMES = %i[
     hooks
     lore
     entries
@@ -17,7 +17,7 @@ class PipelineTraceContractTest < Minitest::Test
     trimming
   ].freeze
 
-  def test_trace_collector_records_stable_stage_order
+  def test_trace_collector_records_stable_step_order
     instrumenter = TavernKit::PromptBuilder::Instrumenter::TraceCollector.new
 
     _plan = TavernKit::SillyTavern.build do
@@ -29,6 +29,6 @@ class PipelineTraceContractTest < Minitest::Test
       message "Hello"
     end
 
-    assert_equal EXPECTED_STAGE_NAMES, instrumenter.stages.map(&:name)
+    assert_equal EXPECTED_STEP_NAMES, instrumenter.steps.map(&:name)
   end
 end

@@ -4,7 +4,7 @@ module TavernKit
   module RisuAI
     module PromptBuilder
       module Steps
-      # Final stage: build a PromptBuilder::Plan from accumulated blocks.
+      # Final step: build a PromptBuilder::Plan from accumulated blocks.
       class PlanAssembly < TavernKit::PromptBuilder::Step
         private
 

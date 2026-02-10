@@ -5,7 +5,7 @@ module TavernKit
     module ToolCalling
       # Provider/model compatibility shims applied to outbound OpenAI-style messages.
       #
-      # Runtime stores only transform *names* so it stays serializable and can be
+      # Context stores only transform *names* so it stays serializable and can be
       # merged via presets. Upper layers can register additional transforms if
       # needed.
       module MessageTransforms

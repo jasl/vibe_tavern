@@ -168,18 +168,18 @@ module TavernKit
   # Use the built-in exception cause chain (raise ..., cause: e) to retain the
   # original error for debugging.
   class PipelineError < Error
-    attr_reader :stage
+    attr_reader :step
 
-    def initialize(message, stage:)
-      @stage = stage
-      super("#{message} (stage: #{stage})")
+    def initialize(message, step:)
+      @step = step
+      super("#{message} (step: #{step})")
     end
   end
 
   class MaxTokensExceededError < PipelineError
     attr_reader :estimated_tokens, :max_tokens, :reserve_tokens, :limit_tokens
 
-    def initialize(estimated_tokens:, max_tokens:, reserve_tokens: 0, stage:)
+    def initialize(estimated_tokens:, max_tokens:, reserve_tokens: 0, step:)
       @estimated_tokens = Integer(estimated_tokens)
       @max_tokens = Integer(max_tokens)
       @reserve_tokens = Integer(reserve_tokens)
@@ -193,7 +193,7 @@ module TavernKit
           @max_tokens,
           @reserve_tokens,
         ),
-        stage: stage,
+        step: step,
       )
     end
   end

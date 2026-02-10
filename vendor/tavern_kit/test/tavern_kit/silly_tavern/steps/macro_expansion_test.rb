@@ -11,7 +11,7 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::MacroExpansionTest < Minites
 
   def run_macro_expansion(ctx)
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::MacroExpansion, name: :macro_expansion
+      use_step :macro_expansion, TavernKit::SillyTavern::PromptBuilder::Steps::MacroExpansion
     end.call(ctx)
   end
 

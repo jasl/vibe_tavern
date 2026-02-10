@@ -10,7 +10,7 @@ module TavernKit
       # symbol keys, typically shaped like:
       #   { ok: true|false, tool_name: "...", data: {...}, warnings: [...], errors: [...] }
       #
-      # Runtime stores only transform *names* so it stays serializable and can
+      # Context stores only transform *names* so it stays serializable and can
       # be merged via presets. Upper layers can register additional transforms
       # if needed.
       module ToolResultTransforms

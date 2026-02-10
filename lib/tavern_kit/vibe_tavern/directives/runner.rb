@@ -49,12 +49,13 @@ module TavernKit
           result_validator: nil
         )
           attempts = []
+          capabilities = @runner_config.capabilities
 
           cfg = @runner_config.directives
           retry_budget = cfg.repair_retry_count
 
           base_llm_options =
-            deep_merge_hashes(
+            TavernKit::Utils.deep_merge_hashes(
               cfg.request_overrides,
               normalize_llm_options(llm_options),
             )
@@ -63,7 +64,7 @@ module TavernKit
 
           base_structured_output_options =
             if structured_output_options.is_a?(Hash)
-              assert_symbol_keys!(structured_output_options)
+              TavernKit::Utils.assert_symbol_keys!(structured_output_options, path: "structured_output_options")
               structured_output_options.dup
             else
               {}
@@ -98,7 +99,7 @@ module TavernKit
               output_instructions,
             ].map(&:to_s).map(&:strip).reject(&:empty?).join("\n\n")
 
-          effective_modes = cfg.modes
+          effective_modes = filter_supported_modes(cfg.modes, capabilities: capabilities, attempts: attempts)
           message_transforms = cfg.message_transforms
           response_transforms = cfg.response_transforms
 
@@ -114,7 +115,7 @@ module TavernKit
               system_text = [system_text, repair_instructions(attempts.last)].join("\n\n") if repair
 
               mode_overrides = mode == :prompt_only ? prompt_only_request_overrides : structured_request_overrides
-              llm_options_hash = deep_merge_hashes(base_llm_options, mode_overrides)
+              llm_options_hash = TavernKit::Utils.deep_merge_hashes(base_llm_options, mode_overrides)
 
               llm_options_hash.delete(:response_format)
               llm_options_hash[:response_format] = response_format if response_format
@@ -172,6 +173,49 @@ module TavernKit
         end
 
         private
+
+        def filter_supported_modes(modes, capabilities:, attempts:)
+          normalized_modes =
+            Array(modes)
+              .map { |mode| mode.to_s.strip.downcase.tr("-", "_").to_sym }
+              .select { |mode| TavernKit::VibeTavern::Directives::DEFAULT_MODES.include?(mode) }
+
+          normalized_modes.each_with_object([]) do |mode, out|
+            if mode_supported?(mode, capabilities)
+              out << mode
+              next
+            end
+
+            attempts << attempt_skipped_mode(mode)
+          end
+        end
+
+        def mode_supported?(mode, capabilities)
+          return true if mode == :prompt_only
+          return false unless capabilities
+
+          case mode
+          when :json_schema
+            capabilities.supports_response_format_json_schema
+          when :json_object
+            capabilities.supports_response_format_json_object
+          else
+            true
+          end
+        end
+
+        def attempt_skipped_mode(mode)
+          {
+            mode: mode,
+            ok: false,
+            skipped: true,
+            structured_output_error: {
+              code: "CAPABILITY_UNSUPPORTED",
+              message: "mode #{mode} is not supported by the current provider/model capabilities",
+            },
+            semantic_error: nil,
+          }
+        end
 
         def response_format_for(mode, schema_name:, allowed_types:)
           case mode
@@ -350,7 +394,7 @@ module TavernKit
           h = value.nil? ? {} : value
           raise ArgumentError, "llm_options must be a Hash" unless h.is_a?(Hash)
 
-          assert_symbol_keys!(h)
+          TavernKit::Utils.assert_symbol_keys!(h, path: "llm_options")
 
           h.delete(:model)
           h.delete(:messages)
@@ -360,24 +404,6 @@ module TavernKit
         def validate_llm_options!(llm_options)
           invalid = llm_options.keys & RESERVED_LLM_OPTIONS_KEYS
           raise ArgumentError, "directives llm_options contains reserved keys: #{invalid.inspect}" if invalid.any?
-        end
-
-        def assert_symbol_keys!(hash)
-          hash.each_key do |k|
-            raise ArgumentError, "Hash keys must be Symbols (got #{k.class})" unless k.is_a?(Symbol)
-          end
-        end
-
-        def deep_merge_hashes(left, right)
-          out = (left.is_a?(Hash) ? left : {}).dup
-          (right.is_a?(Hash) ? right : {}).each do |k, v|
-            if out[k].is_a?(Hash) && v.is_a?(Hash)
-              out[k] = deep_merge_hashes(out[k], v)
-            else
-              out[k] = v
-            end
-          end
-          out
         end
       end
     end

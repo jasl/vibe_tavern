@@ -126,7 +126,7 @@ class TavernKit::PromptBuilder::PlanTest < Minitest::Test
 
   def test_trace
     trace = TavernKit::PromptBuilder::Trace.new(
-      stages: [],
+      steps: [],
       fingerprint: "fp",
       started_at: Time.now,
       finished_at: Time.now,

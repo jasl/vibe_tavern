@@ -102,11 +102,11 @@ class TrimmerContractTest < Minitest::Test
         max_tokens: 10,
         reserve_tokens: 9,
         token_estimator: estimator,
-        stage: :trimming,
+        step: :trimming,
       )
     end
 
-    assert_equal :trimming, error.stage
+    assert_equal :trimming, error.step
     assert_operator error.estimated_tokens, :>, error.limit_tokens
   end
 end

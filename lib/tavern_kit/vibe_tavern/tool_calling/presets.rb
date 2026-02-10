@@ -3,10 +3,10 @@
 module TavernKit
   module VibeTavern
     module ToolCalling
-      # Small helpers to build `runtime[:tool_calling]` hashes.
+      # Small helpers to build `context[:tool_calling]` hashes.
       #
       # "Presets" are intentionally optional sugar: the source of truth is the
-      # runtime hash itself so upper layers (scripts/app) can compose settings
+      # context hash itself so upper layers (scripts/app) can compose settings
       # without hidden behavior.
       module Presets
         module_function
@@ -17,7 +17,7 @@ module TavernKit
         # - start from a known baseline
         # - merge additional provider/model-specific presets on top
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def default_tool_calling
           tool_calling(
             tool_use_mode: :relaxed,
@@ -33,9 +33,9 @@ module TavernKit
           )
         end
 
-        # Generic tool-calling runtime configuration.
+        # Generic tool-calling context configuration.
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def tool_calling(
           tool_use_mode: :enforced,
           tool_failure_policy: nil,
@@ -74,16 +74,16 @@ module TavernKit
           h[:response_transforms] = response_transforms unless response_transforms.nil?
           h[:tool_call_transforms] = tool_call_transforms unless tool_call_transforms.nil?
           h[:tool_result_transforms] = tool_result_transforms unless tool_result_transforms.nil?
-          h[:request_overrides] = normalize_request_overrides(request_overrides) unless request_overrides.nil?
+          h[:request_overrides] = TavernKit::Utils.normalize_request_overrides(request_overrides) unless request_overrides.nil?
 
           h
         end
 
-        # Wrap a request overrides hash into a `runtime[:tool_calling]` shape.
+        # Wrap a request overrides hash into a `context[:tool_calling]` shape.
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def request_overrides(overrides)
-          { request_overrides: normalize_request_overrides(overrides) }
+          { request_overrides: TavernKit::Utils.normalize_request_overrides(overrides) }
         end
 
         def message_transforms(*names)
@@ -112,7 +112,7 @@ module TavernKit
         # must remain opt-in via presets so we don't accidentally send
         # non-standard fields to strict providers.
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def provider_defaults(provider, **kwargs)
           case provider.to_s.strip.downcase.tr("-", "_")
           when "openrouter"
@@ -131,7 +131,7 @@ module TavernKit
 
         # Optional, opinionated model defaults.
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def model_defaults(model)
           m = model.to_s.strip
           return {} if m.empty?
@@ -157,7 +157,7 @@ module TavernKit
         # Convenience helper to build a baseline tool-calling config for a given
         # OpenAI-compatible provider/model combination.
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def for(provider:, model: nil, **kwargs)
           merge(
             default_tool_calling,
@@ -166,14 +166,14 @@ module TavernKit
           )
         end
 
-        # Merge multiple `runtime[:tool_calling]` hashes into one.
+        # Merge multiple `context[:tool_calling]` hashes into one.
         #
         # Semantics:
         # - request_overrides: deep-merged (Hash only)
         # - tool_allowlist/tool_denylist and *_transforms: merged as unique string lists
         # - everything else: last write wins
         #
-        # @return [Hash] a merged hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a merged hash suitable for `context[:tool_calling]`
         def merge(*configs)
           Array(configs).compact.reduce({}) do |acc, cfg|
             deep_merge_tool_calling(acc, cfg.is_a?(Hash) ? cfg : {})
@@ -182,8 +182,8 @@ module TavernKit
 
         def openrouter_tool_calling(route: nil, transforms: nil, provider_only: nil, provider_order: nil, provider_ignore: nil, request_overrides: nil)
           merged_overrides =
-            deep_merge_hashes(
-              normalize_request_overrides(
+            TavernKit::Utils.deep_merge_hashes(
+              TavernKit::Utils.normalize_request_overrides(
                 openrouter_routing(
                   route: route,
                   transforms: transforms,
@@ -192,7 +192,7 @@ module TavernKit
                   provider_ignore: provider_ignore,
                 ),
               ),
-              normalize_request_overrides(request_overrides),
+              TavernKit::Utils.normalize_request_overrides(request_overrides),
             )
 
           tool_calling(
@@ -206,7 +206,7 @@ module TavernKit
         # - Optionally force sequential tool calls (`parallel_tool_calls: false`)
         # - Keep optional text-tag fallback disabled unless explicitly requested
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def openai_compatible_reliability(parallel_tool_calls: nil, enable_content_tag_fallback: false)
           response_transforms = [
             "assistant_function_call_to_tool_calls",
@@ -237,7 +237,7 @@ module TavernKit
         #
         # Keep this opt-in to avoid affecting normal OpenAI-compatible paths.
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def content_tag_tool_call_fallback
           tool_calling(
             response_transforms: ["assistant_content_tool_call_tags_to_tool_calls"],
@@ -246,7 +246,7 @@ module TavernKit
 
         # DeepSeek-compatible compatibility defaults observed in practice.
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def deepseek_openrouter_compat
           tool_calling(
             message_transforms: ["assistant_tool_calls_reasoning_content_empty_if_missing"],
@@ -255,7 +255,7 @@ module TavernKit
 
         # Gemini-compatible compatibility defaults observed in practice.
         #
-        # @return [Hash] a hash suitable for `runtime[:tool_calling]`
+        # @return [Hash] a hash suitable for `context[:tool_calling]`
         def gemini_openrouter_compat
           tool_calling(
             message_transforms: ["assistant_tool_calls_signature_skip_validator_if_missing"],
@@ -276,9 +276,9 @@ module TavernKit
           end
 
           provider = {}
-          only = normalize_string_list(provider_only) if provider_only
-          order = normalize_string_list(provider_order) if provider_order
-          ignore = normalize_string_list(provider_ignore) if provider_ignore
+          only = TavernKit::Utils.normalize_string_list(provider_only) if provider_only
+          order = TavernKit::Utils.normalize_string_list(provider_order) if provider_order
+          ignore = TavernKit::Utils.normalize_string_list(provider_ignore) if provider_ignore
 
           provider[:only] = only if only
           provider[:order] = order if order
@@ -287,12 +287,6 @@ module TavernKit
 
           overrides
         end
-
-        def normalize_string_list(value)
-          list = Array(value).map { |v| v.to_s.strip }.reject(&:empty?)
-          list.empty? ? nil : list
-        end
-        private_class_method :normalize_string_list
 
         def deep_merge_tool_calling(left, right)
           out = (left.is_a?(Hash) ? left : {}).dup
@@ -303,13 +297,13 @@ module TavernKit
             case key
             when :request_overrides
               merged =
-                deep_merge_hashes(
-                  normalize_request_overrides(out[:request_overrides]),
-                  normalize_request_overrides(v),
+                TavernKit::Utils.deep_merge_hashes(
+                  TavernKit::Utils.normalize_request_overrides(out[:request_overrides]),
+                  TavernKit::Utils.normalize_request_overrides(v),
                 )
               out[:request_overrides] = merged
             when :tool_allowlist, :tool_denylist, :message_transforms, :tool_transforms, :response_transforms, :tool_call_transforms, :tool_result_transforms
-              out[key] = merge_string_list(out[key], v)
+              out[key] = TavernKit::Utils.merge_string_list(out[key], v)
             else
               out[key] = v
             end
@@ -325,71 +319,6 @@ module TavernKit
           key
         end
         private_class_method :canonical_tool_calling_key
-
-        def merge_string_list(left, right)
-          return nil if right.nil?
-
-          right_list = normalize_string_list(right)
-          return [] if explicit_empty_string_list?(right)
-
-          left_list = normalize_string_list(left)
-          return right_list if left_list.nil?
-
-          (left_list + right_list).uniq
-        end
-        private_class_method :merge_string_list
-
-        def explicit_empty_string_list?(value)
-          case value
-          when String
-            value.split(",").map(&:strip).reject(&:empty?).empty?
-          when Array
-            value.map { |v| v.to_s.strip }.reject(&:empty?).empty?
-          else
-            false
-          end
-        end
-        private_class_method :explicit_empty_string_list?
-
-        def normalize_request_overrides(value)
-          return {} if value.nil?
-          raise ArgumentError, "request_overrides must be a Hash" unless value.is_a?(Hash)
-
-          assert_deep_symbol_keys!(value)
-          value
-        end
-        private_class_method :normalize_request_overrides
-
-        def assert_deep_symbol_keys!(value, path: "request_overrides")
-          case value
-          when Hash
-            value.each do |k, v|
-              unless k.is_a?(Symbol)
-                raise ArgumentError, "#{path} keys must be Symbols (got #{k.class})"
-              end
-
-              assert_deep_symbol_keys!(v, path: "#{path}.#{k}")
-            end
-          when Array
-            value.each_with_index do |v, idx|
-              assert_deep_symbol_keys!(v, path: "#{path}[#{idx}]")
-            end
-          end
-        end
-        private_class_method :assert_deep_symbol_keys!
-
-        def deep_merge_hashes(left, right)
-          out = (left.is_a?(Hash) ? left : {}).dup
-          (right.is_a?(Hash) ? right : {}).each do |k, v|
-            if out[k].is_a?(Hash) && v.is_a?(Hash)
-              out[k] = deep_merge_hashes(out[k], v)
-            else
-              out[k] = v
-            end
-          end
-          out
-        end
-        private_class_method :deep_merge_hashes
       end
     end
   end

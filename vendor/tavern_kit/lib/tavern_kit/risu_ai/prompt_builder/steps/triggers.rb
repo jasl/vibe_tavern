@@ -4,7 +4,7 @@ module TavernKit
   module RisuAI
     module PromptBuilder
       module Steps
-        # Stage: triggers (tolerant).
+        # Step: triggers (tolerant).
         #
         # This step is intentionally minimal: it executes triggers against an
         # in-memory "chat" hash and stores the resulting scriptstate back into ctx
@@ -16,8 +16,15 @@ module TavernKit
             triggers = ctx[:risuai_triggers]
             return unless triggers.is_a?(Array) && triggers.any?
 
-            runtime = ctx.runtime
-            chat_index = runtime ? runtime.chat_index.to_i : -1
+            context = ctx.context
+            chat_index =
+              if context.respond_to?(:chat_index)
+                context.chat_index.to_i
+              elsif context.respond_to?(:[]) && context.key?(:chat_index)
+                context[:chat_index].to_i
+              else
+                -1
+              end
 
             ctx.variables_store!
 

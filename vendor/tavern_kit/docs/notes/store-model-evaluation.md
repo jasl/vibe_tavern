@@ -26,7 +26,7 @@ We need a safe, typed, validated way to access JSONB fields in Rails models with
 
 ## Current EasyTalk + EasyTalkCoder Approach (Playground)
 - Uses `serialize :jsonb, coder: EasyTalkCoder.new(SchemaClass)` for JSONB columns.
-- EasyTalk provides a single schema source with JSON Schema output and runtime validation.
+- EasyTalk provides a single schema source with JSON Schema output and execution-time validation.
 - Conversation settings extend EasyTalk to include `x-ui` and `x-storage` for schema-driven UI and storage mapping (`ConversationSettings::Base`).
 - Schema bundle is already wired into UI rendering and server-side field enumeration.
 - Works for nested schemas via `ConversationSettings::NestedSchemaSupport` (custom extension).

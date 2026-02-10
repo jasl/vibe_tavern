@@ -863,9 +863,9 @@ run_task =
         timeout: client_timeout,
       )
 
-    runtime_inputs = { directives: directives_preset }
+    context_inputs = { directives: directives_preset }
     if language_policy_enabled && language_policy_target_lang
-      runtime_inputs[:language_policy] = {
+      context_inputs[:language_policy] = {
         enabled: true,
         target_lang: language_policy_target_lang,
       }
@@ -875,7 +875,7 @@ run_task =
       TavernKit::VibeTavern::RunnerConfig.build(
         provider: "openrouter",
         model: model,
-        runtime: runtime_inputs,
+        context: context_inputs,
         llm_options_defaults: llm_options_defaults,
       )
 

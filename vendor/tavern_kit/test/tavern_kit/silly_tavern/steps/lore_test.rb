@@ -26,8 +26,8 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::LoreTest < Minitest::Test
     )
 
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Lore, name: :lore
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :lore, TavernKit::SillyTavern::PromptBuilder::Steps::Lore
     end
 
     pipeline.call(ctx)
@@ -58,8 +58,8 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::LoreTest < Minitest::Test
     )
 
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Lore, name: :lore
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :lore, TavernKit::SillyTavern::PromptBuilder::Steps::Lore
     end
 
     pipeline.call(ctx)
@@ -86,8 +86,8 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::LoreTest < Minitest::Test
     ctx = build_ctx(lore_books: [book], user_message: "hello")
 
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Lore, name: :lore
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :lore, TavernKit::SillyTavern::PromptBuilder::Steps::Lore
     end
 
     pipeline.call(ctx)
@@ -116,8 +116,8 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::LoreTest < Minitest::Test
       )
 
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Lore, name: :lore
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :lore, TavernKit::SillyTavern::PromptBuilder::Steps::Lore
     end
 
     pipeline.call(ctx)
@@ -149,8 +149,8 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::LoreTest < Minitest::Test
     ctx = build_ctx(lore_books: [book], user_message: "No keyword in messages.", preset: preset)
 
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Lore, name: :lore
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :lore, TavernKit::SillyTavern::PromptBuilder::Steps::Lore
     end
 
     pipeline.call(ctx)
@@ -182,8 +182,8 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::LoreTest < Minitest::Test
     ctx = build_ctx(lore_books: [book], user_message: "No keyword in messages.", preset: preset)
 
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Lore, name: :lore
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :lore, TavernKit::SillyTavern::PromptBuilder::Steps::Lore
     end
 
     pipeline.call(ctx)
@@ -217,8 +217,8 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::LoreTest < Minitest::Test
       )
 
     pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Lore, name: :lore
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :lore, TavernKit::SillyTavern::PromptBuilder::Steps::Lore
     end
 
     pipeline.call(ctx)

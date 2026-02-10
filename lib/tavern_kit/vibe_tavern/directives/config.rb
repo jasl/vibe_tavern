@@ -17,15 +17,15 @@ module TavernKit
           :message_transforms,
           :response_transforms,
         ) do
-          def self.from_runtime(runtime, provider:, model: nil)
+          def self.from_context(context, provider:, model: nil)
             base =
               TavernKit::VibeTavern::Directives::Presets.for(
                 provider: provider,
                 model: model,
               )
 
-            raw = runtime&.[](:directives)
-            raise ArgumentError, "runtime[:directives] must be a Hash" unless raw.nil? || raw.is_a?(Hash)
+            raw = context&.[](:directives)
+            raise ArgumentError, "context[:directives] must be a Hash" unless raw.nil? || raw.is_a?(Hash)
 
             merged =
               TavernKit::VibeTavern::Directives::Presets.merge(
@@ -38,7 +38,7 @@ module TavernKit
 
           def self.build_from_hash(raw)
             raise ArgumentError, "directives config must be a Hash" unless raw.is_a?(Hash)
-            assert_symbol_keys!(raw)
+            TavernKit::Utils.assert_symbol_keys!(raw, path: "directives config")
 
             modes =
               Array(raw.fetch(:modes, DEFAULT_MODES))
@@ -50,13 +50,9 @@ module TavernKit
             repair_retry_count = integer_or_default(repair_retry_count, default: 1)
             repair_retry_count = 0 if repair_retry_count.negative?
 
-            request_overrides = hash_or_empty(raw.fetch(:request_overrides, {}))
-            structured_request_overrides = hash_or_empty(raw.fetch(:structured_request_overrides, {}))
-            prompt_only_request_overrides = hash_or_empty(raw.fetch(:prompt_only_request_overrides, {}))
-
-            assert_symbol_keys!(request_overrides)
-            assert_symbol_keys!(structured_request_overrides)
-            assert_symbol_keys!(prompt_only_request_overrides)
+            request_overrides = TavernKit::Utils.normalize_symbol_keyed_hash(raw.fetch(:request_overrides, {}), path: "directives.request_overrides")
+            structured_request_overrides = TavernKit::Utils.normalize_symbol_keyed_hash(raw.fetch(:structured_request_overrides, {}), path: "directives.structured_request_overrides")
+            prompt_only_request_overrides = TavernKit::Utils.normalize_symbol_keyed_hash(raw.fetch(:prompt_only_request_overrides, {}), path: "directives.prompt_only_request_overrides")
 
             message_transforms = normalize_string_array(raw.fetch(:message_transforms, nil))
             response_transforms = normalize_string_array(raw.fetch(:response_transforms, nil))
@@ -72,14 +68,6 @@ module TavernKit
             )
           end
 
-          def self.hash_or_empty(value)
-            return {} if value.nil?
-            raise ArgumentError, "config must be a Hash" unless value.is_a?(Hash)
-
-            value
-          end
-          private_class_method :hash_or_empty
-
           def self.integer_or_default(value, default:)
             Integer(value)
           rescue ArgumentError, TypeError
@@ -91,13 +79,6 @@ module TavernKit
             Array(value).map { |v| v.to_s.strip }.reject(&:empty?)
           end
           private_class_method :normalize_string_array
-
-          def self.assert_symbol_keys!(hash)
-            hash.each_key do |k|
-              raise ArgumentError, "config keys must be Symbols (got #{k.class})" unless k.is_a?(Symbol)
-            end
-          end
-          private_class_method :assert_symbol_keys!
         end
     end
   end

@@ -89,12 +89,12 @@ Evidence:
 - Guardrails suite (contracts): `test/characterization/*_contract_test.rb`
 - Integration: `test/integration/silly_tavern_build_test.rb`
 - Prompt infra: `test/tavern_kit/trimmer_test.rb`,
-  `test/tavern_kit/prompt/dialects_test.rb`
+  `test/tavern_kit/prompt_builder/dialects_test.rb`
 
 ## RisuAI Layer (Prompt building)
 
 Delivered:
-- Runtime contract (`ctx.runtime`), CBS engine + macros + environment
+- Context contract (`ctx.context`), CBS engine + macros + environment
 - Lorebook engine + decorator parser
 - Template cards, regex scripts, triggers (prompt-building-safe effects)
 - Memory integration surface (interface + step hooks; algorithms app-owned)
@@ -111,7 +111,7 @@ Evidence:
   - `test/integration/risuai_memory_test.rb`
 
 Policy (by design):
-- UI/DB/network I/O macros/effects are deferred; app layer injects state via runtime metadata/adapters.
+- UI/DB/network I/O macros/effects are deferred; app layer injects state via context metadata/adapters.
 
 ## Docs + hardening
 

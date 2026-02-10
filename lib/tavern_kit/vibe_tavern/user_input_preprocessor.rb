@@ -16,14 +16,14 @@ module TavernKit
         # @param text [String]
         # @param variables_store [TavernKit::VariablesStore::Base]
         # @param assigns [Hash] Liquid assigns
-        # @param runtime [TavernKit::PromptBuilder::Context, nil] used for toggle lookup
+        # @param context [TavernKit::PromptBuilder::Context, nil] used for toggle lookup
         # @param enabled [Boolean, nil] override toggle lookup
-        def call(text, variables_store:, assigns: {}, runtime: nil, enabled: nil, strict: false, on_error: :passthrough, registers: {})
-          enabled = enabled.nil? ? enabled_from_runtime(runtime) : enabled
+        def call(text, variables_store:, assigns: {}, context: nil, enabled: nil, strict: false, on_error: :passthrough, registers: {})
+          enabled = enabled.nil? ? enabled_from_context(context) : enabled
           return text.to_s unless enabled
 
           merged_registers = registers.is_a?(Hash) ? registers.dup : {}
-          merged_registers[:runtime] ||= runtime if runtime
+          merged_registers[:context] ||= context if context
 
           TavernKit::VibeTavern::LiquidMacros.render(
             text,
@@ -35,14 +35,14 @@ module TavernKit
           )
         end
 
-        def enabled_from_runtime(runtime, default: false)
-          return default unless runtime
+        def enabled_from_context(context, default: false)
+          return default unless context
 
           toggles =
-            if runtime.respond_to?(:toggles)
-              runtime.toggles
+            if context.respond_to?(:toggles)
+              context.toggles
             else
-              runtime[:toggles]
+              context[:toggles]
             end
 
           return default unless toggles.is_a?(Hash)

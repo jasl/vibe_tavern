@@ -40,7 +40,7 @@ module TavernKit
 
         raise e if e.is_a?(TavernKit::PipelineError)
 
-        raise TavernKit::PipelineError.new("#{e.class}: #{e.message}", stage: step), cause: e
+        raise TavernKit::PipelineError.new("#{e.class}: #{e.message}", step: step), cause: e
       ensure
         state.current_step = previous_step if state
       end

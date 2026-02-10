@@ -5,7 +5,7 @@ require "test_helper"
 class TavernKit::SillyTavern::PromptBuilder::Steps::CompilationTest < Minitest::Test
   def run_compilation(ctx)
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Compilation, name: :compilation
+      use_step :compilation, TavernKit::SillyTavern::PromptBuilder::Steps::Compilation
     end.call(ctx)
   end
 

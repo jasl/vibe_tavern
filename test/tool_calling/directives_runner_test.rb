@@ -5,13 +5,121 @@ require_relative "test_helper"
 require_relative "../../lib/tavern_kit/vibe_tavern/directives/runner"
 
 class DirectivesRunnerTest < Minitest::Test
-  def build_runner_config(runtime: nil, llm_options_defaults: nil, provider: "openrouter", model: "test-model")
-    TavernKit::VibeTavern::RunnerConfig.build(
-      provider: provider,
-      model: model,
-      runtime: runtime,
-      llm_options_defaults: llm_options_defaults,
-    )
+  def build_runner_config(
+    context: nil,
+    llm_options_defaults: nil,
+    provider: "openrouter",
+    model: "test-model",
+    capabilities_overrides: nil
+  )
+    config =
+      TavernKit::VibeTavern::RunnerConfig.build(
+        provider: provider,
+        model: model,
+        context: context,
+        llm_options_defaults: llm_options_defaults,
+      )
+
+    return config unless capabilities_overrides.is_a?(Hash)
+
+    capabilities = config.capabilities.with(**capabilities_overrides)
+    config.with(capabilities: capabilities)
+  end
+
+  def test_directives_runner_skips_unsupported_structured_mode_by_capability
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          envelope = {
+            assistant_text: "ok",
+            directives: [{ type: "ui.toast", payload: { message: "Saved." } }],
+          }
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: JSON.generate(envelope) }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    context = { directives: { modes: %i[json_schema json_object] } }
+    runner_config =
+      build_runner_config(
+        context: context,
+        capabilities_overrides: {
+          supports_response_format_json_schema: false,
+          supports_response_format_json_object: true,
+        },
+      )
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, runner_config: runner_config)
+
+    result =
+      runner.run(
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+      )
+
+    assert_equal true, result[:ok]
+    assert_equal :json_object, result[:mode]
+    assert_equal 2, result[:attempts].size
+    assert_equal true, result[:attempts][0].fetch(:skipped)
+    assert_equal "CAPABILITY_UNSUPPORTED", result[:attempts][0].dig(:structured_output_error, :code)
+    assert_equal :json_schema, result[:attempts][0].fetch(:mode)
+    assert_equal :json_object, result[:attempts][1].fetch(:mode)
+
+    request_bodies = requests.map { |env| JSON.parse(env[:body]) }
+    assert_equal ["json_object"], request_bodies.map { |body| body.dig("response_format", "type") }
+  end
+
+  def test_directives_runner_returns_failure_when_all_configured_modes_are_unsupported
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 500,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ error: { message: "unexpected request" } }),
+          }
+        end
+      end.new(requests)
+
+    context = { directives: { modes: [:json_schema] } }
+    runner_config =
+      build_runner_config(
+        context: context,
+        capabilities_overrides: {
+          supports_response_format_json_schema: false,
+        },
+      )
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, runner_config: runner_config)
+
+    result =
+      runner.run(
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+      )
+
+    assert_equal false, result[:ok]
+    assert_equal "", result[:assistant_text]
+    assert_equal 1, result[:attempts].size
+    assert_equal true, result[:attempts][0].fetch(:skipped)
+    assert_equal "CAPABILITY_UNSUPPORTED", result[:attempts][0].dig(:structured_output_error, :code)
+    assert_equal [], requests
   end
 
   def build_runner(client:, runner_config:)
@@ -59,8 +167,8 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runtime = { directives: TavernKit::VibeTavern::Directives::Presets.provider_defaults("openrouter", require_parameters: true) }
-    runner_config = build_runner_config(provider: "openrouter", runtime: runtime)
+    context = { directives: TavernKit::VibeTavern::Directives::Presets.provider_defaults("openrouter", require_parameters: true) }
+    runner_config = build_runner_config(provider: "openrouter", context: context)
     runner = build_runner(client: client, runner_config: runner_config)
 
     result =
@@ -111,7 +219,7 @@ class DirectivesRunnerTest < Minitest::Test
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime =
+    context =
       {
         directives:
           TavernKit::VibeTavern::Directives::Presets.directives(
@@ -123,7 +231,7 @@ class DirectivesRunnerTest < Minitest::Test
             },
           ),
       }
-    runner_config = build_runner_config(runtime: runtime)
+    runner_config = build_runner_config(context: context)
     runner = build_runner(client: client, runner_config: runner_config)
 
     assert_raises(ArgumentError) do
@@ -161,8 +269,8 @@ class DirectivesRunnerTest < Minitest::Test
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    runtime = { directives: TavernKit::VibeTavern::Directives::Presets.directives(modes: [:prompt_only]) }
-    runner_config = build_runner_config(runtime: runtime, llm_options_defaults: { temperature: 0.7 })
+    context = { directives: TavernKit::VibeTavern::Directives::Presets.directives(modes: [:prompt_only]) }
+    runner_config = build_runner_config(context: context, llm_options_defaults: { temperature: 0.7 })
     runner = build_runner(client: client, runner_config: runner_config)
 
     result =
@@ -177,7 +285,7 @@ class DirectivesRunnerTest < Minitest::Test
     assert_in_delta 0.7, req.fetch("temperature"), 0.0001
   end
 
-  def test_directives_runner_injects_language_policy_via_runtime
+  def test_directives_runner_injects_language_policy_via_context
     requests = []
 
     adapter =
@@ -203,8 +311,8 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runtime = { language_policy: { enabled: true, target_lang: "ja-JP" } }
-    runner_config = build_runner_config(runtime: runtime)
+    context = { language_policy: { enabled: true, target_lang: "ja-JP" } }
+    runner_config = build_runner_config(context: context)
     runner = build_runner(client: client, runner_config: runner_config)
     result =
       runner.run(
@@ -467,7 +575,7 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner_config = build_runner_config(runtime: { directives: { modes: [:json_schema] } })
+    runner_config = build_runner_config(context: { directives: { modes: [:json_schema] } })
     runner = build_runner(client: client, runner_config: runner_config)
 
     result =
@@ -505,7 +613,7 @@ class DirectivesRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    runtime =
+    context =
       {
         output_tags: {
           enabled: true,
@@ -515,7 +623,7 @@ class DirectivesRunnerTest < Minitest::Test
       }
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner_config = build_runner_config(runtime: runtime)
+    runner_config = build_runner_config(context: context)
     runner = build_runner(client: client, runner_config: runner_config)
 
     result =

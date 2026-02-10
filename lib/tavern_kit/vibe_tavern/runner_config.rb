@@ -12,7 +12,7 @@ module TavernKit
       Data.define(
         :provider,
         :model,
-        :runtime,
+        :context,
         :pipeline,
         :llm_options_defaults,
         :capabilities,
@@ -26,37 +26,37 @@ module TavernKit
         def self.build(
           provider:,
           model:,
-          runtime: nil,
+          context: nil,
           pipeline: TavernKit::VibeTavern::Pipeline,
           step_options: nil,
           llm_options_defaults: nil
         )
           caps = TavernKit::VibeTavern::Capabilities.resolve(provider: provider, model: model)
-          normalized_runtime = normalize_runtime(runtime)
+          normalized_context = normalize_context(context)
           defaults = normalize_llm_options_defaults(llm_options_defaults)
 
           tool_calling =
-            TavernKit::VibeTavern::ToolCalling::Config.from_runtime(
-              normalized_runtime,
+            TavernKit::VibeTavern::ToolCalling::Config.from_context(
+              normalized_context,
               provider: caps.provider,
               model: caps.model,
             )
 
           directives =
-            TavernKit::VibeTavern::Directives::Config.from_runtime(
-              normalized_runtime,
+            TavernKit::VibeTavern::Directives::Config.from_context(
+              normalized_context,
               provider: caps.provider,
               model: caps.model,
             )
 
           language_policy =
-            TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(
-              normalized_runtime,
+            TavernKit::VibeTavern::LanguagePolicy::Config.from_context(
+              normalized_context,
             )
 
           output_tags =
-            TavernKit::VibeTavern::OutputTags::Config.from_runtime(
-              normalized_runtime,
+            TavernKit::VibeTavern::OutputTags::Config.from_context(
+              normalized_context,
             )
 
           configured_pipeline =
@@ -69,7 +69,7 @@ module TavernKit
           new(
             provider: caps.provider,
             model: caps.model,
-            runtime: normalized_runtime,
+            context: normalized_context,
             pipeline: configured_pipeline,
             llm_options_defaults: defaults,
             capabilities: caps,
@@ -80,28 +80,36 @@ module TavernKit
           )
         end
 
-        def self.normalize_runtime(value)
+        def self.normalize_context(value)
           return nil if value.nil?
-          return value if value.is_a?(TavernKit::PromptBuilder::Context)
-
-          raise ArgumentError, "runtime must be a Hash or TavernKit::PromptBuilder::Context" unless value.is_a?(Hash)
-
-          value.each_key do |key|
-            raise ArgumentError, "runtime keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          if value.is_a?(TavernKit::PromptBuilder::Context)
+            return TavernKit::PromptBuilder::Context.new(
+              value.to_h,
+              type: value.type || :vibe_tavern,
+              id: value.id,
+              module_configs: value.module_configs,
+              strict_keys: true,
+            )
           end
 
-          TavernKit::PromptBuilder::Context.new(value, type: :vibe_tavern)
+          raise ArgumentError, "context must be a Hash or TavernKit::PromptBuilder::Context" unless value.is_a?(Hash)
+
+          value.each_key do |key|
+            raise ArgumentError, "context keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+          end
+
+          TavernKit::PromptBuilder::Context.new(value, type: :vibe_tavern, strict_keys: true)
         end
-        private_class_method :normalize_runtime
+        private_class_method :normalize_context
 
         def self.configure_pipeline(pipeline, step_options:, language_policy_config:)
           raise ArgumentError, "pipeline is required" if pipeline.nil?
           raise ArgumentError, "pipeline must be a TavernKit::PromptBuilder::Pipeline" unless pipeline.is_a?(TavernKit::PromptBuilder::Pipeline)
 
           opts = normalize_step_options(step_options)
-          language_policy_options = opts.fetch(:language_policy, {}).dup
-          language_policy_options[:config] = language_policy_config
-          opts[:language_policy] = language_policy_options
+          language_policy_defaults = language_policy_config.to_h
+          language_policy_overrides = opts.fetch(:language_policy, {})
+          opts[:language_policy] = TavernKit::Utils.deep_merge_hashes(language_policy_defaults, language_policy_overrides)
 
           p = pipeline.dup
           opts.each do |step, options|
@@ -116,7 +124,7 @@ module TavernKit
           raise ArgumentError, "step_options must be a Hash" unless value.is_a?(Hash)
 
           value.each_with_object({}) do |(name, options), out|
-            stage = name.to_s.strip.downcase.tr("-", "_").to_sym
+            step_name = name.to_s.strip.downcase.tr("-", "_").to_sym
             raise ArgumentError, "step_options.#{name} must be a Hash" unless options.is_a?(Hash)
 
             options.each_key do |key|
@@ -125,7 +133,7 @@ module TavernKit
               end
             end
 
-            out[stage] = options.dup
+            out[step_name] = options.dup
           end
         end
         private_class_method :normalize_step_options

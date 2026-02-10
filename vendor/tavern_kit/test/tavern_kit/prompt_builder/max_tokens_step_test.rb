@@ -72,14 +72,13 @@ class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
       end
 
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::PromptBuilder::Steps::MaxTokens,
-          name: :max_tokens,
+      use_step :max_tokens, TavernKit::PromptBuilder::Steps::MaxTokens,
           max_tokens: max_tokens,
           reserve_tokens: reserve_tokens,
           message_overhead_tokens: message_overhead_tokens,
           include_message_metadata_tokens: include_message_metadata_tokens,
           mode: mode
-      use_step build_step, name: :build_plan
+      use_step :build_plan, build_step
     end
   end
 
@@ -155,7 +154,7 @@ class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
       pipeline.call(state)
     end
 
-    assert_equal :max_tokens, err.stage
+    assert_equal :max_tokens, err.step
     assert_equal 6, err.estimated_tokens
     assert_equal 5, err.max_tokens
     assert_equal 0, err.reserve_tokens

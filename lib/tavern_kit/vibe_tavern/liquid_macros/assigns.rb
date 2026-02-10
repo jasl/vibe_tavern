@@ -17,10 +17,10 @@ module TavernKit
         def build(ctx)
           character = ctx.respond_to?(:character) ? ctx.character : nil
           user = ctx.respond_to?(:user) ? ctx.user : nil
-          runtime = runtime_from(ctx)
+          context = context_from(ctx)
 
-          runtime_data = runtime ? runtime.to_h : {}
-          runtime_hash = TavernKit::Utils.deep_stringify_keys(runtime_data)
+          context_data = context ? context.to_h : {}
+          context_hash = TavernKit::Utils.deep_stringify_keys(context_data)
 
           {
             "char" => char_name(character),
@@ -32,24 +32,23 @@ module TavernKit
             "system_prompt" => presence(character&.data&.system_prompt),
             "post_history_instructions" => presence(character&.data&.post_history_instructions),
             "mes_examples" => presence(character&.data&.mes_example),
-            "runtime" => runtime_hash,
-            "chat_index" => runtime_data[:chat_index],
-            "message_index" => runtime_data[:message_index],
-            "model" => runtime_data[:model],
-            "role" => runtime_data[:role],
+            "context" => context_hash,
+            "chat_index" => context_data[:chat_index],
+            "message_index" => context_data[:message_index],
+            "model" => context_data[:model],
+            "role" => context_data[:role],
           }
         end
 
-        def runtime_from(ctx)
-          runtime = ctx.respond_to?(:runtime) ? ctx.runtime : nil
-          return runtime if runtime.is_a?(TavernKit::PromptBuilder::Context)
-          return TavernKit::PromptBuilder::Context.build(runtime, type: :app) if runtime.is_a?(Hash)
+        def context_from(ctx)
+          return ctx if ctx.is_a?(TavernKit::PromptBuilder::Context)
 
-          return nil unless ctx.respond_to?(:key?) && ctx.key?(:runtime)
-
-          TavernKit::PromptBuilder::Context.build(ctx[:runtime], type: :app)
+          context = ctx.respond_to?(:context) ? ctx.context : nil
+          return context if context.is_a?(TavernKit::PromptBuilder::Context)
+          return TavernKit::PromptBuilder::Context.build(context, type: :app) if context.is_a?(Hash)
+          nil
         end
-        private_class_method :runtime_from
+        private_class_method :context_from
 
         def char_name(character)
           return nil unless character

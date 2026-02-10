@@ -23,19 +23,20 @@ module TavernKit
       class TraceCollector < Base
         Frame = Data.define(:name, :started_at, :warnings, :stats)
 
-        attr_reader :stages, :warnings
+        attr_reader :steps, :warnings
 
         def initialize(clock: Process::CLOCK_MONOTONIC)
           @clock = clock
           @started_at = Time.now
           @frames = []
-          @stages = []
+          @steps = []
           @warnings = []
         end
 
         def call(event, **payload)
           case event
           when :step_start
+            assert_allowed_keys!(payload, %i[name])
             name = payload.fetch(:name)
             @frames << Frame.new(
               name: name,
@@ -44,23 +45,27 @@ module TavernKit
               stats: {},
             )
           when :step_finish
-            finish_stage(payload.fetch(:name), stats: payload[:stats])
+            assert_allowed_keys!(payload, %i[name stats])
+            finish_step(payload.fetch(:name), stats: payload[:stats])
           when :step_error
-            finish_stage(payload.fetch(:name), error: payload[:error])
+            assert_allowed_keys!(payload, %i[name error])
+            finish_step(payload.fetch(:name), error: payload[:error])
           when :warning
+            assert_allowed_keys!(payload, %i[message step])
             message = payload[:message].to_s
             @warnings << message
 
-            stage_name = payload[:stage]
-            frame = find_frame(stage_name) || @frames.last
+            step_name = payload[:step]
+            frame = find_frame(step_name) || @frames.last
             frame&.warnings&.<< message
           when :stat
+            assert_allowed_keys!(payload, %i[key value step])
             key = payload[:key]
             value = payload[:value]
             return nil unless key
 
-            stage_name = payload[:stage]
-            frame = find_frame(stage_name) || @frames.last
+            step_name = payload[:step]
+            frame = find_frame(step_name) || @frames.last
             frame&.stats&.[]= key.to_sym, value
           end
 
@@ -69,7 +74,7 @@ module TavernKit
 
         def to_trace(fingerprint:)
           Trace.new(
-            stages: @stages.dup.freeze,
+            steps: @steps.dup.freeze,
             fingerprint: fingerprint.to_s,
             started_at: @started_at,
             finished_at: Time.now,
@@ -79,27 +84,30 @@ module TavernKit
 
         private
 
-        def finish_stage(name, stats: nil, error: nil)
+        def finish_step(name, stats: nil, error: nil)
+          frame = @frames.last
+          raise ArgumentError, "Instrumentation mismatch: missing step_start for #{name.inspect}" unless frame
+          raise ArgumentError, "Instrumentation mismatch: expected #{frame.name.inspect}, got #{name.inspect}" unless frame.name == name
+
           frame = @frames.pop
-          return nil unless frame
 
           duration_ms = (Process.clock_gettime(@clock) - frame.started_at) * 1000
 
-          stage_stats = frame.stats.dup
-          stage_stats.merge!(stats) if stats.is_a?(Hash)
-          stage_stats[:error] = error.class.name if error
+          step_stats = frame.stats.dup
+          step_stats.merge!(stats) if stats.is_a?(Hash)
+          step_stats[:error] = error.class.name if error
 
-          stage = TraceStage.new(
+          step = TraceStep.new(
             name: frame.name,
             duration_ms: duration_ms,
-            stats: stage_stats.freeze,
+            stats: step_stats.freeze,
             warnings: frame.warnings.dup.freeze,
           )
 
           # Step events are nested (Rack-style), so finish order is the
-          # reverse of execution order. Unshift to keep stages ordered as the
+          # reverse of execution order. Unshift to keep steps ordered as the
           # pipeline ran (outer -> inner).
-          @stages.unshift(stage)
+          @steps.unshift(step)
 
           nil
         end
@@ -108,6 +116,13 @@ module TavernKit
           return nil unless name
 
           @frames.reverse.find { |frame| frame.name == name }
+        end
+
+        def assert_allowed_keys!(payload, allowed)
+          extra = payload.keys - allowed
+          return nil if extra.empty?
+
+          raise ArgumentError, "Unknown instrumentation payload keys: #{extra.inspect}"
         end
       end
     end

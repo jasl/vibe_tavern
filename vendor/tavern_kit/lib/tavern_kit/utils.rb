@@ -65,6 +65,122 @@ module TavernKit
       end
     end
 
+    # Deep-merge two hashes.
+    #
+    # Hash values are merged recursively. Arrays and scalar values are replaced by
+    # the right-hand side.
+    def deep_merge_hashes(left, right)
+      lhs = left.is_a?(Hash) ? left : {}
+      rhs = right.is_a?(Hash) ? right : {}
+
+      out = lhs.each_with_object({}) { |(k, v), acc| acc[k] = v }
+
+      rhs.each do |key, value|
+        if out[key].is_a?(Hash) && value.is_a?(Hash)
+          out[key] = deep_merge_hashes(out[key], value)
+        else
+          out[key] = value
+        end
+      end
+
+      out
+    end
+
+    # Assert that all keys in a nested Hash/Array structure are Symbols.
+    #
+    # This is intended for programmer-owned configuration hashes.
+    def assert_deep_symbol_keys!(value, path: "value")
+      case value
+      when Hash
+        value.each do |k, v|
+          unless k.is_a?(Symbol)
+            raise ArgumentError, "#{path} keys must be Symbols (got #{k.class})"
+          end
+
+          assert_deep_symbol_keys!(v, path: "#{path}.#{k}")
+        end
+      when Array
+        value.each_with_index do |v, idx|
+          assert_deep_symbol_keys!(v, path: "#{path}[#{idx}]")
+        end
+      end
+
+      nil
+    end
+
+    # Assert that all keys in a Hash are Symbols.
+    #
+    # This is intended for programmer-owned top-level configuration hashes.
+    def assert_symbol_keys!(value, path: "value")
+      raise ArgumentError, "#{path} must be a Hash" unless value.is_a?(Hash)
+
+      value.each_key do |key|
+        unless key.is_a?(Symbol)
+          raise ArgumentError, "#{path} keys must be Symbols (got #{key.class})"
+        end
+      end
+
+      nil
+    end
+
+    # Normalize a programmer-owned hash value that must have deep Symbol keys.
+    #
+    # Returns {} when value is nil.
+    def normalize_symbol_keyed_hash(value, path:)
+      return {} if value.nil?
+      raise ArgumentError, "#{path} must be a Hash" unless value.is_a?(Hash)
+
+      assert_deep_symbol_keys!(value, path: path.to_s)
+      value
+    end
+
+    def normalize_request_overrides(value)
+      normalize_symbol_keyed_hash(value, path: "request_overrides")
+    end
+
+    # Normalize a string-list-like input into an Array<String> (or nil).
+    #
+    # Accepts strings, symbols, arrays, etc. Elements are `to_s.strip`'d and
+    # empty strings are removed.
+    def normalize_string_list(value)
+      list = Array(value).map { |v| v.to_s.strip }.reject(&:empty?)
+      list.empty? ? nil : list
+    end
+
+    # Returns true when the user explicitly provided an empty string list.
+    #
+    # - "" / " , " => explicit empty
+    # - [] / [" ", ""] => explicit empty
+    #
+    # Non string/array values return false.
+    def explicit_empty_string_list?(value)
+      case value
+      when String
+        value.split(",").map(&:strip).reject(&:empty?).empty?
+      when Array
+        value.map { |v| v.to_s.strip }.reject(&:empty?).empty?
+      else
+        false
+      end
+    end
+
+    # Merge two "string list" values.
+    #
+    # - nil right-hand side => nil (no override)
+    # - explicit empty right-hand side => []
+    # - otherwise => unique concatenation
+    def merge_string_list(left, right)
+      return nil if right.nil?
+
+      right_list = normalize_string_list(right)
+      return [] if explicit_empty_string_list?(right)
+
+      left_list = normalize_string_list(left)
+      return right_list if left_list.nil?
+
+      (left_list + right_list).uniq
+    end
+
     # Returns nil if value is blank, otherwise returns the value.
     def presence(value)
       str = value.to_s.strip

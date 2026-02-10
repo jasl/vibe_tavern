@@ -18,7 +18,7 @@ module TavernKit
           WEEKDAY_LONG = %w[Sunday Monday Tuesday Wednesday Thursday Friday Saturday].freeze
           WEEKDAY_SHORT = %w[Sun Mon Tue Wed Thu Fri Sat].freeze
 
-          # Liquid filter: `{{ runtime.now_ms | unixtime }}`
+          # Liquid filter: `{{ context.now_ms | unixtime }}`
           #
           # - input: epoch milliseconds (preferred) or seconds
           # - output: rounded epoch seconds (string)
@@ -29,7 +29,7 @@ module TavernKit
             ""
           end
 
-          # Liquid filter: `{{ runtime.now_ms | isodate }}`
+          # Liquid filter: `{{ context.now_ms | isodate }}`
           #
           # Returns an ISO-like date in UTC: "YYYY-M-D" (no zero padding).
           def isodate(input = nil)
@@ -39,7 +39,7 @@ module TavernKit
             ""
           end
 
-          # Liquid filter: `{{ runtime.now_ms | isotime }}`
+          # Liquid filter: `{{ context.now_ms | isotime }}`
           #
           # Returns an ISO-like time in UTC: "H:M:S" (no zero padding).
           def isotime(input = nil)
@@ -49,7 +49,7 @@ module TavernKit
             ""
           end
 
-          # Liquid filter: `{{ runtime.now_ms | datetimeformat: \"YYYY-MM-DD HH:mm:ss\" }}`
+          # Liquid filter: `{{ context.now_ms | datetimeformat: \"YYYY-MM-DD HH:mm:ss\" }}`
           #
           # Moment-ish tokens supported (subset):
           # - YYYY, YY
@@ -100,7 +100,7 @@ module TavernKit
 
           def time_from_ms_or_now(input)
             if input.nil? || input.to_s.strip.empty? || input.to_s == "0"
-              ms = runtime_now_ms
+              ms = context_now_ms
               return ::Time.now if ms.nil?
 
               return time_from_ms(ms)
@@ -119,13 +119,13 @@ module TavernKit
             ::Time.now
           end
 
-          def runtime_now_ms
-            rt = @context&.registers&.[](:runtime)
-            if rt.respond_to?(:[])
-              return rt[:now_ms] if rt[:now_ms]
+          def context_now_ms
+            context = @context&.registers&.[](:context)
+            if context.respond_to?(:[])
+              return context[:now_ms] if context[:now_ms]
             end
 
-            raw = @context&.[]("runtime")
+            raw = @context&.[]("context")
             return raw["now_ms"] if raw.is_a?(Hash) && raw.key?("now_ms")
 
             nil

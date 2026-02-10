@@ -17,7 +17,7 @@ module TavernKit
               next
             end
 
-            # In-chat entries are converted to injections and applied in Stage 5.
+            # In-chat entries are converted to injections and applied in Step 5.
             next if entry.in_chat?
 
             content = entry.content.to_s
@@ -38,7 +38,7 @@ module TavernKit
           end
 
           ctx.blocks = blocks
-          ctx.instrument(:stat, stage: :compilation, key: :blocks, value: blocks.size) if ctx.instrumenter
+          ctx.instrument(:stat, step: :compilation, key: :blocks, value: blocks.size) if ctx.instrumenter
         end
       end
       end

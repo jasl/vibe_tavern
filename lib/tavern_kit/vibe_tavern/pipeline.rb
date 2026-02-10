@@ -11,15 +11,7 @@ module TavernKit
   module VibeTavern
     class << self
       def build(**kwargs, &block)
-        if block
-          TavernKit::PromptBuilder.build(pipeline: Pipeline, &block)
-        else
-          builder = TavernKit::PromptBuilder.new(pipeline: Pipeline)
-          kwargs.each do |key, value|
-            builder.public_send(key, value) if builder.respond_to?(key)
-          end
-          builder.build
-        end
+        TavernKit::PromptBuilder.build(pipeline: Pipeline, **kwargs, &block)
       end
 
       def to_messages(dialect: :openai, **kwargs, &block)
@@ -29,9 +21,9 @@ module TavernKit
 
     # Default VibeTavern prompt-builder step chain (minimal).
     Pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::VibeTavern::PromptBuilder::Steps::Prepare, name: :prepare
-      use_step TavernKit::VibeTavern::PromptBuilder::Steps::PlanAssembly, name: :plan_assembly
-      use_step TavernKit::VibeTavern::PromptBuilder::Steps::LanguagePolicy, name: :language_policy
+      use_step :prepare, TavernKit::VibeTavern::PromptBuilder::Steps::Prepare
+      use_step :plan_assembly, TavernKit::VibeTavern::PromptBuilder::Steps::PlanAssembly
+      use_step :language_policy, TavernKit::VibeTavern::PromptBuilder::Steps::LanguagePolicy
     end
 
     TavernKit.run_load_hooks(:vibe_tavern, TavernKit::VibeTavern.infrastructure)

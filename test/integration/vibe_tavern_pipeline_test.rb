@@ -86,16 +86,40 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     assert_equal "Hello.", msgs[1][:content]
   end
 
+  test "prepare step rejects unknown step config keys" do
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::PromptBuilder.build(pipeline: TavernKit::VibeTavern::Pipeline) do
+          context({ module_configs: { prepare: { typo: true } } })
+          message "Hello."
+        end
+      end
+
+    assert_match(/invalid config for step prepare/, error.message)
+  end
+
+  test "plan_assembly step rejects unknown step config keys" do
+    error =
+      assert_raises(ArgumentError) do
+        TavernKit::PromptBuilder.build(pipeline: TavernKit::VibeTavern::Pipeline) do
+          context({ module_configs: { plan_assembly: { typo: true } } })
+          message "Hello."
+        end
+      end
+
+    assert_match(/invalid config for step plan_assembly/, error.message)
+  end
+
   test "optionally prepends a system block from system_template (Liquid-rendered)" do
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)
 
-    runtime = TavernKit::PromptBuilder::Context.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
+    context = TavernKit::PromptBuilder::Context.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
     character = TavernKit::Character.create(name: "Seraphina", nickname: "Sera")
 
     plan =
       TavernKit::VibeTavern.build do
-        runtime runtime
+        context context
         variables_store store
         character character
 
@@ -206,11 +230,11 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "inserts a language policy system block after post_history_instructions and before the user message when enabled" do
-    runtime = { language_policy: { enabled: true, target_lang: "zh-cn" } }
+    context = { language_policy: { enabled: true, target_lang: "zh-cn" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
     pipeline.configure_step(
       :language_policy,
-      config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
+      **context.fetch(:language_policy),
     )
 
     character = TavernKit::Character.create(name: "Seraphina", post_history_instructions: "PHI")
@@ -224,7 +248,7 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
       TavernKit::PromptBuilder.build(pipeline: pipeline) do
         character character
         meta :system_template, nil
-        runtime runtime
+        context context
 
         history history
         message "Continue."
@@ -250,17 +274,17 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "canonicalizes base language tags (ja -> ja-JP) for target_lang allowlist checks" do
-    runtime = { language_policy: { enabled: true, target_lang: "ja" } }
+    context = { language_policy: { enabled: true, target_lang: "ja" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
     pipeline.configure_step(
       :language_policy,
-      config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
+      **context.fetch(:language_policy),
     )
 
     plan =
       TavernKit::PromptBuilder.build(pipeline: pipeline) do
         meta :system_template, nil
-        runtime runtime
+        context context
         message "Hello."
       end
 
@@ -271,11 +295,11 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "allows overriding the language policy text builder via pipeline step options" do
-    runtime = { language_policy: { enabled: true, target_lang: "zh-CN", style_hint: "casual" } }
+    context = { language_policy: { enabled: true, target_lang: "zh-CN", style_hint: "casual" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
     pipeline.configure_step(
       :language_policy,
-      config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
+      **context.fetch(:language_policy),
       policy_text_builder: lambda do |target_lang, style_hint:, special_tags:|
         "Custom LP: #{target_lang} (style=#{style_hint.inspect}, tags=#{special_tags.join(",")})"
       end,
@@ -284,7 +308,7 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     plan =
       TavernKit::PromptBuilder.build(pipeline: pipeline) do
         meta :system_template, nil
-        runtime runtime
+        context context
         message "Hello."
       end
 
@@ -295,17 +319,17 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "does not insert a language policy block when disabled" do
-    runtime = { language_policy: { enabled: false, target_lang: "zh-CN" } }
+    context = { language_policy: { enabled: false, target_lang: "zh-CN" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
     pipeline.configure_step(
       :language_policy,
-      config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
+      **context.fetch(:language_policy),
     )
 
     plan =
       TavernKit::PromptBuilder.build(pipeline: pipeline) do
         meta :system_template, nil
-        runtime runtime
+        context context
         message "Hello."
       end
 
@@ -313,36 +337,38 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     assert_equal ["user"], msgs.map { |m| m[:role] }
   end
 
-  test "normalizes runtime input once and ensures variables_store exists" do
-    state = TavernKit::PromptBuilder::State.new(user_message: "Hello")
-    state[:runtime] = { "chatIndex" => 1, :message_index => 2 }
+  test "normalizes context input once and ensures variables_store exists" do
+    context_data = TavernKit::PromptBuilder::Context.build({ "chatIndex" => 1, :message_index => 2 }, type: :app).to_h
+    context = TavernKit::PromptBuilder::Context.new(context_data.merge(user_message: "Hello"), type: :app)
+    state = TavernKit::PromptBuilder::State.new(context: context)
 
     TavernKit::VibeTavern::Pipeline.call(state)
 
-    assert_instance_of TavernKit::PromptBuilder::Context, state.runtime
-    assert_equal :app, state.runtime.type
-    assert_equal 1, state.runtime[:chat_index]
-    assert_equal 2, state.runtime[:message_index]
+    assert_instance_of TavernKit::PromptBuilder::Context, state.context
+    assert_equal :app, state.context.type
+    assert_equal 1, state.context[:chat_index]
+    assert_equal 2, state.context[:message_index]
 
     assert_instance_of TavernKit::VariablesStore::InMemory, state.variables_store
   end
 
-  test "token_estimation runtime config can set model_hint and token_estimator registry" do
-    state = TavernKit::PromptBuilder::State.new(user_message: "Hello")
-    state[:runtime] = {
+  test "token_estimation context config can set model_hint and token_estimator registry" do
+    context = TavernKit::PromptBuilder::Context.new(
+      user_message: "Hello",
       token_estimation: {
         model_hint: "llama-3.1",
         registry: {
           "llama-3.1" => { tokenizer_family: :heuristic, chars_per_token: 2.0 },
         },
       },
-    }
+    )
+    state = TavernKit::PromptBuilder::State.new(context: context)
 
     TavernKit::VibeTavern::Pipeline.call(state)
 
     assert_equal "llama-3.1", state[:model_hint]
-    assert_equal :runtime, state[:model_hint_source]
-    assert_equal :runtime_registry, state[:token_estimator_source]
+    assert_equal :context, state[:model_hint_source]
+    assert_equal :context_registry, state[:token_estimator_source]
 
     info = state.token_estimator.describe(model_hint: state[:model_hint])
     assert_equal "heuristic", info[:backend]
@@ -359,13 +385,29 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     assert_equal :default, state[:model_hint_source]
   end
 
-  test "explicit model_hint wins over token_estimation runtime hint" do
-    state = TavernKit::PromptBuilder::State.new(user_message: "Hello")
+  test "explicit model_hint wins over token_estimation context hint" do
+    context = TavernKit::PromptBuilder::Context.new(user_message: "Hello", token_estimation: { model_hint: "context" })
+    state = TavernKit::PromptBuilder::State.new(context: context)
     state[:model_hint] = "explicit"
-    state[:runtime] = { token_estimation: { model_hint: "runtime" } }
 
     TavernKit::VibeTavern::Pipeline.call(state)
 
     assert_equal "explicit", state[:model_hint]
+  end
+
+  test "token_estimation metadata fallback is not used without context config" do
+    state = TavernKit::PromptBuilder::State.new(user_message: "Hello")
+    state[:token_estimation] = {
+      model_hint: "metadata-only",
+      registry: {
+        "metadata-only" => { tokenizer_family: :heuristic, chars_per_token: 2.0 },
+      },
+    }
+
+    TavernKit::VibeTavern::Pipeline.call(state)
+
+    assert_nil state[:model_hint_source]
+    assert_nil state[:token_estimator_source]
+    refute_equal "metadata-only", state[:model_hint]
   end
 end

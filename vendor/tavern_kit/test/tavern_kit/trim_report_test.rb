@@ -11,7 +11,7 @@ class TavernKit::TrimReportTest < Minitest::Test
       reason: :budget_exceeded,
       budget_group: :lore,
       priority: 50,
-      source: { stage: :lore, id: "wi:1" },
+      source: { step: :lore, id: "wi:1" },
     )
 
     report = TavernKit::TrimReport.new(

@@ -4,7 +4,7 @@ module TavernKit
   module VibeTavern
     module PromptBuilder
       module Steps
-      # Stage: build a minimal PromptBuilder::Plan from history + user input.
+      # Step: build a minimal PromptBuilder::Plan from history + user input.
       #
       # Initial goal: unblock Rails integration with a deterministic, typed
       # plan output. Higher-level behaviors (macros/lore/injection/trimming)
@@ -16,6 +16,28 @@ module TavernKit
       # - optional post-history instructions
       # - user message
       class PlanAssembly < TavernKit::PromptBuilder::Step
+        Config =
+          Data.define(:default_system_text_builder) do
+            def self.from_hash(raw)
+              return raw if raw.is_a?(self)
+
+              raise ArgumentError, "plan_assembly step config must be a Hash" unless raw.is_a?(Hash)
+              raw.each_key do |key|
+                raise ArgumentError, "plan_assembly step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+              end
+
+              unknown = raw.keys - %i[default_system_text_builder]
+              raise ArgumentError, "unknown plan_assembly step config keys: #{unknown.inspect}" if unknown.any?
+
+              builder = raw.fetch(:default_system_text_builder, nil)
+              if builder && !builder.respond_to?(:call)
+                raise ArgumentError, "plan_assembly.default_system_text_builder must respond to #call"
+              end
+
+              new(default_system_text_builder: builder)
+            end
+          end
+
         DEFAULT_SYSTEM_TEXT_BUILDER =
           lambda do |ctx|
             char = ctx.character
@@ -66,7 +88,7 @@ module TavernKit
             llm_options: ctx.llm_options,
           )
 
-          ctx.instrument(:stat, stage: :plan_assembly, key: :plan_blocks, value: ctx.blocks.size) if ctx.instrumenter
+          ctx.instrument(:stat, step: :plan_assembly, key: :plan_blocks, value: ctx.blocks.size) if ctx.instrumenter
         end
 
         def build_blocks(ctx)
@@ -169,7 +191,10 @@ module TavernKit
 
           return nil unless char || user
 
-          text = build_default_system_text(ctx, default_system_text_builder: option(:default_system_text_builder))
+          cfg = option(:config)
+          raise ArgumentError, "plan_assembly step config must be Steps::PlanAssembly::Config" unless cfg.is_a?(Config)
+
+          text = build_default_system_text(ctx, default_system_text_builder: cfg.default_system_text_builder)
           return nil unless text
 
           TavernKit::PromptBuilder::Block.new(
@@ -182,13 +207,7 @@ module TavernKit
         end
 
         def build_default_system_text(ctx, default_system_text_builder:)
-          builder = default_system_text_builder
-          unless builder.nil? || builder.respond_to?(:call)
-            ctx.warn("plan_assembly.default_system_text_builder must respond to #call (ignoring)")
-            builder = nil
-          end
-
-          builder ||= DEFAULT_SYSTEM_TEXT_BUILDER
+          builder = default_system_text_builder || DEFAULT_SYSTEM_TEXT_BUILDER
 
           text = builder.call(ctx).to_s
           TavernKit::Utils.presence(text)

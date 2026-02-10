@@ -27,7 +27,7 @@ Current infra client:
 
 Schema DSL / validation:
 
-- `vendor/easy_talk` (JSON Schema + runtime validation + error formatting)
+- `vendor/easy_talk` (JSON Schema + execution-time validation + error formatting)
 
 ## What RubyLLM brings (relevant)
 
@@ -80,7 +80,7 @@ need this type of hardening even if RubyLLM were used.
 ## Decision (current)
 
 - Keep `SimpleInference` as the infra HTTP client for OpenAI-compatible APIs.
-- Keep `EasyTalk` for schema definition and runtime validation.
+- Keep `EasyTalk` for schema definition and execution-time validation.
 - Do not support RubyLLM-style schema providers in `TavernKit::VibeTavern::JsonSchema`.
   If an app wants to use RubyLLM schema DSL, it can pass a plain Hash (extracting
   the `:schema` portion) at the app boundary.

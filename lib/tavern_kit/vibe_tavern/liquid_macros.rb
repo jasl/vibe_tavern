@@ -101,10 +101,10 @@ module TavernKit
       def render_for(ctx, text, strict: nil, on_error: :passthrough, registers: {})
         strict = strict.nil? ? (ctx.respond_to?(:strict?) ? ctx.strict? : false) : strict
         store = ctx.respond_to?(:variables_store) ? ctx.variables_store : nil
-        runtime = ctx.respond_to?(:runtime) ? ctx.runtime : nil
+        context = ctx.respond_to?(:context) ? ctx.context : (ctx if ctx.is_a?(TavernKit::PromptBuilder::Context))
 
         merged_registers = registers.is_a?(Hash) ? registers.dup : {}
-        merged_registers[:runtime] ||= runtime if runtime
+        merged_registers[:context] ||= context if context
 
         render(
           text,

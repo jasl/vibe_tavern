@@ -39,16 +39,74 @@ messages = plan.to_messages(dialect: :openai)
 fingerprint = plan.fingerprint(dialect: :openai)
 ```
 
+## Minimal PromptRunner + RunnerConfig Example (Copy/Paste)
+
+This is the smallest “end-to-end” example that exercises:
+
+- `RunnerConfig` (typed config + capabilities + configured pipeline)
+- `PromptRunner` (single LLM request boundary + preflight)
+- step configs via `context[:module_configs]` (e.g. LanguagePolicy)
+
+```ruby
+# client must respond to:
+# - #chat_completions(**request) -> response with #body (Hash)
+client = SimpleInference::Client.new(
+  base_url: ENV.fetch("OPENROUTER_BASE_URL", "https://openrouter.ai/api"),
+  api_prefix: ENV.fetch("OPENROUTER_API_PREFIX", "/v1"),
+  api_key: ENV.fetch("OPENROUTER_API_KEY"),
+)
+
+context = {
+  # Protocol/runner configs (strict, symbol keys).
+  language_policy: { enabled: true, target_lang: "zh-CN", special_tags: ["lang"] },
+
+  # Per-step overrides (merged on top of step defaults).
+  module_configs: {
+    language_policy: { style_hint: "casual" },
+  },
+}
+
+runner_config =
+  TavernKit::VibeTavern::RunnerConfig.build(
+    provider: "openrouter",
+    model: "openai/gpt-4o-mini",
+    context: context,
+    llm_options_defaults: { temperature: 0.2 },
+  )
+
+prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
+
+prompt_request =
+  prompt_runner.build_request(
+    runner_config: runner_config,
+    history: [],
+    system: nil,
+    strict: true,
+    dialect: :openai,
+  )
+
+result = prompt_runner.perform(prompt_request)
+assistant_message = result.assistant_message
+```
+
+Notes:
+
+- `context` is the single source of truth for per-run settings.
+- Use `context[:module_configs]` for per-step overrides. Unknown step keys are ignored.
+- Use `RunnerConfig.build(step_options: ...)` only when you want to change step defaults
+  outside of the context object (e.g. “system-wide” tuning in scripts).
+
 ## Supported Inputs (DSL)
 
-`TavernKit::VibeTavern` uses the standard TavernKit DSL (`TavernKit.build { ... }`).
+`TavernKit::VibeTavern.build { ... }` uses the PromptBuilder DSL (it is backed by
+`TavernKit::PromptBuilder`).
 
 Currently used by this pipeline:
 - `history(...)` (required for prior messages; chronological)
 - `message(...)` (the current user input; blank after `.strip` is ignored)
 - `character(...)` (optional; used for the default `system` block and post-history instructions)
 - `user(...)` (optional; used for the default `system` block)
-- `runtime(...)` (optional; see Runtime Contract)
+- `context(...)` (optional; see Context Contract)
 - `variables_store(...)` (optional; will be defaulted if not provided)
 - `token_estimator(...)` (optional; defaults to `TavernKit::TokenEstimator.default`)
 - `strict(...)` (optional; affects warning handling across TavernKit)
@@ -134,26 +192,26 @@ Liquid rendering:
   Raw character card text fields (like `post_history_instructions`) are treated
   as plain text by default for safety and predictability.
 
-## Runtime Contract
+## Context Contract
 
-VibeTavern uses runtime as the "app snapshot" for a build. You can pass:
+VibeTavern uses context as the "app snapshot" for a build. You can pass:
 - a `TavernKit::PromptBuilder::Context` instance (recommended), or
-- a Hash (treated as runtime input and normalized by the pipeline)
+- a Hash (treated as context input and normalized by the pipeline)
 
 Normalization (Prepare step):
-- if runtime is provided as a Hash, the pipeline converts it to a runtime object:
+- if context is provided as a Hash, the pipeline converts it to a context object:
   `TavernKit::PromptBuilder::Context.build(hash, type: :app)`
 
 Immutability:
-- `runtime` cannot be replaced once the pipeline starts executing steps.
-  If you need different runtime values, construct a new runtime instance per build.
+- `context` cannot be replaced once the pipeline starts executing steps.
+  If you need different context values, construct a new context instance per build.
 
 Key normalization:
-- TavernKit normalizes **top-level** runtime keys (snake_case symbols) when you
-  build a runtime from a Hash.
-- Nested hashes inside runtime (e.g. `runtime[:toggles]`) are **not** auto-normalized.
+- TavernKit normalizes **top-level** context keys (snake_case symbols) when you
+  build a context from a Hash.
+- Nested hashes inside context (e.g. `context[:toggles]`) are **not** auto-normalized.
   If you rely on toggles (e.g. `:expand_user_input_macros`), normalize those keys
-  in the app before injecting runtime.
+  in the app before injecting context.
 
 ## VariablesStore Contract
 
@@ -172,12 +230,96 @@ Lifecycle recommendation:
 If `instrumenter` is present:
 - PlanAssembly emits a lightweight stat:
   - `event: :stat`
-  - `stage: :plan_assembly`
+  - `step: :plan_assembly`
   - `key: :plan_blocks`
   - `value: blocks.size`
 
 Use `TavernKit::PromptBuilder::Instrumenter::TraceCollector` in development if you want
 to collect events for debugging.
+
+## Default Steps (Order)
+
+Default pipeline: `lib/tavern_kit/vibe_tavern/pipeline.rb`
+
+Order:
+
+1. `:prepare` (`TavernKit::VibeTavern::PromptBuilder::Steps::Prepare`)
+2. `:plan_assembly` (`TavernKit::VibeTavern::PromptBuilder::Steps::PlanAssembly`)
+3. `:language_policy` (`TavernKit::VibeTavern::PromptBuilder::Steps::LanguagePolicy`)
+
+## Step Config Reference
+
+This section is the “single table” for how each step is configured and what
+it consumes.
+
+### Config Sources (Two Levels)
+
+Step config is merged from:
+
+1. Static defaults (pipeline `use_step` and/or `RunnerConfig.build(step_options: ...)`)
+2. Per-run overrides: `context.module_configs[step_name]` (aka `configs:`)
+
+For steps that define a typed config (`StepClass::Config`), keys are validated
+by `Config.from_hash` (unknown keys fail fast).
+
+### `:prepare` (`Steps::Prepare`)
+
+Typed step config: `Steps::Prepare::Config` (no fields today).
+
+Behavior config (context-owned, not step options):
+
+- `context[:token_estimation]` (Hash; optional)
+  - `model_hint` (String)
+  - `token_estimator` (responds to `#estimate`)
+  - `registry` (Hash; passed to `TavernKit::TokenEstimator.new(registry: ...)`)
+- Meta key: `meta(:default_model_hint, provider_model_id)` (set by `PromptRunner`)
+
+Common pitfall:
+
+- Do not put token estimation settings under `configs[:prepare]`. Those will
+  error (the step has no step-level config keys).
+
+### `:plan_assembly` (`Steps::PlanAssembly`)
+
+Typed step config: `Steps::PlanAssembly::Config`
+
+Schema:
+
+- `default_system_text_builder` (callable; optional)
+  - default: `nil` (uses the built-in deterministic builder)
+
+Template inputs (metadata):
+
+- `meta(:system_template, ...)` (Liquid; blank disables system block)
+- `meta(:post_history_template, ...)` (Liquid; blank disables post-history block)
+
+Common pitfalls:
+
+- Prefer setting callables via `RunnerConfig.build(step_options: ...)` so your
+  context stays serializable.
+- Builders should be deterministic and return a String (blank disables default system).
+
+### `:language_policy` (`Steps::LanguagePolicy`)
+
+Typed step config: `Steps::LanguagePolicy::Config`
+
+Primary configuration (context-owned, parsed by `RunnerConfig` and injected as step defaults):
+
+- `context[:language_policy]`
+  - `enabled` (Boolean; default false)
+  - `target_lang` (String; canonicalized)
+  - `style_hint` (String; optional)
+  - `special_tags` (Array<String>; optional)
+  - `policy_text_builder` (callable; optional)
+
+Per-run step overrides (`configs:` / `context.module_configs[:language_policy]`) are deep-merged on top:
+
+- `style_hint` is the most common override (e.g. “casual” vs “formal”)
+
+Common pitfalls:
+
+- If `target_lang` is not in the allowlist, the step warns and does nothing for that run.
+- Add `"lang"` to `special_tags` if you want mixed-language spans via `<lang code=\"...\">...</lang>`.
 
 ## When to Use Platform Pipelines Instead
 

@@ -46,6 +46,29 @@ its own configuration parsing.
 
 ---
 
+## PromptBuilder Input + Step Config Contract (V2)
+
+To keep the builder API strict and predictable:
+
+- `PromptBuilder.new(...)` accepts fixed keyword inputs (`character`, `user`,
+  `history`, `message`, `preset`, `dialect`, `strict`, `llm_options`, etc.).
+- Unknown keyword inputs fail fast (`ArgumentError`).
+- Per-step dynamic configuration is passed via `configs:` and stored in
+  `context.module_configs`.
+- Step config ownership is local to each step:
+  - define `Step::Config`
+  - implement `Step::Config.from_hash`
+  - step consumes only `option(:config)` as that typed object
+- `Pipeline` resolves step config from:
+  - static step defaults (`use_step ...`)
+  - deep-merged `context.module_configs[step_name]` overrides
+  - typed parsing via step-local config class/builder
+
+Unknown step names in `context.module_configs` are ignored; known step config
+shape errors are fail-fast.
+
+---
+
 ## Hash Key Type Convention
 
 TavernKit uses a consistent Hash key type policy to avoid `hash["a"] || hash[:a]`
@@ -174,8 +197,8 @@ Preferred options:
   - Keep `extensions` as a String-keyed Hash (passthrough contract).
 - **Mixed-key feature flags / config hashes:** `Utils::HashAccessor.wrap(hash)` to read alternative spellings
   without sprinkling manual fallbacks.
-- **Runtime/app-state contract:** `PromptBuilder::Context.build(raw, type: :app)` to canonicalize keys into
-  snake_case Symbols (because runtime keys are TavernKit-owned).
+- **Context/app-state contract:** `PromptBuilder::Context.build(raw, type: :app)` to canonicalize keys into
+  snake_case Symbols (because context keys are TavernKit-owned).
 
 ---
 
@@ -288,7 +311,7 @@ Minimal shared schema + `extensions` Hash for platform-specific fields:
 | Platform | Extensions |
 |----------|-----------|
 | ST | `match_persona_description`, `match_character_description`, `match_character_personality`, `match_character_depth_prompt`, `match_scenario`, `match_creator_notes`, `character_filter`, `triggers`, `selective_logic`, `secondary_keys`, `use_probability`, `probability`, `sticky`, `cooldown`, `delay`, `group_override`, `group_weight`, etc. (40+ fields) |
-| RisuAI | Runtime decorator parsing from `content` — no persistent extensions needed |
+| RisuAI | Decorator parsing from `content` — no persistent extensions needed |
 
 ---
 
@@ -667,10 +690,10 @@ dependency**:
   (block counts, token estimates, warnings, evictions) and a stable prompt
   fingerprint derived from final output messages (excluding random block ids).
 - Blocks should carry provenance in `block.metadata[:source]` (e.g.,
-  `{ stage: :lore, id: "wi:entry_123" }`) so traces and trim reports can explain
+  `{ step: :lore, id: "wi:entry_123" }`) so traces and trim reports can explain
   *why* content exists in the final prompt.
 - Step exceptions should be wrapped as a `PipelineError` that includes
-  the failing stage name and original error to make production debugging
+  the failing step name (`PipelineError#step`) and original error to make production debugging
   actionable.
 
 This should be opt-in (off by default) so production overhead is controllable.
@@ -679,25 +702,25 @@ This should be opt-in (off by default) so production overhead is controllable.
 
 ```ruby
 module TavernKit
-  module Prompt
-    # Per-stage trace record.
-    TraceStage = Data.define(
+  module PromptBuilder
+    # Per-step trace record.
+    TraceStep = Data.define(
       :name,             # Symbol - step name
       :duration_ms,      # Float - execution time
-      :stats,            # Hash - stage-specific counters (symbol keys)
-      :warnings          # Array<String> - warnings emitted during this stage
+      :stats,            # Hash - step-specific counters (symbol keys)
+      :warnings          # Array<String> - warnings emitted during this step
     )
 
     # Complete pipeline trace.
     Trace = Data.define(
-      :stages,           # Array<TraceStage>
+      :steps,            # Array<TraceStep>
       :fingerprint,      # String - SHA256 of final prompt content (for caching)
       :started_at,       # Time
       :finished_at,      # Time
-      :total_warnings    # Array<String> - all warnings (aggregated from stages + context)
+      :total_warnings    # Array<String> - all warnings (aggregated from steps + context)
     ) do
       def duration_ms = (finished_at - started_at) * 1000
-      def success? = stages.none? { |s| s.stats[:error] }
+      def success? = steps.none? { |s| s.stats[:error] }
     end
 
     # Simple callable interface (Proc-compatible).
@@ -716,47 +739,47 @@ module TavernKit
 
       # Trace-collecting instrumenter for debugging.
       class TraceCollector < Base
-        attr_reader :stages, :warnings
+        attr_reader :steps, :warnings
 
         def initialize
           @started_at = Time.now
-          @stages = []
+          @steps = []
           @warnings = []
-          @stage_warnings = Hash.new { |h, k| h[k] = [] }
-          @stage_stats = Hash.new { |h, k| h[k] = {} }
+          @step_warnings = Hash.new { |h, k| h[k] = [] }
+          @step_stats = Hash.new { |h, k| h[k] = {} }
           @current_step = nil
-          @stage_start = nil
+          @step_started_at = nil
         end
 
         def call(event, **payload)
           case event
           when :step_start
             @current_step = payload[:name]
-            @stage_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-            @stage_warnings[@current_step] = []
-            @stage_stats[@current_step] = {}
+            @step_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            @step_warnings[@current_step] = []
+            @step_stats[@current_step] = {}
           when :step_finish
-            duration = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - @stage_start) * 1000
-            @stages << TraceStage.new(
+            duration = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - @step_started_at) * 1000
+            @steps << TraceStep.new(
               name: @current_step,
               duration_ms: duration,
-              stats: @stage_stats[@current_step].merge(payload[:stats] || {}),
-              warnings: @stage_warnings[@current_step].dup
+              stats: @step_stats[@current_step].merge(payload[:stats] || {}),
+              warnings: @step_warnings[@current_step].dup
             )
           when :warning
             @warnings << payload[:message]
-            stage = payload[:stage] || @current_step
-            @stage_warnings[stage] << payload[:message] if stage
+            step = payload[:step] || @current_step
+            @step_warnings[step] << payload[:message] if step
           when :stat
-            stage = payload[:stage] || @current_step
+            step = payload[:step] || @current_step
             key = payload[:key]
-            @stage_stats[stage][key.to_sym] = payload[:value] if stage && key
+            @step_stats[step][key.to_sym] = payload[:value] if step && key
           when :step_error
-            @stages << TraceStage.new(
+            @steps << TraceStep.new(
               name: @current_step,
               duration_ms: 0,
-              stats: @stage_stats[@current_step].merge(error: payload[:error].class.name),
-              warnings: @stage_warnings[@current_step].dup
+              stats: @step_stats[@current_step].merge(error: payload[:error].class.name),
+              warnings: @step_warnings[@current_step].dup
             )
           end
         end
@@ -764,7 +787,7 @@ module TavernKit
         def to_trace(fingerprint:)
           finished_at = Time.now
           Trace.new(
-            stages: @stages.freeze,
+            steps: @steps.freeze,
             fingerprint: fingerprint,
             started_at: @started_at,
             finished_at: finished_at,
@@ -780,8 +803,8 @@ end
 **Debug switch (Core):**
 - `context.instrumenter` is `nil` by default (production).
 - Debug builds set `context.instrumenter = Instrumenter::TraceCollector.new`.
-- Step authors can emit stage-local stats via `ctx.instrument(:stat, key: ..., value: ...)`
-  (and optionally `stage:` when emitting from nested helpers).
+- Step authors can emit step-local stats via `ctx.instrument(:stat, key: ..., value: ...)`
+  (and optionally `step:` when emitting from nested helpers).
 - Provide a helper that supports lazy payload evaluation so step authors
   can attach expensive debug data without impacting production:
 
@@ -812,7 +835,7 @@ class TavernKit::PromptBuilder::Context
     msg = message.to_s
     @warnings << msg
 
-    instrument(:warning, message: msg, stage: @current_step)
+    instrument(:warning, message: msg, step: @current_step)
 
     if @strict
       raise TavernKit::StrictModeError, msg
@@ -826,7 +849,7 @@ end
 
 This ensures warnings appear in both:
 - `context.warnings` (for programmatic access)
-- `trace.stages[n].warnings` (for per-stage debugging)
+- `trace.steps[n].warnings` (for per-step debugging)
 - `trace.total_warnings` (for summary)
 
 ---
@@ -865,13 +888,13 @@ module TavernKit
   # Strict mode: warnings become errors.
   class StrictModeError < Error; end
 
-  # Pipeline execution failures (wraps stage errors).
+  # Pipeline execution failures (wraps step errors).
   class PipelineError < Error
-    attr_reader :stage
+    attr_reader :step
 
-    def initialize(message, stage:)
-      @stage = stage
-      super("#{message} (stage: #{stage})")
+    def initialize(message, step:)
+      @step = step
+      super("#{message} (step: #{step})")
     end
   end
 
@@ -969,7 +992,7 @@ end
 | **Unmatched placeholders after expansion** | `raise UnconsumedMacroError` | `warn` | Quality issue but recoverable |
 | **Missing required context** (no character) | `raise ArgumentError` | `raise ArgumentError` | Cannot proceed without data |
 | **Invalid card format** | `raise InvalidCardError` | `raise InvalidCardError` | Cannot parse, unrecoverable |
-| **Step exception** | `raise PipelineError` | `raise PipelineError` | Always fatal, wrap with stage info |
+| **Step exception** | `raise PipelineError` | `raise PipelineError` | Always fatal, wrap with step info |
 | **Token budget exceeded** | `raise TokenBudgetExceeded` | Trim + `warn` | Recoverable via trimming |
 | **Invalid preset field value** | `raise InvalidPresetError` | `warn` + use default | Config error, but can continue |
 | **Lore entry parse error** | `raise LoreParseError` | `warn` + skip entry | One bad entry shouldn't kill build |
@@ -988,7 +1011,7 @@ def warn(message)
   msg = message.to_s
   @warnings << msg
 
-  instrument(:warning, message: msg, stage: @current_step)
+  instrument(:warning, message: msg, step: @current_step)
   raise TavernKit::StrictModeError, msg if @strict
   effective_warning_handler&.call(msg)
   nil
@@ -1001,31 +1024,31 @@ end
 - Debug builds
 
 **Use normal mode for:**
-- Production runtime (graceful degradation)
+- Production mode (graceful degradation)
 - User-facing applications
 
 #### 11d. Pipeline Error Wrapping
 
-Step exceptions should always be wrapped to include stage context:
+Step exceptions should always be wrapped to include step context:
 
 ```ruby
 # Rack-style step chain: wrap errors at the step boundary.
 class TavernKit::PromptBuilder::Step
   def call(ctx)
-    stage = self.class.step_name
-    ctx.instance_variable_set(:@current_step, stage)
+    step = self.class.step_name
+    ctx.instance_variable_set(:@current_step, step)
 
-    ctx.instrument(:step_start, name: stage)
+    ctx.instrument(:step_start, name: step)
 
     before(ctx)
     @app.call(ctx)
     after(ctx)
 
-    ctx.instrument(:step_finish, name: stage, stats: {})
+    ctx.instrument(:step_finish, name: step, stats: {})
     ctx
   rescue StandardError => e
-    ctx.instrument(:step_error, name: stage, error: e)
-    raise TavernKit::PipelineError.new(e.message, stage: stage), cause: e
+    ctx.instrument(:step_error, name: step, error: e)
+    raise TavernKit::PipelineError.new(e.message, step: step), cause: e
   ensure
     ctx.instance_variable_set(:@current_step, nil)
   end

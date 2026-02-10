@@ -84,13 +84,16 @@ class TavernKit::PromptBuilder::StateTest < Minitest::Test
     assert_equal "ok", state.variables_store.get("z", scope: :global)
   end
 
-  def test_runtime_reads_and_writes_runtime_payload
+  def test_state_holds_prompt_builder_context
     context = TavernKit::PromptBuilder::Context.build({ language_policy: { enabled: true } }, type: :app)
-    state = TavernKit::PromptBuilder::State.new
+    state = TavernKit::PromptBuilder::State.new(context: context)
 
-    state.runtime = context
-    assert_equal context, state.runtime
-    assert_equal context, state[:runtime]
-    assert state.key?(:runtime)
+    assert_equal context, state.context
+    assert_equal true, state.context[:language_policy][:enabled]
+  end
+
+  def test_context_writer_rejects_non_context
+    state = TavernKit::PromptBuilder::State.new
+    assert_raises(ArgumentError) { state.context = {} }
   end
 end

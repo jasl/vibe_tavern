@@ -6,7 +6,7 @@ module TavernKit
   module VibeTavern
     module PromptBuilder
       module Steps
-        # Stage: inject a short "output language" policy block.
+        # Step: inject a short "output language" policy block.
         #
         # Contract (P0):
         # - Constrain human-facing assistant text to a target language
@@ -14,8 +14,51 @@ module TavernKit
         # - Never introduce app-level safety/ethics policy text
         #
         # Configuration:
-        # - typed `LanguagePolicy::Config` injected via step options
+        # - typed `Steps::LanguagePolicy::Config` injected via step options
         class LanguagePolicy < TavernKit::PromptBuilder::Step
+          Config =
+            Data.define(
+              :enabled,
+              :target_lang,
+              :style_hint,
+              :special_tags,
+              :policy_text_builder,
+            ) do
+              def self.from_hash(raw)
+                return raw if raw.is_a?(self)
+
+                raise ArgumentError, "language_policy step config must be a Hash" unless raw.is_a?(Hash)
+                raw.each_key do |key|
+                  raise ArgumentError, "language_policy step config keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+                end
+
+                enabled = raw.fetch(:enabled, false) ? true : false
+                target_lang = TavernKit::VibeTavern::LanguagePolicy.canonical_target_lang(raw.fetch(:target_lang, nil))
+
+                style_hint = raw.fetch(:style_hint, nil)&.to_s&.strip
+                style_hint = nil if style_hint.to_s.empty?
+
+                special_tags =
+                  Array(raw.fetch(:special_tags, []))
+                    .map { |item| item.to_s.strip }
+                    .reject(&:empty?)
+                    .uniq
+
+                policy_text_builder = raw.fetch(:policy_text_builder, nil)
+                if policy_text_builder && !policy_text_builder.respond_to?(:call)
+                  raise ArgumentError, "language_policy.policy_text_builder must respond to #call"
+                end
+
+                new(
+                  enabled: enabled,
+                  target_lang: target_lang,
+                  style_hint: style_hint,
+                  special_tags: special_tags,
+                  policy_text_builder: policy_text_builder,
+                )
+              end
+            end
+
           DEFAULT_POLICY_TEXT_BUILDER =
             lambda do |target_lang, style_hint:, special_tags:|
               parts = []
@@ -45,7 +88,7 @@ module TavernKit
         def before(ctx)
           cfg = option(:config)
           return if cfg.nil?
-          raise ArgumentError, "language_policy step config must be LanguagePolicy::Config" unless cfg.is_a?(TavernKit::VibeTavern::LanguagePolicy::Config)
+          raise ArgumentError, "language_policy step config must be Steps::LanguagePolicy::Config" unless cfg.is_a?(Config)
           return unless cfg.enabled
 
           target_lang = cfg.target_lang.to_s.strip
@@ -58,7 +101,7 @@ module TavernKit
 
           style_hint = cfg.style_hint
           special_tags = cfg.special_tags
-          policy_text_builder = cfg.policy_text_builder || option(:policy_text_builder)
+          policy_text_builder = cfg.policy_text_builder
 
           policy_text =
             build_policy_text(
@@ -96,7 +139,7 @@ module TavernKit
 
           rebuild_plan!(ctx)
 
-          ctx.instrument(:stat, stage: :language_policy, key: :enabled, value: true) if ctx.instrumenter
+          ctx.instrument(:stat, step: :language_policy, key: :enabled, value: true) if ctx.instrumenter
         end
 
         def resolve_insertion_index(blocks)

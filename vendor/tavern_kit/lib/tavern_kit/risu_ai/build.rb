@@ -7,15 +7,7 @@ module TavernKit
     class << self
       # Convenience entrypoint using the default RisuAI pipeline.
       def build(**kwargs, &block)
-        if block
-          TavernKit::PromptBuilder.build(pipeline: Pipeline, &block)
-        else
-          dsl = TavernKit::PromptBuilder.new(pipeline: Pipeline)
-          kwargs.each do |key, value|
-            dsl.public_send(key, value) if dsl.respond_to?(key)
-          end
-          dsl.build
-        end
+        TavernKit::PromptBuilder.build(pipeline: Pipeline, **kwargs, &block)
       end
 
       def to_messages(dialect: :openai, **kwargs, &block)

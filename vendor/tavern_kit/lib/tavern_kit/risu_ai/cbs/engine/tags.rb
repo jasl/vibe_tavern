@@ -129,7 +129,7 @@ module TavernKit
               end
             end
 
-            # Unknown tokens are preserved as-is for later expansion stages.
+            # Unknown tokens are preserved as-is for later expansion steps.
             "{{#{expanded_raw}}}"
           end
         end

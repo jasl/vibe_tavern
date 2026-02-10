@@ -25,7 +25,7 @@ module TavernKit
         model_hint: nil,
         message_overhead_tokens: 0,
         include_message_metadata_tokens: false,
-        stage: :trimming,
+        step: :trimming,
         on_overflow: :error
       )
         strategy = strategy.to_sym
@@ -82,7 +82,7 @@ module TavernKit
               estimated_tokens: final_tokens,
               max_tokens: max_tokens || (budget_tokens + reserve_tokens),
               reserve_tokens: reserve_tokens,
-              stage: stage,
+              step: step,
             )
           when :return
             # Best-effort return (callers can inspect TrimReport#over_budget?).

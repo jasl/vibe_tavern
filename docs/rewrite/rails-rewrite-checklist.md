@@ -17,7 +17,7 @@ Source of truth for integration semantics:
 
 - **Content models**: Character / Lore / Preset / Template / MessageHistory.
 - **Session state**: `variables_store` (persisted, per chat).
-- **Per-build snapshot**: `runtime` (not persisted; derived per request/build).
+- **Per-build snapshot**: `context` (not persisted; derived per request/build).
 - **Prompt build**: inputs -> `PromptBuilder::Plan` -> dialect messages.
 - **Observability**: store/replay-friendly artifacts (`fingerprint`, `trace`, `trim_report`).
 
@@ -103,21 +103,21 @@ Tests:
 
 ---
 
-## Milestone 3: VariablesStore + Runtime Assembly (App ↔ Pipeline Sync)
+## Milestone 3: VariablesStore + Context Assembly (App ↔ Pipeline Sync)
 
 Deliverable:
-- Rails can reliably create `variables_store` and `runtime` for every prompt build.
+- Rails can reliably create `variables_store` and `context` for every prompt build.
 
 Services:
 - `PromptBuilding::LoadVariablesStore.call(chat)`:
   - Load JSONB -> `TavernKit::VariablesStore::InMemory`
   - Enforce scopes and serialization rules (string keys at boundary OK; store normalizes internally)
-- `PromptBuilding::BuildRuntime.call(chat, request_context:)`:
+- `PromptBuilding::BuildContext.call(chat, request_context:)`:
   - Build `TavernKit::PromptBuilder::Context.build({ ... }, type: :app, id: chat.id)`
   - Compute/derive:
     - `chat_index`, `message_index` (from DB message count / request)
     - RisuAI: `cbs_conditions`, `toggles`, `metadata`, `modules`, `assets` as needed
-  - Do not persist runtime; treat it as a per-build snapshot.
+  - Do not persist context; treat it as a per-build snapshot.
 
 Concurrency policy (important):
 - When building prompts concurrently for the same chat, guard `variables_store` writes:
@@ -127,7 +127,7 @@ Concurrency policy (important):
 
 Tests:
 - variables_store round-trip tests
-- runtime defaults tests (tolerant mode)
+- context defaults tests (tolerant mode)
 - concurrency safety test for store update (use lock/optimistic strategy)
 
 ---
@@ -149,7 +149,7 @@ Service (single entrypoint):
     - Character, Preset/LoreBooks, TemplateCards, Message history
   - Construct:
     - `variables_store` via service
-    - `runtime` via service
+    - `context` via service
     - `instrumenter` in development (`TraceCollector`) else nil
   - Call TavernKit:
     - ST: `TavernKit::SillyTavern.build { ... }`

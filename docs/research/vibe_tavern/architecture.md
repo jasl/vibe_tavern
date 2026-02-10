@@ -32,7 +32,7 @@ To keep call sites consistent, we use a single entrypoint object:
 - `lib/tavern_kit/vibe_tavern/runner_config.rb`
 
 `RunnerConfig` is responsible for:
-- accepting a request-scoped `runtime` snapshot (Symbol keys)
+- accepting a request-scoped `context` snapshot (Symbol keys)
 - building a per-run configured pipeline (step options)
 - normalizing `llm_options_defaults` (Symbol keys; reserved keys rejected)
 - parsing module-local configs:
@@ -55,7 +55,7 @@ Examples:
 
 `TavernKit::VibeTavern` builds a `PromptBuilder::Plan` from:
 - `history` (messages)
-- `runtime` (request-scoped config snapshot)
+- `context` (request-scoped config snapshot)
 - `variables_store` (session-scoped state)
 - `llm_options` (provider/model request options)
 - `strict` (debug/test policy)
@@ -63,6 +63,16 @@ Examples:
 Key property:
 - Tools / response_format / request overrides must be part of the plan’s request
   surface (`plan.llm_options`) so runs are reproducible.
+
+PromptBuilder API contract (V2):
+- `PromptBuilder.new(...)` accepts fixed keyword inputs (`character`, `user`,
+  `history`, `message`, `preset`, `dialect`, `strict`, `llm_options`, etc.)
+  plus `configs:` for step-level overrides.
+- `context` remains the single external input truth; `state` is internal
+  mutable build state only.
+- Unknown step names in `context.module_configs` are ignored (no side effects).
+- For known steps, config parsing is strict and typed via step-local
+  `Step::Config.from_hash`.
 
 ### 2) Single request boundary: PromptRunner
 
@@ -134,7 +144,7 @@ Directives presets:
 - `lib/tavern_kit/vibe_tavern/directives/presets.rb`
 
 Principle:
-- Presets are optional sugar; the source of truth is the runtime/config hash.
+- Presets are optional sugar; the source of truth is the context/config hash.
 - Provider/model quirks are **opt-in** and composable.
 
 Cross-protocol compatibility:

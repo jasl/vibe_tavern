@@ -76,6 +76,78 @@ A2UI should remain *optional*:
   for a specific client.
 - The directive protocol stays stable either way.
 
+## P0 Checklist (Directives -> IR -> Compiler/Validator)
+
+This section is the “do it, verify it” checklist for the A2UI backend. Keep it
+as the Definition of Done for the first production-capable slice.
+
+### Boundaries (Must Stay True)
+
+- [ ] The LLM never emits A2UI JSONL directly. It emits directives only.
+- [ ] The app owns directive types, UI templates, and catalogs (infra does not hardcode product UI).
+- [ ] UI IR is strong-fact state (deterministic, inspectable, replayable).
+- [ ] The compiler is deterministic (no model calls; no best-effort string rewriting).
+- [ ] The validator runs before any A2UI messages are flushed to the client.
+
+### Directives Layer (LLM-facing)
+
+- [ ] Directives envelope is strict JSON (`json_schema -> json_object -> prompt_only`).
+- [ ] Structured outputs enforce `parallel_tool_calls: false` whenever `response_format` is present.
+- [ ] Directive execution updates UI IR only (no implicit UI mutations in the compiler).
+
+### UI IR (Strong-fact State)
+
+- [ ] State separation is explicit:
+  - committed facts (authoritative)
+  - draft edits (`/draft/...`)
+  - ephemeral narration (discardable)
+- [ ] All internal patch paths are JSON Pointers (syntax canonicalization via `TavernKit::Text::JSONPointer`).
+- [ ] UI IR encodes surface lifecycle and versioning (epoch/rev or equivalent) to reject stale user actions.
+
+### A2UI Compiler (Deterministic)
+
+- [ ] Compiler outputs a per-surface batch of messages in recommended order:
+  - `surfaceUpdate` -> `dataModelUpdate` -> `beginRendering`
+- [ ] Compiler never emits BoundValue shorthands that include both `path` and `literal*`.
+- [ ] Compiler enforces allowlists (catalog-driven component types, actions, and context keys).
+- [ ] Compiler enforces guardrails (count/bytes/depth) on:
+  - messages per surface/response
+  - components per surface
+  - data model entries/depth/string sizes
+
+### A2UI Validator (Shape + Semantics)
+
+- [ ] Shape validation:
+  - JSONL line parsing
+  - exactly one top-level key per message
+  - required surface/message fields present
+- [ ] Semantic validation:
+  - `beginRendering` gate (must follow at least one `surfaceUpdate`)
+  - component wrapper one-of component key
+  - ID references exist; no cycles
+  - per-surface scoping is consistent
+
+### Failure Policy (Hard/Soft + Surface Safety)
+
+Goal: never leave a stale interactive UI behind, and never emit invalid A2UI.
+
+- [ ] **Hard fail** (dev/test, strict): raise and do not flush any surface messages for that turn.
+- [ ] **Soft fail** (prod): fall back to plain assistant text (no surface changes).
+- [ ] **Surface fail** (prod, preferred for invalid/stale UI risk): emit `deleteSurface(surfaceId)` then fall back.
+- [ ] **Epoch reset** (prod, strongest): rotate surfaceId epoch/version and re-send full init.
+- [ ] Mapping from error family -> recovery action is explicit and stable (not ad-hoc).
+
+### Tests (Minimum)
+
+- [ ] Unit tests:
+  - JSON Pointer canonicalization is syntax-only (RFC 6901 rules)
+  - typed contents builder (dataModel adjacency list) is deterministic
+  - validator rejects multi-key messages and beginRendering-before-surfaceUpdate
+- [ ] Integration tests:
+  - directives -> UI IR -> compile -> validate -> JSONL encode (happy path)
+  - compiler guardrail trips -> surface fail + fallback (prod mode)
+  - stale userAction -> rejected with stable error code and safe recovery
+
 ## Key A2UI v0.8 protocol facts we must preserve
 
 These become hard validation rules (not “best effort”):

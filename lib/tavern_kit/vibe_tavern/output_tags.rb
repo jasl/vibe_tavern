@@ -7,14 +7,14 @@ module TavernKit
     # This is intended for tags that help prompt generation (e.g. `<lang ...>`)
     # but should not be shown to end users as-is.
     #
-    # Configuration is programmer-owned and strict. Runtime input is parsed via
-    # `OutputTags::Config.from_runtime(runtime)`, then consumers call
+    # Configuration is programmer-owned and strict. Context input is parsed via
+    # `OutputTags::Config.from_context(context)`, then consumers call
     # `OutputTags.transform(text, config: config)`.
     #
-    # Runtime shape:
+    # Context shape:
     #
     # ```ruby
-    # runtime[:output_tags] = {
+    # context[:output_tags] = {
     #   enabled: true,
     #   escape_hatch: { enabled: true, mode: :html_entity },
     #   rules: [
@@ -113,12 +113,12 @@ module TavernKit
               )
             end
 
-            def from_runtime(runtime)
-              raw = runtime&.[](:output_tags)
+            def from_context(context)
+              raw = context&.[](:output_tags)
               return disabled if raw.nil?
 
-              raise ArgumentError, "runtime[:output_tags] must be a Hash" unless raw.is_a?(Hash)
-              assert_symbol_keys!(raw, path: "output_tags")
+              raise ArgumentError, "context[:output_tags] must be a Hash" unless raw.is_a?(Hash)
+              TavernKit::Utils.assert_symbol_keys!(raw, path: "output_tags")
 
               enabled = TavernKit::Coerce.bool(raw.fetch(:enabled, false), default: false)
               escape_hatch = parse_escape_hatch(raw.fetch(:escape_hatch, DEFAULT_ESCAPE_HATCH))
@@ -143,7 +143,7 @@ module TavernKit
 
             def parse_escape_hatch(raw)
               raise ArgumentError, "output_tags.escape_hatch must be a Hash" unless raw.is_a?(Hash)
-              assert_symbol_keys!(raw, path: "output_tags.escape_hatch")
+              TavernKit::Utils.assert_symbol_keys!(raw, path: "output_tags.escape_hatch")
 
               enabled = TavernKit::Coerce.bool(raw.fetch(:enabled, false), default: false)
               mode = raw.fetch(:mode, :html_entity)
@@ -162,7 +162,7 @@ module TavernKit
               raw.map do |item|
                 raise ArgumentError, "output_tags.rules entries must be Hash" unless item.is_a?(Hash)
 
-                assert_symbol_keys!(item, path: "output_tags.rules[]")
+                TavernKit::Utils.assert_symbol_keys!(item, path: "output_tags.rules[]")
                 TavernKit::VibeTavern::OutputTags::Rule.new(
                   tag: item.fetch(:tag),
                   action: item.fetch(:action),
@@ -174,24 +174,16 @@ module TavernKit
 
             def parse_sanitizers(raw)
               raise ArgumentError, "output_tags.sanitizers must be a Hash" unless raw.is_a?(Hash)
-              assert_symbol_keys!(raw, path: "output_tags.sanitizers")
+              TavernKit::Utils.assert_symbol_keys!(raw, path: "output_tags.sanitizers")
 
               raw.each_with_object({}) do |(name, cfg), out|
                 raise ArgumentError, "sanitizer name must be a Symbol" unless name.is_a?(Symbol)
                 raise ArgumentError, "sanitizer #{name} config must be a Hash" unless cfg.is_a?(Hash)
 
-                assert_symbol_keys!(cfg, path: "output_tags.sanitizers.#{name}")
+                TavernKit::Utils.assert_symbol_keys!(cfg, path: "output_tags.sanitizers.#{name}")
                 enabled = TavernKit::Coerce.bool(cfg.fetch(:enabled, false), default: false)
 
                 out[name] = cfg.merge(enabled: enabled)
-              end
-            end
-
-            def assert_symbol_keys!(hash, path:)
-              hash.each_key do |key|
-                unless key.is_a?(Symbol)
-                  raise ArgumentError, "#{path} keys must be Symbols (got #{key.class})"
-                end
               end
             end
           end

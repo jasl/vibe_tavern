@@ -11,11 +11,11 @@ module TavernKit
     # and after passing to subsequent steps.
     #
     # This is the workflow orchestrator. Specific platform workflows
-    # configurations (e.g., SillyTavern 9-stage) are defined elsewhere.
+    # configurations (e.g., SillyTavern 9-step) are defined elsewhere.
     #
     # @example Building a pipeline from scratch
     #   pipeline = Pipeline.new do
-    #     use_step MyStep, name: :my_step
+    #     use_step :my_step, MyStep
     #   end
     #
     class Pipeline
@@ -30,7 +30,7 @@ module TavernKit
       TERMINAL = Terminal.new
 
       # Entry representing a step in the pipeline.
-      Entry = Data.define(:step_class, :options, :name)
+      Entry = Data.define(:step_class, :options, :name, :config_class, :default_config)
 
       # Create an empty pipeline (no steps).
       # @return [Pipeline]
@@ -52,16 +52,23 @@ module TavernKit
       end
 
       # Add a step to the end of the pipeline.
-      def use_step(step_class, name: nil, **options)
-        resolved_name = resolve_name(step_class, name)
-
-        if @index.key?(resolved_name)
-          raise ArgumentError, "Step name already registered: #{resolved_name}"
+      def use_step(name, step_class, **options)
+        unless name.is_a?(Symbol)
+          raise ArgumentError, "step name must be a Symbol (got #{name.class})"
         end
 
-        entry = Entry.new(step_class: step_class, options: options, name: resolved_name)
+        if @index.key?(name)
+          raise ArgumentError, "Step name already registered: #{name}"
+        end
+
+        entry =
+          build_entry(
+            step_class: step_class,
+            name: name,
+            options: options,
+          )
         @entries << entry
-        @index[resolved_name] = @entries.size - 1
+        @index[name] = @entries.size - 1
         self
       end
 
@@ -70,7 +77,12 @@ module TavernKit
         idx = @index[name]
         raise ArgumentError, "Unknown step: #{name}" unless idx
 
-        @entries[idx] = Entry.new(step_class: step_class, options: options, name: name)
+        @entries[idx] =
+          build_entry(
+            step_class: step_class,
+            name: name,
+            options: options,
+          )
         self
       end
 
@@ -84,7 +96,12 @@ module TavernKit
           raise ArgumentError, "Step name already registered: #{resolved_name}"
         end
 
-        entry = Entry.new(step_class: step_class, options: options, name: resolved_name)
+        entry =
+          build_entry(
+            step_class: step_class,
+            name: resolved_name,
+            options: options,
+          )
         @entries.insert(idx, entry)
         reindex!
         self
@@ -100,7 +117,12 @@ module TavernKit
           raise ArgumentError, "Step name already registered: #{resolved_name}"
         end
 
-        entry = Entry.new(step_class: step_class, options: options, name: resolved_name)
+        entry =
+          build_entry(
+            step_class: step_class,
+            name: resolved_name,
+            options: options,
+          )
         @entries.insert(idx + 1, entry)
         reindex!
         self
@@ -122,10 +144,14 @@ module TavernKit
         raise ArgumentError, "Unknown step: #{name}" unless idx
 
         entry = @entries[idx]
+        merged_options = TavernKit::Utils.deep_merge_hashes(entry.options, options)
+
         @entries[idx] = Entry.new(
           step_class: entry.step_class,
-          options: entry.options.merge(options),
+          options: merged_options,
           name: entry.name,
+          config_class: entry.config_class,
+          default_config: resolve_default_config(entry.name, entry.config_class, merged_options),
         )
         self
       end
@@ -194,13 +220,33 @@ module TavernKit
 
       def resolve_step_options(entry, state)
         base = entry.options
+        if entry.config_class
+          return resolve_typed_config_options(entry, state, base)
+        end
+
         context = state.context
         return base unless context
 
         overrides = context.module_configs.fetch(entry.name, nil)
         return base unless overrides.is_a?(Hash) && overrides.any?
 
-        base.merge(overrides)
+        TavernKit::Utils.deep_merge_hashes(base, overrides)
+      end
+
+      def resolve_typed_config_options(entry, state, base)
+        context = state.context
+        overrides = context&.module_configs&.fetch(entry.name, nil)
+        has_overrides = overrides.is_a?(Hash) && overrides.any?
+
+        typed =
+          if has_overrides
+            merged = TavernKit::Utils.deep_merge_hashes(base, overrides)
+            resolve_typed_config(entry.name, entry.config_class, merged)
+          else
+            entry.default_config
+          end
+
+        { config: typed }
       end
 
       def coerce_state(value)
@@ -212,6 +258,51 @@ module TavernKit
         end
 
         raise ArgumentError, "state must be a TavernKit::PromptBuilder::State or TavernKit::PromptBuilder::Context"
+      end
+
+      def build_entry(step_class:, name:, options:)
+        resolved_config_class = resolve_config_class(step_class)
+        default_config = resolve_default_config(name, resolved_config_class, options)
+
+        Entry.new(
+          step_class: step_class,
+          options: options,
+          name: name,
+          config_class: resolved_config_class,
+          default_config: default_config,
+        )
+      end
+
+      def resolve_config_class(step_class)
+        return nil unless step_class.const_defined?(:Config, false)
+
+        config_class = step_class.const_get(:Config, false)
+        unless config_class.respond_to?(:from_hash)
+          raise ArgumentError, "#{step_class}::Config must respond to .from_hash"
+        end
+
+        config_class
+      end
+
+      def resolve_default_config(name, config_class, options)
+        return nil unless config_class
+
+        resolve_typed_config(name, config_class, options)
+      end
+
+      def resolve_typed_config(name, config_class, raw)
+        config =
+          begin
+            raw.is_a?(config_class) ? raw : config_class.from_hash(raw)
+          rescue StandardError => e
+            raise ArgumentError, "invalid config for step #{name}: #{e.message}"
+          end
+
+        if config_class && !config.is_a?(config_class)
+          raise ArgumentError, "config for step #{name} must be a #{config_class}"
+        end
+
+        config
       end
     end
   end

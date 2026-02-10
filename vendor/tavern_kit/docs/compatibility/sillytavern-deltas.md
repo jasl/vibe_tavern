@@ -139,7 +139,7 @@ For TavernKit: implement `/` and `#` flags. Parse but ignore `!`, `?`, `~`, `>`.
 ### 1.6 NEW: Typed Argument Validation
 
 Macro definitions specify argument types (`string`, `integer`, `number`, `boolean`)
-via `MacroValueType`. Arguments are validated at runtime. `strictArgs` controls
+via `MacroValueType`. Arguments are validated at execution time. `strictArgs` controls
 error vs warning behavior.
 
 Old TavernKit docs: no mention of typed arguments.
@@ -538,7 +538,7 @@ These were listed as "NOT implemented" but ST v1.15.0 HAS them:
 | Entry field: `useProbability` | Enable/disable probability check | Implemented (Lore::EntryExtensions) |
 | Macro flags (`!`, `?`, `~`, `>`) | Parsed but unimplemented | Implemented (parse + ignore) |
 | Pre/post-processor pipeline | Extensible processing around evaluation | Implemented |
-| Typed macro arguments | Runtime type validation | Implemented |
+| Typed macro arguments | Macro argument type validation | Implemented |
 | Multimodal Message content | Images, video, audio | Deferred (future) |
 | System prompt as separate entity | `sysprompt.content` separate from instruct | Implemented (macros; content is app-supplied) |
 | MacroBrowser documentation UI | Dynamic searchable UI | Not applicable (gem has no UI) |
@@ -712,7 +712,7 @@ Source: `script.js` (line 2913), `instruct-mode.js` (line 300), `power-user.js`
 
 **4. Custom stopping strings** (`power_user.custom_stopping_strings`):
 - Permanent: JSON array string (parsed, validated)
-- Ephemeral: `EPHEMERAL_STOPPING_STRINGS` runtime array
+- Ephemeral: `EPHEMERAL_STOPPING_STRINGS` in-memory array
 - Macro substitution if `custom_stopping_strings_macro` enabled
 
 Single-line mode: prepends `"\n"` to all stops.
@@ -987,7 +987,7 @@ Integration: cached via `calculateLogitBias()`, sent as `logit_bias` field.
 
 ### 16.4 Regex Scripts Extension
 
-Per-character regex find/replace rules applied to messages at runtime.
+Per-character regex find/replace rules applied to messages at execution time.
 
 ### 16.5 Memory/Summarize Extension
 

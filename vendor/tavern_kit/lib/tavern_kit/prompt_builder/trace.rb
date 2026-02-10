@@ -3,7 +3,7 @@
 module TavernKit
   class PromptBuilder
     # Per-step trace record.
-    TraceStage = Data.define(
+    TraceStep = Data.define(
       :name,        # Symbol - step name
       :duration_ms, # Float - execution time
       :stats,       # Hash - step-specific counters (symbol keys)
@@ -12,7 +12,7 @@ module TavernKit
 
     # Complete pipeline trace.
     Trace = Data.define(
-      :stages,        # Array<TraceStage>
+      :steps,         # Array<TraceStep>
       :fingerprint,   # String - stable fingerprint for caching/debugging
       :started_at,    # Time
       :finished_at,   # Time
@@ -21,7 +21,7 @@ module TavernKit
       def duration_ms = (finished_at - started_at) * 1000
 
       def success?
-        stages.none? { |stage| stage.stats.key?(:error) }
+        steps.none? { |step| step.stats.key?(:error) }
       end
     end
   end

@@ -14,17 +14,17 @@ module TavernKit
   module SillyTavern
     # Default SillyTavern prompt-builder step chain.
     #
-    # Stage names are pinned by `docs/contracts/prompt-orchestration.md`.
+    # Step names are pinned by `docs/contracts/prompt-orchestration.md`.
     Pipeline = TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Hooks, name: :hooks
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Lore, name: :lore
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Entries, name: :entries
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::PinnedGroups, name: :pinned_groups
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Injection, name: :injection
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Compilation, name: :compilation
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::MacroExpansion, name: :macro_expansion
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::PlanAssembly, name: :plan_assembly
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Trimming, name: :trimming
+      use_step :hooks, TavernKit::SillyTavern::PromptBuilder::Steps::Hooks
+      use_step :lore, TavernKit::SillyTavern::PromptBuilder::Steps::Lore
+      use_step :entries, TavernKit::SillyTavern::PromptBuilder::Steps::Entries
+      use_step :pinned_groups, TavernKit::SillyTavern::PromptBuilder::Steps::PinnedGroups
+      use_step :injection, TavernKit::SillyTavern::PromptBuilder::Steps::Injection
+      use_step :compilation, TavernKit::SillyTavern::PromptBuilder::Steps::Compilation
+      use_step :macro_expansion, TavernKit::SillyTavern::PromptBuilder::Steps::MacroExpansion
+      use_step :plan_assembly, TavernKit::SillyTavern::PromptBuilder::Steps::PlanAssembly
+      use_step :trimming, TavernKit::SillyTavern::PromptBuilder::Steps::Trimming
     end
   end
 end

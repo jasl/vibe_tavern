@@ -67,7 +67,7 @@ module TavernKit
             llm_options: ctx.llm_options,
           )
 
-          ctx.instrument(:stat, stage: :plan_assembly, key: :plan_blocks, value: ctx.blocks.size) if ctx.instrumenter
+          ctx.instrument(:stat, step: :plan_assembly, key: :plan_blocks, value: ctx.blocks.size) if ctx.instrumenter
         end
 
         def build_llm_options(ctx, preset, env:)

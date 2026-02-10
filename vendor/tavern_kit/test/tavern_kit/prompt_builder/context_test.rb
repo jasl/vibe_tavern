@@ -74,4 +74,36 @@ class TavernKit::PromptBuilder::ContextTest < Minitest::Test
     assert context.key?(:chat_index)
     assert_nil context[:missing]
   end
+
+  def test_strict_keys_reject_unknown_dynamic_setter
+    context = TavernKit::PromptBuilder::Context.new({ known: 1 }, strict_keys: true)
+
+    assert_raises(KeyError) do
+      context.unknown = 2
+    end
+  end
+
+  def test_strict_keys_allows_updating_existing_keys
+    context = TavernKit::PromptBuilder::Context.new({ known: 1 }, strict_keys: true)
+
+    context.known = 3
+
+    assert_equal 3, context[:known]
+  end
+
+  def test_strict_keys_reject_unknown_bracket_setter
+    context = TavernKit::PromptBuilder::Context.new({ known: 1 }, strict_keys: true)
+
+    assert_raises(KeyError) do
+      context[:unknown] = 2
+    end
+  end
+
+  def test_set_can_allow_new_keys_explicitly
+    context = TavernKit::PromptBuilder::Context.new({ known: 1 }, strict_keys: true)
+
+    context.set(:unknown, 2, allow_new: true)
+
+    assert_equal 2, context[:unknown]
+  end
 end

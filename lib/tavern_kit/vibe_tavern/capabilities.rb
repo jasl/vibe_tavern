@@ -23,7 +23,7 @@ module TavernKit
 
           # VibeTavern targets OpenAI-compatible APIs. If a provider/model does
           # not support a capability, prefer explicit, per-provider policy
-          # in RunnerConfig/runtime rather than silent coercion.
+          # in RunnerConfig/context rather than silent coercion.
           new(
             provider: provider_id,
             model: model_s,

@@ -7,7 +7,7 @@ module TavernKit
         # Deterministic RNG helpers inspired by RisuAI's CBS macros.
         #
         # These are intended for prompt-building use (reproducible by default),
-        # with seeds injected via runtime.
+        # with seeds injected via context.
         module DeterministicRng
           # Liquid filter: `{{ "word" | hash7 }}`
           #
@@ -37,15 +37,15 @@ module TavernKit
           # - a String split by `,` or `:` (supports escaping commas via `\\,`)
           #
           # Seeds:
-          # - cid defaults to `runtime.message_index` (or 0)
-          # - word defaults to `runtime.rng_word`, else `char`, else "0"
+          # - cid defaults to `context.message_index` (or 0)
+          # - word defaults to `context.rng_word`, else `char`, else "0"
           #
           # Optional overrides:
           #   `{{ list | pick: 10, "seed" }}`
           def pick(input, cid = nil, word = nil)
-            runtime = runtime_hash_from_context
-            cid ||= (runtime && runtime["message_index"]) || 0
-            word ||= (runtime && runtime["rng_word"])
+            context = context_hash_from_registers
+            cid ||= (context && context["message_index"]) || 0
+            word ||= (context && context["rng_word"])
 
             word = default_rng_word(word)
 
@@ -67,7 +67,7 @@ module TavernKit
 
           # Liquid filter: `{{ "2d6" | rollp }}`
           #
-          # Deterministic dice roll using runtime seeds (RisuAI-like).
+          # Deterministic dice roll using context seeds (RisuAI-like).
           # - notation: "NdM" or "M"
           # - uses `message_index` as base cid and `rng_word` as seed word
           def rollp(input, cid = nil, word = nil)
@@ -86,9 +86,9 @@ module TavernKit
             return "NaN" if num.nan? || sides.nan?
             return "NaN" if num < 1 || sides < 1
 
-            runtime = runtime_hash_from_context
-            cid ||= (runtime && runtime["message_index"]) || 0
-            word ||= (runtime && runtime["rng_word"])
+            context = context_hash_from_registers
+            cid ||= (context && context["message_index"]) || 0
+            word ||= (context && context["rng_word"])
             word = default_rng_word(word)
 
             total = 0
@@ -108,11 +108,11 @@ module TavernKit
 
           private
 
-          def runtime_hash_from_context
-            rt = @context&.registers&.[](:runtime)
-            return TavernKit::Utils.deep_stringify_keys(rt.to_h) if rt && rt.respond_to?(:to_h)
+          def context_hash_from_registers
+            ctx = @context&.registers&.[](:context)
+            return TavernKit::Utils.deep_stringify_keys(ctx.to_h) if ctx && ctx.respond_to?(:to_h)
 
-            raw = @context&.[]("runtime")
+            raw = @context&.[]("context")
             raw.is_a?(Hash) ? raw : nil
           end
 

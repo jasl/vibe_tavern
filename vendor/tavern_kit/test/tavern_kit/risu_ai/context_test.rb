@@ -2,12 +2,12 @@
 
 require "test_helper"
 
-class TavernKit::RisuAI::RuntimeTest < Minitest::Test
+class TavernKit::RisuAI::ContextTest < Minitest::Test
   def test_normalize_coerces_known_fields
     char = TavernKit::Character.create(name: "Seraphina")
     ctx = TavernKit::PromptBuilder::Context.new(character: char, history: [])
 
-    runtime = TavernKit::RisuAI::Runtime.build(
+    risu_context = TavernKit::RisuAI::Context.build(
       {
         "chatIndex" => "5",
         "messageIndex" => 42,
@@ -23,7 +23,7 @@ class TavernKit::RisuAI::RuntimeTest < Minitest::Test
       strict: true,
     )
 
-    h = runtime.to_h
+    h = risu_context.to_h
     assert_equal 5, h[:chat_index]
     assert_equal 42, h[:message_index]
     assert_equal "seed", h[:rng_word]
@@ -47,7 +47,7 @@ class TavernKit::RisuAI::RuntimeTest < Minitest::Test
     char = TavernKit::Character.create(name: "Seraphina")
     ctx = TavernKit::PromptBuilder::Context.new(character: char, history: [])
 
-    runtime = TavernKit::RisuAI::Runtime.build({}, context: ctx)
-    assert_equal "Seraphina", runtime.to_h[:rng_word]
+    risu_context = TavernKit::RisuAI::Context.build({}, context: ctx)
+    assert_equal "Seraphina", risu_context.to_h[:rng_word]
   end
 end

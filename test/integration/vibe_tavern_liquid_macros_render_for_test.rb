@@ -1,13 +1,13 @@
 require "test_helper"
 
 class VibeTavernLiquidMacrosRenderForTest < ActiveSupport::TestCase
-  test "render_for wires assigns, variables_store, and runtime registers" do
+  test "render_for wires assigns, variables_store, and context registers" do
     store = TavernKit::VariablesStore::InMemory.new
     store.set("mood", "happy", scope: :local)
 
-    runtime = TavernKit::PromptBuilder::Context.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
+    context = TavernKit::PromptBuilder::Context.build({ chat_index: 1, message_index: 5, rng_word: "seed" }, type: :app)
 
-    ctx = TavernKit::PromptBuilder::Context.new(runtime: runtime, variables_store: store)
+    ctx = TavernKit::PromptBuilder::State.new(context: context, variables_store: store)
 
     out =
       TavernKit::VibeTavern::LiquidMacros.render_for(

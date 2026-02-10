@@ -671,7 +671,7 @@ headers["HTTP-Referer"] = ENV["OPENROUTER_HTTP_REFERER"] if ENV["OPENROUTER_HTTP
 headers["X-Title"] = ENV["OPENROUTER_X_TITLE"] if ENV["OPENROUTER_X_TITLE"]
 
 # Optional OpenRouter request-level knobs (OpenAI-compatible).
-# These are injected via runtime[:tool_calling][:request_overrides] so the lower
+# These are injected via context[:tool_calling][:request_overrides] so the lower
 # layers (pipeline/client) stay provider-agnostic.
 base_request_overrides = {}
 
@@ -1273,7 +1273,7 @@ end
 chat_only_scenario = {
   id: "chat_only",
   title: "Tool calling disabled (control)",
-  runtime_overrides: { tool_use_mode: :disabled, request_overrides: { max_tokens: 32 } },
+  context_overrides: { tool_use_mode: :disabled, request_overrides: { max_tokens: 32 } },
   prepare: ->(_workspace) { },
   system: <<~SYS.strip,
     Tool calling is disabled for this run.
@@ -1294,7 +1294,7 @@ SCENARIOS =
       {
         id: "happy_path",
         title: "Happy path (get -> patch -> done)",
-        runtime_overrides: {},
+        context_overrides: {},
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
@@ -1330,7 +1330,7 @@ SCENARIOS =
       {
         id: "partial_success_failure",
         title: "Partial success (state_get ok) + failure (bad state_patch) + recovery",
-        runtime_overrides: { request_overrides: { parallel_tool_calls: true } },
+        context_overrides: { request_overrides: { parallel_tool_calls: true } },
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
@@ -1368,7 +1368,7 @@ SCENARIOS =
       {
         id: "missing_workspace_id",
         title: "Missing workspace_id (implicit context)",
-        runtime_overrides: {},
+        context_overrides: {},
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
@@ -1403,7 +1403,7 @@ SCENARIOS =
       {
         id: "type_error_recovery",
         title: "Type error recovery (ops must be Array)",
-        runtime_overrides: {},
+        context_overrides: {},
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
@@ -1433,7 +1433,7 @@ SCENARIOS =
       {
         id: "happy_path_parallel",
         title: "Happy path (parallel tool calls: state_get + state_patch -> done)",
-        runtime_overrides: { request_overrides: { parallel_tool_calls: true } },
+        context_overrides: { request_overrides: { parallel_tool_calls: true } },
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
@@ -1467,7 +1467,7 @@ SCENARIOS =
       {
         id: "long_arguments_guard",
         title: "Long arguments guardrail (ARGUMENTS_TOO_LARGE) + recovery",
-        runtime_overrides: { max_tool_args_bytes: 300, request_overrides: { max_tokens: 256 } },
+        context_overrides: { max_tool_args_bytes: 300, request_overrides: { max_tokens: 256 } },
         prepare: ->(_workspace) { },
         system: <<~SYS.strip,
           You are a tool-using assistant.
@@ -1499,7 +1499,7 @@ SCENARIOS =
       {
         id: "tool_output_truncation",
         title: "Tool output too large truncation (TOOL_OUTPUT_TOO_LARGE)",
-        runtime_overrides: { max_tool_output_bytes: 5_000, tool_failure_policy: :tolerated },
+        context_overrides: { max_tool_output_bytes: 5_000, tool_failure_policy: :tolerated },
         prepare: lambda { |workspace|
           workspace.draft["big"] = "x" * 12_000
         },
@@ -1821,7 +1821,7 @@ process_task =
               request_overrides: effective_request_overrides,
             ),
             *model_workaround_presets,
-            scenario[:runtime_overrides] || {},
+            scenario[:context_overrides] || {},
           )
 
         effective_tag_fallback =
@@ -1839,17 +1839,17 @@ process_task =
           system_text = system_text.gsub("Done.", done_override)
         end
 
-        runtime_inputs = { tool_calling: tool_calling }
+        context_inputs = { tool_calling: tool_calling }
         if language_policy_enabled && language_policy_target_lang
-          runtime_inputs[:language_policy] = {
+          context_inputs[:language_policy] = {
             enabled: true,
             target_lang: language_policy_target_lang,
           }
         end
 
-        runtime =
+        context =
           TavernKit::PromptBuilder::Context.build(
-            runtime_inputs,
+            context_inputs,
             type: :app,
           )
 
@@ -1883,7 +1883,7 @@ process_task =
             TavernKit::VibeTavern::RunnerConfig.build(
               provider: "openrouter",
               model: model,
-              runtime: runtime,
+              context: context,
               llm_options_defaults: llm_options_defaults,
             )
 
@@ -2114,7 +2114,7 @@ process_task =
           elapsed_ms: elapsed_ms,
           tool_use_mode: effective_tool_use_mode,
           tools_enabled: effective_tools_enabled,
-          runtime_tool_calling: tool_calling,
+          context_tool_calling: tool_calling,
           assistant_text: assistant_text,
           assistant_text_language_shape: assistant_text_language_shape,
           assistant_text_language_ok: assistant_text_language_ok,

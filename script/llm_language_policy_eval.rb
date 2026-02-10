@@ -705,21 +705,21 @@ process_task =
           read_timeout: client_read_timeout,
         )
 
-      runtime = nil
+      context = nil
       if language_policy_enabled && target_lang_raw
         lp_cfg = {
           enabled: true,
           target_lang: target_lang_raw,
         }
         lp_cfg[:special_tags] = ["lang"] if scenario[:uses_lang_spans] == true
-        runtime = { language_policy: lp_cfg }
+        context = { language_policy: lp_cfg }
       end
 
       runner_config =
         TavernKit::VibeTavern::RunnerConfig.build(
           provider: "openrouter",
           model: model,
-          runtime: runtime,
+          context: context,
           llm_options_defaults: llm_options_defaults,
         )
 

@@ -4,19 +4,19 @@ module TavernKit
   module RisuAI
     module PromptBuilder
       module Steps
-      # Stage: CBS macro expansion for all blocks.
+      # Step: CBS macro expansion for all blocks.
       class CBS < TavernKit::PromptBuilder::Step
         private
 
         def before(ctx)
           ctx.blocks ||= []
 
-          runtime = ctx.runtime
-          chat_index = runtime ? runtime.chat_index.to_i : -1
-          message_index = runtime ? runtime.message_index.to_i : inferred_message_index(ctx)
-          rng_word = runtime ? runtime.rng_word.to_s : ""
-          run_var = runtime ? (runtime.run_var == true) : true
-          rm_var = runtime ? (runtime.rm_var == true) : false
+          context = ctx.context
+          chat_index = context_int(context, :chat_index, default: -1)
+          message_index = context_int(context, :message_index, default: inferred_message_index(ctx))
+          rng_word = context_value(context, :rng_word, default: "").to_s
+          run_var = context_value(context, :run_var, default: true) == true
+          rm_var = context_value(context, :rm_var, default: false) == true
 
           env_kwargs = {
             character: ctx.character,
@@ -28,10 +28,10 @@ module TavernKit
             variables: ctx.variables_store,
             dialect: ctx.dialect,
             model_hint: ctx[:model_hint],
-            toggles: runtime&.toggles,
-            metadata: runtime&.metadata,
-            cbs_conditions: runtime&.cbs_conditions,
-            modules: runtime&.modules,
+            toggles: context_value(context, :toggles, default: nil),
+            metadata: context_value(context, :metadata, default: nil),
+            cbs_conditions: context_value(context, :cbs_conditions, default: nil),
+            modules: context_value(context, :modules, default: nil),
             run_var: run_var,
             rm_var: rm_var,
             rng_word: rng_word,
@@ -53,6 +53,26 @@ module TavernKit
           history.size
         rescue ArgumentError
           0
+        end
+
+        def context_int(context, key, default:)
+          value = context_value(context, key, default: default)
+          value.to_i
+        rescue StandardError
+          default
+        end
+
+        def context_value(context, key, default:)
+          return default unless context
+
+          if context.respond_to?(key)
+            value = context.public_send(key)
+            return value.nil? ? default : value
+          end
+
+          return context[key] if context.respond_to?(:[]) && context.key?(key)
+
+          default
         end
       end
       end

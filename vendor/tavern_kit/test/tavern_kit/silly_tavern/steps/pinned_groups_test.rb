@@ -5,7 +5,7 @@ require "test_helper"
 class TavernKit::SillyTavern::PromptBuilder::Steps::PinnedGroupsTest < Minitest::Test
   def run_pinned_groups(ctx)
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::PinnedGroups, name: :pinned_groups
+      use_step :pinned_groups, TavernKit::SillyTavern::PromptBuilder::Steps::PinnedGroups
     end.call(ctx)
   end
 

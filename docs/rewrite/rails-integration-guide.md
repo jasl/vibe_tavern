@@ -56,13 +56,13 @@ Two pieces of state are critical:
    - RisuAI: persisted variables + scriptstate bridges
    - Lifecycle: typically per-chat (persist in DB as JSON, or rebuild from events)
 
-2) `runtime` (per-build app snapshot)
+2) `context` (per-build app snapshot)
    - chat indices, app metadata, feature toggles, cbs conditions, etc
    - Lifecycle: per prompt build (derive from DB + request context)
 
 Rule of thumb:
 - variables_store is *stateful across turns*
-- runtime is a *read-only snapshot for this build*
+- context is a *read-only snapshot for this build*
 
 ## Chat History (Message Contract)
 
@@ -118,7 +118,7 @@ plan =
     character character_obj
     user user_obj
 
-    runtime TavernKit::PromptBuilder::Context.build(
+    context TavernKit::PromptBuilder::Context.build(
       { chat_index: chat_index, message_index: message_index },
       type: :app,
       id: chat_id,
@@ -158,13 +158,13 @@ Notes:
 - If you want “user input also runs macros/scripts” (ST/RisuAI-style), keep it
   app-owned and run it **before persistence** using:
   `TavernKit::VibeTavern::UserInputPreprocessor.call(...)`.
-  Default toggle: `runtime[:toggles][:expand_user_input_macros]` (off by default).
-  Important: `runtime[:toggles]` must use **snake_case symbol keys**.
-  If you load toggles from JSON (string keys), normalize before building runtime:
+  Default toggle: `context[:toggles][:expand_user_input_macros]` (off by default).
+  Important: `context[:toggles]` must use **snake_case symbol keys**.
+  If you load toggles from JSON (string keys), normalize before building context:
 
   ```ruby
   toggles = json_toggles.to_h.transform_keys { |k| TavernKit::Utils.underscore(k).to_sym }
-  runtime = TavernKit::PromptBuilder::Context.build({ toggles: toggles }, type: :app, id: chat.id)
+  context = TavernKit::PromptBuilder::Context.build({ toggles: toggles }, type: :app, id: chat.id)
   ```
 
 ## Extending / Adding App-owned Pipelines
@@ -187,7 +187,7 @@ end
 ```ruby
 plan =
   TavernKit.build(pipeline: PromptBuilding::Pipeline) do
-    # Same DSL inputs (character/user/history/preset/lore_books/runtime/etc)
+    # Same DSL inputs (character/user/history/preset/lore_books/context/etc)
     message user_input
   end
 ```
@@ -239,7 +239,7 @@ plan =
     preset st_preset
     lore_books [global_lore, character_lore]
 
-    runtime TavernKit::PromptBuilder::Context.build(
+    context TavernKit::PromptBuilder::Context.build(
       { chat_index: chat_index, message_index: message_index },
       type: :app,
       id: chat_id,
@@ -276,7 +276,7 @@ plan =
     preset risu_preset_hash # contains `promptTemplate` (or `prompt_template`)
     lore_books [risu_lorebook]
 
-    runtime TavernKit::PromptBuilder::Context.build(
+    context TavernKit::PromptBuilder::Context.build(
       {
         chat_index: chat_index,
         message_index: message_index,
@@ -297,4 +297,4 @@ plan =
 ```
 
 RisuAI-specific behaviors that depend on app state should be injected through
-`runtime` (metadata/toggles/conditions) and adapters (e.g., memory integration).
+`context` (metadata/toggles/conditions) and adapters (e.g., memory integration).

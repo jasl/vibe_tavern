@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "risu_ai/utils"
-require_relative "risu_ai/runtime"
+require_relative "risu_ai/context"
 require_relative "risu_ai/cbs"
 require_relative "risu_ai/lore"
 require_relative "risu_ai/lorebook"

@@ -9,7 +9,7 @@ module TavernKit
       # The runner parses tool calls into an Array<Hash> with symbol keys:
       #   { id:, type:, function: { name:, arguments: ... } }
       #
-      # Runtime stores only transform *names* so it stays serializable and can be
+      # Context stores only transform *names* so it stays serializable and can be
       # merged via presets. Upper layers can register additional transforms if
       # needed.
       module ToolCallTransforms

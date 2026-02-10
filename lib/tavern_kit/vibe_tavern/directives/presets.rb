@@ -33,9 +33,9 @@ module TavernKit
           h = {}
           h[:modes] = Array(modes).compact if modes
           h[:repair_retry_count] = repair_retry_count unless repair_retry_count.nil?
-          h[:request_overrides] = normalize_request_overrides(request_overrides) unless request_overrides.nil?
-          h[:structured_request_overrides] = normalize_request_overrides(structured_request_overrides) unless structured_request_overrides.nil?
-          h[:prompt_only_request_overrides] = normalize_request_overrides(prompt_only_request_overrides) unless prompt_only_request_overrides.nil?
+          h[:request_overrides] = TavernKit::Utils.normalize_request_overrides(request_overrides) unless request_overrides.nil?
+          h[:structured_request_overrides] = TavernKit::Utils.normalize_symbol_keyed_hash(structured_request_overrides, path: "structured_request_overrides") unless structured_request_overrides.nil?
+          h[:prompt_only_request_overrides] = TavernKit::Utils.normalize_symbol_keyed_hash(prompt_only_request_overrides, path: "prompt_only_request_overrides") unless prompt_only_request_overrides.nil?
           h[:message_transforms] = Array(message_transforms).compact unless message_transforms.nil?
           h[:response_transforms] = Array(response_transforms).compact unless response_transforms.nil?
           h
@@ -95,13 +95,13 @@ module TavernKit
             case key
             when :request_overrides, :structured_request_overrides, :prompt_only_request_overrides
               merged =
-                deep_merge_hashes(
-                  normalize_request_overrides(out[key]),
-                  normalize_request_overrides(v),
+                TavernKit::Utils.deep_merge_hashes(
+                  TavernKit::Utils.normalize_symbol_keyed_hash(out[key], path: key),
+                  TavernKit::Utils.normalize_symbol_keyed_hash(v, path: key),
                 )
               out[key] = merged
             when :message_transforms, :response_transforms
-              out[key] = merge_string_list(out[key], v)
+              out[key] = TavernKit::Utils.merge_string_list(out[key], v)
             else
               out[key] = v
             end
@@ -110,77 +110,6 @@ module TavernKit
           out
         end
         private_class_method :deep_merge_directives
-
-        def merge_string_list(left, right)
-          return nil if right.nil?
-
-          right_list = normalize_string_list(right)
-          return [] if explicit_empty_string_list?(right)
-
-          left_list = normalize_string_list(left)
-          return right_list if left_list.nil?
-
-          (left_list + right_list).uniq
-        end
-        private_class_method :merge_string_list
-
-        def normalize_string_list(value)
-          list = Array(value).map { |v| v.to_s.strip }.reject(&:empty?)
-          list.empty? ? nil : list
-        end
-        private_class_method :normalize_string_list
-
-        def explicit_empty_string_list?(value)
-          case value
-          when String
-            value.split(",").map(&:strip).reject(&:empty?).empty?
-          when Array
-            value.map { |v| v.to_s.strip }.reject(&:empty?).empty?
-          else
-            false
-          end
-        end
-        private_class_method :explicit_empty_string_list?
-
-        def normalize_request_overrides(value)
-          return {} if value.nil?
-          raise ArgumentError, "request_overrides must be a Hash" unless value.is_a?(Hash)
-
-          assert_deep_symbol_keys!(value)
-          value
-        end
-        private_class_method :normalize_request_overrides
-
-        def assert_deep_symbol_keys!(value, path: "request_overrides")
-          case value
-          when Hash
-            value.each do |k, v|
-              unless k.is_a?(Symbol)
-                raise ArgumentError, "#{path} keys must be Symbols (got #{k.class})"
-              end
-
-              assert_deep_symbol_keys!(v, path: "#{path}.#{k}")
-            end
-          when Array
-            value.each_with_index do |v, idx|
-              assert_deep_symbol_keys!(v, path: "#{path}[#{idx}]")
-            end
-          end
-        end
-        private_class_method :assert_deep_symbol_keys!
-
-        def deep_merge_hashes(left, right)
-          out = (left.is_a?(Hash) ? left : {}).dup
-          (right.is_a?(Hash) ? right : {}).each do |k, v|
-            if out[k].is_a?(Hash) && v.is_a?(Hash)
-              out[k] = deep_merge_hashes(out[k], v)
-            else
-              out[k] = v
-            end
-          end
-          out
-        end
-        private_class_method :deep_merge_hashes
       end
     end
   end

@@ -42,7 +42,7 @@ module TavernKit
               estimated_tokens: prompt_tokens,
               max_tokens: max_tokens,
               reserve_tokens: reserve_tokens,
-              stage: option(:__step, self.class.step_name),
+              step: option(:__step, self.class.step_name),
             )
           when :off, :none, nil
             nil

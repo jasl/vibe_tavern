@@ -8,19 +8,48 @@ require_relative "prompt_builder/pipeline"
 module TavernKit
   # PromptBuilder is the only public prompt-construction entrypoint.
   class PromptBuilder
+    KEYWORD_INPUT_KEYS = %i[
+      character
+      user
+      preset
+      dialect
+      history
+      message
+      lore_book
+      lore_books
+      generation_type
+      group
+      greeting
+      authors_note
+      macro_vars
+      macro_registry
+      injection_registry
+      hook_registry
+      force_world_info
+      token_estimator
+      variables_store
+      lore_engine
+      expander
+      warning_handler
+      instrumenter
+      llm_options
+      strict
+    ].freeze
+
     attr_reader :state
     attr_reader :pipeline
     attr_reader :input_context
 
-    def initialize(pipeline:, context: nil, &block)
+    def initialize(pipeline:, context: nil, configs: nil, **inputs, &block)
       raise ArgumentError, "pipeline: is required" if pipeline.nil?
       raise ArgumentError, "pipeline must be a TavernKit::PromptBuilder::Pipeline" unless pipeline.is_a?(Pipeline)
 
       @pipeline = pipeline
       @input_context = coerce_context(context)
-      context_attrs = @input_context ? @input_context.to_h : {}
-      @state = State.new(**context_attrs, context: @input_context)
+      merge_configs!(configs) if configs
+      @state = State.new(context: @input_context)
       @built = false
+      apply_keyword_inputs!(inputs)
 
       instance_eval(&block) if block
     end
@@ -167,19 +196,12 @@ module TavernKit
       self
     end
 
-    # Alias to keep builder ergonomics where callers previously supplied runtime.
-    def runtime(value)
-      @state.runtime = value
-
-      if value.is_a?(TavernKit::PromptBuilder::Context)
-        @input_context = value
-        @state.context ||= value
-      elsif value.is_a?(Hash)
-        normalized = TavernKit::PromptBuilder::Context.build(value, type: :app)
-        @input_context = normalized
-        @state.context ||= normalized
-      end
-
+    # Merge per-step config overrides into context.module_configs.
+    #
+    # @param value [Hash]
+    def configs(value)
+      merge_configs!(value)
+      @state.context = @input_context if @state
       self
     end
 
@@ -245,36 +267,58 @@ module TavernKit
     end
 
     class << self
-      def build(pipeline:, context: nil, **kwargs, &block)
-        if block
-          builder = new(pipeline: pipeline, context: context, &block)
-          builder.build
-        else
-          builder = new(pipeline: pipeline, context: context)
-          kwargs.each do |key, value|
-            builder.public_send(key, value) if builder.respond_to?(key)
-          end
-          builder.build
-        end
+      def build(pipeline:, context: nil, configs: nil, **kwargs, &block)
+        builder = new(pipeline: pipeline, context: context, configs: configs, **kwargs, &block)
+        builder.build
       end
 
-      def to_messages(dialect: :openai, pipeline:, context: nil, **kwargs, &block)
-        builder = new(pipeline: pipeline, context: context)
-        builder.dialect(dialect)
-
-        if block
-          builder.instance_eval(&block)
-        else
-          kwargs.each do |key, value|
-            builder.public_send(key, value) if builder.respond_to?(key)
-          end
-        end
-
+      def to_messages(dialect: :openai, pipeline:, context: nil, configs: nil, **kwargs, &block)
+        builder = new(pipeline: pipeline, context: context, configs: configs, **kwargs, &block)
         builder.to_messages(dialect: dialect)
       end
     end
 
     private
+
+    def apply_keyword_inputs!(inputs)
+      inputs.each do |key, value|
+        unless KEYWORD_INPUT_KEYS.include?(key)
+          raise ArgumentError, "unknown PromptBuilder input key: #{key.inspect}"
+        end
+
+        if key == :authors_note
+          raise ArgumentError, "authors_note must be a Hash" unless value.is_a?(Hash)
+
+          authors_note(**value)
+          next
+        end
+
+        public_send(key, value)
+      end
+    end
+
+    def merge_configs!(value)
+      raise ArgumentError, "configs must be a Hash" unless value.is_a?(Hash)
+
+      current = @input_context || TavernKit::PromptBuilder::Context.new({}, type: :app)
+      context_class = current.class
+      normalized =
+        TavernKit::PromptBuilder::Context.new(
+          {},
+          module_configs: value,
+        ).module_configs
+
+      merged_configs = TavernKit::Utils.deep_merge_hashes(current.module_configs, normalized)
+
+      @input_context =
+        context_class.new(
+          current.to_h,
+          type: current.type || :app,
+          id: current.id,
+          module_configs: merged_configs,
+          strict_keys: current.strict_keys?,
+        )
+    end
 
     def coerce_context(value)
       return nil if value.nil?

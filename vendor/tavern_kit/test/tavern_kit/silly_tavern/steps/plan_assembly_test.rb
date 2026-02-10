@@ -5,7 +5,7 @@ require "test_helper"
 class TavernKit::SillyTavern::PromptBuilder::Steps::PlanAssemblyTest < Minitest::Test
   def run_plan_assembly(ctx)
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::PlanAssembly, name: :plan_assembly
+      use_step :plan_assembly, TavernKit::SillyTavern::PromptBuilder::Steps::PlanAssembly
     end.call(ctx)
   end
 

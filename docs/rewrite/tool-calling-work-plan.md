@@ -16,7 +16,7 @@ Out of scope (for now):
 
 ### 1) Align `enforced` semantics with eval scenarios
 
-- [x] Add `runtime[:tool_calling][:tool_failure_policy]` (`fatal|tolerated`).
+- [x] Add `context[:tool_calling][:tool_failure_policy]` (`fatal|tolerated`).
   - `fatal` (default): current behavior (final run fails if any tool ends in `ok=false`).
   - `tolerated`: allow tool failures, but require at least one successful tool result (`ok=true`).
 - [x] Update eval scenarios to use `tool_failure_policy=tolerated` where appropriate (e.g. `tool_output_truncation`).
@@ -49,7 +49,7 @@ Acceptance:
 
 ### 4) Remove deprecated aliases / compatibility keys
 
-- [x] Keep only canonical `runtime[:tool_calling]` keys (remove old alias keys and
+- [x] Keep only canonical `context[:tool_calling]` keys (remove old alias keys and
   back-compat transform names introduced during PoC).
 - [x] Update docs/tests accordingly.
 
@@ -210,7 +210,7 @@ Acceptance:
 
 ### 17) Tool loop guardrails (small, opt-in)
 
-- [x] Add `runtime[:tool_calling][:max_tool_calls_per_turn]` (Integer, optional).
+- [x] Add `context[:tool_calling][:max_tool_calls_per_turn]` (Integer, optional).
   - If set, limit tool execution to the first N tool calls per assistant response.
   - Emit `ignored_tool_calls_count` in events/trace when limiting occurs.
 - [x] If `request_overrides[:parallel_tool_calls] == false` and no explicit max is set:

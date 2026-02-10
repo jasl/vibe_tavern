@@ -18,13 +18,13 @@ and what remains as explicit decisions/backlogs.
 - **Canonical keys at boundaries**:
   - Use `TavernKit::Utils::HashAccessor` when parsing mixed-key external hashes
     (string/symbol, camelCase/snake_case) to avoid ad-hoc `h[:x] || h["x"]`.
-  - Platform runtime input is normalized once at pipeline entry (snake_case
+  - Platform context input is normalized once at pipeline entry (snake_case
     symbol keys) so downstream code can rely on a stable shape.
 - **VariablesStore** is the standard name for ST `var`/`globalvar` and RisuAI
   extensions (session-level state). The older "ChatVariables/Store" naming is
   removed from the public surface.
-- **Runtime** is application-owned per-build state (chat indices, toggles,
-  metadata). It is set once on `ctx.runtime` and must not be replaced during
+- **Context** is application-owned per-build state (chat indices, toggles,
+  metadata). It is set once on `ctx.context` and must not be replaced during
   step execution.
 
 ## Security hardening
@@ -54,6 +54,6 @@ and what remains as explicit decisions/backlogs.
 
 ## Remaining decisions / explicit non-goals
 
-- `runtime.metadata` / `runtime.toggles` remain plain Hashes for now (a future
+- `context.metadata` / `context.toggles` remain plain Hashes for now (a future
   unification into Stores is deferred).
 - UI directives / CLI tooling are tracked in `docs/backlogs.md`.

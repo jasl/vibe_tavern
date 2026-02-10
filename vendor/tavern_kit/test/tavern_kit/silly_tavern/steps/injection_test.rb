@@ -5,8 +5,8 @@ require "test_helper"
 class TavernKit::SillyTavern::PromptBuilder::Steps::InjectionTest < Minitest::Test
   def run_pipeline(ctx)
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::PinnedGroups, name: :pinned_groups
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Injection, name: :injection
+      use_step :pinned_groups, TavernKit::SillyTavern::PromptBuilder::Steps::PinnedGroups
+      use_step :injection, TavernKit::SillyTavern::PromptBuilder::Steps::Injection
     end.call(ctx)
   end
 

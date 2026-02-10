@@ -24,7 +24,7 @@ module TavernKit
             token_estimator: ctx.token_estimator,
             model_hint: model_hint,
             message_overhead_tokens: overhead,
-            stage: :trimming,
+            step: :trimming,
           )
 
           ctx.blocks = TavernKit::Trimmer.apply(ctx.blocks, result)
@@ -43,13 +43,13 @@ module TavernKit
 
           if ctx.instrumenter
             if ctx.token_estimator.respond_to?(:describe)
-              ctx.instrument(:stat, stage: :trimming, key: :token_estimator, value: ctx.token_estimator.describe(model_hint: model_hint))
+              ctx.instrument(:stat, step: :trimming, key: :token_estimator, value: ctx.token_estimator.describe(model_hint: model_hint))
             end
 
-            ctx.instrument(:stat, stage: :trimming, key: :budget_tokens, value: result.report.budget_tokens)
-            ctx.instrument(:stat, stage: :trimming, key: :initial_tokens, value: result.report.initial_tokens)
-            ctx.instrument(:stat, stage: :trimming, key: :final_tokens, value: result.report.final_tokens)
-            ctx.instrument(:stat, stage: :trimming, key: :eviction_count, value: result.report.eviction_count)
+            ctx.instrument(:stat, step: :trimming, key: :budget_tokens, value: result.report.budget_tokens)
+            ctx.instrument(:stat, step: :trimming, key: :initial_tokens, value: result.report.initial_tokens)
+            ctx.instrument(:stat, step: :trimming, key: :final_tokens, value: result.report.final_tokens)
+            ctx.instrument(:stat, step: :trimming, key: :eviction_count, value: result.report.eviction_count)
           end
         end
 

@@ -11,7 +11,7 @@ class TavernKit::SillyTavern::PromptBuilder::Steps::TrimmingTest < Minitest::Tes
 
   def run_trimming(ctx)
     TavernKit::PromptBuilder::Pipeline.new do
-      use_step TavernKit::SillyTavern::PromptBuilder::Steps::Trimming, name: :trimming
+      use_step :trimming, TavernKit::SillyTavern::PromptBuilder::Steps::Trimming
     end.call(ctx)
   end
 

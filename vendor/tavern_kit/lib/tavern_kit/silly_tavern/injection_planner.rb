@@ -2,7 +2,7 @@
 
 module TavernKit
   module SillyTavern
-    # Small helper for Stage 5 Injection that keeps "schedule + rewrite" rules testable.
+    # Small helper for Step 5 Injection that keeps "schedule + rewrite" rules testable.
     module InjectionPlanner
       module_function
 

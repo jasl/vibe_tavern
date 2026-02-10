@@ -27,7 +27,7 @@ TavernKit uses two orthogonal switches:
 Policy:
 
 - For external input, prefer `ctx.warn` + best-effort output (preserve raw tokens if needed).
-- For programmer errors, raise (let `PromptBuilder::Step` wrap with `PipelineError(stage: ...)`).
+- For programmer errors, raise (let `PromptBuilder::Step` wrap with `PipelineError(step: ...)`).
 
 ## PromptBuilder::Message Contract (Tool/Function Calling)
 
@@ -157,11 +157,11 @@ observability), but the reason should indicate group eviction, e.g.
 Default behavior (chosen): **error** (`TavernKit::MaxTokensExceededError`).
 
 If, after evicting every eligible block (i.e. `removable: true` and evictable by
-strategy), the prompt is still above budget, the trimming stage must raise
+strategy), the prompt is still above budget, the trimming step must raise
 `TavernKit::MaxTokensExceededError` (do not silently disable protected blocks).
 
 Error params mapping (for consistency with MaxTokensMiddleware):
-- `stage:` `:trimming`
+- `step:` `:trimming`
 - `max_tokens:` `context_window_tokens`
 - `reserve_tokens:` `reserved_response_tokens`
 - `estimated_tokens:` estimated prompt tokens after the final trimming attempt
@@ -205,7 +205,7 @@ This contract only relies on a restricted Handlebars-like subset:
 - `{{#if field}}...{{/if}}` conditional blocks
 - `{{#unless field}}...{{/unless}}` negative conditional blocks
 
-Unknown `{{macro}}` placeholders must be preserved so Stage 7 MacroExpansion
+Unknown `{{macro}}` placeholders must be preserved so Step 7 MacroExpansion
 can expand them (tolerant mode).
 
 ### Output normalization
@@ -243,7 +243,7 @@ In **text dialect mode** (`ctx.dialect == :text`):
 
 ## InjectionRegistry Contract
 
-`InjectionRegistry::Base` defines the interface for runtime content injection (mirrors
+`InjectionRegistry::Base` defines the interface for context content injection (mirrors
 STscript `/inject` feature).
 
 ### Interface
@@ -552,7 +552,7 @@ This contract pins the ST join behavior from `getGroupCharacterCardsLazy()`:
       with `"<START>\n"` (prepend if missing) before applying join templates.
 
 `baseChatReplace()` substitutions exist in ST, but this contract only requires
-the structural join behavior above; macro expansion still happens later in Stage 7.
+the structural join behavior above; macro expansion still happens later in Step 7.
 
 ## Step Data Flow Contract
 
@@ -560,7 +560,7 @@ Each step has defined inputs and outputs. Steps run in order 1→9.
 The `:hooks` step wraps the pipeline and runs `before_build` hooks in its
 `before(ctx)` phase and `after_build` hooks in its `after(ctx)` phase.
 
-### Stage 1: Hooks
+### Step 1: Hooks
 
 ```
 Name: :hooks
@@ -574,7 +574,7 @@ Output (after): (hooks may mutate ctx.plan)
 Side effects (after): Runs all registered after_build hooks
 ```
 
-### Stage 2: Lore
+### Step 2: Lore
 
 ```
 Name: :lore
@@ -585,7 +585,7 @@ Side effects: Evaluates World Info via ST Lore::Engine
 Invariant: Does NOT modify ctx.blocks
 ```
 
-### Stage 3: Entries
+### Step 3: Entries
 
 ```
 Name: :entries
@@ -598,7 +598,7 @@ Behavior:
   - Apply ST entry ID normalization rules
 ```
 
-### Stage 4: PinnedGroups
+### Step 4: PinnedGroups
 
 ```
 Name: :pinned_groups
@@ -610,7 +610,7 @@ Slots: main_prompt, persona_description, character_description, character_person
        world_info_after, system_prompt, jailbreak, post_history_instructions, etc.
 ```
 
-### Stage 5: Injection
+### Step 5: Injection
 
 ```
 Name: :injection
@@ -719,7 +719,7 @@ effective_depth = (ctx.generation_type == :continue && depth == 0) ? 1 : depth
 content = entries.sort_by(&:id).map { |e| e.content.strip }.reject(&:empty?).join("\n")
 ```
 
-### Stage 6: Compilation
+### Step 6: Compilation
 
 ```
 Name: :compilation
@@ -728,13 +728,13 @@ Output: ctx.blocks (Array<Block> - fully compiled)
 Side effects: Compiles all entries into blocks, resolves outlet insertions
 Behavior:
   - Expand pinned groups into block array
-  - Outlets are expanded via the `{{outlet::key}}` macro in Stage 7 (MacroExpansion);
-    Stage 6 does not do any special outlet placeholder substitution
+  - Outlets are expanded via the `{{outlet::key}}` macro in Step 7 (MacroExpansion);
+    Step 6 does not do any special outlet placeholder substitution
   - Set token_budget_group on each block
   - Set removable flag based on entry/slot requirements
 ```
 
-### Stage 7: MacroExpansion
+### Step 7: MacroExpansion
 
 ```
 Name: :macro_expansion
@@ -748,7 +748,7 @@ Behavior:
   - Record macro errors as warnings (strict mode: raise)
 ```
 
-### Stage 8: PlanAssembly
+### Step 8: PlanAssembly
 
 ```
 Name: :plan_assembly
@@ -766,7 +766,7 @@ Behavior:
   - Populate plan.warnings from ctx.warnings
 ```
 
-### Stage 9: Trimming
+### Step 9: Trimming
 
 ```
 Name: :trimming
@@ -789,7 +789,7 @@ Steps must output blocks that are ready for trimming and dialect conversion:
 - `PromptBuilder::Block#removable` is set correctly (protect hard-required content)
 - `PromptBuilder::Block#message_metadata` is used for tool/function passthrough when needed
 
-Stage naming:
+Step naming:
 
-- All ST pipeline stages must have stable names (symbols) via Pipeline entry names.
-- Exceptions bubble; base step wraps them into `PipelineError(stage: ...)`.
+- All ST pipeline steps must have stable names (symbols) via Pipeline entry names.
+- Exceptions bubble; base step wraps them into `PipelineError(step: ...)`.

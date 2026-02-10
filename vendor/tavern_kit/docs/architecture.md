@@ -43,7 +43,7 @@ Two types of state matter:
 
 - `variables_store`: persisted, session-level mutable state (ST `var/globalvar`,
   RisuAI scriptstate bridges). Typically one per chat.
-- `runtime`: per-build immutable snapshot injected by the app (chat indices,
+- `context`: per-build immutable snapshot injected by the app (chat indices,
   metadata/toggles/conditions, etc). Do not persist; derive per request/build.
 
 ## I/O Boundaries

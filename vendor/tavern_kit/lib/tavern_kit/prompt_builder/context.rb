@@ -4,7 +4,7 @@ module TavernKit
   class PromptBuilder
     # Application-owned per-run context.
     #
-    # This holds runtime input and per-step module configuration overrides.
+    # This holds context input and per-step module configuration overrides.
     # It is intentionally simple and immutable-by-convention.
     class Context
       attr_reader :type, :id, :module_configs
@@ -31,9 +31,10 @@ module TavernKit
       end
       private_class_method :normalize_hash_keys
 
-      def initialize(data = {}, type: nil, id: nil, module_configs: nil, **kwargs)
+      def initialize(data = {}, type: nil, id: nil, module_configs: nil, strict_keys: false, **kwargs)
         @type = type&.to_sym
         @id = id&.to_s
+        @strict_keys = strict_keys == true
 
         merged_data = data.is_a?(Hash) ? data.dup : {}
         merged_data.merge!(kwargs) if kwargs.any?
@@ -45,6 +46,10 @@ module TavernKit
         @module_configs = normalize_module_configs(configs)
       end
 
+      def strict_keys?
+        @strict_keys
+      end
+
       def to_h
         @data.dup
       end
@@ -54,7 +59,17 @@ module TavernKit
       end
 
       def []=(key, value)
-        @data[key.to_sym] = value
+        set(key, value, allow_new: false)
+      end
+
+      def set(key, value, allow_new: false)
+        key_sym = key.to_sym
+
+        if strict_keys? && !allow_new && !@data.key?(key_sym)
+          raise KeyError, "unknown context key: #{key_sym.inspect}"
+        end
+
+        @data[key_sym] = value
       end
 
       def fetch(key, default = nil, &block)
@@ -65,31 +80,11 @@ module TavernKit
         @data.key?(key.to_sym)
       end
 
-      def runtime
-        raw = @data[:runtime]
-        return raw if raw.nil? || raw.is_a?(TavernKit::PromptBuilder::Context)
-        return raw unless raw.is_a?(Hash)
-
-        normalized = TavernKit::PromptBuilder::Context.build(raw, type: :app)
-        @data[:runtime] = normalized
-        normalized
-      end
-
-      def runtime=(value)
-        @data[:runtime] =
-          if value.is_a?(Hash)
-            TavernKit::PromptBuilder::Context.build(value, type: :app)
-          else
-            value
-          end
-      end
-
       def method_missing(name, *args)
         method_name = name.to_s
         if method_name.end_with?("=")
           key = method_name.delete_suffix("=").to_sym
-          @data[key] = args.first
-          return args.first
+          return set(key, args.first, allow_new: false)
         end
 
         return @data[name] if args.empty? && @data.key?(name)

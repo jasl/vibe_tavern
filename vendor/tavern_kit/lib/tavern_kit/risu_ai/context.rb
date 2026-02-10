@@ -2,19 +2,19 @@
 
 module TavernKit
   module RisuAI
-    # Application-owned runtime contract for RisuAI pipelines.
+    # Application-owned context contract for RisuAI pipelines.
     #
     # This is the synchronization boundary between an app (chat state, settings)
-    # and prompt building. Middlewares should assume `ctx.runtime` is set once
+    # and prompt building. Steps should assume `ctx.context` is set once
     # at pipeline entry and not replaced.
-    class Runtime < TavernKit::PromptBuilder::Context
+    class Context < TavernKit::PromptBuilder::Context
       TYPE = :risuai
 
       def self.build(raw, context: nil, strict: false, id: nil)
         data = normalize(raw, context: context, strict: strict)
-        runtime = new(data, type: TYPE, id: id)
-        runtime.validate!(strict: strict)
-        runtime
+        risu_context = new(data, type: TYPE, id: id)
+        risu_context.validate!(strict: strict)
+        risu_context
       end
 
       def self.normalize(raw, context: nil, strict: false)
@@ -74,11 +74,11 @@ module TavernKit
         return default if s.empty?
         return Integer(s) if s.match?(/\A-?\d+\z/)
 
-        raise ArgumentError, "Invalid RisuAI runtime #{key}: expected Integer" if strict
+        raise ArgumentError, "Invalid RisuAI context #{key}: expected Integer" if strict
 
         default
       rescue ArgumentError, TypeError
-        raise ArgumentError, "Invalid RisuAI runtime #{key}: expected Integer" if strict
+        raise ArgumentError, "Invalid RisuAI context #{key}: expected Integer" if strict
 
         default
       end
@@ -105,15 +105,15 @@ module TavernKit
         end
 
         # Upstream uses `chaId + chat.id` as the seed word. TavernKit cannot
-        # infer those IDs, so fall back to character name unless app provides
-        # a stable string via runtime injection (`rng_word:`).
+        # infer those IDs, so fall back to character name unless app provides a
+        # stable string via context injection (`rng_word:`).
         char = context && context.respond_to?(:character) ? context.character : nil
         name = char&.respond_to?(:name) ? char.name.to_s : ""
 
         return name unless name.strip.empty?
         return "0" unless strict
 
-        raise ArgumentError, "Missing RisuAI runtime rng_word"
+        raise ArgumentError, "Missing RisuAI context rng_word"
       end
 
       private_class_method def self.coerce_bool(hash, key, default:, strict:)
@@ -127,7 +127,7 @@ module TavernKit
         return true if TavernKit::Coerce::TRUE_STRINGS.include?(v)
         return false if TavernKit::Coerce::FALSE_STRINGS.include?(v)
 
-        raise ArgumentError, "Invalid RisuAI runtime #{key}: expected Boolean" if strict
+        raise ArgumentError, "Invalid RisuAI context #{key}: expected Boolean" if strict
 
         default
       end
@@ -139,7 +139,7 @@ module TavernKit
         return default if value.nil?
         return value if value.is_a?(Hash)
 
-        raise ArgumentError, "Invalid RisuAI runtime #{key}: expected Hash" if strict
+        raise ArgumentError, "Invalid RisuAI context #{key}: expected Hash" if strict
 
         default
       end
@@ -151,7 +151,7 @@ module TavernKit
         return default if value.nil?
         return Array(value) if value.is_a?(Array)
 
-        raise ArgumentError, "Invalid RisuAI runtime #{key}: expected Array" if strict
+        raise ArgumentError, "Invalid RisuAI context #{key}: expected Array" if strict
 
         default
       end
@@ -187,7 +187,7 @@ module TavernKit
         return if klasses.any? { |k| value.is_a?(k) }
 
         expected = klasses.map(&:name).join(" or ")
-        raise ArgumentError, "Invalid RisuAI runtime #{key}: expected #{expected}"
+        raise ArgumentError, "Invalid RisuAI context #{key}: expected #{expected}"
       end
     end
   end
