@@ -24,6 +24,33 @@ command namespace** (no “shared command names” across tools vs directives).
 
 ## Layers and responsibilities
 
+### 0) Unified configuration + invariants: RunnerConfig / Capabilities / Preflight
+
+VibeTavern treats configuration as **programmer-owned** and **request-scoped**.
+To keep call sites consistent, we use a single entrypoint object:
+
+- `lib/tavern_kit/vibe_tavern/runner_config.rb`
+
+`RunnerConfig` is responsible for:
+- accepting a request-scoped `runtime` snapshot (Symbol keys)
+- building a per-run configured pipeline (middleware options)
+- normalizing `llm_options_defaults` (Symbol keys; reserved keys rejected)
+- parsing module-local configs:
+  - `ToolCalling::Config`
+  - `Directives::Config`
+  - `LanguagePolicy::Config`
+  - `OutputTags::Config`
+- producing a capabilities snapshot (`Capabilities.resolve`) used for routing
+  decisions and strict invariants
+
+Hard invariants are enforced centrally in:
+- `lib/tavern_kit/vibe_tavern/preflight.rb`
+
+Examples:
+- tools and `response_format` are mutually exclusive in a single request
+- structured outputs enforce `parallel_tool_calls: false`
+- streaming is not supported for tool calling / response_format in this layer
+
 ### 1) Prompt building (DSL → messages)
 
 `TavernKit::VibeTavern` builds a `Prompt::Plan` from:
@@ -45,7 +72,6 @@ Responsibilities:
 - build request body from `Prompt::Plan`
 - apply outbound `MessageTransforms` and inbound `ResponseTransforms`
 - send one OpenAI-compatible request via `SimpleInference`
-- optionally parse **structured directives** output (when enabled)
 - (optional) stream chat-only responses via `PromptRunner#perform_stream`
 
 Streaming policy (production default):
@@ -54,9 +80,12 @@ Streaming policy (production default):
   - chat-only runs (no tools, no `response_format`), and
   - future: a final "answer-only" turn after tools (tools disabled).
 
-Important config capability:
-- `llm_options_defaults:` can be injected at construction time (provider-level
-  defaults like temperature/top_p), and merged with per-request `llm_options`.
+PromptRunner contract (after RunnerConfig refactor):
+- `PromptRunner.new(client:)` is transport-only (no config).
+- `PromptRunner#build_request` requires `runner_config:` and merges:
+  - `runner_config.llm_options_defaults` (provider/model defaults)
+  - per-call `llm_options` (strict Symbol keys; reserved keys rejected)
+- no directives parsing and no OutputTags post-processing in PromptRunner itself
 
 ### 3) Tool calling: ToolLoopRunner (+ injected tools)
 
@@ -69,6 +98,8 @@ Responsibilities:
 - parse `tool_calls`, dispatch tools, append tool result messages, loop
 - enforce guardrails (arg/output sizes, optional per-turn limits)
 - emit trace/events for debugging and eval reporting
+- invariant: when an assistant message contains `tool_calls`, the assistant
+  `content` written back into history is forced to `""` (prevents pollution)
 
 Injection points (upper layer):
 - tool list + JSON schema (`ToolRegistry`)
@@ -91,6 +122,9 @@ Directives are designed to be:
 - safe to apply locally (no I/O)
 - tolerant to provider variance (fallback + warnings)
 
+Structured outputs invariant:
+- any request using `response_format` forces `parallel_tool_calls: false`
+
 ### 5) Presets: explicit provider/model workarounds
 
 Tool calling presets:
@@ -107,6 +141,15 @@ Cross-protocol compatibility:
 - Directives runner filters reserved keys from request overrides (`tools`,
   `tool_choice`, `response_format`) so directives presets cannot accidentally
   leak tool config into directives requests (and vice versa).
+
+## Shared deterministic utilities (vendor)
+
+We downshift syntax-level utilities into the embedded gem so they can be reused
+across protocols without duplication:
+
+- `TavernKit::Text::LanguageTag` (BCP-47 / RFC 5646 syntax normalization)
+- `TavernKit::Text::JSONPointer` (RFC 6901 syntax tools)
+- `TavernKit::Text::VerbatimMasker` (verbatim zones + escape hatch masking)
 
 ## Testing strategy
 

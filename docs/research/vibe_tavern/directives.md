@@ -258,9 +258,12 @@ Code lives under `lib/tavern_kit/vibe_tavern/`:
   - canonicalizes directive types using injected allowlist + aliases
   - supports app-injected payload validation; includes helper `validate_patch_ops`
 - `TavernKit::VibeTavern::PromptRunner`
-  - optional `structured_output: :directives_v1` request injection + parse result fields
+  - transport-only request boundary (build/send one request; no directives parsing)
 - `TavernKit::VibeTavern::Directives::Runner`
-  - implements json_schema/json_object/prompt-only fallback and optional repair retry
+  - injects `response_format` by mode
+  - enforces `parallel_tool_calls: false` for structured modes
+  - parses + validates envelope and applies optional repair retry
+  - applies OutputTags post-pass to `assistant_text`
 
 ## App Injection (Recommended)
 
@@ -310,11 +313,8 @@ Optional `structured_output_options` keys:
 - `max_bytes`: content size guardrail for parsing
 - `schema_name`: override the structured output schema name
 - `output_instructions`: extra system instructions about directive types/payloads
-- `inject_response_format`: set `false` to disable auto-injection in `PromptRunner` (advanced)
 
-Then use either:
-- `PromptRunner` (single request boundary), or
-- `Directives::Runner` (includes fallback + repair retry)
+Use `Directives::Runner` to execute directives requests with fallback + repair retry.
 
 Optional semantic validation (recommended when the UI flow requires a specific directive):
 
@@ -360,22 +360,18 @@ Notes:
 - Build a runner with a preset:
 
 ```ruby
+runner_config =
+  TavernKit::VibeTavern::RunnerConfig.build(
+    provider: "openrouter",
+    model: model,
+    runtime: { directives: preset },
+    llm_options_defaults: { temperature: 0.7 },
+  )
+
 runner =
   TavernKit::VibeTavern::Directives::Runner.build(
     client: client,
-    model: model,
-    preset: preset,
-  )
-```
-
-If you also want to pin common request overrides on the provider itself:
-
-```ruby
-prompt_runner =
-  TavernKit::VibeTavern::PromptRunner.new(
-    client: client,
-    model: model,
-    llm_options_defaults: { temperature: 0.7 },
+    runner_config: runner_config,
   )
 ```
 
@@ -393,7 +389,7 @@ combined =
 ## Testing & Eval
 
 CI tests:
-- deterministic adapter-based tests for parser/validator and PromptRunner integration
+- deterministic adapter-based tests for parser/validator and Directives::Runner integration
 
 Live eval (optional):
   - `script/llm_directives_eval.rb` (OpenRouter) to build a model/provider capability matrix

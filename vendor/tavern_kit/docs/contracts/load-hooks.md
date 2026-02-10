@@ -78,3 +78,23 @@ TavernKit.on_load(:my_scope, id: :"my_feature.register") do |infra|
   infra.output_tags_registry.register_sanitizer(:lang_spans, MyLangSpanSanitizer)
 end
 ```
+
+## Example: VibeTavern (in this repo)
+
+VibeTavern exposes an infra payload and runs the hooks at load time:
+
+```ruby
+# lib/tavern_kit/vibe_tavern/pipeline.rb
+TavernKit.run_load_hooks(:vibe_tavern, TavernKit::VibeTavern.infrastructure)
+```
+
+Features register themselves via `TavernKit.on_load`:
+
+```ruby
+TavernKit.on_load(:vibe_tavern, id: :"vibe_tavern.output_tags.lang_spans") do |infra|
+  infra.output_tags_registry.register_sanitizer(
+    :lang_spans,
+    TavernKit::VibeTavern::OutputTags::Sanitizers::LangSpans,
+  )
+end
+```

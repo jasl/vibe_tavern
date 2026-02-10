@@ -83,6 +83,9 @@ When goals conflict, prefer **protocol reliability** over language purity:
 Single-request boundary:
 - `lib/tavern_kit/vibe_tavern/prompt_runner.rb`
 
+Unified configuration entry:
+- `lib/tavern_kit/vibe_tavern/runner_config.rb`
+
 Prompt-building pipeline:
 - `lib/tavern_kit/vibe_tavern/pipeline.rb`
 - `lib/tavern_kit/vibe_tavern/middleware/prepare.rb`
@@ -133,10 +136,17 @@ Optional (app-side customization):
   serializable), e.g.:
 
 ```ruby
-TavernKit::VibeTavern::Pipeline.configure(
-  :language_policy,
-  policy_text_builder: ->(target_lang, style_hint:, special_tags:) { "..." }
-)
+runner_config =
+  TavernKit::VibeTavern::RunnerConfig.build(
+    provider: "openrouter",
+    model: "openai/gpt-5.2:nitro",
+    runtime: { language_policy: { enabled: true, target_lang: "zh-CN" } },
+    middleware_options: {
+      language_policy: {
+        policy_text_builder: ->(target_lang, style_hint:, special_tags:) { "..." },
+      },
+    },
+  )
 ```
 
 ## Language codes (strict, allowlisted BCP-47)
@@ -155,6 +165,8 @@ Policy (P0 recommendation):
   and emit a warning/trace event at the app boundary (do not guess).
 - Canonicalize common case variants (`zh-cn` → `zh-CN`) **before** allowlist
   checks (app-side preferred).
+- Syntax-level normalization helpers live in the embedded gem:
+  - `TavernKit::Text::LanguageTag` (RFC 5646-ish, syntax-only)
 - Accept a small set of common aliases that map to the allowlist (still strict):
   - `en` → `en-US`
   - `ja` → `ja-JP`
@@ -210,6 +222,10 @@ but should not be shown to end users as-is.
 VibeTavern supports an optional, deterministic post-pass on assistant text via:
 
 `runtime[:output_tags]`
+
+Runtime is normalized once by `RunnerConfig` into `OutputTags::Config`.
+Protocol runners (`ToolLoopRunner` / `Directives::Runner`) apply:
+`OutputTags.transform(text, config: runner_config.output_tags)`.
 
 Example (strip wrappers / drop `<think>`):
 
@@ -287,7 +303,7 @@ Pipeline insertion:
   after `:plan_assembly` (because `PlanAssembly` finalizes `ctx.plan`).
 
 Behavior (P0):
-1) Read config from `ctx.runtime`.
+1) Consume typed `LanguagePolicy::Config` injected into middleware options by `RunnerConfig`.
 2) If `enabled` and `target_lang` present:
    - Insert a new **system block** near the end of system instructions,
      ideally **after** post-history instructions and **before** the current user

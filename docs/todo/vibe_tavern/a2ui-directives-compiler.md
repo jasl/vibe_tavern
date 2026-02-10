@@ -204,6 +204,7 @@ Recommended hard rules (P0):
 - UI IR uses **JSON Pointer** everywhere.
   - Always starts with `/`
   - Escape rules follow RFC 6901 (`~` / `/` encoding)
+  - Use `TavernKit::Text::JSONPointer` for syntax-only canonicalization (vendor)
 - Compiler accepts both pointer and segment paths at the boundary, but
   canonicalizes to pointer internally.
 - Event ingress (client → server) applies the same canonicalization rules.
@@ -437,9 +438,9 @@ providers. Keep these constraints explicit:
   `response_format`).
 - Tool calling runs should default to sequential tool calls
   (`parallel_tool_calls: false`); do not rely on provider defaults.
-- Any run that enables `response_format` should explicitly set
-  `parallel_tool_calls: false` to avoid provider-default drift (OpenRouter’s
-  default is true).
+- `Directives::Runner` should explicitly set `parallel_tool_calls: false`
+  whenever `response_format` is present to avoid provider-default drift
+  (OpenRouter’s default is true).
 
 ### 15) “Streaming” confusion
 
@@ -450,7 +451,7 @@ This is independent from **LLM streaming**.
 Our current infra decision is:
 
 - LLM streaming is mutually exclusive with tool calling and `response_format`
-  (enforced in `PromptRunner#perform_stream`)
+  (enforced in `Preflight` / `PromptRunner#perform_stream`)
 - A2UI streaming is an app transport decision (we can stream compiled messages
   even when the LLM call itself is non-streaming)
 

@@ -171,8 +171,8 @@ To reduce model variance and prevent context bloat:
 - the rest are ignored and recorded in the trace/events (`ignored_tool_calls_count`)
 
 Stability-first default:
-- if `request_overrides[:parallel_tool_calls] == false` and no explicit max is set,
-  the runner defaults to `max_tool_calls_per_turn=1`
+- if the effective request sets `parallel_tool_calls: false` and no explicit max is set,
+  the runner defaults to `max_tool_calls_per_turn=1` (sequential tool calls)
 
 ### Empty final assistant recovery
 
@@ -204,7 +204,7 @@ Provider/model request overrides:
 
 For provider-wide defaults shared across protocols (e.g. temperature),
 prefer storing them on the LLM provider config and injecting them into
-`PromptRunner` via `llm_options_defaults:`.
+`RunnerConfig` via `llm_options_defaults:` (PromptRunner is transport-only).
 
 ## Deterministic tests (CI)
 
