@@ -3,9 +3,24 @@
 require_relative "test_helper"
 
 require_relative "../../lib/tavern_kit/vibe_tavern/directives/runner"
-require_relative "../../lib/tavern_kit/vibe_tavern/prompt_runner"
 
 class DirectivesRunnerTest < Minitest::Test
+  def build_runner_config(runtime: nil, llm_options_defaults: nil, provider: "openrouter", model: "test-model")
+    TavernKit::VibeTavern::RunnerConfig.build(
+      provider: provider,
+      model: model,
+      runtime: runtime,
+      llm_options_defaults: llm_options_defaults,
+    )
+  end
+
+  def build_runner(client:, runner_config:)
+    TavernKit::VibeTavern::Directives::Runner.build(
+      client: client,
+      runner_config: runner_config,
+    )
+  end
+
   def test_directives_runner_disables_openrouter_require_parameters_in_prompt_only_via_presets
     requests = []
 
@@ -44,8 +59,9 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    preset = TavernKit::VibeTavern::Directives::Presets.provider_defaults("openrouter", require_parameters: true)
-    runner = TavernKit::VibeTavern::Directives::Runner.build(client: client, model: "test-model", preset: preset)
+    runtime = { directives: TavernKit::VibeTavern::Directives::Presets.provider_defaults("openrouter", require_parameters: true) }
+    runner_config = build_runner_config(provider: "openrouter", runtime: runtime)
+    runner = build_runner(client: client, runner_config: runner_config)
 
     result =
       runner.run(
@@ -68,7 +84,7 @@ class DirectivesRunnerTest < Minitest::Test
     assert_equal false, request_bodies[2].dig("provider", "require_parameters")
   end
 
-  def test_directives_runner_filters_reserved_llm_options_keys_to_avoid_tool_leakage
+  def test_directives_runner_rejects_reserved_llm_options_keys_to_avoid_tool_leakage
     requests = []
 
     adapter =
@@ -95,32 +111,27 @@ class DirectivesRunnerTest < Minitest::Test
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    preset =
-      TavernKit::VibeTavern::Directives::Presets.merge(
-        TavernKit::VibeTavern::Directives::Presets.default_directives,
-        TavernKit::VibeTavern::Directives::Presets.directives(
-          modes: [:json_schema],
-          request_overrides: {
-            temperature: 0.1,
-            tools: [{ type: "function", function: { name: "evil_tool" } }],
-            tool_choice: "none",
-          },
-        ),
-      )
+    runtime =
+      {
+        directives:
+          TavernKit::VibeTavern::Directives::Presets.directives(
+            modes: [:json_schema],
+            request_overrides: {
+              temperature: 0.1,
+              tools: [{ type: "function", function: { name: "evil_tool" } }],
+              tool_choice: "none",
+            },
+          ),
+      }
+    runner_config = build_runner_config(runtime: runtime)
+    runner = build_runner(client: client, runner_config: runner_config)
 
-    runner = TavernKit::VibeTavern::Directives::Runner.build(client: client, model: "test-model", preset: preset)
-
-    result =
+    assert_raises(ArgumentError) do
       runner.run(
         system: "SYS",
         history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
       )
-
-    assert_equal true, result[:ok]
-    req = JSON.parse(requests[0][:body])
-    assert_equal 0.1, req.fetch("temperature")
-    assert_nil req["tools"]
-    assert_nil req["tool_choice"]
+    end
   end
 
   def test_directives_runner_propagates_llm_options_defaults
@@ -150,14 +161,9 @@ class DirectivesRunnerTest < Minitest::Test
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
 
-    preset = TavernKit::VibeTavern::Directives::Presets.directives(modes: [:prompt_only])
-    runner =
-      TavernKit::VibeTavern::Directives::Runner.build(
-        client: client,
-        model: "test-model",
-        llm_options_defaults: { temperature: 0.7 },
-        preset: preset,
-      )
+    runtime = { directives: TavernKit::VibeTavern::Directives::Presets.directives(modes: [:prompt_only]) }
+    runner_config = build_runner_config(runtime: runtime, llm_options_defaults: { temperature: 0.7 })
+    runner = build_runner(client: client, runner_config: runner_config)
 
     result =
       runner.run(
@@ -197,14 +203,13 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::Directives::Runner.build(client: client, model: "test-model")
-
     runtime = { language_policy: { enabled: true, target_lang: "ja-JP" } }
+    runner_config = build_runner_config(runtime: runtime)
+    runner = build_runner(client: client, runner_config: runner_config)
     result =
       runner.run(
         system: "SYS",
         history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
-        runtime: runtime,
       )
 
     assert_equal true, result[:ok]
@@ -256,7 +261,8 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::Directives::Runner.build(client: client, model: "test-model")
+    runner_config = build_runner_config
+    runner = build_runner(client: client, runner_config: runner_config)
 
     result =
       runner.run(
@@ -312,14 +318,14 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::Directives::Runner.build(client: client, model: "test-model")
+    runner_config = build_runner_config
+    runner = build_runner(client: client, runner_config: runner_config)
 
     result =
       runner.run(
         system: "SYS",
         history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
         llm_options: { temperature: 0 },
-        repair_retry_count: 1,
       )
 
     assert_equal true, result[:ok]
@@ -358,7 +364,8 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::Directives::Runner.build(client: client, model: "test-model")
+    runner_config = build_runner_config
+    runner = build_runner(client: client, runner_config: runner_config)
 
     result_validator =
       lambda do |result|
@@ -371,7 +378,6 @@ class DirectivesRunnerTest < Minitest::Test
         system: "SYS",
         history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
         llm_options: { temperature: 0 },
-        repair_retry_count: 1,
         result_validator: result_validator,
       )
 
@@ -421,7 +427,8 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner = TavernKit::VibeTavern::Directives::Runner.build(client: client, model: "test-model")
+    runner_config = build_runner_config
+    runner = build_runner(client: client, runner_config: runner_config)
 
     result =
       runner.run(
@@ -433,5 +440,91 @@ class DirectivesRunnerTest < Minitest::Test
     assert_equal true, result[:ok]
     assert_equal :prompt_only, result[:mode]
     assert_equal "ui.show_form", result[:directives][0].fetch("type")
+  end
+
+  def test_directives_runner_forces_parallel_tool_calls_false_for_structured_modes
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          envelope = {
+            assistant_text: "ok",
+            directives: [{ type: "ui.toast", payload: { message: "Saved." } }],
+          }
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: JSON.generate(envelope) }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner_config = build_runner_config(runtime: { directives: { modes: [:json_schema] } })
+    runner = build_runner(client: client, runner_config: runner_config)
+
+    result =
+      runner.run(
+        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+      )
+
+    assert_equal true, result[:ok]
+    request_body = JSON.parse(requests[0][:body])
+    assert_equal false, request_body.fetch("parallel_tool_calls")
+  end
+
+  def test_directives_runner_applies_output_tags_to_assistant_text
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+
+          envelope = {
+            assistant_text: %(Hi <lang code="ja">ありがとう</lang>.),
+            directives: [{ type: "ui.toast", payload: { message: "Saved." } }],
+          }
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: JSON.generate(envelope) }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    runtime =
+      {
+        output_tags: {
+          enabled: true,
+          rules: [{ tag: "lang", action: :strip }],
+          sanitizers: { lang_spans: { enabled: true, validate_code: true, auto_close: true, on_invalid_code: :strip } },
+        },
+      }
+
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner_config = build_runner_config(runtime: runtime)
+    runner = build_runner(client: client, runner_config: runner_config)
+
+    result =
+      runner.run(
+        history: [TavernKit::Prompt::Message.new(role: :user, content: "hi")],
+      )
+
+    assert_equal true, result[:ok]
+    assert_equal "Hi ありがとう.", result[:assistant_text]
+    assert_equal "Hi ありがとう.", result[:envelope].fetch("assistant_text")
   end
 end

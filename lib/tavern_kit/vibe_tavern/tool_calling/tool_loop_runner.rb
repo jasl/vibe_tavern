@@ -2,6 +2,8 @@
 
 require "json"
 require_relative "../prompt_runner"
+require_relative "../runner_config"
+require_relative "../output_tags"
 require_relative "filtered_tool_registry"
 require_relative "tool_transforms"
 require_relative "tool_call_transforms"
@@ -28,46 +30,67 @@ module TavernKit
           end
         end
 
+        def self.build(client:, runner_config:, tool_executor:, **kwargs)
+          prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
+
+          new(
+            prompt_runner: prompt_runner,
+            runner_config: runner_config,
+            tool_executor: tool_executor,
+            **kwargs,
+          )
+        end
+
         def initialize(
-          client:,
-          model:,
+          prompt_runner:,
+          runner_config:,
           tool_executor:,
-          runtime: nil,
           variables_store: nil,
           registry: nil,
           system: nil,
-          strict: false,
-          fix_empty_final: nil,
-          tool_use_mode: nil,
-          tool_failure_policy: nil,
-          tool_calling_fallback_retry_count: nil,
-          llm_options_defaults: nil
+          strict: false
         )
-          @client = client
-          @model = model.to_s
+          raise ArgumentError, "prompt_runner is required" unless prompt_runner.is_a?(TavernKit::VibeTavern::PromptRunner)
+          raise ArgumentError, "runner_config is required" unless runner_config.is_a?(TavernKit::VibeTavern::RunnerConfig)
+
+          @prompt_runner = prompt_runner
+          @runner_config = runner_config
+          @model = runner_config.model.to_s
           @tool_executor = tool_executor
-          @runtime = runtime
           @variables_store = variables_store
           @registry = registry || ToolRegistry.new
           @system = system.to_s
           @strict = strict == true
-          @prompt_runner =
-            TavernKit::VibeTavern::PromptRunner.new(
-              client: @client,
-              model: @model,
-              llm_options_defaults: llm_options_defaults,
-            )
-          @tool_use_mode = resolve_tool_use_mode(explicit: tool_use_mode)
-          @tool_failure_policy = resolve_tool_failure_policy(explicit: tool_failure_policy)
-          @tool_calling_fallback_retry_count =
-            resolve_tool_calling_fallback_retry_count(explicit: tool_calling_fallback_retry_count, default: 0)
-          @fix_empty_final = resolve_bool_setting(:fix_empty_final, explicit: fix_empty_final, default: true)
-          @max_tool_args_bytes = resolve_bytes_setting(:max_tool_args_bytes, default: MAX_TOOL_ARGS_BYTES)
-          @max_tool_output_bytes = resolve_bytes_setting(:max_tool_output_bytes, default: MAX_TOOL_OUTPUT_BYTES)
 
-          @registry = resolve_registry_mask(@registry)
+          cfg = runner_config.tool_calling
 
-          if tool_use_enabled? && @tool_executor.nil?
+          @tool_use_mode = cfg.tool_use_mode
+          @tool_failure_policy = cfg.tool_failure_policy
+          @tool_calling_fallback_retry_count = cfg.fallback_retry_count
+          @fix_empty_final = cfg.fix_empty_final
+          @fix_empty_final_user_text = cfg.fix_empty_final_user_text
+          @fix_empty_final_disable_tools = cfg.fix_empty_final_disable_tools
+          @max_tool_args_bytes = cfg.max_tool_args_bytes
+          @max_tool_output_bytes = cfg.max_tool_output_bytes
+          @max_tool_calls_per_turn = cfg.max_tool_calls_per_turn
+          @tool_choice = cfg.tool_choice
+          @request_overrides = cfg.request_overrides
+          @message_transforms = cfg.message_transforms
+          @tool_transforms = cfg.tool_transforms
+          @response_transforms = cfg.response_transforms
+          @tool_call_transforms = cfg.tool_call_transforms
+          @tool_result_transforms = cfg.tool_result_transforms
+
+          if cfg.tool_allowlist || cfg.tool_denylist
+            @registry =
+              FilteredToolRegistry.new(
+                base: @registry,
+                allow: cfg.tool_allowlist,
+                deny: cfg.tool_denylist,
+              )
+          end
+
+          if cfg.tool_use_enabled? && @tool_executor.nil?
             raise ArgumentError, "tool_executor is required when tool_use_mode is enabled"
           end
 
@@ -95,18 +118,18 @@ module TavernKit
           last_tool_ok_by_name = {}
 
           max_turns.times do |turn|
-            runtime = @runtime
+            runtime = @runner_config.runtime
             variables_store = @variables_store
             system = @system
             strict = @strict
             tools = @registry.openai_tools(expose: :model)
-            tool_choice = resolve_tool_choice(default: "auto")
-            request_overrides = resolve_request_overrides
-            message_transforms = resolve_message_transforms
-            tool_transforms = resolve_tool_transforms
-            response_transforms = resolve_response_transforms
-            tool_call_transforms = resolve_tool_call_transforms
-            tool_result_transforms = resolve_tool_result_transforms
+            tool_choice = @tool_choice || "auto"
+            request_overrides = @request_overrides
+            message_transforms = @message_transforms
+            tool_transforms = @tool_transforms
+            response_transforms = @response_transforms
+            tool_call_transforms = @tool_call_transforms
+            tool_result_transforms = @tool_result_transforms
             request_attempts_left = @tool_use_mode == :relaxed ? @tool_calling_fallback_retry_count : 0
 
             if pending_user_text && !pending_user_text.strip.empty?
@@ -131,9 +154,9 @@ module TavernKit
 
               prompt_request =
                 @prompt_runner.build_request(
+                  runner_config: @runner_config,
                   history: history,
                   system: system,
-                  runtime: runtime,
                   variables_store: variables_store,
                   strict: strict,
                   llm_options: llm_options_hash,
@@ -231,8 +254,8 @@ module TavernKit
             ignored_tool_calls = 0
 
             if tools_enabled
-              max_tool_calls_per_turn = resolve_max_tool_calls_per_turn(default: nil)
-              if max_tool_calls_per_turn.nil? && request_overrides[:parallel_tool_calls] == false
+              max_tool_calls_per_turn = @max_tool_calls_per_turn
+              if max_tool_calls_per_turn.nil? && options.fetch(:parallel_tool_calls, nil) == false
                 max_tool_calls_per_turn = 1
               end
 
@@ -327,9 +350,9 @@ module TavernKit
                   assistant_content.strip.empty? &&
                   any_tool_calls_seen
                 empty_final_fixup_attempted = true
-                pending_user_text =
-                  resolve_fix_empty_final_user_text(default: DEFAULT_FIX_EMPTY_FINAL_USER_TEXT)
-                disable_tools = resolve_fix_empty_final_disable_tools(default: true)
+                pending_user_text = @fix_empty_final_user_text.to_s.strip
+                pending_user_text = DEFAULT_FIX_EMPTY_FINAL_USER_TEXT if pending_user_text.empty?
+                disable_tools = @fix_empty_final_disable_tools
                 tools_enabled = false if disable_tools
 
                 emit_event(
@@ -392,7 +415,17 @@ module TavernKit
                 any_tool_success_seen: any_tool_success_seen,
               )
 
-              return { assistant_text: assistant_content, history: history, trace: trace }
+              assistant_text =
+                TavernKit::VibeTavern::OutputTags.transform(
+                  assistant_content,
+                  config: @runner_config.output_tags,
+                )
+
+              if history.last.is_a?(TavernKit::Prompt::Message)
+                history[-1] = history.last.with(content: assistant_text)
+              end
+
+              return { assistant_text: assistant_text, history: history, trace: trace }
             end
 
             tool_results = []
@@ -573,271 +606,6 @@ module TavernKit
           handler.call({ type: type }.merge(data))
         rescue StandardError
           nil
-        end
-
-        def resolve_bool_setting(key, explicit:, default:)
-          return explicit == true unless explicit.nil?
-
-          val = runtime_setting_bool(key)
-          val.nil? ? default : val
-        end
-
-        def resolve_bytes_setting(key, default:)
-          val = runtime_setting_value(key)
-          return default if val.nil?
-
-          i = Integer(val)
-          return default if i <= 0
-
-          i
-        rescue ArgumentError, TypeError
-          default
-        end
-
-        def resolve_max_tool_calls_per_turn(default:)
-          val = runtime_setting_value(:max_tool_calls_per_turn)
-          return default if val.nil?
-
-          i = Integer(val)
-          return default if i <= 0
-
-          i
-        rescue ArgumentError, TypeError
-          default
-        end
-
-        def resolve_tool_choice(default:)
-          raw = runtime_setting_value(:tool_choice)
-
-          case raw
-          when nil
-            default
-          when String
-            s = raw.strip
-            s.empty? ? default : s
-          when Symbol
-            raw.to_s
-          when Hash
-            raw
-          else
-            default
-          end
-        end
-
-        def resolve_request_overrides
-          raw = runtime_setting_value(:request_overrides)
-          return {} unless raw.is_a?(Hash)
-
-          raw = TavernKit::Utils.deep_symbolize_keys(raw)
-
-          # Keep ownership clear: these keys are controlled by ToolLoopRunner.
-          reserved = %i[model messages tools tool_choice response_format].freeze
-          raw.each_with_object({}) do |(k, v), out|
-            key = k.to_s.to_sym
-            next if reserved.include?(key)
-
-            out[key] = v
-          end
-        end
-
-        def runtime_setting_value(key)
-          return nil unless @runtime&.respond_to?(:[])
-
-          tool_calling = tool_calling_settings
-          if tool_calling
-            val = tool_calling[key]
-            return val unless val.nil?
-          end
-
-          runtime_hash = runtime_settings_hash
-          if runtime_hash
-            val = runtime_hash[key]
-            return val unless val.nil?
-          end
-
-          val = @runtime[key]
-          return val unless val.nil?
-
-          nil
-        end
-
-        def tool_calling_settings
-          return @tool_calling_settings if defined?(@tool_calling_settings)
-
-          raw =
-            if @runtime.is_a?(Hash)
-              runtime_settings_hash&.[](:tool_calling)
-            else
-              @runtime[:tool_calling]
-            end
-
-          @tool_calling_settings = raw.is_a?(Hash) ? TavernKit::Utils.deep_symbolize_keys(raw) : nil
-        end
-
-        def runtime_settings_hash
-          return @runtime_settings_hash if defined?(@runtime_settings_hash)
-
-          @runtime_settings_hash = @runtime.is_a?(Hash) ? TavernKit::Utils.deep_symbolize_keys(@runtime) : nil
-        end
-
-        def runtime_setting_bool(key)
-          val = runtime_setting_value(key)
-          TavernKit::Coerce.bool(val, default: nil)
-        end
-
-        def resolve_fix_empty_final_user_text(default:)
-          raw = runtime_setting_value(:fix_empty_final_user_text)
-
-          text = raw.to_s.strip
-          text.empty? ? default : text
-        end
-
-        def resolve_fix_empty_final_disable_tools(default:)
-          val = runtime_setting_bool(:fix_empty_final_disable_tools)
-
-          val.nil? ? default : val
-        end
-
-        def resolve_message_transforms
-          raw = runtime_setting_value(:message_transforms)
-
-          normalize_string_list(raw)
-        end
-
-        def resolve_tool_transforms
-          raw = runtime_setting_value(:tool_transforms)
-
-          normalize_string_list(raw)
-        end
-
-        def resolve_response_transforms
-          raw = runtime_setting_value(:response_transforms)
-
-          normalize_string_list(raw)
-        end
-
-        def resolve_tool_call_transforms
-          raw = runtime_setting_value(:tool_call_transforms)
-
-          normalize_string_list(raw)
-        end
-
-        def resolve_tool_result_transforms
-          raw = runtime_setting_value(:tool_result_transforms)
-
-          normalize_string_list(raw)
-        end
-
-        def normalize_string_list(value)
-          case value
-          when nil
-            []
-          when String
-            value.split(",").map(&:strip).reject(&:empty?)
-          when Array
-            value.map { |v| v.to_s.strip }.reject(&:empty?)
-          else
-            [value.to_s.strip].reject(&:empty?)
-          end
-        end
-
-        def resolve_tool_use_mode(explicit:)
-          mode = normalize_tool_use_mode(explicit)
-          return mode if mode
-
-          mode = normalize_tool_use_mode(runtime_setting_value(:tool_use_mode))
-          return mode if mode
-
-          :relaxed
-        end
-
-        def resolve_tool_failure_policy(explicit:)
-          policy = normalize_tool_failure_policy(explicit)
-          return policy if policy
-
-          policy = normalize_tool_failure_policy(runtime_setting_value(:tool_failure_policy))
-          return policy if policy
-
-          :fatal
-        end
-
-        def normalize_tool_failure_policy(value)
-          case value
-          when nil
-            nil
-          else
-            s = value.to_s.strip.downcase.tr("-", "_")
-            policy =
-              case s
-              when "fatal"
-                :fatal
-              when "tolerated"
-                :tolerated
-              else
-                nil
-              end
-
-            return nil unless policy
-            return policy if TOOL_FAILURE_POLICIES.include?(policy)
-
-            nil
-          end
-        end
-
-        # Tool profiles/masking:
-        # - Keep the model-facing tool list small for reliability
-        # - Enforce the same subset in the dispatcher (same registry wrapper)
-        def resolve_registry_mask(registry)
-          allow = runtime_setting_value(:tool_allowlist)
-
-          deny = runtime_setting_value(:tool_denylist)
-
-          return registry if allow.nil? && deny.nil?
-
-          FilteredToolRegistry.new(base: registry, allow: allow, deny: deny)
-        end
-
-        def normalize_tool_use_mode(value)
-          case value
-          when nil
-            nil
-          else
-            s = value.to_s.strip.downcase
-            s = s.tr("-", "_")
-            mode =
-              case s
-              when "enforced", "required", "must"
-                :enforced
-              when "relaxed", "preferred", "optional"
-                :relaxed
-              when "disabled", "off", "none", "0", "false"
-                :disabled
-              else
-                nil
-              end
-
-            return nil unless mode
-            return mode if TOOL_USE_MODES.include?(mode)
-
-            nil
-          end
-        end
-
-        def resolve_tool_calling_fallback_retry_count(explicit:, default:)
-          return normalize_non_negative_int(explicit, default: default) unless explicit.nil?
-
-          normalize_non_negative_int(runtime_setting_value(:fallback_retry_count), default: default)
-        end
-
-        def normalize_non_negative_int(value, default:)
-          return default if value.nil?
-
-          i = Integer(value)
-          return default if i < 0
-
-          i
-        rescue ArgumentError, TypeError
-          default
         end
 
         def tool_use_enabled?

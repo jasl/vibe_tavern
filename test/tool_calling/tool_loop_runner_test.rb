@@ -181,24 +181,72 @@ class ToolLoopRunnerTest < Minitest::Test
     registry: build_registry,
     tool_use_mode: nil,
     runtime: nil,
+    parallel_tool_calls: true,
     fix_empty_final: nil,
     tool_calling_fallback_retry_count: nil,
     llm_options_defaults: nil,
     strict: false,
     system: nil
   )
+    runtime_hash =
+      case runtime
+      when nil
+        {}
+      when TavernKit::Runtime::Base
+        runtime.to_h
+      when Hash
+        runtime
+      else
+        raise ArgumentError, "runtime must be a Hash or TavernKit::Runtime::Base"
+      end
+
+    base_tool_calling =
+      TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling
+
+    overrides = {}
+    overrides[:tool_use_mode] = tool_use_mode unless tool_use_mode.nil?
+    overrides[:fix_empty_final] = fix_empty_final unless fix_empty_final.nil?
+    overrides[:fallback_retry_count] = tool_calling_fallback_retry_count unless tool_calling_fallback_retry_count.nil?
+
+    tool_calling =
+      TavernKit::VibeTavern::ToolCalling::Presets.merge(
+        base_tool_calling,
+        runtime_hash.fetch(:tool_calling, {}),
+        overrides,
+      )
+
+    if !parallel_tool_calls.nil?
+      request_overrides = tool_calling.fetch(:request_overrides, nil)
+      request_overrides = {} unless request_overrides.is_a?(Hash)
+
+      unless request_overrides.key?(:parallel_tool_calls)
+        tool_calling =
+          tool_calling.merge(
+            request_overrides: request_overrides.merge(parallel_tool_calls: parallel_tool_calls),
+          )
+      end
+    end
+
+    effective_mode = tool_calling.fetch(:tool_use_mode, :relaxed).to_sym
+    tool_executor_obj = effective_mode == :disabled ? nil : ToolCallEvalTestExecutor.new(workspace: workspace)
+
+    runner_config =
+      TavernKit::VibeTavern::RunnerConfig.build(
+        provider: "openrouter",
+        model: model,
+        runtime: runtime_hash.merge(tool_calling: tool_calling),
+        llm_options_defaults: llm_options_defaults,
+      )
+
+    prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
+
     TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
-      client: client,
-      model: model,
-      tool_executor: tool_use_mode == :disabled ? nil : ToolCallEvalTestExecutor.new(workspace: workspace),
+      prompt_runner: prompt_runner,
+      runner_config: runner_config,
+      tool_executor: tool_executor_obj,
       registry: registry,
-      runtime: runtime,
       system: system,
       strict: strict,
-      fix_empty_final: fix_empty_final,
-      tool_use_mode: tool_use_mode,
-      tool_calling_fallback_retry_count: tool_calling_fallback_retry_count,
-      llm_options_defaults: llm_options_defaults,
     )
   end
 
@@ -791,12 +839,12 @@ class ToolLoopRunnerTest < Minitest::Test
           tool_calling: {
             tool_use_mode: :relaxed,
             request_overrides: {
-              "temperature" => 0.123,
-              "transforms" => ["middle-out"],
-              "response_format" => { "type" => "json_object" },
-              "model" => "evil-model",
-              "tool_choice" => "none",
-              "tools" => [
+              temperature: 0.123,
+              transforms: ["middle-out"],
+              response_format: { type: "json_object" },
+              model: "evil-model",
+              tool_choice: "none",
+              tools: [
                 { type: "function", function: { name: "evil_tool", parameters: { type: "object" } } },
               ],
             },

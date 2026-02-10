@@ -1,14 +1,17 @@
 # frozen_string_literal: true
 
-require_relative "presets"
+require_relative "../prompt_runner"
+require_relative "../runner_config"
+require_relative "../output_tags"
+require_relative "parser"
+require_relative "schema"
+require_relative "validator"
 
 module TavernKit
   module VibeTavern
     module Directives
       class Runner
-        DEFAULT_REPAIR_RETRY_COUNT = 1
-
-        DEFAULT_MODES = %i[json_schema json_object prompt_only].freeze
+        RESERVED_LLM_OPTIONS_KEYS = %i[model messages tools tool_choice stream stream_options].freeze
 
         ENVELOPE_OUTPUT_INSTRUCTIONS = <<~TEXT.strip
           Return a single JSON object and nothing else (no Markdown, no code fences).
@@ -19,19 +22,14 @@ module TavernKit
           - Each directive: { type: String, payload: Object }
         TEXT
 
-        def self.build(client:, model:, llm_options_defaults: nil, preset: nil)
-          prompt_runner =
-            TavernKit::VibeTavern::PromptRunner.new(
-              client: client,
-              model: model,
-              llm_options_defaults: llm_options_defaults,
-            )
-          new(prompt_runner: prompt_runner, preset: preset)
+        def self.build(client:, runner_config:)
+          prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
+          new(prompt_runner: prompt_runner, runner_config: runner_config)
         end
 
-        def initialize(prompt_runner:, preset: nil)
+        def initialize(prompt_runner:, runner_config:)
           @prompt_runner = prompt_runner
-          @preset = preset.is_a?(Hash) ? preset : nil
+          @runner_config = runner_config
         end
 
         # Runs a single structured directives request with fallbacks.
@@ -43,50 +41,30 @@ module TavernKit
         def run(
           history:,
           system: nil,
-          runtime: nil,
           variables_store: nil,
           strict: false,
           llm_options: nil,
           dialect: :openai,
-          message_transforms: nil,
-          response_transforms: nil,
           structured_output_options: nil,
-          preset: nil,
-          modes: nil,
-          repair_retry_count: nil,
           result_validator: nil
         )
           attempts = []
 
-          effective_preset =
-            TavernKit::VibeTavern::Directives::Presets.merge(
-              @preset,
-              preset,
-            )
-
-          raw_retry_count =
-            repair_retry_count.nil? ? fetch_preset(effective_preset, :repair_retry_count) : repair_retry_count
-          raw_retry_count = DEFAULT_REPAIR_RETRY_COUNT if raw_retry_count.nil?
-
-          retry_budget =
-            begin
-              Integer(raw_retry_count)
-            rescue ArgumentError, TypeError
-              0
-            end
-          retry_budget = 0 if retry_budget.negative?
+          cfg = @runner_config.directives
+          retry_budget = cfg.repair_retry_count
 
           base_llm_options =
             deep_merge_hashes(
-              normalize_llm_options(fetch_preset(effective_preset, :request_overrides)),
+              cfg.request_overrides,
               normalize_llm_options(llm_options),
             )
-          structured_request_overrides = normalize_llm_options(fetch_preset(effective_preset, :structured_request_overrides))
-          prompt_only_request_overrides = normalize_llm_options(fetch_preset(effective_preset, :prompt_only_request_overrides))
+          structured_request_overrides = cfg.structured_request_overrides
+          prompt_only_request_overrides = cfg.prompt_only_request_overrides
 
           base_structured_output_options =
             if structured_output_options.is_a?(Hash)
-              TavernKit::Utils.deep_symbolize_keys(structured_output_options)
+              assert_symbol_keys!(structured_output_options)
+              structured_output_options.dup
             else
               {}
             end
@@ -99,6 +77,11 @@ module TavernKit
 
           allowed_types =
             base_structured_output_options[:allowed_types] || (registry ? registry.types : nil)
+
+          type_aliases =
+            base_structured_output_options[:type_aliases] || (registry&.respond_to?(:type_aliases) ? registry.type_aliases : nil)
+
+          payload_validator = base_structured_output_options[:payload_validator]
 
           output_instructions =
             base_structured_output_options[:output_instructions]
@@ -115,17 +98,15 @@ module TavernKit
               output_instructions,
             ].map(&:to_s).map(&:strip).reject(&:empty?).join("\n\n")
 
-          effective_modes = modes || fetch_preset(effective_preset, :modes) || DEFAULT_MODES
-
-          message_transforms = fetch_preset(effective_preset, :message_transforms) if message_transforms.nil?
-          response_transforms = fetch_preset(effective_preset, :response_transforms) if response_transforms.nil?
+          effective_modes = cfg.modes
+          message_transforms = cfg.message_transforms
+          response_transforms = cfg.response_transforms
 
           Array(effective_modes).each do |mode|
             mode = mode.to_s.strip.downcase.tr("-", "_").to_sym
-            next unless DEFAULT_MODES.include?(mode)
+            next unless TavernKit::VibeTavern::Directives::DEFAULT_MODES.include?(mode)
 
             response_format = response_format_for(mode, schema_name: schema_name, allowed_types: allowed_types)
-            inject_response_format = mode != :prompt_only
 
             (1 + retry_budget).times do |attempt_index|
               repair = attempt_index.positive?
@@ -137,25 +118,21 @@ module TavernKit
 
               llm_options_hash.delete(:response_format)
               llm_options_hash[:response_format] = response_format if response_format
+              llm_options_hash[:parallel_tool_calls] = false if response_format
 
-              structured_opts =
-                base_structured_output_options.merge(
-                  inject_response_format: inject_response_format,
-                )
+              validate_llm_options!(llm_options_hash)
 
               prompt_request =
                 @prompt_runner.build_request(
+                  runner_config: @runner_config,
                   history: history,
                   system: system_text,
-                  runtime: runtime,
                   variables_store: variables_store,
                   strict: strict,
                   llm_options: llm_options_hash,
                   dialect: dialect,
                   message_transforms: message_transforms,
                   response_transforms: response_transforms,
-                  structured_output: :directives_v1,
-                  structured_output_options: structured_opts,
                 )
 
               prompt_result =
@@ -166,9 +143,14 @@ module TavernKit
                   break
                 end
 
-              envelope = prompt_result.structured_output
-              error = prompt_result.structured_output_error
-              warnings = prompt_result.structured_output_warnings
+              envelope, error, warnings =
+                parse_directives_envelope(
+                  prompt_result.assistant_message,
+                  allowed_types: allowed_types,
+                  type_aliases: type_aliases,
+                  payload_validator: payload_validator,
+                  max_bytes: base_structured_output_options.fetch(:max_bytes, nil),
+                )
 
               attempts << attempt_structured(mode, prompt_result, envelope, error, warnings)
 
@@ -240,13 +222,23 @@ module TavernKit
 
         def ok_result(mode, prompt_result, envelope, warnings, attempts)
           directives = Array(envelope.fetch("directives", nil)).select { |d| d.is_a?(Hash) }
+          assistant_text = envelope.fetch("assistant_text", "").to_s
+          assistant_text =
+            TavernKit::VibeTavern::OutputTags.transform(
+              assistant_text,
+              config: @runner_config.output_tags,
+            )
+
+          normalized_envelope = envelope.dup
+          normalized_envelope["assistant_text"] = assistant_text
+
           {
             ok: true,
             mode: mode,
             elapsed_ms: prompt_result.elapsed_ms,
-            assistant_text: envelope.fetch("assistant_text", "").to_s,
+            assistant_text: assistant_text,
             directives: directives,
-            envelope: envelope,
+            envelope: normalized_envelope,
             warnings: Array(warnings),
             attempts: attempts,
           }
@@ -290,6 +282,55 @@ module TavernKit
           }
         end
 
+        def parse_directives_envelope(assistant_message, allowed_types:, type_aliases:, payload_validator:, max_bytes:)
+          tool_calls = assistant_message.fetch("tool_calls", nil)
+          tool_calls_present =
+            case tool_calls
+            when Array
+              tool_calls.any?
+            when Hash
+              tool_calls.any?
+            else
+              false
+            end
+
+          return [nil, nil, []] if tool_calls_present
+
+          parsed =
+            TavernKit::VibeTavern::Directives::Parser.parse_json(
+              assistant_message.fetch("content", nil),
+              max_bytes: normalize_max_bytes(max_bytes),
+            )
+          return [nil, parsed, []] unless parsed[:ok]
+
+          validated =
+            TavernKit::VibeTavern::Directives::Validator.validate(
+              parsed[:value],
+              allowed_types: allowed_types,
+              type_aliases: type_aliases,
+              payload_validator: payload_validator,
+            )
+
+          if validated[:ok]
+            [validated[:value], nil, validated[:warnings]]
+          else
+            [nil, validated, []]
+          end
+        end
+        private :parse_directives_envelope
+
+        def normalize_max_bytes(raw_value)
+          return TavernKit::VibeTavern::Directives::Parser::DEFAULT_MAX_BYTES if raw_value.nil?
+
+          parsed = Integer(raw_value)
+          return TavernKit::VibeTavern::Directives::Parser::DEFAULT_MAX_BYTES if parsed <= 0
+
+          parsed
+        rescue ArgumentError, TypeError
+          TavernKit::VibeTavern::Directives::Parser::DEFAULT_MAX_BYTES
+        end
+        private :normalize_max_bytes
+
         def validate_candidate(candidate, result_validator)
           return [] unless result_validator&.respond_to?(:call)
           return [] unless candidate.is_a?(Hash)
@@ -305,20 +346,26 @@ module TavernKit
         end
         private :validate_candidate
 
-        def fetch_preset(preset, key)
-          return nil unless preset.is_a?(Hash)
-
-          preset[key]
-        end
-
         def normalize_llm_options(value)
-          h = value.is_a?(Hash) ? TavernKit::Utils.deep_symbolize_keys(value) : {}
+          h = value.nil? ? {} : value
+          raise ArgumentError, "llm_options must be a Hash" unless h.is_a?(Hash)
+
+          assert_symbol_keys!(h)
+
           h.delete(:model)
           h.delete(:messages)
-          h.delete(:tools)
-          h.delete(:tool_choice)
-          h.delete(:response_format)
           h
+        end
+
+        def validate_llm_options!(llm_options)
+          invalid = llm_options.keys & RESERVED_LLM_OPTIONS_KEYS
+          raise ArgumentError, "directives llm_options contains reserved keys: #{invalid.inspect}" if invalid.any?
+        end
+
+        def assert_symbol_keys!(hash)
+          hash.each_key do |k|
+            raise ArgumentError, "Hash keys must be Symbols (got #{k.class})" unless k.is_a?(Symbol)
+          end
         end
 
         def deep_merge_hashes(left, right)

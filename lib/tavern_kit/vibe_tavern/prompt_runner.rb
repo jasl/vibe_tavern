@@ -2,8 +2,8 @@
 
 require_relative "tool_calling/message_transforms"
 require_relative "tool_calling/response_transforms"
-require_relative "directives"
-require_relative "output_tags"
+require_relative "preflight"
+require_relative "runner_config"
 
 module TavernKit
   module VibeTavern
@@ -17,8 +17,7 @@ module TavernKit
           :request,
           :strict,
           :response_transforms,
-          :structured_output_kind,
-          :structured_output_options,
+          :output_tags_config,
         ) do
           def initialize(
             plan:,
@@ -28,8 +27,7 @@ module TavernKit
             request:,
             strict:,
             response_transforms:,
-            structured_output_kind: nil,
-            structured_output_options: nil
+            output_tags_config: nil
           )
             super(
               plan: plan,
@@ -39,8 +37,7 @@ module TavernKit
               request: request,
               strict: strict == true,
               response_transforms: Array(response_transforms),
-              structured_output_kind: structured_output_kind&.to_sym,
-              structured_output_options: structured_output_options.is_a?(Hash) ? structured_output_options : {},
+              output_tags_config: output_tags_config,
             )
           end
         end
@@ -53,61 +50,31 @@ module TavernKit
           :assistant_message,
           :finish_reason,
           :elapsed_ms,
-          :structured_output,
-          :structured_output_error,
-          :structured_output_warnings,
-        ) do
-          def initialize(
-            prompt_request:,
-            response:,
-            body:,
-            assistant_message:,
-            finish_reason:,
-            elapsed_ms:,
-            structured_output: nil,
-            structured_output_error: nil,
-            structured_output_warnings: nil
-          )
-            super(
-              prompt_request: prompt_request,
-              response: response,
-              body: body,
-              assistant_message: assistant_message,
-              finish_reason: finish_reason,
-              elapsed_ms: elapsed_ms,
-              structured_output: structured_output,
-              structured_output_error: structured_output_error,
-              structured_output_warnings: Array(structured_output_warnings),
-            )
-          end
-        end
+        )
 
-      def initialize(client:, model:, llm_options_defaults: nil)
+      def initialize(client:)
         @client = client
-        @model = model.to_s
-        @llm_options_defaults = normalize_llm_options_defaults(llm_options_defaults)
       end
 
       def build_request(
+        runner_config:,
         history:,
         system: nil,
-        runtime: nil,
         variables_store: nil,
         strict: false,
         llm_options: nil,
         dialect: :openai,
         message_transforms: nil,
-        response_transforms: nil,
-        structured_output: nil,
-        structured_output_options: nil
+        response_transforms: nil
       )
-        raise ArgumentError, "model is required" if @model.strip.empty?
+        raise ArgumentError, "runner_config is required" unless runner_config.is_a?(TavernKit::VibeTavern::RunnerConfig)
+        raise ArgumentError, "model is required" if runner_config.model.to_s.strip.empty?
 
         strict = strict == true
         history = Array(history)
 
         system_text = system.to_s
-        runtime = normalize_runtime(runtime)
+        runtime = runner_config.runtime
         build_history =
           if system_text.empty?
             history
@@ -115,52 +82,33 @@ module TavernKit
             [TavernKit::Prompt::Message.new(role: :system, content: system_text)] + history
           end
 
-        llm_options = deep_merge_hashes(@llm_options_defaults, normalize_llm_options(llm_options))
+        llm_options = deep_merge_hashes(runner_config.llm_options_defaults, normalize_llm_options(llm_options))
         plan =
-          TavernKit::Prompt::DSL.build(pipeline: Pipeline) do
+          TavernKit::Prompt::DSL.build(pipeline: runner_config.pipeline) do
             history build_history
             runtime runtime if runtime
             variables_store variables_store if variables_store
             llm_options llm_options unless llm_options.empty?
             strict strict
-            meta :default_model_hint, @model
+            meta :default_model_hint, runner_config.model
           end
 
         messages = plan.to_messages(dialect: dialect)
         options = (plan.llm_options || {}).dup
-        request = { model: @model, messages: messages }.merge(options)
+        request = { model: runner_config.model, messages: messages }.merge(options)
 
-        structured_output_kind = structured_output&.to_sym
-        structured_output_options =
-          if structured_output_options.is_a?(Hash)
-            TavernKit::Utils.deep_symbolize_keys(structured_output_options)
-          else
-            {}
-          end
-
-        if structured_output_kind == :directives_v1
-          registry = structured_output_options[:registry]
-          registry = nil unless registry.respond_to?(:types)
-
-          schema_name =
-            structured_output_options[:schema_name] || TavernKit::VibeTavern::Directives::Schema::NAME
-
-          allowed_types =
-            structured_output_options[:allowed_types] || (registry ? registry.types : nil)
-
-          inject_response_format =
-            structured_output_options.key?(:inject_response_format) ? structured_output_options[:inject_response_format] : true
-
-          if inject_response_format != false
-            options[:response_format] ||=
-              TavernKit::VibeTavern::Directives::Schema.response_format(
-                strict: true,
-                name: schema_name,
-                types: allowed_types,
-              )
-            request[:response_format] ||= options[:response_format]
-          end
+        if request.key?(:response_format)
+          # Structured outputs should remain deterministic.
+          options[:parallel_tool_calls] = false
+          request[:parallel_tool_calls] = false
         end
+
+        tools_present = request.key?(:tools) || request.key?(:tool_choice)
+        TavernKit::VibeTavern::Preflight.validate_request!(
+          stream: request.fetch(:stream, false) == true,
+          tools: tools_present,
+          response_format: request.key?(:response_format),
+        )
 
         message_transforms = Array(message_transforms).map(&:to_s).map(&:strip).reject(&:empty?)
         if message_transforms.any?
@@ -181,8 +129,7 @@ module TavernKit
           request: request,
           strict: strict,
           response_transforms: response_transforms,
-          structured_output_kind: structured_output_kind,
-          structured_output_options: structured_output_options,
+          output_tags_config: runner_config.output_tags,
         )
       end
 
@@ -209,97 +156,8 @@ module TavernKit
             assistant_message,
             response_transforms,
             strict: prompt_request.strict,
-            runtime: prompt_request.runtime,
+            output_tags_config: prompt_request.output_tags_config,
           )
-        end
-
-        runtime = prompt_request.runtime
-        output_tags_enabled = runtime && TavernKit::VibeTavern::OutputTags.enabled?(runtime)
-
-        if output_tags_enabled && prompt_request.structured_output_kind.nil?
-          assistant_message["content"] =
-            TavernKit::VibeTavern::OutputTags.transform(
-              assistant_message.fetch("content", nil),
-              runtime: runtime,
-            )
-        end
-
-        structured_output = nil
-        structured_output_error = nil
-        structured_output_warnings = nil
-
-        if prompt_request.structured_output_kind == :directives_v1
-          opts = prompt_request.structured_output_options
-          registry = opts.is_a?(Hash) ? opts[:registry] : nil
-          registry = nil unless registry.respond_to?(:types)
-
-          allowed_types =
-            opts.is_a?(Hash) ? opts[:allowed_types] : nil
-          allowed_types = registry.types if allowed_types.nil? && registry
-
-          type_aliases =
-            opts.is_a?(Hash) ? opts[:type_aliases] : nil
-          type_aliases = registry.type_aliases if type_aliases.nil? && registry&.respond_to?(:type_aliases)
-
-          payload_validator =
-            opts.is_a?(Hash) ? opts[:payload_validator] : nil
-
-          tool_calls = assistant_message.fetch("tool_calls", nil)
-          tool_calls_present =
-            case tool_calls
-            when Array
-              tool_calls.any?
-            when Hash
-              tool_calls.any?
-            else
-              false
-            end
-
-          # If this turn contains tool calls, do not attempt to parse directives.
-          unless tool_calls_present
-            raw_max_bytes = opts.is_a?(Hash) ? opts[:max_bytes] : nil
-            max_bytes =
-              begin
-                Integer(raw_max_bytes)
-              rescue ArgumentError, TypeError
-                nil
-              end
-            max_bytes ||= TavernKit::VibeTavern::Directives::Parser::DEFAULT_MAX_BYTES
-
-            parsed =
-              TavernKit::VibeTavern::Directives::Parser.parse_json(
-                assistant_message.fetch("content", nil),
-                max_bytes: max_bytes,
-              )
-
-            if parsed[:ok]
-              validated =
-                TavernKit::VibeTavern::Directives::Validator.validate(
-                  parsed[:value],
-                  allowed_types: allowed_types,
-                  type_aliases: type_aliases,
-                  payload_validator: payload_validator,
-                )
-              if validated[:ok]
-                structured_output = validated[:value]
-                structured_output_warnings = validated[:warnings]
-              else
-                structured_output_error = validated
-              end
-            else
-              structured_output_error = parsed
-            end
-          end
-        end
-
-        if output_tags_enabled && structured_output.is_a?(Hash) && structured_output.key?("assistant_text")
-          transformed = structured_output.dup
-          transformed["assistant_text"] =
-            TavernKit::VibeTavern::OutputTags.transform(
-              structured_output.fetch("assistant_text", nil),
-              runtime: runtime,
-            )
-          structured_output = transformed
         end
 
         PromptResult.new(
@@ -309,19 +167,12 @@ module TavernKit
           assistant_message: assistant_message,
           finish_reason: body.dig("choices", 0, "finish_reason"),
           elapsed_ms: elapsed_ms,
-          structured_output: structured_output,
-          structured_output_error: structured_output_error,
-          structured_output_warnings: structured_output_warnings,
         )
       end
 
       def perform_stream(prompt_request, include_usage: true, &on_delta)
         prompt_request = prompt_request.is_a?(PromptRequest) ? prompt_request : nil
         raise ArgumentError, "prompt_request is required" unless prompt_request
-
-        if prompt_request.structured_output_kind
-          raise ArgumentError, "PromptRunner#perform_stream does not support structured outputs; use #perform instead"
-        end
 
         req = prompt_request.request
         if req.key?(:tools) || req.key?(:tool_choice)
@@ -370,17 +221,8 @@ module TavernKit
             assistant_message,
             response_transforms,
             strict: prompt_request.strict,
-            runtime: prompt_request.runtime,
+            output_tags_config: prompt_request.output_tags_config,
           )
-        end
-
-        runtime = prompt_request.runtime
-        if runtime && TavernKit::VibeTavern::OutputTags.enabled?(runtime)
-          assistant_message["content"] =
-            TavernKit::VibeTavern::OutputTags.transform(
-              assistant_message.fetch("content", nil),
-              runtime: runtime,
-            )
         end
 
         PromptResult.new(
@@ -396,7 +238,10 @@ module TavernKit
       private
 
       def normalize_llm_options(value)
-        h = value.is_a?(Hash) ? TavernKit::Utils.deep_symbolize_keys(value) : {}
+        h = value.nil? ? {} : value
+        raise ArgumentError, "llm_options must be a Hash" unless h.is_a?(Hash)
+
+        assert_symbol_keys!(h)
 
         # Streaming is an execution mode, not a request option in this layer.
         # Use PromptRunner#perform_stream for streaming chat-only runs.
@@ -409,30 +254,19 @@ module TavernKit
         h
       end
 
-      def normalize_llm_options_defaults(value)
-        h = normalize_llm_options(value)
-        h.delete(:tools)
-        h.delete(:tool_choice)
-        h.delete(:response_format)
-        h
-      end
-
-      def normalize_runtime(value)
-        return nil if value.nil?
-        return value unless value.is_a?(Hash)
-
-        TavernKit::Runtime::Base.build(value, type: :app)
-      rescue StandardError
-        nil
+      def assert_symbol_keys!(hash)
+        hash.each_key do |key|
+          raise ArgumentError, "Hash keys must be Symbols (got #{key.class})" unless key.is_a?(Symbol)
+        end
       end
 
       def deep_merge_hashes(left, right)
         out = (left.is_a?(Hash) ? left : {}).dup
-        (right.is_a?(Hash) ? right : {}).each do |k, v|
-          if out[k].is_a?(Hash) && v.is_a?(Hash)
-            out[k] = deep_merge_hashes(out[k], v)
+        (right.is_a?(Hash) ? right : {}).each do |key, value|
+          if out[key].is_a?(Hash) && value.is_a?(Hash)
+            out[key] = deep_merge_hashes(out[key], value)
           else
-            out[k] = v
+            out[key] = value
           end
         end
         out

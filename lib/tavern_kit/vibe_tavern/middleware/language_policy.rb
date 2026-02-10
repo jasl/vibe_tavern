@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../output_tags/sanitizers/lang_spans"
+require_relative "../language_policy"
 
 module TavernKit
   module VibeTavern
@@ -13,7 +13,7 @@ module TavernKit
       # - Never introduce app-level safety/ethics policy text
       #
       # Configuration:
-      # - runtime[:language_policy] (strict)
+      # - typed `LanguagePolicy::Config` injected via middleware options
       class LanguagePolicy < TavernKit::Prompt::Middleware::Base
         DEFAULT_POLICY_TEXT_BUILDER =
           lambda do |target_lang, style_hint:, special_tags:|
@@ -39,65 +39,28 @@ module TavernKit
             parts.join("\n")
           end.freeze
 
-        SUPPORTED_TARGET_LANGS = %w[
-          en-US
-          zh-CN
-          zh-TW
-          ko-KR
-          ja-JP
-          yue-HK
-        ].freeze
-
-        CANONICAL_TARGET_LANGS = {
-          "en" => "en-US",
-          "en-us" => "en-US",
-          "zh-cn" => "zh-CN",
-          "zh-tw" => "zh-TW",
-          "zh-hans" => "zh-CN",
-          "zh-hans-cn" => "zh-CN",
-          "zh-hant" => "zh-TW",
-          "zh-hant-tw" => "zh-TW",
-          "ko-kr" => "ko-KR",
-          "ko" => "ko-KR",
-          "ja-jp" => "ja-JP",
-          "ja" => "ja-JP",
-          "yue-hk" => "yue-HK",
-          "yue" => "yue-HK",
-        }.freeze
-
         private
 
         def before(ctx)
-          cfg = language_policy_config(ctx)
-          return unless cfg
+          cfg = option(:config)
+          return if cfg.nil?
+          raise ArgumentError, "language_policy middleware config must be LanguagePolicy::Config" unless cfg.is_a?(TavernKit::VibeTavern::LanguagePolicy::Config)
+          return unless cfg.enabled
 
-          enabled = TavernKit::Coerce.bool(cfg.fetch(:enabled), default: false)
-          return unless enabled
+          target_lang = cfg.target_lang.to_s.strip
+          raise ArgumentError, "language_policy.target_lang must be present" if target_lang.empty?
 
-          raw_target = cfg.fetch(:target_lang)
-          raise ArgumentError, "language_policy.target_lang must be present" if raw_target.to_s.strip.empty?
-
-          target_lang = canonicalize_target_lang(raw_target)
-          unless SUPPORTED_TARGET_LANGS.include?(target_lang)
-            ctx.warn("language_policy.target_lang not supported (disabling): #{raw_target.inspect}")
+          unless TavernKit::VibeTavern::LanguagePolicy::SUPPORTED_TARGET_LANGS.include?(target_lang)
+            ctx.warn("language_policy.target_lang not supported (disabling): #{target_lang.inspect}")
             return
           end
 
-          style_hint = cfg.fetch(:style_hint, nil)
-          style_hint = style_hint.to_s.strip
-          style_hint = nil if style_hint.empty?
-          special_tags =
-            Array(cfg.fetch(:special_tags, nil))
-              .map { |item| item.to_s.strip }
-              .reject(&:empty?)
-              .uniq
-
-          policy_text_builder = cfg.fetch(:policy_text_builder, nil)
-          policy_text_builder ||= option(:policy_text_builder)
+          style_hint = cfg.style_hint
+          special_tags = cfg.special_tags
+          policy_text_builder = cfg.policy_text_builder || option(:policy_text_builder)
 
           policy_text =
             build_policy_text(
-              ctx,
               target_lang,
               style_hint: style_hint,
               special_tags: special_tags,
@@ -108,24 +71,7 @@ module TavernKit
           insert_policy_block!(ctx, target_lang, policy_text)
         end
 
-        def language_policy_config(ctx)
-          runtime = ctx.runtime
-          raw = runtime&.[](:language_policy)
-          return nil if raw.nil?
-
-          raise ArgumentError, "runtime[:language_policy] must be a Hash" unless raw.is_a?(Hash)
-
-          raw
-        end
-
-        def canonicalize_target_lang(raw)
-          s = raw.to_s.strip.tr("_", "-")
-          return "" if s.empty?
-
-          CANONICAL_TARGET_LANGS.fetch(s.downcase, s)
-        end
-
-        def build_policy_text(ctx, target_lang, style_hint:, special_tags:, policy_text_builder:)
+        def build_policy_text(target_lang, style_hint:, special_tags:, policy_text_builder:)
           builder = policy_text_builder || DEFAULT_POLICY_TEXT_BUILDER
           raise ArgumentError, "language_policy.policy_text_builder must respond to #call" unless builder.respond_to?(:call)
 
@@ -176,25 +122,9 @@ module TavernKit
           plan = ctx.plan
           return unless plan
 
-          ctx.plan =
-            TavernKit::Prompt::Plan.new(
-              blocks: ctx.blocks,
-              outlets: plan.outlets,
-              lore_result: plan.lore_result,
-              trim_report: plan.trim_report,
-              greeting: plan.greeting,
-              greeting_index: plan.greeting_index,
-              warnings: ctx.warnings,
-              trace: plan.trace,
-              llm_options: plan.llm_options,
-            )
+          ctx.plan = plan.with_blocks(ctx.blocks).with(warnings: ctx.warnings)
         end
       end
     end
   end
-end
-
-TavernKit.on_load(:vibe_tavern, id: :"vibe_tavern.language_policy.lang_spans") do |infra|
-  registry = infra.output_tags_registry
-  registry.register_sanitizer(:lang_spans, TavernKit::VibeTavern::OutputTags::Sanitizers::LangSpans)
 end

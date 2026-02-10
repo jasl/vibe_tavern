@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "text_masker"
-
 module TavernKit
   module VibeTavern
     # Post-process assistant text by stripping/renaming XML-ish control tags.
@@ -9,7 +7,11 @@ module TavernKit
     # This is intended for tags that help prompt generation (e.g. `<lang ...>`)
     # but should not be shown to end users as-is.
     #
-    # Configuration (runtime[:output_tags]) is programmer-owned and strict:
+    # Configuration is programmer-owned and strict. Runtime input is parsed via
+    # `OutputTags::Config.from_runtime(runtime)`, then consumers call
+    # `OutputTags.transform(text, config: config)`.
+    #
+    # Runtime shape:
     #
     # ```ruby
     # runtime[:output_tags] = {
@@ -30,7 +32,7 @@ module TavernKit
     #
     # External text is treated as tolerant input; sanitizer implementations
     # should be best-effort and must not modify verbatim zones (handled by
-    # TextMasker).
+    # TavernKit::Text::VerbatimMasker).
     module OutputTags
       DEFAULT_ESCAPE_HATCH = { enabled: true, mode: :html_entity }.freeze
 
@@ -90,34 +92,128 @@ module TavernKit
           private :normalize_attrs
         end
 
+      Config =
+        Data.define(
+          :enabled,
+          :escape_hatch,
+          :rules,
+          :sanitizers,
+          :warn,
+          :warner,
+        ) do
+          class << self
+            def disabled
+              new(
+                enabled: false,
+                escape_hatch: DEFAULT_ESCAPE_HATCH,
+                rules: [],
+                sanitizers: {},
+                warn: false,
+                warner: nil,
+              )
+            end
+
+            def from_runtime(runtime)
+              raw = runtime&.[](:output_tags)
+              return disabled if raw.nil?
+
+              raise ArgumentError, "runtime[:output_tags] must be a Hash" unless raw.is_a?(Hash)
+              assert_symbol_keys!(raw, path: "output_tags")
+
+              enabled = TavernKit::Coerce.bool(raw.fetch(:enabled, false), default: false)
+              escape_hatch = parse_escape_hatch(raw.fetch(:escape_hatch, DEFAULT_ESCAPE_HATCH))
+              rules = parse_rules(raw.fetch(:rules, []))
+              sanitizers = parse_sanitizers(raw.fetch(:sanitizers, {}))
+              warn_to_stderr = TavernKit::Coerce.bool(raw.fetch(:warn, false), default: false)
+
+              warner = raw.fetch(:warner, nil)
+              raise ArgumentError, "output_tags.warner must respond to #call" unless warner.nil? || warner.respond_to?(:call)
+
+              new(
+                enabled: enabled,
+                escape_hatch: escape_hatch,
+                rules: rules,
+                sanitizers: sanitizers,
+                warn: warn_to_stderr,
+                warner: warner,
+              )
+            end
+
+            private
+
+            def parse_escape_hatch(raw)
+              raise ArgumentError, "output_tags.escape_hatch must be a Hash" unless raw.is_a?(Hash)
+              assert_symbol_keys!(raw, path: "output_tags.escape_hatch")
+
+              enabled = TavernKit::Coerce.bool(raw.fetch(:enabled, false), default: false)
+              mode = raw.fetch(:mode, :html_entity)
+              raise ArgumentError, "output_tags.escape_hatch.mode must be a Symbol" unless mode.is_a?(Symbol)
+
+              unless TavernKit::Text::VerbatimMasker::ESCAPE_MODES.include?(mode)
+                raise ArgumentError, "output_tags.escape_hatch.mode not supported: #{mode.inspect}"
+              end
+
+              { enabled: enabled, mode: mode }
+            end
+
+            def parse_rules(raw)
+              raise ArgumentError, "output_tags.rules must be an Array" unless raw.is_a?(Array)
+
+              raw.map do |item|
+                raise ArgumentError, "output_tags.rules entries must be Hash" unless item.is_a?(Hash)
+
+                assert_symbol_keys!(item, path: "output_tags.rules[]")
+                TavernKit::VibeTavern::OutputTags::Rule.new(
+                  tag: item.fetch(:tag),
+                  action: item.fetch(:action),
+                  to: item.fetch(:to, nil),
+                  attrs: item.fetch(:attrs, nil),
+                )
+              end
+            end
+
+            def parse_sanitizers(raw)
+              raise ArgumentError, "output_tags.sanitizers must be a Hash" unless raw.is_a?(Hash)
+              assert_symbol_keys!(raw, path: "output_tags.sanitizers")
+
+              raw.each_with_object({}) do |(name, cfg), out|
+                raise ArgumentError, "sanitizer name must be a Symbol" unless name.is_a?(Symbol)
+                raise ArgumentError, "sanitizer #{name} config must be a Hash" unless cfg.is_a?(Hash)
+
+                assert_symbol_keys!(cfg, path: "output_tags.sanitizers.#{name}")
+                enabled = TavernKit::Coerce.bool(cfg.fetch(:enabled, false), default: false)
+
+                out[name] = cfg.merge(enabled: enabled)
+              end
+            end
+
+            def assert_symbol_keys!(hash, path:)
+              hash.each_key do |key|
+                unless key.is_a?(Symbol)
+                  raise ArgumentError, "#{path} keys must be Symbols (got #{key.class})"
+                end
+              end
+            end
+          end
+        end
+
       module_function
 
       def registry
         @registry ||= Registry.new
       end
 
-      def enabled?(runtime)
-        cfg = config(runtime)
-        return false unless cfg
-
-        TavernKit::Coerce.bool(cfg.fetch(:enabled), default: false)
+      def enabled?(config)
+        normalize_config(config).enabled
       end
 
-      def transform(text, runtime:)
-        cfg = config(runtime)
-        return text.to_s unless cfg
+      def transform(text, config:)
+        cfg = normalize_config(config)
+        return text.to_s unless cfg.enabled
 
-        enabled = TavernKit::Coerce.bool(cfg.fetch(:enabled), default: false)
-        return text.to_s unless enabled
-
-        escape_hatch = escape_hatch_config(cfg.fetch(:escape_hatch, DEFAULT_ESCAPE_HATCH))
-        rules = rules_config(cfg.fetch(:rules, []))
-        sanitizers = sanitizers_config(cfg.fetch(:sanitizers, {}))
-
-        warn_to_stderr = TavernKit::Coerce.bool(cfg.fetch(:warn, false), default: false)
-
-        warner = cfg.fetch(:warner, nil)
-        raise ArgumentError, "output_tags.warner must respond to #call" unless warner.nil? || warner.respond_to?(:call)
+        escape_hatch = cfg.escape_hatch
+        rules = cfg.rules
+        sanitizers = cfg.sanitizers
 
         has_escape = escape_hatch[:enabled] == true && text.to_s.include?("\\<")
         has_sanitizers = sanitizers.any? { |_name, scfg| scfg.fetch(:enabled) == true }
@@ -125,7 +221,7 @@ module TavernKit
         return text.to_s if rules.empty? && !has_sanitizers && !has_escape
 
         masked_text, placeholders =
-          TavernKit::VibeTavern::TextMasker.mask(
+          TavernKit::Text::VerbatimMasker.mask(
             text.to_s,
             escape_hatch: escape_hatch,
           )
@@ -145,70 +241,20 @@ module TavernKit
         end
 
         transformed = rules.empty? ? sanitized_text : apply_rules(sanitized_text, rules)
-        restored = TavernKit::VibeTavern::TextMasker.unmask(transformed, placeholders)
+        restored = TavernKit::Text::VerbatimMasker.unmask(transformed, placeholders)
 
-        emit_warnings(warnings, warn_to_stderr: warn_to_stderr, warner: warner) if warnings.any?
+        emit_warnings(warnings, warn_to_stderr: cfg.warn, warner: cfg.warner) if warnings.any?
 
         restored
       end
 
-      def config(runtime)
-        return nil unless runtime
-        raise ArgumentError, "runtime must respond to #[]" unless runtime.respond_to?(:[])
+      def normalize_config(config)
+        return Config.disabled if config.nil?
+        return config if config.is_a?(Config)
 
-        cfg = runtime[:output_tags]
-        return nil if cfg.nil?
-
-        raise ArgumentError, "runtime[:output_tags] must be a Hash" unless cfg.is_a?(Hash)
-
-        cfg
+        raise ArgumentError, "output_tags config must be an OutputTags::Config"
       end
-      private_class_method :config
-
-      def escape_hatch_config(raw)
-        raise ArgumentError, "output_tags.escape_hatch must be a Hash" unless raw.is_a?(Hash)
-
-        enabled = TavernKit::Coerce.bool(raw.fetch(:enabled), default: false)
-
-        mode = raw.fetch(:mode)
-        raise ArgumentError, "output_tags.escape_hatch.mode must be a Symbol" unless mode.is_a?(Symbol)
-        unless TavernKit::VibeTavern::TextMasker::ESCAPE_MODES.include?(mode)
-          raise ArgumentError, "output_tags.escape_hatch.mode not supported: #{mode.inspect}"
-        end
-
-        { enabled: enabled, mode: mode }
-      end
-      private_class_method :escape_hatch_config
-
-      def rules_config(raw)
-        raise ArgumentError, "output_tags.rules must be an Array" unless raw.is_a?(Array)
-
-        raw.map do |item|
-          raise ArgumentError, "output_tags.rules entries must be Hash" unless item.is_a?(Hash)
-
-          Rule.new(
-            tag: item.fetch(:tag),
-            action: item.fetch(:action),
-            to: item.fetch(:to, nil),
-            attrs: item.fetch(:attrs, nil),
-          )
-        end
-      end
-      private_class_method :rules_config
-
-      def sanitizers_config(raw)
-        raise ArgumentError, "output_tags.sanitizers must be a Hash" unless raw.is_a?(Hash)
-
-        raw.each_with_object({}) do |(k, v), out|
-          raise ArgumentError, "sanitizer name must be a Symbol" unless k.is_a?(Symbol)
-          raise ArgumentError, "sanitizer #{k} config must be a Hash" unless v.is_a?(Hash)
-
-          enabled = TavernKit::Coerce.bool(v.fetch(:enabled), default: false)
-
-          out[k] = v.merge(enabled: enabled)
-        end
-      end
-      private_class_method :sanitizers_config
+      private_class_method :normalize_config
 
       def emit_warnings(warnings, warn_to_stderr:, warner:)
         Array(warnings).each do |w|

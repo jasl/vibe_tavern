@@ -3,6 +3,7 @@
 require_relative "middleware/prepare"
 require_relative "middleware/plan_assembly"
 require_relative "middleware/language_policy"
+require_relative "output_tags/registration"
 require_relative "infrastructure"
 
 module TavernKit

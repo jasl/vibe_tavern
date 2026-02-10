@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../text_masker"
 
 module TavernKit
   module VibeTavern
@@ -27,7 +26,7 @@ module TavernKit
           REGISTRY[canonical] = transform
         end
 
-        def apply!(assistant_message, transforms, strict: false, runtime: nil)
+        def apply!(assistant_message, transforms, strict: false, output_tags_config: nil)
           return unless assistant_message.is_a?(Hash)
 
           Array(transforms).each do |name|
@@ -36,7 +35,7 @@ module TavernKit
 
             transform = REGISTRY[canonical]
             if transform
-              call_transform(transform, assistant_message, runtime)
+              call_transform(transform, assistant_message, output_tags_config)
             elsif strict
               raise ArgumentError, "Unknown response transform: #{name}"
             end
@@ -48,19 +47,19 @@ module TavernKit
         end
         private_class_method :canonical_name
 
-        def call_transform(transform, assistant_message, runtime)
-          return transform.call(assistant_message) if runtime.nil?
+        def call_transform(transform, assistant_message, output_tags_config)
+          return transform.call(assistant_message) if output_tags_config.nil?
 
           params = transform.respond_to?(:parameters) ? transform.parameters : []
-          accepts_keywords =
-            params.any? do |type, _name|
-              %i[key keyreq keyrest].include?(type)
+          accepts_output_tags_keyword =
+            params.any? do |type, name|
+              type == :keyrest || (%i[key keyreq].include?(type) && name == :output_tags_config)
             end
 
-          if accepts_keywords
-            transform.call(assistant_message, runtime: runtime)
+          if accepts_output_tags_keyword
+            transform.call(assistant_message, output_tags_config: output_tags_config)
           elsif transform.arity == 2
-            transform.call(assistant_message, runtime)
+            transform.call(assistant_message, output_tags_config)
           else
             transform.call(assistant_message)
           end
@@ -185,7 +184,7 @@ extract_tool_call_from_tag_payload =
 
 TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
   "assistant_content_tool_call_tags_to_tool_calls",
-  lambda do |msg, runtime: nil|
+  lambda do |msg, output_tags_config: nil|
     tool_calls = msg.fetch("tool_calls", nil)
     return if tool_calls.is_a?(Array) && tool_calls.any?
     return if tool_calls.is_a?(Hash) && tool_calls.any?
@@ -194,24 +193,17 @@ TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
     return unless content.is_a?(String)
     return unless content.include?("<tool_call>")
 
-    escape_hatch_cfg = nil
-    if runtime && runtime.respond_to?(:[])
-      output_tags_cfg = runtime[:output_tags]
-      if output_tags_cfg
-        raise ArgumentError, "runtime[:output_tags] must be a Hash" unless output_tags_cfg.is_a?(Hash)
-        escape_hatch_cfg = output_tags_cfg.fetch(:escape_hatch, nil)
-      end
-    end
+    escape_hatch_cfg = output_tags_config&.escape_hatch
 
     masked, placeholders =
-      TavernKit::VibeTavern::TextMasker.mask(
+      TavernKit::Text::VerbatimMasker.mask(
         content,
         escape_hatch: escape_hatch_cfg,
       )
 
     tagged = masked.scan(/<tool_call>(.*?)<\/tool_call>/m).flatten
     if tagged.empty?
-      msg["content"] = TavernKit::VibeTavern::TextMasker.unmask(masked, placeholders)
+      msg["content"] = TavernKit::Text::VerbatimMasker.unmask(masked, placeholders)
       return
     end
 
@@ -220,13 +212,13 @@ TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
         extract_tool_call_from_tag_payload.call(payload, idx + 1)
       end
     if parsed.empty?
-      msg["content"] = TavernKit::VibeTavern::TextMasker.unmask(masked, placeholders)
+      msg["content"] = TavernKit::Text::VerbatimMasker.unmask(masked, placeholders)
       return
     end
 
     msg["tool_calls"] = parsed
 
     cleaned_masked = masked.gsub(/<tool_call>.*?<\/tool_call>/m, "").strip
-    msg["content"] = TavernKit::VibeTavern::TextMasker.unmask(cleaned_masked, placeholders)
+    msg["content"] = TavernKit::Text::VerbatimMasker.unmask(cleaned_masked, placeholders)
   end,
 )

@@ -206,6 +206,13 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "inserts a language policy system block after post_history_instructions and before the user message when enabled" do
+    runtime = { language_policy: { enabled: true, target_lang: "zh-cn" } }
+    pipeline = TavernKit::VibeTavern::Pipeline.dup
+    pipeline.configure(
+      :language_policy,
+      config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
+    )
+
     character = TavernKit::Character.create(name: "Seraphina", post_history_instructions: "PHI")
 
     history = [
@@ -214,10 +221,10 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     ]
 
     plan =
-      TavernKit::VibeTavern.build do
+      TavernKit::Prompt::DSL.build(pipeline: pipeline) do
         character character
         meta :system_template, nil
-        runtime({ language_policy: { enabled: true, target_lang: "zh-cn" } })
+        runtime runtime
 
         history history
         message "Continue."
@@ -243,10 +250,17 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "canonicalizes base language tags (ja -> ja-JP) for target_lang allowlist checks" do
+    runtime = { language_policy: { enabled: true, target_lang: "ja" } }
+    pipeline = TavernKit::VibeTavern::Pipeline.dup
+    pipeline.configure(
+      :language_policy,
+      config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
+    )
+
     plan =
-      TavernKit::VibeTavern.build do
+      TavernKit::Prompt::DSL.build(pipeline: pipeline) do
         meta :system_template, nil
-        runtime({ language_policy: { enabled: true, target_lang: "ja" } })
+        runtime runtime
         message "Hello."
       end
 
@@ -257,9 +271,11 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "allows overriding the language policy text builder via pipeline middleware options" do
+    runtime = { language_policy: { enabled: true, target_lang: "zh-CN", style_hint: "casual" } }
     pipeline = TavernKit::VibeTavern::Pipeline.dup
     pipeline.configure(
       :language_policy,
+      config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
       policy_text_builder: lambda do |target_lang, style_hint:, special_tags:|
         "Custom LP: #{target_lang} (style=#{style_hint.inspect}, tags=#{special_tags.join(",")})"
       end,
@@ -268,7 +284,7 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
     plan =
       TavernKit::Prompt::DSL.build(pipeline: pipeline) do
         meta :system_template, nil
-        runtime({ language_policy: { enabled: true, target_lang: "zh-CN", style_hint: "casual" } })
+        runtime runtime
         message "Hello."
       end
 
@@ -279,10 +295,17 @@ class VibeTavernPipelineTest < ActiveSupport::TestCase
   end
 
   test "does not insert a language policy block when disabled" do
+    runtime = { language_policy: { enabled: false, target_lang: "zh-CN" } }
+    pipeline = TavernKit::VibeTavern::Pipeline.dup
+    pipeline.configure(
+      :language_policy,
+      config: TavernKit::VibeTavern::LanguagePolicy::Config.from_runtime(runtime),
+    )
+
     plan =
-      TavernKit::VibeTavern.build do
+      TavernKit::Prompt::DSL.build(pipeline: pipeline) do
         meta :system_template, nil
-        runtime({ language_policy: { enabled: false, target_lang: "zh-CN" } })
+        runtime runtime
         message "Hello."
       end
 
