@@ -270,4 +270,3 @@ Media:
 - Which Google surface do we want as the long-term default:
   - `generativelanguage.googleapis.com` (API key) vs Vertex AI (OAuth)?
 - Do we need embeddings/rerank parity now, or only chat + tools + directives?
-

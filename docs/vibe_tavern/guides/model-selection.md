@@ -28,6 +28,31 @@ Reports are written under:
 - Directives: `tmp/llm_directives_eval_reports/<timestamp>/`
 - Language policy: `tmp/llm_language_policy_eval_reports/<timestamp>/`
 
+## Production sampling defaults (eval harness)
+
+The eval scripts support **sampling profiles** (a small catalog of per-model
+sampling params) via:
+
+- `script/openrouter_sampling_profiles.rb`
+
+In `strategy=production`, the eval harness will **auto-select** the first
+`recommended` sampling profile that matches the model **when you only requested**
+the `default` profile. This makes the production strategy closer to how we’d run
+models in an app (tuned defaults instead of provider defaults).
+
+Controls:
+
+- `OPENROUTER_PRODUCTION_AUTO_SAMPLING_PROFILE` (default: `1`)
+  - set to `0` to disable auto-selection
+- If you want a strict matrix run (no auto overrides), request >1 profiles:
+  `OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling"`
+
+Note: on OpenRouter, some model+sampling-param sets can cause structured-mode
+HTTP 404 (“no endpoints found that can handle the requested parameters”), which
+may push directives into `prompt_only` via fallback. See:
+
+- `docs/vibe_tavern/case_studies/directives.md`
+
 ## Current “stable” set (what `OPENROUTER_MODEL_FILTER=stable` means)
 
 The eval scripts currently treat these as “stable” (as of 2026-02-09):
