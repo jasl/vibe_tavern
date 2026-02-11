@@ -164,6 +164,23 @@ class PromptRunnerTest < Minitest::Test
     end
   end
 
+  def test_prompt_runner_rejects_dialects_that_do_not_return_openai_messages
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
+    runner_config = build_runner_config
+
+    error =
+      assert_raises(ArgumentError) do
+        runner.build_request(
+          runner_config: runner_config,
+          history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+          dialect: :anthropic,
+        )
+      end
+
+    assert_includes error.message, "messages Array"
+    assert_includes error.message, "dialect"
+  end
+
   def test_prompt_runner_does_not_send_parallel_tool_calls_when_capability_is_disabled
     runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
     runner_config =

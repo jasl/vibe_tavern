@@ -100,6 +100,12 @@ Responsibilities:
 - send one OpenAI-compatible request via `SimpleInference`
 - (optional) stream chat-only responses via `PromptRunner#perform_stream`
 
+Dialect note:
+- `PromptRunner` builds OpenAI-compatible ChatCompletions requests (`model` + `messages` Array).
+- Use `dialect: :openai` (or another dialect that returns an OpenAI-style messages Array).
+- Dialects that produce non-OpenAI payloads (e.g. `:anthropic`, `:google`) are not supported here yet.
+  See `docs/todo/vibe_tavern/native-anthropic-google-and-media-apis.md`.
+
 Streaming policy (production default):
 - Tool calling turns are **non-streaming** (mutually exclusive in code).
 - Streaming is intended for:

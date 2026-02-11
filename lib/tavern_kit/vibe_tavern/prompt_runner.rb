@@ -97,6 +97,11 @@ module TavernKit
           end
 
         messages = plan.to_messages(dialect: dialect)
+        unless messages.is_a?(Array) && messages.all? { |msg| msg.is_a?(Hash) }
+          raise ArgumentError,
+                "PromptRunner requires an OpenAI-compatible messages Array (dialect: :openai). " \
+                  "Got #{messages.class} from dialect #{dialect.inspect}."
+        end
         options = (plan.llm_options || {}).dup
         TavernKit::VibeTavern::RequestPolicy.normalize_options!(options, capabilities: runner_config.capabilities)
         request = { model: runner_config.model, messages: messages }.merge(options)
