@@ -5,7 +5,9 @@ module TavernKit
     module PromptBuilder
       module Steps
       # Expand {{macro}} syntax in block content via ST Macro engine.
-      class MacroExpansion < TavernKit::PromptBuilder::Step
+      module MacroExpansion
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

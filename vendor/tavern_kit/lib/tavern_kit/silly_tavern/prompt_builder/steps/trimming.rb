@@ -5,7 +5,9 @@ module TavernKit
     module PromptBuilder
       module Steps
       # ST token budget enforcement (delegates to Core Trimmer).
-      class Trimming < TavernKit::PromptBuilder::Step
+      module Trimming
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

@@ -5,7 +5,9 @@ module TavernKit
     module PromptBuilder
       module Steps
       # Assemble prompt blocks from template + groups.
-      class TemplateAssembly < TavernKit::PromptBuilder::Step
+      module TemplateAssembly
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

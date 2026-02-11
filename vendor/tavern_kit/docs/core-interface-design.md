@@ -58,20 +58,26 @@ To keep the builder API strict and predictable:
 - Step config ownership is local to each step:
   - define `Step::Config`
   - implement `Step::Config.from_hash`
-  - step consumes the typed config argument (`StepClass.before(state, config)`)
+  - step consumes the typed config argument (`Step.before(state, config)`)
 - `Pipeline` resolves step config from:
   - static step defaults (`use_step ...`)
   - deep-merged `context.module_configs[step_name]` overrides
   - typed parsing via step-local config class/builder
 
 Step execution contract:
+- steps are modules that `extend TavernKit::PromptBuilder::Step`
 - steps are not instantiated
-- `Pipeline` calls step class hooks (`StepClass.before/after`) with the typed
+- `Pipeline` calls step hooks (`Step.before/after`) with the typed
   config object
-  - this prevents per-run state from leaking into step instance variables
+  - this prevents per-run state from leaking into step module state
 
 Unknown step names in `context.module_configs` are ignored; known step config
 shape errors are fail-fast.
+
+Notes:
+- Steps should not store per-run state in module instance variables.
+- `Pipeline` reuses each step's `default_config` across builds; configs should be
+  treated as immutable (avoid mutating nested arrays/hashes inside config).
 
 ---
 
@@ -1035,30 +1041,13 @@ end
 
 #### 11d. Pipeline Error Wrapping
 
-Step exceptions should always be wrapped to include step context:
+Step exceptions are wrapped by `Pipeline` to include step context:
 
 ```ruby
-# Rack-style step chain: wrap errors at the step boundary.
-class TavernKit::PromptBuilder::Step
-  def call(ctx)
-    step = self.class.step_name
-    ctx.instance_variable_set(:@current_step, step)
-
-    ctx.instrument(:step_start, name: step)
-
-    before(ctx)
-    @app.call(ctx)
-    after(ctx)
-
-    ctx.instrument(:step_finish, name: step, stats: {})
-    ctx
-  rescue StandardError => e
-    ctx.instrument(:step_error, name: step, error: e)
-    raise TavernKit::PipelineError.new(e.message, step: step), cause: e
-  ensure
-    ctx.instance_variable_set(:@current_step, nil)
-  end
-end
+# In Pipeline#call
+# - emits :step_start / :step_finish
+# - emits :step_error for failures
+# - raises TavernKit::PipelineError(step: ...) with the original error as cause
 ```
 
 ---

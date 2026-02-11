@@ -15,7 +15,9 @@ module TavernKit
         # - history passthrough
         # - optional post-history instructions
         # - user message
-        class PlanAssembly < TavernKit::PromptBuilder::Step
+        module PlanAssembly
+          extend TavernKit::PromptBuilder::Step
+
           Config =
             Data.define(:default_system_text_builder) do
               def self.from_hash(raw)
@@ -93,126 +95,126 @@ module TavernKit
             private
 
             def build_blocks(ctx, config)
-            blocks = []
+              blocks = []
 
-            system_block = build_system_block(ctx, config)
-            blocks << system_block if system_block
+              system_block = build_system_block(ctx, config)
+              blocks << system_block if system_block
 
-            history = TavernKit::ChatHistory.wrap(ctx.history)
-            history.each do |message|
-              blocks << TavernKit::PromptBuilder::Block.new(
-                role: message.role,
-                content: message.content.to_s,
-                name: message.name,
-                attachments: message.attachments,
-                message_metadata: message.metadata,
-                slot: :history,
-                token_budget_group: :history,
-                metadata: { source: :history },
-              )
-            end
+              history = TavernKit::ChatHistory.wrap(ctx.history)
+              history.each do |message|
+                blocks << TavernKit::PromptBuilder::Block.new(
+                  role: message.role,
+                  content: message.content.to_s,
+                  name: message.name,
+                  attachments: message.attachments,
+                  message_metadata: message.metadata,
+                  slot: :history,
+                  token_budget_group: :history,
+                  metadata: { source: :history },
+                )
+              end
 
-            post_history_block = build_post_history_block(ctx)
-            blocks << post_history_block if post_history_block
+              post_history_block = build_post_history_block(ctx)
+              blocks << post_history_block if post_history_block
 
-            user_text = ctx.user_message.to_s
-            unless user_text.strip.empty?
-              blocks << TavernKit::PromptBuilder::Block.new(
-                role: :user,
-                content: user_text,
-                slot: :user_message,
-                token_budget_group: :history,
-                metadata: { source: :user_message },
-              )
-            end
+              user_text = ctx.user_message.to_s
+              unless user_text.strip.empty?
+                blocks << TavernKit::PromptBuilder::Block.new(
+                  role: :user,
+                  content: user_text,
+                  slot: :user_message,
+                  token_budget_group: :history,
+                  metadata: { source: :user_message },
+                )
+              end
 
-            blocks
+              blocks
             end
 
             def build_system_block(ctx, config)
-            # Explicit override (including nil/blank) wins.
-            if ctx.key?(:system_template)
-              return nil if ctx[:system_template].to_s.strip.empty?
+              # Explicit override (including nil/blank) wins.
+              if ctx.key?(:system_template)
+                return nil if ctx[:system_template].to_s.strip.empty?
 
-              return build_template_block(ctx, ctx[:system_template], source: :system_template, slot: :system)
+                return build_template_block(ctx, ctx[:system_template], source: :system_template, slot: :system)
+              end
+
+              build_default_system_block(ctx, config)
             end
-
-            build_default_system_block(ctx, config)
-          end
 
             def build_post_history_block(ctx)
-            if ctx.key?(:post_history_template)
-              return nil if ctx[:post_history_template].to_s.strip.empty?
+              if ctx.key?(:post_history_template)
+                return nil if ctx[:post_history_template].to_s.strip.empty?
 
-              return build_template_block(
-                ctx,
-                ctx[:post_history_template],
-                source: :post_history_template,
+                return build_template_block(
+                  ctx,
+                  ctx[:post_history_template],
+                  source: :post_history_template,
+                  slot: :post_history_instructions,
+                )
+              end
+
+              text = ctx.character&.data&.post_history_instructions.to_s
+              text = TavernKit::Utils.presence(text)
+              return nil unless text
+
+              TavernKit::PromptBuilder::Block.new(
+                role: :system,
+                content: text,
                 slot: :post_history_instructions,
+                token_budget_group: :system,
+                metadata: { source: :post_history_instructions },
               )
             end
 
-            text = ctx.character&.data&.post_history_instructions.to_s
-            text = TavernKit::Utils.presence(text)
-            return nil unless text
-
-            TavernKit::PromptBuilder::Block.new(
-              role: :system,
-              content: text,
-              slot: :post_history_instructions,
-              token_budget_group: :system,
-              metadata: { source: :post_history_instructions },
-            )
-          end
-
             def build_template_block(ctx, template, source:, slot:)
-            rendered =
-              TavernKit::VibeTavern::LiquidMacros.render_for(
-                ctx,
-                template.to_s,
-                strict: ctx.strict?,
-                on_error: :passthrough,
+              rendered =
+                TavernKit::VibeTavern::LiquidMacros.render_for(
+                  ctx,
+                  template.to_s,
+                  strict: ctx.strict?,
+                  on_error: :passthrough,
+                )
+
+              text = TavernKit::Utils.presence(rendered)
+              return nil unless text
+
+              TavernKit::PromptBuilder::Block.new(
+                role: :system,
+                content: text,
+                slot: slot,
+                token_budget_group: :system,
+                metadata: { source: source },
               )
-
-            text = TavernKit::Utils.presence(rendered)
-            return nil unless text
-
-            TavernKit::PromptBuilder::Block.new(
-              role: :system,
-              content: text,
-              slot: slot,
-              token_budget_group: :system,
-              metadata: { source: source },
-            )
-          end
+            end
 
             def build_default_system_block(ctx, config)
-            char = ctx.character
-            user = ctx.user
+              char = ctx.character
+              user = ctx.user
 
-            return nil unless char || user
+              return nil unless char || user
 
-            text = build_default_system_text(ctx, default_system_text_builder: config.default_system_text_builder)
-            return nil unless text
+              text = build_default_system_text(ctx, default_system_text_builder: config.default_system_text_builder)
+              return nil unless text
 
-            TavernKit::PromptBuilder::Block.new(
-              role: :system,
-              content: text,
-              slot: :system,
-              token_budget_group: :system,
-              metadata: { source: :default_system },
-            )
-          end
+              TavernKit::PromptBuilder::Block.new(
+                role: :system,
+                content: text,
+                slot: :system,
+                token_budget_group: :system,
+                metadata: { source: :default_system },
+              )
+            end
 
             def build_default_system_text(ctx, default_system_text_builder:)
-            builder = default_system_text_builder || DEFAULT_SYSTEM_TEXT_BUILDER
+              builder = default_system_text_builder || DEFAULT_SYSTEM_TEXT_BUILDER
 
-            text = builder.call(ctx).to_s
-            TavernKit::Utils.presence(text)
-          rescue StandardError => e
-            ctx.warn("plan_assembly.default_system_text_builder error (using default): #{e.class}: #{e.message}")
-            text = DEFAULT_SYSTEM_TEXT_BUILDER.call(ctx).to_s
-            TavernKit::Utils.presence(text)
+              text = builder.call(ctx).to_s
+              TavernKit::Utils.presence(text)
+            rescue StandardError => e
+              ctx.warn("plan_assembly.default_system_text_builder error (using default): #{e.class}: #{e.message}")
+              text = DEFAULT_SYSTEM_TEXT_BUILDER.call(ctx).to_s
+              TavernKit::Utils.presence(text)
             end
           end
         end

@@ -5,7 +5,9 @@ module TavernKit
     module PromptBuilder
       module Steps
       # Final step: build a PromptBuilder::Plan from accumulated blocks.
-      class PlanAssembly < TavernKit::PromptBuilder::Step
+      module PlanAssembly
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

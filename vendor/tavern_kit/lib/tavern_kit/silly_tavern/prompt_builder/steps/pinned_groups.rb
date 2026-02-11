@@ -5,7 +5,9 @@ module TavernKit
     module PromptBuilder
       module Steps
       # Resolve ST pinned prompt groups into block arrays.
-      class PinnedGroups < TavernKit::PromptBuilder::Step
+      module PinnedGroups
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

@@ -15,7 +15,9 @@ module TavernKit
         #
         # Configuration:
         # - typed `Steps::LanguagePolicy::Config` injected via step options
-        class LanguagePolicy < TavernKit::PromptBuilder::Step
+        module LanguagePolicy
+          extend TavernKit::PromptBuilder::Step
+
           Config =
             Data.define(
               :enabled,
@@ -110,57 +112,57 @@ module TavernKit
             private
 
             def build_policy_text(target_lang, style_hint:, special_tags:, policy_text_builder:)
-            builder = policy_text_builder || DEFAULT_POLICY_TEXT_BUILDER
-            raise ArgumentError, "language_policy.policy_text_builder must respond to #call" unless builder.respond_to?(:call)
+              builder = policy_text_builder || DEFAULT_POLICY_TEXT_BUILDER
+              raise ArgumentError, "language_policy.policy_text_builder must respond to #call" unless builder.respond_to?(:call)
 
-            builder.call(target_lang, style_hint: style_hint, special_tags: special_tags).to_s
+              builder.call(target_lang, style_hint: style_hint, special_tags: special_tags).to_s
             end
 
             def insert_policy_block!(ctx, target_lang, policy_text)
-            ctx.blocks = Array(ctx.blocks).dup
+              ctx.blocks = Array(ctx.blocks).dup
 
-            policy_block =
-              TavernKit::PromptBuilder::Block.new(
-                role: :system,
-                content: policy_text,
-                slot: :language_policy,
-                token_budget_group: :system,
-                metadata: { source: :language_policy, target_lang: target_lang },
-              )
+              policy_block =
+                TavernKit::PromptBuilder::Block.new(
+                  role: :system,
+                  content: policy_text,
+                  slot: :language_policy,
+                  token_budget_group: :system,
+                  metadata: { source: :language_policy, target_lang: target_lang },
+                )
 
-            insertion_index = resolve_insertion_index(ctx.blocks)
-            ctx.blocks.insert(insertion_index, policy_block)
+              insertion_index = resolve_insertion_index(ctx.blocks)
+              ctx.blocks.insert(insertion_index, policy_block)
 
-            rebuild_plan!(ctx)
+              rebuild_plan!(ctx)
 
-            ctx.instrument(:stat, step: ctx.current_step, key: :enabled, value: true)
+              ctx.instrument(:stat, step: ctx.current_step, key: :enabled, value: true)
             end
 
             def resolve_insertion_index(blocks)
-            user_index = blocks.find_index { |block| block.respond_to?(:slot) && block.slot == :user_message }
-            return user_index if user_index
+              user_index = blocks.find_index { |block| block.respond_to?(:slot) && block.slot == :user_message }
+              return user_index if user_index
 
-            # Prefer inserting just before the trailing "prompting" messages
-            # (user/tool) so the last message remains user/tool for chat semantics.
-            tail_start_index = blocks.length
-            while tail_start_index.positive?
-              block = blocks[tail_start_index - 1]
-              role = block.respond_to?(:role) ? block.role : nil
-              break unless role == :user || role == :tool
+              # Prefer inserting just before the trailing "prompting" messages
+              # (user/tool) so the last message remains user/tool for chat semantics.
+              tail_start_index = blocks.length
+              while tail_start_index.positive?
+                block = blocks[tail_start_index - 1]
+                role = block.respond_to?(:role) ? block.role : nil
+                break unless role == :user || role == :tool
 
-              tail_start_index -= 1
-            end
+                tail_start_index -= 1
+              end
 
-            return tail_start_index if tail_start_index < blocks.length
+              return tail_start_index if tail_start_index < blocks.length
 
-            blocks.length
+              blocks.length
             end
 
             def rebuild_plan!(ctx)
-            plan = ctx.plan
-            return unless plan
+              plan = ctx.plan
+              return unless plan
 
-            ctx.plan = plan.with_blocks(ctx.blocks).with(warnings: ctx.warnings)
+              ctx.plan = plan.with_blocks(ctx.blocks).with(warnings: ctx.warnings)
             end
           end
         end

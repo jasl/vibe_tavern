@@ -7,7 +7,9 @@ module TavernKit
       # ST World Info orchestration.
       #
       # Step contract is pinned in `docs/contracts/prompt-orchestration.md`.
-      class Lore < TavernKit::PromptBuilder::Step
+      module Lore
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

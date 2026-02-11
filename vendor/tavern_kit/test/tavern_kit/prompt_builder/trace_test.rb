@@ -3,7 +3,9 @@
 require "test_helper"
 
 class TavernKit::PromptBuilder::TraceTest < Minitest::Test
-  class WarnA < TavernKit::PromptBuilder::Step
+  module WarnA
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)
@@ -26,7 +28,9 @@ class TavernKit::PromptBuilder::TraceTest < Minitest::Test
     end
   end
 
-  class WarnB < TavernKit::PromptBuilder::Step
+  module WarnB
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)
@@ -48,7 +52,9 @@ class TavernKit::PromptBuilder::TraceTest < Minitest::Test
     end
   end
 
-  class Boom < TavernKit::PromptBuilder::Step
+  module Boom
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)

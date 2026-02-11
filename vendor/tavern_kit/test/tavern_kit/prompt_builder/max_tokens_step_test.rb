@@ -3,7 +3,9 @@
 require "test_helper"
 
 class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
-  class BuildPlanStep < TavernKit::PromptBuilder::Step
+  module BuildPlanStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)
@@ -27,7 +29,9 @@ class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
     end
   end
 
-  class BuildTwoMessagesPlanStep < TavernKit::PromptBuilder::Step
+  module BuildTwoMessagesPlanStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)
@@ -53,7 +57,9 @@ class TavernKit::PromptBuilder::MaxTokensStepTest < Minitest::Test
     end
   end
 
-  class BuildOneMessageWithMetadataPlanStep < TavernKit::PromptBuilder::Step
+  module BuildOneMessageWithMetadataPlanStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)

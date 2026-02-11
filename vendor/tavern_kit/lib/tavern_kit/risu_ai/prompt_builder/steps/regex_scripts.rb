@@ -8,7 +8,9 @@ module TavernKit
       #
       # This applies scripts in `ctx[:risuai_regex_scripts]` to every block's
       # content in `mode: :request` (tolerant; no-op when none are configured).
-      class RegexScripts < TavernKit::PromptBuilder::Step
+      module RegexScripts
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

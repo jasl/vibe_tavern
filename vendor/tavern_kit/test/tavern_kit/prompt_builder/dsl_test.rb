@@ -4,7 +4,9 @@ require "test_helper"
 
 class TavernKit::PromptBuilderTest < Minitest::Test
   # Simple step that creates a plan from state
-  class SimplePlanStep < TavernKit::PromptBuilder::Step
+  module SimplePlanStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)
@@ -30,7 +32,9 @@ class TavernKit::PromptBuilderTest < Minitest::Test
     end
   end
 
-  class DialectPlanStep < TavernKit::PromptBuilder::Step
+  module DialectPlanStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)

@@ -271,6 +271,8 @@ module TavernKit
           merged = TavernKit::Utils.deep_merge_hashes(entry.options, overrides)
           resolve_typed_config(entry.name, entry.config_class, merged)
         else
+          # NOTE: `default_config` is computed once at pipeline wiring time and is
+          # reused across builds. Step configs should be treated as immutable.
           entry.default_config
         end
       end
@@ -287,6 +289,7 @@ module TavernKit
       end
 
       def build_entry(step_class:, name:, options:)
+        assert_step_contract!(step_class)
         resolved_config_class = resolve_config_class(step_class)
         default_config = resolve_default_config(name, resolved_config_class, options)
 
@@ -310,6 +313,18 @@ module TavernKit
         end
 
         config_class
+      end
+
+      def assert_step_contract!(step_class)
+        if step_class.is_a?(Class)
+          raise ArgumentError, "#{step_class} must be a module (steps must not be instantiable)"
+        end
+
+        unless step_class.singleton_class.ancestors.include?(TavernKit::PromptBuilder::Step)
+          raise ArgumentError, "#{step_class} must extend TavernKit::PromptBuilder::Step"
+        end
+
+        nil
       end
 
       def resolve_default_config(name, config_class, options)

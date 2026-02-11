@@ -8,7 +8,9 @@ module TavernKit
       #
       # This calls an application-provided adapter and inserts the returned
       # blocks into the `:memory` slot for TemplateCards.
-      class Memory < TavernKit::PromptBuilder::Step
+      module Memory
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

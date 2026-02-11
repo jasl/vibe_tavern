@@ -9,7 +9,9 @@ module TavernKit
         # This step is intentionally minimal: it executes triggers against an
         # in-memory "chat" hash and stores the resulting scriptstate back into ctx
         # metadata for later macro expansion. UI/state parity remains app-owned.
-        class Triggers < TavernKit::PromptBuilder::Step
+        module Triggers
+          extend TavernKit::PromptBuilder::Step
+
           Config =
             Data.define do
               def self.from_hash(raw)

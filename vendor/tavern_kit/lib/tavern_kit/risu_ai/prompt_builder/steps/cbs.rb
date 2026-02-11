@@ -5,7 +5,9 @@ module TavernKit
     module PromptBuilder
       module Steps
       # Step: CBS macro expansion for all blocks.
-      class CBS < TavernKit::PromptBuilder::Step
+      module CBS
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

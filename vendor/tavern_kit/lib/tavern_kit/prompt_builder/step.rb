@@ -2,12 +2,19 @@
 
 module TavernKit
   class PromptBuilder
-    # Base class for all prompt-builder pipeline steps.
-    class Step
+    # Interface contract for all prompt-builder pipeline steps.
+    #
+    # Steps are modules that `extend Step` and implement:
+    # - `Config.from_hash`
+    # - `self.before(state, config)` / `self.after(state, config)` hooks
+    #
+    # Important: do not store per-run state in module instance variables.
+    # Keep per-run data in the provided `state` and `config` objects.
+    module Step
       # Name used when a step is registered without an explicit name.
       #
       # @return [Symbol]
-      def self.step_name
+      def step_name
         name.split("::").last
           .gsub(/Step$/, "")
           .gsub(/([a-z])([A-Z])/, '\1_\2')
@@ -15,18 +22,18 @@ module TavernKit
           .to_sym
       end
 
-      # Class-level hook: run before inner steps.
+      # Hook: run before inner steps.
       #
       # @param state [TavernKit::PromptBuilder::State]
-      # @param config [Object] typed step config (`StepClass::Config`)
-      def self.before(_state, _config)
+      # @param config [Object] typed step config (`StepModule::Config`)
+      def before(_state, _config)
       end
 
-      # Class-level hook: run after inner steps.
+      # Hook: run after inner steps.
       #
       # @param state [TavernKit::PromptBuilder::State]
-      # @param config [Object] typed step config (`StepClass::Config`)
-      def self.after(_state, _config)
+      # @param config [Object] typed step config (`StepModule::Config`)
+      def after(_state, _config)
       end
     end
   end

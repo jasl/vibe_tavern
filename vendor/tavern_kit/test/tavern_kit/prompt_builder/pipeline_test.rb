@@ -4,7 +4,9 @@ require "test_helper"
 
 class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
   # Test step that records calls
-  class RecordStep < TavernKit::PromptBuilder::Step
+  module RecordStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define(:label) do
         def self.from_hash(raw)
@@ -34,7 +36,9 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
     end
   end
 
-  class AlphaStep < TavernKit::PromptBuilder::Step
+  module AlphaStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)
@@ -57,7 +61,9 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
     end
   end
 
-  class BetaStep < TavernKit::PromptBuilder::Step
+  module BetaStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define do
         def self.from_hash(raw)
@@ -80,7 +86,9 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
     end
   end
 
-  class CaptureOptionsStep < TavernKit::PromptBuilder::Step
+  module CaptureOptionsStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define(:nested, :scalar, :list) do
         def self.from_hash(raw)
@@ -107,7 +115,9 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
     end
   end
 
-  class TypedConfigStep < TavernKit::PromptBuilder::Step
+  module TypedConfigStep
+    extend TavernKit::PromptBuilder::Step
+
     Config =
       Data.define(:label) do
         def self.from_hash(raw)
@@ -130,8 +140,10 @@ class TavernKit::PromptBuilder::PipelineTest < Minitest::Test
     end
   end
 
-  class NoInstantiateStep < TavernKit::PromptBuilder::Step
-    def initialize(*)
+  module NoInstantiateStep
+    extend TavernKit::PromptBuilder::Step
+
+    def self.new(*)
       raise "steps must not be instantiated"
     end
 

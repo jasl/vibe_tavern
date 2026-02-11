@@ -10,7 +10,9 @@ module TavernKit
         # - Build scan messages for lorebook activation
         # - Run RisuAI::Lore::Engine
         # - Build initial prompt sections and assemble blocks via TemplateCards
-        class Prepare < TavernKit::PromptBuilder::Step
+        module Prepare
+          extend TavernKit::PromptBuilder::Step
+
           Config =
             Data.define(:description_text_builder) do
               def self.from_hash(raw)

@@ -6,7 +6,7 @@ This document standardizes prompt-build observability for the new
 Scope:
 - `TavernKit::PromptBuilder`
 - `TavernKit::PromptBuilder::Pipeline`
-- `TavernKit::PromptBuilder::Step`
+- `TavernKit::PromptBuilder::Step` (step contract module)
 - `TavernKit::PromptBuilder::State`
 - `TavernKit::PromptBuilder::Instrumenter::*`
 
@@ -38,7 +38,10 @@ Scope:
 - Per-run overrides are supplied via `context.module_configs[step_name]`.
 - `Pipeline` deep-merges defaults + overrides and then resolves typed config
   via step-local parser (`Step::Config.from_hash` or step-specific builder).
-- Steps are not instantiated; `Pipeline` calls `StepClass.before/after(state, config)`.
+- Steps are modules that `extend TavernKit::PromptBuilder::Step` and are not instantiated.
+- `Pipeline` calls step hooks `Step.before/after(state, config)`.
+- `Pipeline` reuses each step's `default_config` across builds; configs should be
+  treated as immutable.
 - Unknown step keys in `context.module_configs` are ignored.
 - Known step config parse errors are treated as programmer errors (fail-fast).
 
@@ -89,5 +92,5 @@ Recommended inspection order:
 - Prefer `state.warn` (not `raise`) for expected external input failures.
 - Keep expensive instrumentation lazy via `state.instrument { ... }` blocks.
 - Emit local counters with `state.instrument(:stat, step: ..., key: ..., value: ...)`.
-- Do not store per-run state in instance variables (steps are class hooks).
+- Do not store per-run state in module instance variables (steps are module hooks).
 - Do not mix transport/protocol concerns into prompt-building steps.

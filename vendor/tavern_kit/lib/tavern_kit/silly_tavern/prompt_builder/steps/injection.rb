@@ -5,7 +5,9 @@ module TavernKit
     module PromptBuilder
       module Steps
       # ST injection step (extension prompts + Author's Note + persona).
-      class Injection < TavernKit::PromptBuilder::Step
+      module Injection
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define do
             def self.from_hash(raw)

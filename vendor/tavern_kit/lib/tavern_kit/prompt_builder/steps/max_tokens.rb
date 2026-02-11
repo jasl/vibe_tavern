@@ -7,7 +7,9 @@ require_relative "../step"
 module TavernKit
   class PromptBuilder
     module Steps
-      class MaxTokens < TavernKit::PromptBuilder::Step
+      module MaxTokens
+        extend TavernKit::PromptBuilder::Step
+
         Config =
           Data.define(
             :max_tokens,
@@ -99,94 +101,94 @@ module TavernKit
         class << self
           private
 
-        def exceeded_message(prompt_tokens, limit_tokens, max_tokens, reserve_tokens)
-          format(
-            "Prompt estimated tokens %d exceeded limit %d (max_tokens: %d, reserve_tokens: %d)",
-            prompt_tokens,
-            limit_tokens,
-            max_tokens,
-            reserve_tokens,
-          )
-        end
-
-        def estimate_prompt_tokens(state, config)
-          estimator = config.token_estimator || state.token_estimator || TavernKit::TokenEstimator.default
-          model_hint = resolve_value(config.model_hint.nil? ? state[:model_hint] : config.model_hint, state)
-          overhead_per_message = resolve_non_negative_int(config.message_overhead_tokens, state, allow_nil: true) || 0
-          include_metadata_tokens = resolve_value(config.include_message_metadata_tokens, state) == true
-
-          if estimator.respond_to?(:describe)
-            state.instrument(:stat, key: :token_estimator, step: state.current_step) do
-              { value: estimator.describe(model_hint: model_hint) }
-            end
+          def exceeded_message(prompt_tokens, limit_tokens, max_tokens, reserve_tokens)
+            format(
+              "Prompt estimated tokens %d exceeded limit %d (max_tokens: %d, reserve_tokens: %d)",
+              prompt_tokens,
+              limit_tokens,
+              max_tokens,
+              reserve_tokens,
+            )
           end
 
-          messages = if state.plan
-            state.plan.messages
-          elsif state.blocks
-            Array(state.blocks).select(&:enabled?).map(&:to_message)
-          else
-            []
-          end
+          def estimate_prompt_tokens(state, config)
+            estimator = config.token_estimator || state.token_estimator || TavernKit::TokenEstimator.default
+            model_hint = resolve_value(config.model_hint.nil? ? state[:model_hint] : config.model_hint, state)
+            overhead_per_message = resolve_non_negative_int(config.message_overhead_tokens, state, allow_nil: true) || 0
+            include_metadata_tokens = resolve_value(config.include_message_metadata_tokens, state) == true
 
-          content_tokens = messages.sum do |msg|
-            estimator.estimate(msg.content.to_s, model_hint: model_hint)
-          end
-
-          metadata_tokens = if include_metadata_tokens
-            messages.sum do |msg|
-              estimate_message_metadata_tokens(msg, estimator: estimator, model_hint: model_hint)
-            end
-          else
-            0
-          end
-
-          overhead_tokens = overhead_per_message * messages.size
-
-          {
-            content: content_tokens,
-            metadata: metadata_tokens,
-            overhead_per_message: overhead_per_message,
-            overhead_total: overhead_tokens,
-            message_count: messages.size,
-            total: content_tokens + metadata_tokens + overhead_tokens,
-          }
-        end
-
-        def estimate_message_metadata_tokens(message, estimator:, model_hint:)
-          meta = message.metadata
-          return 0 unless meta.is_a?(Hash) && meta.any?
-
-          serialized =
-            begin
-              JSON.generate(meta)
-            rescue JSON::GeneratorError, TypeError
-              meta.to_s
+            if estimator.respond_to?(:describe)
+              state.instrument(:stat, key: :token_estimator, step: state.current_step) do
+                { value: estimator.describe(model_hint: model_hint) }
+              end
             end
 
-          estimator.estimate(serialized, model_hint: model_hint)
-        end
+            messages = if state.plan
+              state.plan.messages
+            elsif state.blocks
+              Array(state.blocks).select(&:enabled?).map(&:to_message)
+            else
+              []
+            end
 
-        def resolve_value(value, state)
-          value.respond_to?(:call) ? value.call(state) : value
-        end
+            content_tokens = messages.sum do |msg|
+              estimator.estimate(msg.content.to_s, model_hint: model_hint)
+            end
 
-        def resolve_non_negative_int(value, state, allow_nil:)
-          resolved = resolve_value(value, state)
-          return nil if allow_nil && resolved.nil?
+            metadata_tokens = if include_metadata_tokens
+              messages.sum do |msg|
+                estimate_message_metadata_tokens(msg, estimator: estimator, model_hint: model_hint)
+              end
+            else
+              0
+            end
 
-          int = Integer(resolved)
-          raise ArgumentError, "Expected a non-negative Integer, got: #{resolved.inspect}" if int.negative?
+            overhead_tokens = overhead_per_message * messages.size
 
-          int
-        rescue ArgumentError, TypeError
-          raise ArgumentError, "Expected a non-negative Integer, got: #{resolved.inspect}"
-        end
+            {
+              content: content_tokens,
+              metadata: metadata_tokens,
+              overhead_per_message: overhead_per_message,
+              overhead_total: overhead_tokens,
+              message_count: messages.size,
+              total: content_tokens + metadata_tokens + overhead_tokens,
+            }
+          end
 
-        def resolve_mode(value, state)
-          resolved = resolve_value(value, state)
-          resolved.nil? ? nil : resolved.to_sym
-        end
+          def estimate_message_metadata_tokens(message, estimator:, model_hint:)
+            meta = message.metadata
+            return 0 unless meta.is_a?(Hash) && meta.any?
+
+            serialized =
+              begin
+                JSON.generate(meta)
+              rescue JSON::GeneratorError, TypeError
+                meta.to_s
+              end
+
+            estimator.estimate(serialized, model_hint: model_hint)
+          end
+
+          def resolve_value(value, state)
+            value.respond_to?(:call) ? value.call(state) : value
+          end
+
+          def resolve_non_negative_int(value, state, allow_nil:)
+            resolved = resolve_value(value, state)
+            return nil if allow_nil && resolved.nil?
+
+            int = Integer(resolved)
+            raise ArgumentError, "Expected a non-negative Integer, got: #{resolved.inspect}" if int.negative?
+
+            int
+          rescue ArgumentError, TypeError
+            raise ArgumentError, "Expected a non-negative Integer, got: #{resolved.inspect}"
+          end
+
+          def resolve_mode(value, state)
+            resolved = resolve_value(value, state)
+            resolved.nil? ? nil : resolved.to_sym
+          end
         end
       end
     end

@@ -4,7 +4,9 @@ module TavernKit
   module SillyTavern
     module PromptBuilder
       module Steps
-        class Hooks < TavernKit::PromptBuilder::Step
+        module Hooks
+          extend TavernKit::PromptBuilder::Step
+
           Config =
             Data.define do
               def self.from_hash(raw)
