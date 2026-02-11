@@ -8,6 +8,7 @@ require_relative "filtered_tool_registry"
 require_relative "tool_transforms"
 require_relative "tool_call_transforms"
 require_relative "tool_result_transforms"
+require_relative "tool_output_limiter"
 
 module TavernKit
   module VibeTavern
@@ -19,6 +20,8 @@ module TavernKit
         TOOL_USE_MODES = %i[enforced relaxed disabled].freeze
         TOOL_FAILURE_POLICIES = %i[fatal tolerated].freeze
         DEFAULT_FIX_EMPTY_FINAL_USER_TEXT = "Please provide your final answer.".freeze
+        FINAL_STREAM_SYSTEM_SUFFIX =
+          "Tools are now disabled. Using the tool results above, provide your final answer only. Do not request tool calls.".freeze
 
         class ToolUseError < StandardError
           attr_reader :code, :details
@@ -100,7 +103,7 @@ module TavernKit
             end
         end
 
-        def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS, on_event: nil, &block)
+        def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS, on_event: nil, final_stream: false, &block)
           raise ArgumentError, "model is required" if @model.strip.empty?
 
           event_handler = on_event.respond_to?(:call) ? on_event : nil
@@ -424,6 +427,126 @@ module TavernKit
                 history[-1] = history.last.with(content: assistant_text)
               end
 
+              if final_stream == true && any_tool_calls_seen
+                non_stream_final_msg = history.pop
+                unless non_stream_final_msg.is_a?(TavernKit::PromptBuilder::Message)
+                  history << non_stream_final_msg if non_stream_final_msg
+                  non_stream_final_msg = nil
+                end
+
+                system_stream =
+                  [
+                    system.to_s,
+                    FINAL_STREAM_SYSTEM_SUFFIX,
+                  ].map(&:to_s).map(&:strip).reject(&:empty?).join("\n\n")
+
+                emit_event(
+                  event_handler,
+                  :final_stream_start,
+                  turn: turn,
+                  messages_count: history.size,
+                )
+
+                begin
+                  stream_request =
+                    @prompt_runner.build_request(
+                      runner_config: @runner_config,
+                      history: history,
+                      system: system_stream,
+                      variables_store: variables_store,
+                      strict: strict,
+                      llm_options: request_overrides,
+                      dialect: :openai,
+                      message_transforms: [],
+                      response_transforms: [],
+                    )
+
+                  stream_result =
+                    @prompt_runner.perform_stream(stream_request) do |delta|
+                      emit_event(
+                        event_handler,
+                        :final_stream_delta,
+                        turn: turn,
+                        delta: delta,
+                      )
+                    end
+
+                  stream_content = stream_result.assistant_message.fetch("content", nil).to_s
+                  streamed_text =
+                    TavernKit::VibeTavern::OutputTags.transform(
+                      stream_content,
+                      config: @runner_config.output_tags,
+                    )
+
+                  if non_stream_final_msg.is_a?(TavernKit::PromptBuilder::Message)
+                    history << non_stream_final_msg.with(content: streamed_text)
+                  else
+                    history << TavernKit::PromptBuilder::Message.new(role: :assistant, content: streamed_text)
+                  end
+
+                  usage = stream_result.body.fetch("usage", nil)
+                  usage = nil unless usage.is_a?(Hash)
+
+                  emit_event(
+                    event_handler,
+                    :final_stream_end,
+                    turn: turn,
+                    elapsed_ms: stream_result.elapsed_ms,
+                    finish_reason: stream_result.finish_reason,
+                    assistant_content_bytes: stream_content.bytesize,
+                    usage: usage,
+                  )
+
+                  trace_entry[:final_stream] = {
+                    ok: true,
+                    elapsed_ms: stream_result.elapsed_ms,
+                    finish_reason: stream_result.finish_reason,
+                    usage: usage,
+                    assistant_content_bytes: stream_content.bytesize,
+                    skipped_reason: nil,
+                  }
+
+                  return { assistant_text: streamed_text, history: history, trace: trace }
+                rescue ArgumentError => e
+                  history << non_stream_final_msg if non_stream_final_msg.is_a?(TavernKit::PromptBuilder::Message)
+
+                  emit_event(
+                    event_handler,
+                    :final_stream_skipped,
+                    turn: turn,
+                    message: e.message.to_s,
+                  )
+
+                  trace_entry[:final_stream] = {
+                    ok: false,
+                    elapsed_ms: nil,
+                    finish_reason: nil,
+                    usage: nil,
+                    assistant_content_bytes: nil,
+                    skipped_reason: e.message.to_s,
+                  }
+                rescue StandardError => e
+                  history << non_stream_final_msg if non_stream_final_msg.is_a?(TavernKit::PromptBuilder::Message)
+
+                  emit_event(
+                    event_handler,
+                    :final_stream_error,
+                    turn: turn,
+                    error_class: e.class.name,
+                    message: e.message.to_s,
+                  )
+
+                  trace_entry[:final_stream] = {
+                    ok: false,
+                    elapsed_ms: nil,
+                    finish_reason: nil,
+                    usage: nil,
+                    assistant_content_bytes: nil,
+                    skipped_reason: "#{e.class}: #{e.message}",
+                  }
+                end
+              end
+
               return { assistant_text: assistant_text, history: history, trace: trace }
             end
 
@@ -477,7 +600,7 @@ module TavernKit
                     data: { bytes: arguments_bytes, max_bytes: @max_tool_args_bytes },
                   )
                 else
-                  @dispatcher.execute(name: name, args: args)
+                  @dispatcher.execute(name: name, args: args, tool_call_id: id)
                 end
 
               effective_tool_name = result.is_a?(Hash) ? result.fetch(:tool_name, name).to_s : name
@@ -493,7 +616,61 @@ module TavernKit
                   )
               end
 
-              tool_content = JSON.generate(result)
+              output_replaced = false
+              limiter = ToolOutputLimiter.check(result, max_bytes: @max_tool_output_bytes)
+              unless limiter[:ok]
+                output_replaced = true
+                result =
+                  tool_error_envelope(
+                    effective_tool_name,
+                    code: "TOOL_OUTPUT_TOO_LARGE",
+                    message: "Tool output exceeded size limit",
+                    data: {
+                      estimated_bytes: limiter[:estimated_bytes],
+                      max_bytes: @max_tool_output_bytes,
+                      reason: limiter[:reason],
+                    },
+                  )
+
+                if tool_result_transforms.any?
+                  result =
+                    ToolResultTransforms.apply(
+                      result,
+                      tool_result_transforms,
+                      tool_name: effective_tool_name,
+                      tool_call_id: id,
+                      strict: @strict,
+                    )
+                end
+              end
+
+              tool_content =
+                begin
+                  JSON.generate(result)
+                rescue StandardError => e
+                  output_replaced = true
+                  result =
+                    tool_error_envelope(
+                      effective_tool_name,
+                      code: "TOOL_OUTPUT_SERIALIZATION_ERROR",
+                      message: "Tool output could not be serialized to JSON",
+                      data: { error_class: e.class.name, message: e.message.to_s },
+                    )
+
+                  if tool_result_transforms.any?
+                    result =
+                      ToolResultTransforms.apply(
+                        result,
+                        tool_result_transforms,
+                        tool_name: effective_tool_name,
+                        tool_call_id: id,
+                        strict: @strict,
+                      )
+                  end
+
+                  JSON.generate(result)
+                end
+
               if tool_content.bytesize > @max_tool_output_bytes
                 output_replaced = true
                 too_large_bytes = tool_content.bytesize
@@ -516,12 +693,7 @@ module TavernKit
                     )
                 end
 
-                tool_content =
-                  JSON.generate(
-                    result
-                  )
-              else
-                output_replaced = false
+                tool_content = JSON.generate(result)
               end
 
               effective_tool_name = result.is_a?(Hash) ? result.fetch(:tool_name, effective_tool_name).to_s : effective_tool_name

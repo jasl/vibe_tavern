@@ -24,6 +24,7 @@ module TavernKit
       use_step :prepare, TavernKit::VibeTavern::PromptBuilder::Steps::Prepare
       use_step :plan_assembly, TavernKit::VibeTavern::PromptBuilder::Steps::PlanAssembly
       use_step :language_policy, TavernKit::VibeTavern::PromptBuilder::Steps::LanguagePolicy
+      use_step :max_tokens, TavernKit::PromptBuilder::Steps::MaxTokens
     end
 
     TavernKit.run_load_hooks(:vibe_tavern, TavernKit::VibeTavern.infrastructure)

@@ -11,9 +11,10 @@ module TavernKit
           @registry = registry
           @expose = expose
           @tool_name_aliases = tool_name_aliases || DEFAULT_TOOL_NAME_ALIASES
+          @executor_accepts_tool_call_id = nil
         end
 
-        def execute(name:, args:)
+        def execute(name:, args:, tool_call_id: nil)
           name = normalize_tool_name(name.to_s.strip)
           args = args.is_a?(Hash) ? args : {}
 
@@ -21,7 +22,13 @@ module TavernKit
             return error_envelope(name, code: "TOOL_NOT_ALLOWED", message: "Tool not allowed: #{name}")
           end
 
-          result = @executor.call(name: name, args: args)
+          tool_call_id = tool_call_id.to_s
+          result =
+            if !tool_call_id.empty? && executor_accepts_tool_call_id?
+              @executor.call(name: name, args: args, tool_call_id: tool_call_id)
+            else
+              @executor.call(name: name, args: args)
+            end
 
           # Allow executors to return already-normalized envelopes, but don't
           # require it for simple implementations.
@@ -79,6 +86,28 @@ module TavernKit
           end
 
           normalized
+        end
+
+        def executor_accepts_tool_call_id?
+          return @executor_accepts_tool_call_id unless @executor_accepts_tool_call_id.nil?
+
+          params = callable_parameters(@executor)
+          @executor_accepts_tool_call_id =
+            params.any? do |type, name|
+              type == :keyrest || (%i[key keyreq].include?(type) && name == :tool_call_id)
+            end
+        end
+
+        def callable_parameters(callable)
+          return [] unless callable
+
+          if callable.respond_to?(:parameters)
+            callable.parameters
+          else
+            callable.method(:call).parameters
+          end
+        rescue NameError, TypeError
+          []
         end
 
         def normalize_envelope(default_tool_name, value)

@@ -29,9 +29,10 @@ module TavernKit
           context: nil,
           pipeline: TavernKit::VibeTavern::Pipeline,
           step_options: nil,
-          llm_options_defaults: nil
+          llm_options_defaults: nil,
+          capabilities_overrides: nil
         )
-          caps = TavernKit::VibeTavern::Capabilities.resolve(provider: provider, model: model)
+          caps = TavernKit::VibeTavern::Capabilities.resolve(provider: provider, model: model, overrides: capabilities_overrides)
           normalized_context = normalize_context(context)
           defaults = normalize_llm_options_defaults(llm_options_defaults)
 
@@ -64,6 +65,7 @@ module TavernKit
               pipeline,
               step_options: step_options,
               language_policy_config: language_policy,
+              capabilities: caps,
             )
 
           new(
@@ -102,7 +104,7 @@ module TavernKit
         end
         private_class_method :normalize_context
 
-        def self.configure_pipeline(pipeline, step_options:, language_policy_config:)
+        def self.configure_pipeline(pipeline, step_options:, language_policy_config:, capabilities:)
           raise ArgumentError, "pipeline is required" if pipeline.nil?
           raise ArgumentError, "pipeline must be a TavernKit::PromptBuilder::Pipeline" unless pipeline.is_a?(TavernKit::PromptBuilder::Pipeline)
 
@@ -111,6 +113,14 @@ module TavernKit
           language_policy_overrides = opts.fetch(:language_policy, {})
           opts[:language_policy] = TavernKit::Utils.deep_merge_hashes(language_policy_defaults, language_policy_overrides)
 
+          if pipeline.has?(:max_tokens)
+            max_tokens_defaults = build_max_tokens_step_defaults(capabilities)
+            if max_tokens_defaults
+              max_tokens_overrides = opts.fetch(:max_tokens, {})
+              opts[:max_tokens] = TavernKit::Utils.deep_merge_hashes(max_tokens_defaults, max_tokens_overrides)
+            end
+          end
+
           p = pipeline.dup
           opts.each do |step, options|
             p.configure_step(step, **options)
@@ -118,6 +128,22 @@ module TavernKit
           p
         end
         private_class_method :configure_pipeline
+
+        def self.build_max_tokens_step_defaults(capabilities)
+          return nil unless capabilities.respond_to?(:context_window_tokens)
+
+          max_tokens = capabilities.context_window_tokens
+          return nil if max_tokens.nil?
+
+          reserve_tokens = capabilities.respond_to?(:reserved_response_tokens) ? capabilities.reserved_response_tokens : 0
+
+          {
+            max_tokens: max_tokens,
+            reserve_tokens: reserve_tokens,
+            mode: :error,
+          }
+        end
+        private_class_method :build_max_tokens_step_defaults
 
         def self.normalize_step_options(value)
           return {} if value.nil?

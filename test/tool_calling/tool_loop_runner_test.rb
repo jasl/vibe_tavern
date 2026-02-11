@@ -180,6 +180,7 @@ class ToolLoopRunnerTest < Minitest::Test
     workspace:,
     registry: build_registry,
     tool_use_mode: nil,
+    tool_executor: nil,
     context: nil,
     parallel_tool_calls: true,
     fix_empty_final: nil,
@@ -228,7 +229,12 @@ class ToolLoopRunnerTest < Minitest::Test
     end
 
     effective_mode = tool_calling.fetch(:tool_use_mode, :relaxed).to_sym
-    tool_executor_obj = effective_mode == :disabled ? nil : ToolCallEvalTestExecutor.new(workspace: workspace)
+    tool_executor_obj =
+      if effective_mode == :disabled
+        nil
+      else
+        tool_executor || ToolCallEvalTestExecutor.new(workspace: workspace)
+      end
 
     runner_config =
       TavernKit::VibeTavern::RunnerConfig.build(
@@ -381,6 +387,342 @@ class ToolLoopRunnerTest < Minitest::Test
 
     tool_result = msgs2.find { |m| m["role"] == "tool" && m.key?("tool_call_id") }
     refute_nil tool_result
+  end
+
+  def test_tool_dispatcher_passes_tool_call_id_when_executor_accepts_it
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_state_get",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    delegate = ToolCallEvalTestExecutor.new(workspace: workspace)
+
+    recording_executor =
+      Class.new do
+        attr_reader :tool_call_ids
+
+        def initialize(delegate:)
+          @delegate = delegate
+          @tool_call_ids = []
+        end
+
+        def call(name:, args:, tool_call_id:)
+          @tool_call_ids << tool_call_id.to_s
+          @delegate.call(name: name, args: args)
+        end
+      end.new(delegate: delegate)
+
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, tool_executor: recording_executor)
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_includes recording_executor.tool_call_ids, "call_state_get"
+  end
+
+  def test_tool_dispatcher_does_not_pass_tool_call_id_when_executor_does_not_accept_it
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_state_get",
+                          type: "function",
+                          function: { name: "state_get", arguments: JSON.generate({ workspace_id: workspace_id }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    workspace = ToolCallEvalTestWorkspace.new
+    executor = ToolCallEvalTestExecutor.new(workspace: workspace)
+
+    context = { tool_calling: { tool_failure_policy: :fatal } }
+
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        tool_use_mode: :enforced,
+        tool_executor: executor,
+        context: context,
+      )
+
+    result = runner.run(user_text: "workspace_id=#{workspace.id}")
+    assert_equal "Done.", result[:assistant_text]
+  end
+
+  def test_tool_loop_final_stream_replaces_non_stream_final_answer
+    events = []
+    workspace = ToolCallEvalTestWorkspace.new
+
+    client =
+      Class.new do
+        @response_struct = Struct.new(:body)
+        @chat_result_struct = Struct.new(:content, :usage, :finish_reason)
+
+        class << self
+          attr_reader :response_struct, :chat_result_struct
+        end
+
+        attr_reader :chat_completions_requests, :chat_requests
+
+        def initialize(workspace_id:)
+          @workspace_id = workspace_id.to_s
+          @call_count = 0
+          @chat_completions_requests = []
+          @chat_requests = []
+        end
+
+        def chat_completions(**request)
+          @chat_completions_requests << request
+          @call_count += 1
+
+          body =
+            if @call_count == 1
+              {
+                "choices" => [
+                  {
+                    "message" => {
+                      "role" => "assistant",
+                      "content" => "",
+                      "tool_calls" => [
+                        {
+                          "id" => "call_state_get",
+                          "type" => "function",
+                          "function" => { "name" => "state_get", "arguments" => JSON.generate({ "workspace_id" => @workspace_id }) },
+                        },
+                      ],
+                    },
+                    "finish_reason" => "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                "choices" => [
+                  { "message" => { "role" => "assistant", "content" => "NONSTREAM FINAL" }, "finish_reason" => "stop" },
+                ],
+                  }
+            end
+
+          self.class.response_struct.new(body)
+        end
+
+        def chat(model:, messages:, stream:, include_usage:, **kwargs, &on_delta)
+          @chat_requests << { model: model, messages: messages, stream: stream, include_usage: include_usage, **kwargs }
+
+          on_delta.call("delta_1")
+          on_delta.call("delta_2")
+
+          self.class.chat_result_struct.new(
+            "Streamed final",
+            { "prompt_tokens" => 1, "completion_tokens" => 2, "total_tokens" => 3 },
+            "stop",
+          )
+        end
+      end.new(workspace_id: workspace.id)
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace)
+
+    result =
+      runner.run(
+        user_text: "workspace_id=#{workspace.id}",
+        final_stream: true,
+        on_event: ->(e) { events << e },
+      )
+
+    assert_equal "Streamed final", result[:assistant_text]
+
+    types = events.map { |e| e[:type] }
+    assert_includes types, :final_stream_start
+    assert_equal 2, events.count { |e| e[:type] == :final_stream_delta }
+    assert_includes types, :final_stream_end
+
+    chat_req = client.chat_requests.last
+    refute chat_req.key?(:tools)
+    refute chat_req.key?(:tool_choice)
+    refute chat_req.key?(:response_format)
+
+    system_msg = Array(chat_req[:messages]).find { |m| (m["role"] || m[:role]).to_s == "system" }
+    refute_nil system_msg
+    assert_includes (system_msg["content"] || system_msg[:content]).to_s, "Tools are now disabled"
+  end
+
+  def test_tool_loop_final_stream_skips_when_streaming_capability_is_disabled
+    events = []
+    workspace = ToolCallEvalTestWorkspace.new
+
+    client =
+      Class.new do
+        @response_struct = Struct.new(:body)
+
+        class << self
+          attr_reader :response_struct
+        end
+
+        def initialize(workspace_id:)
+          @workspace_id = workspace_id.to_s
+          @call_count = 0
+        end
+
+        def chat_completions(**_request)
+          @call_count += 1
+
+          body =
+            if @call_count == 1
+              {
+                "choices" => [
+                  {
+                    "message" => {
+                      "role" => "assistant",
+                      "content" => "",
+                      "tool_calls" => [
+                        {
+                          "id" => "call_state_get",
+                          "type" => "function",
+                          "function" => { "name" => "state_get", "arguments" => JSON.generate({ "workspace_id" => @workspace_id }) },
+                        },
+                      ],
+                    },
+                    "finish_reason" => "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                "choices" => [
+                  { "message" => { "role" => "assistant", "content" => "NONSTREAM FINAL" }, "finish_reason" => "stop" },
+                ],
+              }
+            end
+
+          self.class.response_struct.new(body)
+        end
+
+        def chat(**_kwargs)
+          raise "should not be called"
+        end
+      end.new(workspace_id: workspace.id)
+
+    runner_config =
+      TavernKit::VibeTavern::RunnerConfig.build(
+        provider: "openrouter",
+        model: "test-model",
+      )
+    runner_config = runner_config.with(capabilities: runner_config.capabilities.with(supports_streaming: false))
+
+    prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
+    executor = ToolCallEvalTestExecutor.new(workspace: workspace)
+
+    runner =
+      TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
+        prompt_runner: prompt_runner,
+        runner_config: runner_config,
+        tool_executor: executor,
+        registry: build_registry,
+      )
+
+    result =
+      runner.run(
+        user_text: "workspace_id=#{workspace.id}",
+        final_stream: true,
+        on_event: ->(e) { events << e },
+      )
+
+    assert_equal "NONSTREAM FINAL", result[:assistant_text]
+    assert_includes events.map { |e| e[:type] }, :final_stream_skipped
   end
 
   def test_tool_loop_emits_progress_events

@@ -42,6 +42,17 @@ To keep call sites consistent, we use a single entrypoint object:
   - `OutputTags::Config`
 - producing a capabilities snapshot (`Capabilities.resolve`) used for routing
   decisions and strict invariants
+  - registry-driven overrides live in:
+    - `lib/tavern_kit/vibe_tavern/capabilities_registry.rb`
+  - unknown provider/model defaults are intentionally conservative (do not
+    assume `json_schema` support)
+  - capabilities can optionally include prompt budget fields:
+    - `context_window_tokens` (app-chosen context window cap)
+    - `reserved_response_tokens` (tokens reserved for the model response)
+    - when configured, the VibeTavern pipeline enforces the prompt budget via
+      `TavernKit::PromptBuilder::Steps::MaxTokens` (step name: `:max_tokens`)
+    - global defaults can be set via:
+      `TavernKit::VibeTavern::CapabilitiesRegistry.configure_default_overrides(...)`
 
 Hard invariants are enforced centrally in:
 - `lib/tavern_kit/vibe_tavern/preflight.rb`
@@ -88,7 +99,8 @@ Streaming policy (production default):
 - Tool calling turns are **non-streaming** (mutually exclusive in code).
 - Streaming is intended for:
   - chat-only runs (no tools, no `response_format`), and
-  - future: a final "answer-only" turn after tools (tools disabled).
+  - a final "answer-only" turn after tools (tools disabled; optional best-effort
+    extra request via `ToolLoopRunner#run(final_stream: true)`).
 
 PromptRunner contract (after RunnerConfig refactor):
 - `PromptRunner.new(client:)` is transport-only (no config).
