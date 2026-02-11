@@ -4,13 +4,33 @@ require "test_helper"
 require "pathname"
 
 class VibeTavernTokenEstimationTest < ActiveSupport::TestCase
-  def with_credentials_tokenizer_root(value)
+  def with_token_estimation_config(root: nil, tokenizer_root: nil)
     mod = TavernKit::VibeTavern::TokenEstimation
-    original = mod.method(:credentials_tokenizer_root)
-    mod.define_singleton_method(:credentials_tokenizer_root) { value }
+    original = mod.config
+    mod.configure(root: root, tokenizer_root: tokenizer_root)
     yield
   ensure
-    mod.define_singleton_method(:credentials_tokenizer_root, original)
+    mod.configure(root: original.root, tokenizer_root: original.tokenizer_root)
+  end
+
+  def with_env(key, value)
+    key = key.to_s
+    original_missing = !ENV.key?(key)
+    original = ENV[key]
+
+    if value.nil?
+      ENV.delete(key)
+    else
+      ENV[key] = value
+    end
+
+    yield
+  ensure
+    if original_missing
+      ENV.delete(key)
+    else
+      ENV[key] = original
+    end
   end
 
   test "canonical_model_hint normalizes common variants" do
@@ -31,36 +51,42 @@ class VibeTavernTokenEstimationTest < ActiveSupport::TestCase
   end
 
   test "registry exposes hf_tokenizers paths under vendor/tokenizers" do
-    root = Pathname.new("/example/root")
-    registry = TavernKit::VibeTavern::TokenEstimation.registry(root: root)
+    mod = TavernKit::VibeTavern::TokenEstimation
 
-    assert_equal(
-      {
-        tokenizer_family: :hf_tokenizers,
-        tokenizer_path: "/example/root/vendor/tokenizers/deepseek-v3/tokenizer.json",
-        source_hint: "deepseek-v3",
-        source_repo: "deepseek-ai/DeepSeek-V3-0324",
-      },
-      registry.fetch("deepseek-v3"),
-    )
+    with_env(mod::TOKENIZER_ROOT_ENV_KEY, nil) do
+      with_token_estimation_config(root: nil, tokenizer_root: nil) do
+        root = Pathname.new("/example/root")
+        registry = mod.registry(root: root)
 
-    assert_equal(
-      {
-        tokenizer_family: :hf_tokenizers,
-        tokenizer_path: "/example/root/vendor/tokenizers/qwen3/tokenizer.json",
-        source_hint: "qwen3",
-        source_repo: "Qwen/Qwen3-30B-A3B-Instruct-2507",
-      },
-      registry.fetch("qwen3"),
-    )
+        assert_equal(
+          {
+            tokenizer_family: :hf_tokenizers,
+            tokenizer_path: "/example/root/vendor/tokenizers/deepseek-v3/tokenizer.json",
+            source_hint: "deepseek-v3",
+            source_repo: "deepseek-ai/DeepSeek-V3-0324",
+          },
+          registry.fetch("deepseek-v3"),
+        )
 
-    assert_equal(
-      {
-        tokenizer_family: :tiktoken,
-        source_hint: "kimi-k2.5",
-      },
-      registry.fetch("kimi-k2.5"),
-    )
+        assert_equal(
+          {
+            tokenizer_family: :hf_tokenizers,
+            tokenizer_path: "/example/root/vendor/tokenizers/qwen3/tokenizer.json",
+            source_hint: "qwen3",
+            source_repo: "Qwen/Qwen3-30B-A3B-Instruct-2507",
+          },
+          registry.fetch("qwen3"),
+        )
+
+        assert_equal(
+          {
+            tokenizer_family: :tiktoken,
+            source_hint: "kimi-k2.5",
+          },
+          registry.fetch("kimi-k2.5"),
+        )
+      end
+    end
   end
 
   test "Prepare injects canonical model_hint and default estimator" do
@@ -82,19 +108,66 @@ class VibeTavernTokenEstimationTest < ActiveSupport::TestCase
     assert_operator count, :>=, 1
   end
 
-  test "tokenizer_path uses tokenizer_root from creds when present" do
-    with_credentials_tokenizer_root("shared/tokenizers") do
-      assert_equal(
-        "/example/root/shared/tokenizers/deepseek-v3/tokenizer.json",
-        TavernKit::VibeTavern::TokenEstimation.tokenizer_path(root: "/example/root", hint: "deepseek-v3"),
-      )
-    end
+  test "default_root uses configured root when present" do
+    mod = TavernKit::VibeTavern::TokenEstimation
 
-    with_credentials_tokenizer_root("/opt/tokenizers") do
-      assert_equal(
-        "/opt/tokenizers/qwen3/tokenizer.json",
-        TavernKit::VibeTavern::TokenEstimation.tokenizer_path(root: "/example/root", hint: "qwen3"),
-      )
+    with_env(mod::ROOT_ENV_KEY, nil) do
+      with_token_estimation_config(root: "/example/root", tokenizer_root: nil) do
+        assert_equal "/example/root", mod.default_root.to_s
+      end
+    end
+  end
+
+  test "default_root uses VIBE_TAVERN_ROOT when config.root is blank" do
+    mod = TavernKit::VibeTavern::TokenEstimation
+
+    with_token_estimation_config(root: nil, tokenizer_root: nil) do
+      with_env(mod::ROOT_ENV_KEY, "/env/root") do
+        assert_equal "/env/root", mod.default_root.to_s
+      end
+    end
+  end
+
+  test "default_root raises when neither config nor ENV provide root" do
+    mod = TavernKit::VibeTavern::TokenEstimation
+
+    with_token_estimation_config(root: nil, tokenizer_root: nil) do
+      with_env(mod::ROOT_ENV_KEY, nil) do
+        assert_raises(mod::ConfigurationError) { mod.default_root }
+      end
+    end
+  end
+
+  test "tokenizer_path uses configured tokenizer_root when present" do
+    mod = TavernKit::VibeTavern::TokenEstimation
+
+    with_env(mod::TOKENIZER_ROOT_ENV_KEY, nil) do
+      with_token_estimation_config(root: nil, tokenizer_root: "shared/tokenizers") do
+        assert_equal(
+          "/example/root/shared/tokenizers/deepseek-v3/tokenizer.json",
+          mod.tokenizer_path(root: "/example/root", hint: "deepseek-v3"),
+        )
+      end
+
+      with_token_estimation_config(root: nil, tokenizer_root: "/opt/tokenizers") do
+        assert_equal(
+          "/opt/tokenizers/qwen3/tokenizer.json",
+          mod.tokenizer_path(root: "/example/root", hint: "qwen3"),
+        )
+      end
+    end
+  end
+
+  test "tokenizer_path uses TOKEN_ESTIMATION__TOKENIZER_ROOT when config.tokenizer_root is blank" do
+    mod = TavernKit::VibeTavern::TokenEstimation
+
+    with_token_estimation_config(root: nil, tokenizer_root: nil) do
+      with_env(mod::TOKENIZER_ROOT_ENV_KEY, "shared/tokenizers") do
+        assert_equal(
+          "/example/root/shared/tokenizers/deepseek-v3/tokenizer.json",
+          mod.tokenizer_path(root: "/example/root", hint: "deepseek-v3"),
+        )
+      end
     end
   end
 end

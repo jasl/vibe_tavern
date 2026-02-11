@@ -6,6 +6,16 @@
 
 require Rails.root.join("lib/tavern_kit/vibe_tavern/token_estimation").to_s
 
-TavernKit::VibeTavern::TokenEstimation
-  .estimator
-  .preload!(strict: Rails.env.production?)
+tokenizer_root =
+  begin
+    Rails.app.creds.option(:token_estimation, :tokenizer_root)
+  rescue StandardError
+    nil
+  end
+
+TavernKit::VibeTavern::TokenEstimation.configure(
+  root: Rails.root,
+  tokenizer_root: tokenizer_root,
+)
+
+TavernKit::VibeTavern::TokenEstimation.estimator.preload!(strict: Rails.env.production?)

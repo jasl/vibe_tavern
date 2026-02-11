@@ -10,6 +10,13 @@ module TavernKit
     # allowing accurate token estimation via a small curated set of tokenizer
     # assets.
     module TokenEstimation
+      ROOT_ENV_KEY = "VIBE_TAVERN_ROOT"
+      TOKENIZER_ROOT_ENV_KEY = "TOKEN_ESTIMATION__TOKENIZER_ROOT"
+
+      class ConfigurationError < StandardError; end
+
+      Config = Data.define(:root, :tokenizer_root)
+
       module_function
 
       HF_TOKENIZER_FAMILIES = %i[hf_tokenizers huggingface_tokenizers tokenizers].freeze
@@ -134,7 +141,10 @@ module TavernKit
 
       def tokenizer_root(root: default_root)
         root = Pathname.new(root.to_s)
-        configured = credentials_tokenizer_root
+        configured = config.tokenizer_root
+        if blank_path?(configured)
+          configured = ENV.fetch(TOKENIZER_ROOT_ENV_KEY, nil)
+        end
         return root.join("vendor", "tokenizers").to_s if blank_path?(configured)
 
         configured_root = Pathname.new(configured.to_s)
@@ -143,19 +153,37 @@ module TavernKit
       end
 
       def default_root
-        if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
-          Rails.root
-        else
-          Pathname.new(__dir__).join("../../..").cleanpath
-        end
+        configured = config.root
+        return configured if configured.is_a?(Pathname)
+        return Pathname.new(configured.to_s) unless blank_path?(configured)
+
+        env_root = ENV.fetch(ROOT_ENV_KEY, nil)
+        return Pathname.new(env_root.to_s) unless blank_path?(env_root)
+
+        raise(
+          ConfigurationError,
+          "Token estimation root is not configured. Set TavernKit::VibeTavern::TokenEstimation.configure(root: ...) " \
+            "or ENV[#{ROOT_ENV_KEY.inspect}].",
+        )
       end
 
-      def credentials_tokenizer_root
-        return nil unless defined?(Rails) && Rails.respond_to?(:app) && Rails.app
+      def config
+        @config ||= Config.new(root: nil, tokenizer_root: nil)
+      end
 
-        Rails.app.creds.option(:token_estimation, :tokenizer_root)
-      rescue StandardError
-        nil
+      def configure(root: nil, tokenizer_root: nil)
+        updated =
+          Config.new(
+            root: blank_path?(root) ? nil : root,
+            tokenizer_root: blank_path?(tokenizer_root) ? nil : tokenizer_root,
+          )
+
+        ESTIMATOR_MUTEX.synchronize do
+          @config = updated
+          @estimators = nil
+        end
+
+        updated
       end
 
       def blank_path?(value)

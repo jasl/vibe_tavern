@@ -108,9 +108,25 @@ There are two layers of caching:
 
 `config/initializers/token_estimation.rb` runs:
 
+- `TokenEstimation.configure(root: Rails.root, tokenizer_root: Rails.app.creds.option(:token_estimation, :tokenizer_root))`
 - `TokenEstimation.estimator.preload!(strict: Rails.env.production?)`
 
 In production, this fails fast if a tokenizer asset is missing/invalid.
+
+### Configuration
+
+Rails:
+
+- `root` is set to `Rails.root` by the initializer.
+- `tokenizer_root` is read from credentials (`Rails.app.creds.option(:token_estimation, :tokenizer_root)`).
+  - If blank/missing, it falls back to `ENV["TOKEN_ESTIMATION__TOKENIZER_ROOT"]`.
+
+Non-Rails:
+
+- You must provide a root via `TokenEstimation.configure(root: ...)` or `ENV["VIBE_TAVERN_ROOT"]`.
+- Optional: provide `tokenizer_root` via `TokenEstimation.configure(tokenizer_root: ...)` or `ENV["TOKEN_ESTIMATION__TOKENIZER_ROOT"]`.
+- If `tokenizer_root` is relative, it is resolved against the configured root.
+- There is no `__dir__` fallback; missing root raises at use time.
 
 ## Failure / degradation policy
 
@@ -128,15 +144,16 @@ Tokenizer assets live in-repo (not under `/resources`, which is gitignored):
 - `vendor/tokenizers/<hint>/tokenizer.json`
 - `vendor/tokenizers/<hint>/source.json` (source metadata)
 
-Default root path is `Rails.root/vendor/tokenizers`. You can override it via
-credentials:
+Default tokenizer root is `<root>/vendor/tokenizers` (Rails: `Rails.root/vendor/tokenizers`).
+You can override it via credentials:
 
 ```yaml
 token_estimation:
   tokenizer_root: /absolute/path/to/tokenizers
 ```
 
-If `tokenizer_root` is relative, it is resolved against `Rails.root`.
+If `tokenizer_root` is relative, it is resolved against `<root>`. If credentials
+are blank/missing, `ENV["TOKEN_ESTIMATION__TOKENIZER_ROOT"]` is used as a fallback.
 
 Download/update them with:
 
