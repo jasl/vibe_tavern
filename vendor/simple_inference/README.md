@@ -47,6 +47,39 @@ puts result.content
 p result.usage
 ```
 
+## Protocols / Contract
+
+SimpleInference exposes a small, OpenAI-shaped chat contract that upper layers
+(like `TavernKit::VibeTavern`) can depend on.
+
+### Required methods
+
+#### `#chat_completions(**params) -> SimpleInference::Response`
+
+- Request params follow the OpenAI Chat Completions shape (e.g. `model`,
+  `messages`, `tools`, `response_format`, etc.).
+- On success, `response.body` is a Hash (String keys) that contains an
+  OpenAI-like payload:
+  - `body["choices"][0]["message"]` (Hash)
+  - `body["choices"][0]["finish_reason"]` (String/nil)
+  - `body["usage"]` (Hash/nil)
+- On non-2xx responses, it raises `SimpleInference::Errors::HTTPError` by
+  default (`raise_on_error: true`), and the error exposes `#status`, `#body`,
+  and `#raw_body`.
+
+#### `#chat(model:, messages:, stream:, include_usage:, **opts, &on_delta) -> SimpleInference::OpenAI::ChatResult`
+
+- Non-streaming: returns a `ChatResult` with `content`, `usage`, `finish_reason`,
+  and `response`.
+- Streaming: yields **String** deltas to the given block and returns the final
+  accumulated `ChatResult`.
+
+### Adding new protocols
+
+New protocol implementations (Anthropic/Gemini/etc.) should translate
+provider-native APIs into the OpenAI-like response body shape above, so app code
+can keep a single parsing path.
+
 ## Configuration
 
 ### Options
@@ -62,6 +95,8 @@ p result.usage
 | `raise_on_error` | `SIMPLE_INFERENCE_RAISE_ON_ERROR` | `true` | Raise exceptions on HTTP errors |
 | `headers` | – | `{}` | Additional headers to send with requests |
 | `adapter` | – | `Default` | HTTP adapter (see [Adapters](#http-adapters)) |
+
+Note: `base_url` must include a URL scheme (e.g. `https://api.openai.com`).
 
 ### Provider Examples
 

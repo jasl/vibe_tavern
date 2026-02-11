@@ -90,19 +90,9 @@ Alternative (not recommended for first pass):
 
 ## Plan (deferred but scoped)
 
-### Phase 0: Lock the adapter contract (design + tests-first)
+### Status
 
-- Define the canonical interface expected by VibeTavern runners:
-  - `#chat_completions(**openai_params) -> SimpleInference::Response`
-  - `#chat(model:, messages:, stream:, include_usage:, **opts) -> SimpleInference::OpenAI::ChatResult`
-  - raises `SimpleInference::Errors::HTTPError` consistently on HTTP failures
-- Define the canonical OpenAI-shaped subset we commit to supporting across adapters:
-  - `messages` role semantics + tool tracing fields
-  - `tools`, `tool_choice`, `parallel_tool_calls`
-  - `response_format` as best-effort (capability-gated)
-- Add “normalization spec” test vectors:
-  - OpenAI request → expected provider JSON + headers
-  - provider response → expected OpenAI-shaped body (`choices[0].message`, `usage`)
+- Phase 0 is complete (adapter contract locked + shared protocol base extracted).
 
 ### Phase 1: Add native text protocols to SimpleInference (chat-only)
 
@@ -123,8 +113,8 @@ Add protocols alongside `OpenAICompatible`:
 
 Construction/back-compat options:
 
-- Option A: `SimpleInference::Client.for(protocol: :anthropic, ...)`
-- Option B: instantiate protocol classes directly and pass to PromptRunner:
+- Option A (future): `SimpleInference::Client.for(protocol: :anthropic, ...)`
+- Option B (current): instantiate protocol classes directly and pass to PromptRunner:
   `PromptRunner.new(client: SimpleInference::Protocols::Anthropic.new(...))`
 
 Tests:

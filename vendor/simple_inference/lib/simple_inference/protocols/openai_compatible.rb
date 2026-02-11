@@ -6,6 +6,8 @@ require "uri"
 require "timeout"
 require "socket"
 
+require_relative "base"
+
 module SimpleInference
   module Protocols
     # OpenAI-compatible HTTP API protocol implementation.
@@ -21,19 +23,7 @@ module SimpleInference
     # Future protocols (Anthropic, Gemini, etc.) should live alongside this class
     # under `SimpleInference::Protocols::*`, keeping provider-specific request/response
     # shapes out of shared application code.
-    class OpenAICompatible
-      attr_reader :config, :adapter
-
-      def initialize(options = {})
-        @config = Config.new(options || {})
-        @adapter = @config.adapter || HTTPAdapters::Default.new
-
-        unless @adapter.is_a?(HTTPAdapter)
-          raise Errors::ConfigurationError,
-                "adapter must be an instance of SimpleInference::HTTPAdapter (got #{@adapter.class})"
-        end
-      end
-
+    class OpenAICompatible < Base
       # POST /v1/chat/completions
       # params: { model: "model-name", messages: [...], ... }
       def chat_completions(**params)
@@ -254,20 +244,22 @@ module SimpleInference
         full_path = with_query(path, params)
         request_json(
           method: :get,
-          path: full_path,
+          url: "#{base_url}#{full_path}",
+          headers: config.headers,
           body: nil,
           expect_json: true,
-          raise_on_http_error: raise_on_http_error
+          raise_on_http_error: raise_on_http_error,
         )
       end
 
       def post_json(path, body, raise_on_http_error: nil)
         request_json(
           method: :post,
-          path: path,
+          url: "#{base_url}#{path}",
+          headers: config.headers,
           body: body,
           expect_json: true,
-          raise_on_http_error: raise_on_http_error
+          raise_on_http_error: raise_on_http_error,
         )
       end
 
@@ -277,6 +269,7 @@ module SimpleInference
         end
 
         url = "#{base_url}#{path}"
+        validate_url!(url)
 
         headers = config.headers.merge(
           "Content-Type" => "application/json",
@@ -456,33 +449,6 @@ module SimpleInference
             },
           ],
         }
-      end
-
-      def request_json(method:, path:, body:, expect_json:, raise_on_http_error:)
-        if base_url.nil? || base_url.empty?
-          raise Errors::ConfigurationError, "base_url is required"
-        end
-
-        url = "#{base_url}#{path}"
-
-        headers = config.headers.merge("Content-Type" => "application/json")
-        payload = body.nil? ? nil : JSON.generate(body)
-
-        request_env = {
-          method: method,
-          url: url,
-          headers: headers,
-          body: payload,
-          timeout: config.timeout,
-          open_timeout: config.open_timeout,
-          read_timeout: config.read_timeout,
-        }
-
-        handle_response(
-          request_env,
-          expect_json: expect_json,
-          raise_on_http_error: raise_on_http_error
-        )
       end
 
       def with_query(path, params)
@@ -688,92 +654,6 @@ module SimpleInference
 
           total
         end
-      end
-
-      def handle_response(request_env, expect_json:, raise_on_http_error:)
-        response = @adapter.call(request_env)
-
-        status = response[:status]
-        headers = (response[:headers] || {}).transform_keys { |k| k.to_s.downcase }
-        body = response[:body].to_s
-
-        should_parse_json =
-          if expect_json.nil?
-            content_type = headers["content-type"]
-            content_type && content_type.include?("json")
-          else
-            expect_json
-          end
-
-        parsed_body =
-          if should_parse_json
-            begin
-              parse_json(body)
-            rescue Errors::DecodeError
-              # Prefer HTTPError over DecodeError for non-2xx responses.
-              status >= 200 && status < 300 ? raise : body
-            end
-          else
-            body
-          end
-
-        response = Response.new(status: status, headers: headers, body: parsed_body, raw_body: body)
-        maybe_raise_http_error(response: response, raise_on_http_error: raise_on_http_error)
-        response
-      rescue Timeout::Error => e
-        raise Errors::TimeoutError, e.message
-      rescue SocketError, SystemCallError => e
-        raise Errors::ConnectionError, e.message
-      end
-
-      def parse_json(body)
-        return nil if body.nil? || body.empty?
-
-        JSON.parse(body)
-      rescue JSON::ParserError => e
-        raise Errors::DecodeError, "Failed to parse JSON response: #{e.message}"
-      end
-
-      def raise_on_http_error?(raise_on_http_error)
-        raise_on_http_error.nil? ? config.raise_on_error : !!raise_on_http_error
-      end
-
-      def http_error_message(status, body_str, parsed_body: nil)
-        message = "HTTP #{status}"
-
-        error_body =
-          if parsed_body.is_a?(Hash)
-            parsed_body
-          else
-            begin
-              JSON.parse(body_str)
-            rescue JSON::ParserError
-              nil
-            end
-          end
-
-        return message unless error_body.is_a?(Hash)
-
-        error_field = error_body["error"]
-        if error_field.is_a?(Hash)
-          error_field["message"] || error_body["message"] || message
-        else
-          error_field || error_body["message"] || message
-        end
-      end
-
-      def maybe_raise_http_error(response:, raise_on_http_error:, ignore_streaming_unsupported: false)
-        return unless raise_on_http_error?(raise_on_http_error)
-        return if response.success?
-
-        # Do not raise for the known "streaming unsupported" case; the caller will
-        # perform a non-streaming retry fallback.
-        return if ignore_streaming_unsupported && streaming_unsupported_error?(response.status, response.body)
-
-        raise Errors::HTTPError.new(
-          http_error_message(response.status, response.raw_body.to_s, parsed_body: response.body),
-          response: response
-        )
       end
     end
   end
