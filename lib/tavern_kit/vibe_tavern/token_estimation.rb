@@ -13,6 +13,7 @@ module TavernKit
       module_function
 
       HF_TOKENIZER_FAMILIES = %i[hf_tokenizers huggingface_tokenizers tokenizers].freeze
+      ESTIMATOR_MUTEX = Mutex.new
 
       SOURCES = [
         {
@@ -110,9 +111,12 @@ module TavernKit
       def estimator(root: default_root)
         root = Pathname.new(root.to_s).cleanpath
         root_dir = tokenizer_root(root: root)
-        @estimators ||= {}
         cache_key = "#{root}|#{root_dir}"
-        @estimators[cache_key] ||= TavernKit::TokenEstimator.new(registry: registry(root: root, tokenizer_root_path: root_dir))
+
+        ESTIMATOR_MUTEX.synchronize do
+          @estimators ||= {}
+          @estimators[cache_key] ||= TavernKit::TokenEstimator.new(registry: registry(root: root, tokenizer_root_path: root_dir))
+        end
       end
 
       def sources

@@ -168,4 +168,3 @@ module TavernKit
     end
   end
 end
-

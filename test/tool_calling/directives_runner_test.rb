@@ -588,6 +588,67 @@ class DirectivesRunnerTest < Minitest::Test
     assert_equal false, request_body.fetch("parallel_tool_calls")
   end
 
+  def test_directives_runner_returns_structured_error_when_tool_calls_are_present
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+
+          response_body = {
+            choices: [
+              {
+                message: {
+                  role: "assistant",
+                  content: "",
+                  tool_calls: [
+                    {
+                      id: "call_1",
+                      type: "function",
+                      function: { name: "state_get", arguments: "{}" },
+                    },
+                  ],
+                },
+                finish_reason: "tool_calls",
+              },
+            ],
+          }
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+    runner_config =
+      build_runner_config(
+        context: {
+          directives: {
+            modes: [:json_schema],
+            repair_retry_count: 0,
+          },
+        },
+      )
+    runner = build_runner(client: client, runner_config: runner_config)
+
+    result =
+      runner.run(
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+      )
+
+    assert_equal false, result[:ok]
+    assert_equal 1, result[:attempts].size
+    assert_equal "TOOL_CALLS_PRESENT", result[:attempts][0].dig(:structured_output_error, :code)
+  end
+
   def test_directives_runner_applies_output_tags_to_assistant_text
     requests = []
 

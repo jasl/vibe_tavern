@@ -164,6 +164,73 @@ class PromptRunnerTest < Minitest::Test
     end
   end
 
+  def test_prompt_runner_does_not_send_parallel_tool_calls_when_capability_is_disabled
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
+    runner_config =
+      build_runner_config(
+        capabilities_overrides: { supports_parallel_tool_calls: false },
+      )
+
+    prompt_request =
+      runner.build_request(
+        runner_config: runner_config,
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+        llm_options: { response_format: { type: "json_object" } },
+      )
+
+    refute prompt_request.request.key?(:parallel_tool_calls)
+  end
+
+  def test_prompt_runner_defaults_parallel_tool_calls_false_for_tool_calling
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
+    runner_config = build_runner_config
+
+    prompt_request =
+      runner.build_request(
+        runner_config: runner_config,
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+        llm_options: {
+          tools: [{ type: "function", function: { name: "state_get", parameters: { type: "object", properties: {} } } }],
+        },
+      )
+
+    assert_equal false, prompt_request.options.fetch(:parallel_tool_calls)
+  end
+
+  def test_prompt_runner_filters_parallel_tool_calls_from_request_when_unsupported
+    runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
+    supported = build_runner_config
+    unsupported =
+      build_runner_config(
+        capabilities_overrides: { supports_parallel_tool_calls: false },
+      )
+
+    prompt_request_supported =
+      runner.build_request(
+        runner_config: supported,
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+        llm_options: {
+          tools: [{ type: "function", function: { name: "state_get", parameters: { type: "object", properties: {} } } }],
+          parallel_tool_calls: true,
+        },
+      )
+
+    assert_equal true, prompt_request_supported.request.fetch(:parallel_tool_calls)
+
+    prompt_request_unsupported =
+      runner.build_request(
+        runner_config: unsupported,
+        history: [TavernKit::PromptBuilder::Message.new(role: :user, content: "hi")],
+        llm_options: {
+          tools: [{ type: "function", function: { name: "state_get", parameters: { type: "object", properties: {} } } }],
+          parallel_tool_calls: true,
+        },
+      )
+
+    assert_equal true, prompt_request_unsupported.options.fetch(:parallel_tool_calls)
+    refute prompt_request_unsupported.request.key?(:parallel_tool_calls)
+  end
+
   def test_prompt_runner_perform_applies_response_transforms
     requests = []
 

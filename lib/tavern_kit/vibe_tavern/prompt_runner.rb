@@ -3,6 +3,7 @@
 require_relative "tool_calling/message_transforms"
 require_relative "tool_calling/response_transforms"
 require_relative "preflight"
+require_relative "request_policy"
 require_relative "runner_config"
 
 module TavernKit
@@ -97,13 +98,9 @@ module TavernKit
 
         messages = plan.to_messages(dialect: dialect)
         options = (plan.llm_options || {}).dup
+        TavernKit::VibeTavern::RequestPolicy.normalize_options!(options, capabilities: runner_config.capabilities)
         request = { model: runner_config.model, messages: messages }.merge(options)
-
-        if request.key?(:response_format)
-          # Structured outputs should remain deterministic.
-          options[:parallel_tool_calls] = false
-          request[:parallel_tool_calls] = false
-        end
+        TavernKit::VibeTavern::RequestPolicy.filter_request!(request, capabilities: runner_config.capabilities)
 
         tools_present = request.key?(:tools) || request.key?(:tool_choice)
         TavernKit::VibeTavern::Preflight.validate_request!(

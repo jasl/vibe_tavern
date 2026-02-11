@@ -57,9 +57,14 @@ To keep call sites consistent, we use a single entrypoint object:
 Hard invariants are enforced centrally in:
 - `lib/tavern_kit/vibe_tavern/preflight.rb`
 
+Request normalization is applied centrally in:
+- `lib/tavern_kit/vibe_tavern/request_policy.rb`
+  - structured outputs force `parallel_tool_calls: false` in internal options
+  - `parallel_tool_calls` is removed from the outbound request when the current
+    provider/model capabilities do not support sending the field
+
 Examples:
 - tools and `response_format` are mutually exclusive in a single request
-- structured outputs enforce `parallel_tool_calls: false`
 - streaming is not supported for tool calling / response_format in this layer
 
 ### 1) Prompt building (DSL → messages)
@@ -146,6 +151,7 @@ Directives are designed to be:
 
 Structured outputs invariant:
 - any request using `response_format` forces `parallel_tool_calls: false`
+  (via `RequestPolicy`, best-effort depending on capabilities)
 
 ### 5) Presets: explicit provider/model workarounds
 

@@ -808,6 +808,19 @@ module TavernKit
           return :too_large if str.bytesize > @max_tool_args_bytes
 
           parsed = JSON.parse(str)
+
+          if parsed.is_a?(String)
+            inner = parsed.strip
+            return :too_large if inner.bytesize > @max_tool_args_bytes
+
+            begin
+              parsed2 = JSON.parse(inner)
+              parsed = parsed2 unless parsed2.nil?
+            rescue JSON::ParserError
+              return :invalid_json
+            end
+          end
+
           return TavernKit::Utils.deep_stringify_keys(parsed) if parsed.is_a?(Hash)
 
           :invalid_json

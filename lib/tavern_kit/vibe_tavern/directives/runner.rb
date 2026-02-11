@@ -119,7 +119,6 @@ module TavernKit
 
               llm_options_hash.delete(:response_format)
               llm_options_hash[:response_format] = response_format if response_format
-              llm_options_hash[:parallel_tool_calls] = false if response_format
 
               validate_llm_options!(llm_options_hash)
 
@@ -338,7 +337,27 @@ module TavernKit
               false
             end
 
-          return [nil, nil, []] if tool_calls_present
+          if tool_calls_present
+            tool_calls_count =
+              case tool_calls
+              when Array
+                tool_calls.size
+              when Hash
+                tool_calls.size
+              else
+                0
+              end
+
+            return [
+                     nil,
+                     {
+                       code: "TOOL_CALLS_PRESENT",
+                       message: "Tool calls are not allowed in directives mode; output JSON envelope only.",
+                       tool_calls_count: tool_calls_count,
+                     },
+                     [],
+                   ]
+          end
 
           parsed =
             TavernKit::VibeTavern::Directives::Parser.parse_json(
