@@ -174,6 +174,16 @@ Stability-first default:
 - if the effective request sets `parallel_tool_calls: false` and no explicit max is set,
   the runner defaults to `max_tool_calls_per_turn=1` (sequential tool calls)
 
+### Assistant content policy in tool-call turns
+
+Some providers/models emit natural-language content alongside `tool_calls`.
+To keep tool loops deterministic (and reduce language/style “bleed” into tool
+turns), ToolLoopRunner enforces:
+
+- if an assistant message contains any `tool_calls`, the assistant message
+  written back into history has `content: ""`
+- any stripped content is recorded in trace as a small sample (debug only)
+
 ### Empty final assistant recovery
 
 Some providers occasionally return an empty final assistant message even after

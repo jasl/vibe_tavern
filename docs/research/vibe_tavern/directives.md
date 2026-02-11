@@ -274,7 +274,8 @@ Code lives under `lib/tavern_kit/vibe_tavern/`:
   - transport-only request boundary (build/send one request; no directives parsing)
 - `TavernKit::VibeTavern::Directives::Runner`
   - injects `response_format` by mode
-  - enforces `parallel_tool_calls: false` for structured modes
+  - relies on `PromptRunner` request normalization (`RequestPolicy`) for structured-output invariants
+    (e.g. `parallel_tool_calls: false` when the provider/model supports sending the field)
   - parses + validates envelope and applies optional repair retry
   - applies OutputTags post-pass to `assistant_text`
 

@@ -93,9 +93,16 @@ Estimator selection precedence:
 3) `context[:token_estimation][:registry]` (build `TavernKit::TokenEstimator.new(registry: ...)`)
 4) default `TavernKit::VibeTavern::TokenEstimation.estimator`
 
-Actionable checklist doc:
+### Caching strategy
 
-- `docs/todo/vibe_tavern/tokenizer-loading.md`
+There are two layers of caching:
+
+- App-level estimator instance cache:
+  - `TavernKit::VibeTavern::TokenEstimation.estimator` memoizes a configured
+    `TavernKit::TokenEstimator` per tokenizer root path.
+- Core adapter caches:
+  - `TokenEstimator` caches HF tokenizers in an LRU cache (by `tokenizer_path`).
+  - `tiktoken` adapter caches encoding selection per `model_hint`.
 
 ### Boot-time preload
 
@@ -104,6 +111,15 @@ Actionable checklist doc:
 - `TokenEstimation.estimator.preload!(strict: Rails.env.production?)`
 
 In production, this fails fast if a tokenizer asset is missing/invalid.
+
+## Failure / degradation policy
+
+Token estimation is a budgeting/observability helper, not a protocol boundary.
+
+- Hot path: `TokenEstimator#estimate` is defensive and should never raise:
+  - configured backend → `tiktoken` → heuristic
+  - always returns an Integer
+- Deploy-time: `preload!(strict: true)` may raise to catch missing/invalid assets.
 
 ## Tokenizer assets (download + commit)
 

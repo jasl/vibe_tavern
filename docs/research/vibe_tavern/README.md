@@ -13,9 +13,10 @@ Audience:
 1) `docs/research/vibe_tavern/architecture.md`
 2) `docs/research/vibe_tavern/token-estimation.md`
 3) `docs/research/vibe_tavern/macros.md`
-4) `docs/research/vibe_tavern/tool-calling.md`
-5) `docs/research/vibe_tavern/directives.md`
-6) (Optional) `docs/research/vibe_tavern/ruby-llm.md`
+4) `docs/research/vibe_tavern/language-policy.md`
+5) `docs/research/vibe_tavern/tool-calling.md`
+6) `docs/research/vibe_tavern/directives.md`
+7) (Optional) `docs/research/vibe_tavern/ruby-llm.md`
 
 Product backlog (not research, intentionally not locked in yet):
 - `docs/todo/vibe_tavern/deferred-agentic-generation.md`
