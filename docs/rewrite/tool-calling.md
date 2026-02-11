@@ -2,4 +2,4 @@
 
 Tool calling reliability notes are now maintained as a research/case study doc:
 
-- `docs/research/vibe_tavern/tool-calling.md`
+- `docs/vibe_tavern/case_studies/tool-calling.md`

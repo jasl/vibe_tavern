@@ -29,7 +29,7 @@ Guidelines:
   - Add DB-free tool-calling loop harness + offline tests + optional OpenRouter eval script: `677f3e9`
   - Support `llm_options(...)` in the prompt DSL (for tools/request-level features): `27f650f`
   - Refactor embedded `simple_inference` to a protocol-based structure (OpenAI-compatible stays default): `08dd945`
-  - Doc: `docs/research/vibe_tavern/tool-calling.md`
+  - Doc: `docs/vibe_tavern/case_studies/tool-calling.md`
 
 - Liquid-based macros foundation (app-owned, for `TavernKit::VibeTavern`)
   - Add Liquid dependency: `88dff88`

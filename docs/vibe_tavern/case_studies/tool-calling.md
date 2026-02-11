@@ -14,8 +14,8 @@ Out of scope (for now):
 - UI/editor product flows (this doc is infra + experiments only)
 
 Related (separate protocol):
-- Structured Directives (single-turn UI/state instructions): `docs/research/vibe_tavern/directives.md`
-- Architecture overview: `docs/research/vibe_tavern/architecture.md`
+- Structured Directives (single-turn UI/state instructions): `docs/vibe_tavern/case_studies/directives.md`
+- Architecture overview: `docs/vibe_tavern/design/architecture.md`
 
 ## Conclusions (current)
 

@@ -128,4 +128,3 @@ Deterministic coverage:
 - Drift detection + optional rewrite fallback for **non-streaming** outputs.
 - Hit-based glossary / “no translate list” injection to stabilize terminology.
 - App-level UX for per-turn language overrides (`allow_language_switch`).
-

@@ -7,10 +7,15 @@ This repo currently maintains three doc tracks:
 These are app/rewrite implementation notes:
 - `docs/rewrite/README.md`
 
-## Research / case study docs (shareable)
+## VibeTavern docs
 
-These are reliability-focused write-ups for `TavernKit::VibeTavern`:
-- `docs/research/vibe_tavern/README.md`
+These docs include:
+- architecture + design docs
+- reliability case studies
+- developer usage guides (for humans and AIs)
+
+Start here:
+- `docs/vibe_tavern/README.md`
 
 ## Product TODO / backlog docs
 

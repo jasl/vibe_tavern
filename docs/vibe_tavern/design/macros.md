@@ -1,10 +1,10 @@
-# Liquid Macros (Research Notes)
+# Liquid Macros (VibeTavern)
 
 This document records the **Liquid-based macro language** used by the app-owned
 prompt pipeline (`TavernKit::VibeTavern`).
 
 Architecture overview:
-- `docs/research/vibe_tavern/architecture.md`
+- `docs/vibe_tavern/design/architecture.md`
 
 Goal: make templates feel close to ST/RisuAI “Handlebars-like” authoring, while
 keeping a Ruby-native, testable implementation.

@@ -10,6 +10,6 @@ Start here:
 - Work log (what changed and why): `docs/rewrite/work-log.md`
 
 Research / case study notes (shareable):
-- `docs/research/vibe_tavern/README.md`
+- `docs/vibe_tavern/README.md`
 
 For the TavernKit gem documentation, see: `vendor/tavern_kit/docs/README.md`.

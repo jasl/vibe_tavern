@@ -1,4 +1,4 @@
-# TavernKit::VibeTavern Architecture (Research Notes)
+# TavernKit::VibeTavern Architecture
 
 This document describes the **architecture boundaries** of `TavernKit::VibeTavern`
 as implemented in this repo.

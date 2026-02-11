@@ -6,8 +6,8 @@ without making the LLM generate A2UI directly.
 This is a product-facing backlog item. It depends on (and builds on) the
 protocol/reliability work already documented in:
 
-- Structured directives: `docs/research/vibe_tavern/directives.md`
-- Architecture overview: `docs/research/vibe_tavern/architecture.md`
+- Structured directives: `docs/vibe_tavern/case_studies/directives.md`
+- Architecture overview: `docs/vibe_tavern/design/architecture.md`
 - A2UI reference source: `resources/A2UI/` (upstream repo checkout)
 
 ## Why A2UI (and why compile instead of generating A2UI)

@@ -24,8 +24,8 @@ Non-goals (for now):
 - model-specific hacks in core runners (quirks live in opt-in presets/transforms)
 
 Related (separate protocol):
-- Tool calling (multi-turn, side effects): `docs/research/vibe_tavern/tool-calling.md`
-- Architecture overview: `docs/research/vibe_tavern/architecture.md`
+- Tool calling (multi-turn, side effects): `docs/vibe_tavern/case_studies/tool-calling.md`
+- Architecture overview: `docs/vibe_tavern/design/architecture.md`
 
 Prompt-build boundary (current):
 - Directives runners are protocol-layer components and do not parse prompt step

@@ -9,8 +9,8 @@ that can help users generate and iteratively edit:
 That product-level goal is **deferred** for now. We are currently focusing on
 making the **protocol layer** reliable across models/providers:
 
-- Tool use (multi-turn tool loop): `docs/research/vibe_tavern/tool-calling.md`
-- Structured directives (single-turn UI/state instructions): `docs/research/vibe_tavern/directives.md`
+- Tool use (multi-turn tool loop): `docs/vibe_tavern/case_studies/tool-calling.md`
+- Structured directives (single-turn UI/state instructions): `docs/vibe_tavern/case_studies/directives.md`
 
 This document is a parking lot for the original goal: requirements, candidate
 architecture ideas, and open questions. Nothing here is “locked in”.
