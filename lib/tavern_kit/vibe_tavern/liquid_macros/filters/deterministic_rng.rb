@@ -14,8 +14,10 @@ module TavernKit
           # Returns a 7-digit deterministic number string derived from the input.
           def hash7(input)
             word = input.to_s
-            num = (pick_hash_rand(0, word) * 10_000_000) + 1
-            num.round.to_i.to_s.rjust(7, "0")
+            num = (pick_hash_rand(0, word) * 10_000_000).floor
+            num = 9_999_999 if num > 9_999_999
+            num = 0 if num.negative?
+            num.to_i.to_s.rjust(7, "0")
           rescue StandardError
             ""
           end

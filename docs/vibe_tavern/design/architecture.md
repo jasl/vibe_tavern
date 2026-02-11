@@ -166,9 +166,10 @@ Principle:
 - Provider/model quirks are **opt-in** and composable.
 
 Cross-protocol compatibility:
-- Directives runner filters reserved keys from request overrides (`tools`,
-  `tool_choice`, `response_format`) so directives presets cannot accidentally
-  leak tool config into directives requests (and vice versa).
+- Directives runner rejects tool-calling keys in request overrides (`tools`,
+  `tool_choice`) and always overwrites `response_format` per mode, so directives
+  presets cannot accidentally leak tool config into directives requests (and
+  vice versa).
 
 ## Shared deterministic utilities (vendor)
 
