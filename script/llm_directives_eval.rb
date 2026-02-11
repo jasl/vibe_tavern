@@ -1213,19 +1213,33 @@ run_task =
     }
   end
 
+production_auto_sampling_profile =
+  ENV.fetch("OPENROUTER_PRODUCTION_AUTO_SAMPLING_PROFILE", "1") == "1"
+recommended_sampling_profiles = OpenRouterSamplingProfiles::CATALOG.filter("recommended")
+
 task_list =
   selected_models.each_with_index.flat_map do |model_entry, model_index|
-    profiles =
+    base_profiles =
       if enforce_sampling_profile_applicability
         selected_sampling_profiles.select { |p| p.applies_to_model?(model_entry.id) }
       else
         selected_sampling_profiles
       end
 
-    profiles = [default_sampling_profile] if profiles.empty?
+    base_profiles = [default_sampling_profile] if base_profiles.empty?
 
-    profiles.flat_map do |profile|
-      requested_strategies.flat_map do |strategy|
+    requested_strategies.flat_map do |strategy|
+      profiles = base_profiles
+
+      if production_auto_sampling_profile &&
+          strategy.id == DirectivesEval::Strategies::PRODUCTION.id &&
+          base_profiles.length == 1 &&
+          base_profiles.first.id == default_sampling_profile.id
+        recommended = recommended_sampling_profiles.find { |p| p.applies_to_model?(model_entry.id) }
+        profiles = [recommended] if recommended
+      end
+
+      profiles.flat_map do |profile|
         selected_language_policies.map do |language_policy|
           {
             model_entry: model_entry,
@@ -1277,7 +1291,7 @@ summary = {
   language_policy_strict: language_policy_strict,
   language_policies: selected_language_policies.map(&:id),
   sampling_profile_filter: sampling_profile_filter,
-  sampling_profiles: selected_sampling_profiles.map(&:id),
+  sampling_profiles: task_list.map { |t| t[:sampling_profile].id }.uniq,
   sampling_profile_enforce_applicability: enforce_sampling_profile_applicability,
   strategy_filter: raw_strategy_filter,
   strategy_matrix: strategy_matrix,
@@ -1372,7 +1386,7 @@ puts "language_policy_matrix: #{language_policy_matrix}" if language_policy_matr
 puts "language_policy_strict: #{language_policy_strict}" if language_policy_strict
 puts "language_policies: #{selected_language_policies.map(&:id).join(",")}"
 puts "sampling_profile_filter: #{sampling_profile_filter}"
-puts "sampling_profiles: #{selected_sampling_profiles.map(&:id).join(",")}"
+puts "sampling_profiles: #{task_list.map { |t| t[:sampling_profile].id }.uniq.join(",")}"
 puts "strategy_filter: #{raw_strategy_filter}" unless raw_strategy_filter.empty?
 puts "strategy_matrix: #{strategy_matrix}" if strategy_matrix
 puts "strategies: #{requested_strategies.map(&:id).join(",")}"

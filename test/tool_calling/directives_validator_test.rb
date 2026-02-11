@@ -5,6 +5,24 @@ require_relative "test_helper"
 require_relative "../../lib/tavern_kit/vibe_tavern/directives/validator"
 
 class DirectivesValidatorTest < Minitest::Test
+  def test_validate_accepts_assistant_text_key_variants
+    envelope = {
+      "assistant‒text" => "ok",
+      "directives" => [
+        { "type" => "ui.show_form", "payload" => { "form_id" => "character_form_v1" } },
+      ],
+    }
+
+    result =
+      TavernKit::VibeTavern::Directives::Validator.validate(
+        envelope,
+        allowed_types: ["ui.show_form"],
+      )
+
+    assert_equal true, result[:ok]
+    assert_equal "ok", result[:value].fetch("assistant_text")
+  end
+
   def test_validate_canonicalizes_superficial_type_variants_via_allowlist
     envelope = {
       "assistant_text" => "ok",

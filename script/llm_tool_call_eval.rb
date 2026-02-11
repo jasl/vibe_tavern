@@ -1661,19 +1661,33 @@ FileUtils.mkdir_p(out_dir)
 
 reports = []
 
+production_auto_sampling_profile =
+  ENV.fetch("OPENROUTER_PRODUCTION_AUTO_SAMPLING_PROFILE", "1") == "1"
+recommended_sampling_profiles = OpenRouterSamplingProfiles::CATALOG.filter("recommended")
+
 task_list =
   selected_model_entries.each_with_index.flat_map do |model_entry, model_index|
-    profiles =
+    base_profiles =
       if enforce_sampling_profile_applicability
         selected_sampling_profiles.select { |p| p.applies_to_model?(model_entry.id) }
       else
         selected_sampling_profiles
       end
 
-    profiles = [default_sampling_profile] if profiles.empty?
+    base_profiles = [default_sampling_profile] if base_profiles.empty?
 
-    profiles.flat_map do |sampling_profile|
-      requested_strategies.flat_map do |strategy|
+    requested_strategies.flat_map do |strategy|
+      profiles = base_profiles
+
+      if production_auto_sampling_profile &&
+          strategy.id == ToolCallEval::Strategies::PRODUCTION.id &&
+          base_profiles.length == 1 &&
+          base_profiles.first.id == default_sampling_profile.id
+        recommended = recommended_sampling_profiles.find { |p| p.applies_to_model?(model_entry.id) }
+        profiles = [recommended] if recommended
+      end
+
+      profiles.flat_map do |sampling_profile|
         fallback_profiles.flat_map do |fallback_profile|
           selected_language_policies.map do |language_policy|
             {
@@ -2313,7 +2327,7 @@ summary = {
   tool_allowlist: tool_allowlist,
   request_overrides: base_request_overrides,
   sampling_profile_filter: sampling_profile_filter,
-  sampling_profiles: selected_sampling_profiles.map(&:id),
+  sampling_profiles: task_list.map { |t| t[:sampling_profile].id }.uniq,
   sampling_profile_enforce_applicability: enforce_sampling_profile_applicability,
   llm_options_defaults_overrides: llm_options_defaults_overrides,
   model_filter: model_filter,
@@ -2425,7 +2439,7 @@ puts "fix_empty_final: #{fix_empty_final}"
 puts "tool_allowlist: #{tool_allowlist ? tool_allowlist.join(",") : "(full)"}"
 puts "request_overrides: #{base_request_overrides.any? ? base_request_overrides.keys.join(",") : "(none)"}"
 puts "sampling_profile_filter: #{sampling_profile_filter}"
-puts "sampling_profiles: #{selected_sampling_profiles.map(&:id).join(",")}"
+puts "sampling_profiles: #{task_list.map { |t| t[:sampling_profile].id }.uniq.join(",")}"
 puts "model_filter: #{model_filter}"
 puts "selected_models: #{selected_model_entries.map(&:id).join(",")}"
 puts "strategy_filter: #{raw_strategy_filter}" unless raw_strategy_filter.empty?

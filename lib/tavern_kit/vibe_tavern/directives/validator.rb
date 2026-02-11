@@ -299,6 +299,12 @@ module TavernKit
             hash[key]
           elsif hash.key?(key.to_sym)
             hash[key.to_sym]
+          else
+            wanted_token = tokenize_type(key)
+            return nil if wanted_token.empty?
+
+            matched_key = hash.keys.find { |k| tokenize_type(k) == wanted_token }
+            matched_key ? hash[matched_key] : nil
           end
         end
         private_class_method :fetch_key
