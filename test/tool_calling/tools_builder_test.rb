@@ -10,31 +10,7 @@ require_relative "../../lib/tavern_kit/vibe_tavern/tools_builder"
 class ToolsBuilderTest < Minitest::Test
   ToolDefinition = TavernKit::VibeTavern::ToolsBuilder::Definition
 
-  class DefaultExecutor
-    def call(name:, args:)
-      {
-        ok: true,
-        tool_name: name,
-        data: { routed: "default", args: args },
-        warnings: [],
-        errors: [],
-      }
-    end
-  end
-
-  class McpExecutor
-    def call(name:, args:)
-      {
-        ok: true,
-        tool_name: name,
-        data: { routed: "mcp", args: args },
-        warnings: [],
-        errors: [],
-      }
-    end
-  end
-
-  def test_builds_snapshot_catalog_and_default_executor_router
+  def test_builds_snapshot_catalog
     base =
       TavernKit::VibeTavern::Tools::Custom::Catalog.new(
         definitions: [
@@ -57,20 +33,15 @@ class ToolsBuilderTest < Minitest::Test
       TavernKit::VibeTavern::ToolsBuilder.build(
         runner_config: runner_config,
         base_catalog: base,
-        default_executor: DefaultExecutor.new,
       )
 
-    assert_kind_of TavernKit::VibeTavern::ToolsBuilder::CatalogSnapshot, surface.catalog
+    assert_kind_of TavernKit::VibeTavern::ToolsBuilder::CatalogSnapshot, surface
 
-    names = surface.catalog.openai_tools(expose: :model).map { |t| t.dig(:function, :name) }.compact
+    names = surface.openai_tools(expose: :model).map { |t| t.dig(:function, :name) }.compact
     assert_includes names, "state_get"
-
-    result = surface.executor.call(name: "state_get", args: { "a" => 1 })
-    assert_equal true, result.fetch(:ok)
-    assert_equal "default", result.fetch(:data).fetch(:routed)
   end
 
-  def test_includes_skills_tools_and_routes_skills_prefix
+  def test_includes_skills_tools
     Dir.mktmpdir do |dir|
       skills_root = File.join(dir, "skills_root")
       skill_dir = File.join(skills_root, "foo")
@@ -104,19 +75,14 @@ class ToolsBuilderTest < Minitest::Test
           base_catalog: TavernKit::VibeTavern::Tools::Custom::Catalog.new,
         )
 
-      names = surface.catalog.openai_tools(expose: :model).map { |t| t.dig(:function, :name) }.compact
+      names = surface.openai_tools(expose: :model).map { |t| t.dig(:function, :name) }.compact
       assert_includes names, "skills_list"
       assert_includes names, "skills_load"
       assert_includes names, "skills_read_file"
-
-      result = surface.executor.call(name: "skills_list", args: {})
-      assert_equal true, result.fetch(:ok)
-      skills = result.fetch(:data).fetch(:skills)
-      assert_equal ["foo"], skills.map { |s| s.fetch(:name) }
     end
   end
 
-  def test_includes_mcp_tools_and_routes_mcp_prefix
+  def test_includes_mcp_tools
     runner_config =
       TavernKit::VibeTavern::RunnerConfig.build(
         provider: "openrouter",
@@ -138,15 +104,10 @@ class ToolsBuilderTest < Minitest::Test
         runner_config: runner_config,
         base_catalog: TavernKit::VibeTavern::Tools::Custom::Catalog.new,
         mcp_definitions: mcp_defs,
-        mcp_executor: McpExecutor.new,
       )
 
-    names = surface.catalog.openai_tools(expose: :model).map { |t| t.dig(:function, :name) }.compact
+    names = surface.openai_tools(expose: :model).map { |t| t.dig(:function, :name) }.compact
     assert_includes names, "mcp_fake__echo"
-
-    result = surface.executor.call(name: "mcp_fake__echo", args: { "x" => 1 })
-    assert_equal true, result.fetch(:ok)
-    assert_equal "mcp", result.fetch(:data).fetch(:routed)
   end
 
   def test_raises_on_duplicate_tool_names_across_sources
@@ -217,7 +178,6 @@ class ToolsBuilderTest < Minitest::Test
       TavernKit::VibeTavern::ToolsBuilder.build(
         runner_config: runner_config,
         base_catalog: base,
-        default_executor: DefaultExecutor.new,
       )
     end
   end
@@ -249,10 +209,9 @@ class ToolsBuilderTest < Minitest::Test
       TavernKit::VibeTavern::ToolsBuilder.build(
         runner_config: runner_config,
         base_catalog: base,
-        default_executor: DefaultExecutor.new,
       )
 
-    names = surface.catalog.openai_tools(expose: :model).map { |t| t.dig(:function, :name) }.compact
+    names = surface.openai_tools(expose: :model).map { |t| t.dig(:function, :name) }.compact
     assert_equal ["tool_0"], names
   end
 end

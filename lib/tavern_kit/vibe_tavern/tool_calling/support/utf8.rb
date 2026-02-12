@@ -2,7 +2,7 @@
 
 module TavernKit
   module VibeTavern
-    module ToolsBuilder
+    module ToolCalling
       module Support
         module Utf8
           module_function

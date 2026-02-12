@@ -2,7 +2,7 @@
 
 module TavernKit
   module VibeTavern
-    module ToolsBuilder
+    module ToolCalling
       module Support
         module Envelope
           module_function

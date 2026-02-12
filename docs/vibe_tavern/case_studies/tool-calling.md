@@ -109,7 +109,9 @@ Tool injection/execution:
   - validates tool name + args, executes tool, returns a normalized result envelope
 - `lib/tavern_kit/vibe_tavern/tools_builder/composer.rb`
   - compose multiple tool-definition sets into one catalog
-- `lib/tavern_kit/vibe_tavern/tools_builder/executor_router.rb`
+- `lib/tavern_kit/vibe_tavern/tool_calling/executor_builder.rb`
+  - build a runtime executor/router for the model-visible tool surface
+- `lib/tavern_kit/vibe_tavern/tool_calling/executor_router.rb`
   - route tool execution by tool-name prefix (`skills_*`, `mcp_*`, default)
 
 ### Optional: EasyTalk for tool parameter schemas
@@ -140,8 +142,8 @@ tool =
 
 Compatibility hooks (opt-in):
 
-- `lib/tavern_kit/vibe_tavern/tool_calling/message_transforms.rb`
-- `lib/tavern_kit/vibe_tavern/tool_calling/response_transforms.rb`
+- `lib/tavern_kit/vibe_tavern/transforms/message_transforms.rb`
+- `lib/tavern_kit/vibe_tavern/transforms/response_transforms.rb`
 - `lib/tavern_kit/vibe_tavern/tool_calling/tool_transforms.rb`
 - `lib/tavern_kit/vibe_tavern/tool_calling/tool_call_transforms.rb`
 - `lib/tavern_kit/vibe_tavern/tool_calling/tool_result_transforms.rb`

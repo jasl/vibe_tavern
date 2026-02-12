@@ -20,12 +20,5 @@ TavernKit::VibeTavern::TokenEstimation.configure(
 )
 
 require_relative "../../lib/tavern_kit/vibe_tavern/tools/skills"
-require_relative "../../lib/tavern_kit/vibe_tavern/tools/skills/store"
-require_relative "../../lib/tavern_kit/vibe_tavern/tools/skills/config"
-require_relative "../../lib/tavern_kit/vibe_tavern/tools/skills/frontmatter"
-require_relative "../../lib/tavern_kit/vibe_tavern/tools/skills/skill_metadata"
-require_relative "../../lib/tavern_kit/vibe_tavern/tools/skills/skill"
-require_relative "../../lib/tavern_kit/vibe_tavern/tools/skills/file_system_store"
-require_relative "../../lib/tavern_kit/vibe_tavern/tools/skills/tool_executor"
 require_relative "../../lib/tavern_kit/vibe_tavern/runner_config"
 require_relative "../../lib/tavern_kit/vibe_tavern/prompt_runner"

@@ -2,7 +2,7 @@
 
 require_relative "test_helper"
 
-require_relative "../../lib/tavern_kit/vibe_tavern/tools_builder/executor_router"
+require_relative "../../lib/tavern_kit/vibe_tavern/tool_calling/executor_router"
 
 class ToolExecutorRouterTest < Minitest::Test
   class SkillsExecutor
@@ -43,7 +43,7 @@ class ToolExecutorRouterTest < Minitest::Test
 
   def test_routes_by_prefix_and_passes_tool_call_id_only_when_supported
     router =
-      TavernKit::VibeTavern::ToolsBuilder::ExecutorRouter.new(
+      TavernKit::VibeTavern::ToolCalling::ExecutorRouter.new(
         skills_executor: SkillsExecutor.new,
         mcp_executor: McpExecutor.new,
         default_executor: DefaultExecutor.new,
@@ -66,7 +66,7 @@ class ToolExecutorRouterTest < Minitest::Test
   end
 
   def test_returns_not_implemented_when_no_executor_available
-    router = TavernKit::VibeTavern::ToolsBuilder::ExecutorRouter.new
+    router = TavernKit::VibeTavern::ToolCalling::ExecutorRouter.new
 
     result = router.call(name: "skills_list", args: {})
     assert_equal false, result.fetch(:ok)

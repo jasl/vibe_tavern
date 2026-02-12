@@ -160,7 +160,8 @@ Additional first-class tool sources (optional):
 
 When wiring multiple tool sources:
 - prefer `TavernKit::VibeTavern::ToolsBuilder` as the canonical composition entrypoint
-- the low-level primitives remain available (`ToolsBuilder::Composer`, `ToolsBuilder::ExecutorRouter`)
+- prefer `TavernKit::VibeTavern::ToolCalling::ExecutorBuilder` as the canonical executor wiring entrypoint
+- the low-level primitives remain available (`ToolsBuilder::Composer`, `ToolCalling::ExecutorRouter`)
 
 ### 4) Structured directives: Schema/Parser/Validator/Runner
 

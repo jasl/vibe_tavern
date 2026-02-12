@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "constants"
+
 module TavernKit
   module VibeTavern
     module Directives
@@ -9,9 +11,6 @@ module TavernKit
       # config hash itself so upper layers (scripts/app) can compose settings
       # without hidden behavior.
       module Presets
-        DEFAULT_MODES = %i[json_schema json_object prompt_only].freeze
-        DEFAULT_REPAIR_RETRY_COUNT = 1
-
         module_function
 
         def default_directives

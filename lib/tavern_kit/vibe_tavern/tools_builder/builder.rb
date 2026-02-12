@@ -9,9 +9,7 @@ module TavernKit
         def build(
           runner_config:,
           base_catalog: nil,
-          default_executor: nil,
-          mcp_definitions: nil,
-          mcp_executor: nil
+          mcp_definitions: nil
         )
           raise ArgumentError, "runner_config is required" unless runner_config.is_a?(TavernKit::VibeTavern::RunnerConfig)
 
@@ -26,7 +24,7 @@ module TavernKit
           skills_cfg = TavernKit::VibeTavern::Tools::Skills::Config.from_context(runner_config.context)
 
           custom_tools = Array(base_catalog.definitions)
-          skill_tools = skills_cfg.enabled ? TavernKit::VibeTavern::Tools::Skills::ToolExecutor.tool_definitions : []
+          skill_tools = skills_cfg.enabled ? TavernKit::VibeTavern::Tools::Skills::ToolDefinitions.definitions : []
           mcp_tools = mcp_definitions.nil? ? [] : Array(mcp_definitions)
 
           normalized_defs = normalize_definitions(custom_tools + skill_tools + mcp_tools)
@@ -45,8 +43,6 @@ module TavernKit
               base_custom_catalog
             end
 
-          visible_defs = catalog.definitions.select(&:exposed_to_model?)
-
           if tools_enabled
             catalog =
               TavernKit::VibeTavern::ToolsBuilder::CatalogSnapshot.build_from(
@@ -55,53 +51,7 @@ module TavernKit
                 max_bytes: cfg.max_tool_definitions_bytes,
               )
           end
-
-          executor =
-            if tools_enabled
-              if !mcp_definitions.nil? && mcp_executor.nil?
-                raise ArgumentError, "mcp_executor is required when mcp_definitions are provided"
-              end
-
-              skills_executor =
-                if skills_cfg.enabled
-                  TavernKit::VibeTavern::Tools::Skills::ToolExecutor.new(
-                    store: skills_cfg.store,
-                    max_bytes: cfg.max_tool_output_bytes,
-                  )
-                end
-
-              if visible_defs.any? { |d| d.name.to_s.start_with?("skills_") } && skills_executor.nil?
-                raise ArgumentError, "skills executor is required for skills_* tools"
-              end
-
-              if visible_defs.any? { |d| d.name.to_s.start_with?("mcp_") } && mcp_executor.nil?
-                raise ArgumentError, "mcp_executor is required for mcp_* tools"
-              end
-
-              needs_default_executor =
-                visible_defs.any? do |d|
-                  n = d.name.to_s
-                  !n.start_with?("skills_") && !n.start_with?("mcp_")
-                end
-
-              needs_default_executor = false if visible_defs.empty?
-
-              if needs_default_executor && default_executor.nil?
-                raise ArgumentError, "default_executor is required for non-prefixed tools"
-              end
-
-              if skills_executor.nil? && mcp_executor.nil? && default_executor.nil?
-                raise ArgumentError, "at least one tool executor is required when tool_use_mode is enabled"
-              end
-
-              TavernKit::VibeTavern::ToolsBuilder::ExecutorRouter.new(
-                skills_executor: skills_executor,
-                mcp_executor: mcp_executor,
-                default_executor: default_executor,
-              )
-            end
-
-          BuildResult.new(catalog: catalog, executor: executor)
+          catalog
         end
 
         def normalize_definitions(defs)

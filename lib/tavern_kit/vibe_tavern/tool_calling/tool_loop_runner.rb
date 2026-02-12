@@ -16,10 +16,6 @@ module TavernKit
     module ToolCalling
       class ToolLoopRunner
         DEFAULT_MAX_TURNS = 12
-        MAX_TOOL_ARGS_BYTES = 200_000
-        MAX_TOOL_OUTPUT_BYTES = 200_000
-        TOOL_USE_MODES = %i[enforced relaxed disabled].freeze
-        TOOL_FAILURE_POLICIES = %i[fatal tolerated].freeze
         DEFAULT_FIX_EMPTY_FINAL_USER_TEXT = "Please provide your final answer.".freeze
         FINAL_STREAM_SYSTEM_SUFFIX =
           "Tools are now disabled. Using the tool results above, provide your final answer only. Do not request tool calls.".freeze

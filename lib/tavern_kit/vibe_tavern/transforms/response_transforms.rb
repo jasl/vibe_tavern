@@ -4,7 +4,7 @@ require "json"
 
 module TavernKit
   module VibeTavern
-    module ToolCalling
+    module Transforms
       # Provider/model compatibility shims applied to inbound OpenAI-style response
       # message hashes.
       #
@@ -70,7 +70,7 @@ module TavernKit
   end
 end
 
-TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
+TavernKit::VibeTavern::Transforms::ResponseTransforms.register(
   "assistant_function_call_to_tool_calls",
   lambda do |msg|
     tool_calls = msg.fetch("tool_calls", nil)
@@ -98,7 +98,7 @@ TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
   end,
 )
 
-TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
+TavernKit::VibeTavern::Transforms::ResponseTransforms.register(
   "assistant_tool_calls_object_to_array",
   lambda do |msg|
     tool_calls = msg.fetch("tool_calls", nil)
@@ -108,7 +108,7 @@ TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
   end,
 )
 
-TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
+TavernKit::VibeTavern::Transforms::ResponseTransforms.register(
   "assistant_tool_calls_arguments_json_string_if_hash",
   lambda do |msg|
     tool_calls = msg.fetch("tool_calls", nil)
@@ -182,7 +182,7 @@ extract_tool_call_from_tag_payload =
     }
   end
 
-TavernKit::VibeTavern::ToolCalling::ResponseTransforms.register(
+TavernKit::VibeTavern::Transforms::ResponseTransforms.register(
   "assistant_content_tool_call_tags_to_tool_calls",
   lambda do |msg, output_tags_config: nil|
     tool_calls = msg.fetch("tool_calls", nil)

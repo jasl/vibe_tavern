@@ -247,22 +247,24 @@ class ToolLoopRunnerTest < Minitest::Test
 
     prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
 
-    surface =
-      if effective_mode == :disabled
-        nil
-      else
-        TavernKit::VibeTavern::ToolsBuilder.build(
-          runner_config: runner_config,
-          base_catalog: registry,
-          default_executor: tool_executor_obj,
-        )
-      end
+    tool_surface =
+      TavernKit::VibeTavern::ToolsBuilder.build(
+        runner_config: runner_config,
+        base_catalog: registry,
+      )
+
+    executor =
+      TavernKit::VibeTavern::ToolCalling::ExecutorBuilder.build(
+        runner_config: runner_config,
+        registry: tool_surface,
+        default_executor: tool_executor_obj,
+      )
 
     TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
       prompt_runner: prompt_runner,
       runner_config: runner_config,
-      tool_executor: effective_mode == :disabled ? nil : surface.executor,
-      registry: effective_mode == :disabled ? registry : surface.catalog,
+      tool_executor: executor,
+      registry: tool_surface,
       system: system,
       strict: strict,
     )
@@ -2040,7 +2042,7 @@ class ToolLoopRunnerTest < Minitest::Test
           user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
           workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
 
-          max = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::MAX_TOOL_ARGS_BYTES
+          max = TavernKit::VibeTavern::ToolCalling::DEFAULT_MAX_TOOL_ARGS_BYTES
           big = "a" * (max + 1000)
 
           response_body =
@@ -2235,7 +2237,7 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    max = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::MAX_TOOL_OUTPUT_BYTES
+    max = TavernKit::VibeTavern::ToolCalling::DEFAULT_MAX_TOOL_OUTPUT_BYTES
     workspace = ToolCallEvalTestWorkspace.new(draft: { "big" => ("x" * (max + 10_000)) })
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
@@ -2307,7 +2309,7 @@ class ToolLoopRunnerTest < Minitest::Test
         end
       end.new(requests)
 
-    max = TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::MAX_TOOL_OUTPUT_BYTES
+    max = TavernKit::VibeTavern::ToolCalling::DEFAULT_MAX_TOOL_OUTPUT_BYTES
     workspace = ToolCallEvalTestWorkspace.new(draft: { "big" => ("x" * (max + 10_000)) })
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)

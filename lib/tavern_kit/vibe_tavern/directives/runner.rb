@@ -3,6 +3,7 @@
 require_relative "../prompt_runner"
 require_relative "../runner_config"
 require_relative "../output_tags"
+require_relative "constants"
 require_relative "parser"
 require_relative "schema"
 require_relative "validator"

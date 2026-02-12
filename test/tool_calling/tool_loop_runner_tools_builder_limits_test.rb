@@ -7,18 +7,6 @@ require_relative "../../lib/tavern_kit/vibe_tavern/prompt_runner"
 require_relative "../../lib/tavern_kit/vibe_tavern/tools_builder"
 
 class ToolLoopRunnerToolsBuilderLimitsTest < Minitest::Test
-  class DummyExecutor
-    def call(name:, args:, tool_call_id: nil)
-      {
-        ok: true,
-        tool_name: name,
-        data: { args: args, tool_call_id: tool_call_id },
-        warnings: [],
-        errors: [],
-      }
-    end
-  end
-
   def test_allow_deny_is_applied_before_snapshot_limits
     registry = build_registry(count: 3)
 
@@ -35,14 +23,13 @@ class ToolLoopRunnerToolsBuilderLimitsTest < Minitest::Test
         },
       )
 
-    surface =
+    catalog =
       TavernKit::VibeTavern::ToolsBuilder.build(
         runner_config: runner_config,
         base_catalog: registry,
-        default_executor: DummyExecutor.new,
       )
 
-    tools = surface.catalog.openai_tools(expose: :model)
+    tools = catalog.openai_tools(expose: :model)
     assert_equal 1, tools.size
 
     names = tools.map { |t| t.dig(:function, :name) }.compact
@@ -81,7 +68,6 @@ class ToolLoopRunnerToolsBuilderLimitsTest < Minitest::Test
       TavernKit::VibeTavern::ToolsBuilder.build(
         runner_config: runner_config,
         base_catalog: registry,
-        default_executor: DummyExecutor.new,
       )
     end
   end
@@ -105,7 +91,6 @@ class ToolLoopRunnerToolsBuilderLimitsTest < Minitest::Test
       TavernKit::VibeTavern::ToolsBuilder.build(
         runner_config: runner_config,
         base_catalog: registry,
-        default_executor: DummyExecutor.new,
       )
     end
   end

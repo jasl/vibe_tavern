@@ -1901,11 +1901,19 @@ process_task =
               llm_options_defaults: llm_options_defaults,
             )
 
-          surface =
+          tool_surface =
             if effective_tools_enabled
               TavernKit::VibeTavern::ToolsBuilder.build(
                 runner_config: runner_config,
                 base_catalog: registry,
+              )
+            end
+
+          effective_executor =
+            if effective_tools_enabled
+              TavernKit::VibeTavern::ToolCalling::ExecutorBuilder.build(
+                runner_config: runner_config,
+                registry: tool_surface,
                 default_executor: tool_executor,
               )
             end
@@ -1914,8 +1922,8 @@ process_task =
             TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.build(
               client: client,
               runner_config: runner_config,
-              tool_executor: effective_tools_enabled ? surface.executor : nil,
-              registry: effective_tools_enabled ? surface.catalog : registry,
+              tool_executor: effective_executor,
+              registry: effective_tools_enabled ? tool_surface : registry,
               system: system_text,
               strict: false,
             )

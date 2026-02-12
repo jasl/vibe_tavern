@@ -1,12 +1,11 @@
 # frozen_string_literal: true
 
+require_relative "constants"
 require_relative "presets"
 
 module TavernKit
   module VibeTavern
     module Directives
-      DEFAULT_MODES = %i[json_schema json_object prompt_only].freeze
-
       Config =
         Data.define(
           :modes,
@@ -46,8 +45,8 @@ module TavernKit
                 .select { |m| DEFAULT_MODES.include?(m) }
             modes = DEFAULT_MODES.dup if modes.empty?
 
-            repair_retry_count = raw.fetch(:repair_retry_count, 1)
-            repair_retry_count = integer_or_default(repair_retry_count, default: 1)
+            repair_retry_count = raw.fetch(:repair_retry_count, DEFAULT_REPAIR_RETRY_COUNT)
+            repair_retry_count = integer_or_default(repair_retry_count, default: DEFAULT_REPAIR_RETRY_COUNT)
             repair_retry_count = 0 if repair_retry_count.negative?
 
             request_overrides = TavernKit::Utils.normalize_symbol_keyed_hash(raw.fetch(:request_overrides, {}), path: "directives.request_overrides")

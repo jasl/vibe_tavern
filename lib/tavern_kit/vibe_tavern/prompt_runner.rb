@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "tool_calling/message_transforms"
-require_relative "tool_calling/response_transforms"
+require_relative "transforms"
 require_relative "preflight"
 require_relative "request_policy"
 require_relative "runner_config"
@@ -117,7 +116,7 @@ module TavernKit
 
         message_transforms = Array(message_transforms).map(&:to_s).map(&:strip).reject(&:empty?)
         if message_transforms.any?
-          TavernKit::VibeTavern::ToolCalling::MessageTransforms.apply!(
+          TavernKit::VibeTavern::Transforms::MessageTransforms.apply!(
             request.fetch(:messages),
             message_transforms,
             strict: strict,
@@ -158,7 +157,7 @@ module TavernKit
 
         response_transforms = prompt_request.response_transforms
         if response_transforms.any?
-          TavernKit::VibeTavern::ToolCalling::ResponseTransforms.apply!(
+          TavernKit::VibeTavern::Transforms::ResponseTransforms.apply!(
             assistant_message,
             response_transforms,
             strict: prompt_request.strict,
@@ -228,7 +227,7 @@ module TavernKit
 
         response_transforms = prompt_request.response_transforms
         if response_transforms.any?
-          TavernKit::VibeTavern::ToolCalling::ResponseTransforms.apply!(
+          TavernKit::VibeTavern::Transforms::ResponseTransforms.apply!(
             assistant_message,
             response_transforms,
             strict: prompt_request.strict,

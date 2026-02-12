@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "liquid_macros"
+
 module TavernKit
   module VibeTavern
     # Optional app-layer preprocessing for end-user input.

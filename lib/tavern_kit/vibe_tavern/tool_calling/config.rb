@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "constants"
 require_relative "presets"
 
 module TavernKit
@@ -28,14 +29,6 @@ module TavernKit
           :tool_result_transforms,
           :request_overrides,
         ) do
-          TOOL_USE_MODES = %i[enforced relaxed disabled].freeze
-          TOOL_FAILURE_POLICIES = %i[fatal tolerated].freeze
-
-          DEFAULT_MAX_TOOL_ARGS_BYTES = 200_000
-          DEFAULT_MAX_TOOL_OUTPUT_BYTES = 200_000
-          DEFAULT_MAX_TOOL_DEFINITIONS_COUNT = 128
-          DEFAULT_MAX_TOOL_DEFINITIONS_BYTES = 200_000
-
           def tool_use_enabled?
             tool_use_mode != :disabled
           end

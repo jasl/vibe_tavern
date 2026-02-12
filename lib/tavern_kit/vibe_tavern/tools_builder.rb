@@ -1,10 +1,17 @@
 # frozen_string_literal: true
 
+require_relative "tools_builder/catalog"
+require_relative "tools_builder/definition"
+require_relative "tools_builder/filtered_catalog"
+require_relative "tools_builder/catalog_snapshot"
+require_relative "tools_builder/composer"
+require_relative "tools/custom"
+require_relative "tools/skills"
+require_relative "tools_builder/builder"
+
 module TavernKit
   module VibeTavern
     module ToolsBuilder
-      BuildResult = Data.define(:catalog, :executor)
-
       module_function
 
       def build(...)
@@ -13,5 +20,3 @@ module TavernKit
     end
   end
 end
-
-require_relative "tools_builder/builder"

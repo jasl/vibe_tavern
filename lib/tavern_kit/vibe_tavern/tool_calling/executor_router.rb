@@ -2,7 +2,7 @@
 
 module TavernKit
   module VibeTavern
-    module ToolsBuilder
+    module ToolCalling
       class ExecutorRouter
         def initialize(skills_executor: nil, mcp_executor: nil, default_executor: nil)
           @skills_executor = skills_executor

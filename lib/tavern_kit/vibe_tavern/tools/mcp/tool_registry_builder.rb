@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
 require_relative "../../tools_builder/definition"
+require_relative "constants"
 require_relative "client"
+require_relative "server_config"
+require_relative "snapshot"
 require_relative "tool_adapter"
 require_relative "transport/stdio"
 
@@ -9,22 +12,7 @@ module TavernKit
   module VibeTavern
     module Tools
       module MCP
-        ServerConfig =
-          Data.define(
-            :id,
-            :command,
-            :args,
-            :env,
-            :chdir,
-            :protocol_version,
-            :client_info,
-            :capabilities,
-            :timeout_s,
-          )
-
         class ToolRegistryBuilder
-          BuildResult = Data.define(:definitions, :mapping, :clients)
-
           def initialize(servers:)
             @servers = Array(servers)
           end
@@ -35,7 +23,7 @@ module TavernKit
             clients = {}
 
             @servers.each do |server|
-              cfg = coerce_server_config(server)
+              cfg = ServerConfig.coerce(server)
 
               server_id = cfg.id.to_s.strip
               raise ArgumentError, "server id is required" if server_id.empty?
@@ -102,7 +90,7 @@ module TavernKit
             end
 
             definitions.sort_by!(&:name)
-            BuildResult.new(definitions: definitions, mapping: mapping, clients: clients)
+            Snapshot.new(definitions: definitions, mapping: mapping, clients: clients)
           rescue StandardError
             clients.each_value do |client|
               begin
@@ -113,26 +101,6 @@ module TavernKit
             end
 
             raise
-          end
-
-          private
-
-          def coerce_server_config(value)
-            return value if value.is_a?(MCP::ServerConfig)
-
-            raise ArgumentError, "server config must be an MCP::ServerConfig" unless value.is_a?(Hash)
-
-            MCP::ServerConfig.new(
-              id: value.fetch(:id),
-              command: value.fetch(:command),
-              args: value.fetch(:args, nil),
-              env: value.fetch(:env, nil),
-              chdir: value.fetch(:chdir, nil),
-              protocol_version: value.fetch(:protocol_version, nil),
-              client_info: value.fetch(:client_info, nil),
-              capabilities: value.fetch(:capabilities, nil),
-              timeout_s: value.fetch(:timeout_s, nil),
-            )
           end
         end
       end

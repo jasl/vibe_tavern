@@ -64,7 +64,8 @@ Code:
 
 ## Tools (model-facing)
 
-The Skills tool surface is exposed via `Tools::Skills::ToolExecutor`:
+The Skills tool surface is exposed via `Tools::Skills::ToolDefinitions` (wired
+by `ToolsBuilder`):
 
 - `skills_list`: list skill metadata
 - `skills_load`: load `SKILL.md` body (progressive disclosure)
@@ -72,8 +73,11 @@ The Skills tool surface is exposed via `Tools::Skills::ToolExecutor`:
   `assets/`
 - `skills_run_script`: stub only (returns `NOT_IMPLEMENTED`)
 
+Tool execution is owned by `ToolCalling::Executors::SkillsExecutor`.
+
 Code:
-- `lib/tavern_kit/vibe_tavern/tools/skills/tool_executor.rb`
+- `lib/tavern_kit/vibe_tavern/tools/skills/tool_definitions.rb`
+- `lib/tavern_kit/vibe_tavern/tool_calling/executors/skills_executor.rb`
 
 ## File read security
 

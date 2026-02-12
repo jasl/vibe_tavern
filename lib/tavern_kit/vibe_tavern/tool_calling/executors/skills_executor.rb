@@ -1,71 +1,18 @@
 # frozen_string_literal: true
 
-require_relative "../../tools_builder/definition"
-require_relative "../../tools_builder/support/envelope"
-require_relative "../../tools_builder/support/utf8"
-require_relative "store"
+require_relative "../../tools/skills/store"
+require_relative "../support/envelope"
+require_relative "../support/utf8"
 
 module TavernKit
   module VibeTavern
-    module Tools
-      module Skills
-        class ToolExecutor
+    module ToolCalling
+      module Executors
+        class SkillsExecutor
           DEFAULT_MAX_BYTES = 200_000
 
-          def self.tool_definitions(include_run_script: false)
-            defs = [
-              ToolsBuilder::Definition.new(
-                name: "skills_list",
-                description: "List available agent skills (metadata only).",
-                parameters: { type: "object", properties: {} },
-              ),
-              ToolsBuilder::Definition.new(
-                name: "skills_load",
-                description: "Load a skill's SKILL.md body (progressive disclosure).",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string", description: "Skill name" },
-                  },
-                  required: ["name"],
-                },
-              ),
-              ToolsBuilder::Definition.new(
-                name: "skills_read_file",
-                description: "Read a file bundled with a skill (scripts/, references/, assets/).",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string", description: "Skill name" },
-                    path: { type: "string", description: "Relative path like references/foo.md" },
-                  },
-                  required: ["name", "path"],
-                },
-              ),
-            ]
-
-            if include_run_script
-              defs <<
-                ToolsBuilder::Definition.new(
-                  name: "skills_run_script",
-                  description: "Run a skill script (not implemented).",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      name: { type: "string", description: "Skill name" },
-                      script: { type: "string", description: "Relative script path under scripts/" },
-                      args: { type: "object", description: "Arguments (JSON object)" },
-                    },
-                    required: ["name", "script"],
-                  },
-                )
-            end
-
-            defs
-          end
-
           def initialize(store:, max_bytes: DEFAULT_MAX_BYTES)
-            raise ArgumentError, "store is required" unless store.is_a?(Store)
+            raise ArgumentError, "store is required" unless store.is_a?(TavernKit::VibeTavern::Tools::Skills::Store)
 
             @store = store
             @max_bytes = Integer(max_bytes)
@@ -155,15 +102,15 @@ module TavernKit
           end
 
           def ok_envelope(tool_name, data = {})
-            ToolsBuilder::Support::Envelope.ok_envelope(tool_name, data)
+            TavernKit::VibeTavern::ToolCalling::Support::Envelope.ok_envelope(tool_name, data)
           end
 
           def error_envelope(tool_name, code:, message:)
-            ToolsBuilder::Support::Envelope.error_envelope(tool_name, code: code, message: message)
+            TavernKit::VibeTavern::ToolCalling::Support::Envelope.error_envelope(tool_name, code: code, message: message)
           end
 
           def normalize_utf8(value)
-            ToolsBuilder::Support::Utf8.normalize_utf8(value)
+            TavernKit::VibeTavern::ToolCalling::Support::Utf8.normalize_utf8(value)
           end
         end
       end

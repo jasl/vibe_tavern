@@ -5,7 +5,7 @@ require_relative "test_helper"
 require "fileutils"
 require "tmpdir"
 
-class SkillsToolExecutorTest < Minitest::Test
+class SkillsExecutorTest < Minitest::Test
   def write_skill(root, name:, description: "Test skill", body: "Body")
     skill_dir = File.join(root, name)
     FileUtils.mkdir_p(skill_dir)
@@ -34,7 +34,7 @@ class SkillsToolExecutorTest < Minitest::Test
       File.write(File.join(skill_dir, "references", "x.md"), "ref-x")
 
       store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
-      executor = TavernKit::VibeTavern::Tools::Skills::ToolExecutor.new(store: store, max_bytes: 200_000)
+      executor = TavernKit::VibeTavern::ToolCalling::Executors::SkillsExecutor.new(store: store, max_bytes: 200_000)
 
       list = executor.call(name: "skills_list", args: {})
       assert_equal true, list.fetch(:ok)
@@ -60,7 +60,7 @@ class SkillsToolExecutorTest < Minitest::Test
 
       write_skill(skills_root, name: "foo")
       store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
-      executor = TavernKit::VibeTavern::Tools::Skills::ToolExecutor.new(store: store, max_bytes: 200_000)
+      executor = TavernKit::VibeTavern::ToolCalling::Executors::SkillsExecutor.new(store: store, max_bytes: 200_000)
 
       result = executor.call(name: "skills_run_script", args: { "name" => "foo", "script" => "scripts/run.rb" })
       assert_equal false, result.fetch(:ok)
@@ -75,7 +75,7 @@ class SkillsToolExecutorTest < Minitest::Test
 
       write_skill(skills_root, name: "foo")
       store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
-      executor = TavernKit::VibeTavern::Tools::Skills::ToolExecutor.new(store: store, max_bytes: 200_000)
+      executor = TavernKit::VibeTavern::ToolCalling::Executors::SkillsExecutor.new(store: store, max_bytes: 200_000)
 
       missing = executor.call(name: "skills_load", args: { "name" => "nope" })
       assert_equal false, missing.fetch(:ok)

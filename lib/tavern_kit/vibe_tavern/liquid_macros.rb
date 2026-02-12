@@ -1,5 +1,26 @@
 # frozen_string_literal: true
 
+require "liquid"
+
+require_relative "liquid_macros/assigns"
+require_relative "liquid_macros/variables_drop"
+require_relative "liquid_macros/filters/deterministic_rng"
+require_relative "liquid_macros/filters/time"
+require_relative "liquid_macros/tags/base"
+require_relative "liquid_macros/tags/assignment_tag"
+require_relative "liquid_macros/tags/name_only_tag"
+require_relative "liquid_macros/tags/set_var"
+require_relative "liquid_macros/tags/set_default_var"
+require_relative "liquid_macros/tags/add_var"
+require_relative "liquid_macros/tags/inc_var"
+require_relative "liquid_macros/tags/dec_var"
+require_relative "liquid_macros/tags/delete_var"
+require_relative "liquid_macros/tags/set_global"
+require_relative "liquid_macros/tags/add_global"
+require_relative "liquid_macros/tags/inc_global"
+require_relative "liquid_macros/tags/dec_global"
+require_relative "liquid_macros/tags/delete_global"
+
 module TavernKit
   module VibeTavern
     # Liquid-based macros for the Rails rewrite.

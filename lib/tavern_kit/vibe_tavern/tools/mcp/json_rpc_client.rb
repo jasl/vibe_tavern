@@ -2,6 +2,7 @@
 
 require "json"
 
+require_relative "constants"
 require_relative "errors"
 
 module TavernKit

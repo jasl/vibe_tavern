@@ -2,7 +2,7 @@
 
 module TavernKit
   module VibeTavern
-    module ToolCalling
+    module Transforms
       # Provider/model compatibility shims applied to outbound OpenAI-style messages.
       #
       # Context stores only transform *names* so it stays serializable and can be
@@ -48,7 +48,7 @@ module TavernKit
   end
 end
 
-TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
+TavernKit::VibeTavern::Transforms::MessageTransforms.register(
   "assistant_tool_calls_content_null_if_blank",
   lambda do |messages|
     messages.each do |msg|
@@ -87,12 +87,12 @@ reasoning_content_empty =
     end
   end
 
-TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
+TavernKit::VibeTavern::Transforms::MessageTransforms.register(
   "assistant_tool_calls_reasoning_content_empty_if_missing",
   reasoning_content_empty,
 )
 
-TavernKit::VibeTavern::ToolCalling::MessageTransforms.register(
+TavernKit::VibeTavern::Transforms::MessageTransforms.register(
   "assistant_tool_calls_signature_skip_validator_if_missing",
   lambda do |messages|
     messages.each do |msg|
