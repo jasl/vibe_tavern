@@ -51,6 +51,8 @@ module TavernKit
           tool_result_transforms: nil,
           fallback_retry_count: 0,
           tool_choice: nil,
+          max_tool_definitions_count: nil,
+          max_tool_definitions_bytes: nil,
           max_tool_args_bytes: nil,
           max_tool_output_bytes: nil,
           request_overrides: nil
@@ -65,6 +67,8 @@ module TavernKit
           h[:tool_allowlist] = tool_allowlist unless tool_allowlist.nil?
           h[:tool_denylist] = tool_denylist unless tool_denylist.nil?
           h[:tool_choice] = tool_choice unless tool_choice.nil?
+          h[:max_tool_definitions_count] = max_tool_definitions_count unless max_tool_definitions_count.nil?
+          h[:max_tool_definitions_bytes] = max_tool_definitions_bytes unless max_tool_definitions_bytes.nil?
           h[:max_tool_args_bytes] = max_tool_args_bytes unless max_tool_args_bytes.nil?
           h[:max_tool_output_bytes] = max_tool_output_bytes unless max_tool_output_bytes.nil?
           h[:fix_empty_final_user_text] = fix_empty_final_user_text unless fix_empty_final_user_text.nil?

@@ -4,6 +4,7 @@ require_relative "test_helper"
 
 require "securerandom"
 require_relative "../../lib/tavern_kit/vibe_tavern/tool_calling/presets"
+require_relative "../../lib/tavern_kit/vibe_tavern/tools_builder"
 
 class ToolCallEvalTestWorkspace
   attr_reader :id, :draft, :ui_state
@@ -153,17 +154,17 @@ end
 class ToolLoopRunnerTest < Minitest::Test
   def build_registry
     defs = [
-      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
         name: "state_get",
         description: "Read workspace state",
         parameters: { type: "object", properties: { workspace_id: { type: "string" } } },
       ),
-      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
         name: "state_patch",
         description: "Patch draft",
         parameters: { type: "object", properties: { workspace_id: { type: "string" } } },
       ),
-      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
         name: "facts_commit",
         description: "Commit facts (UI only)",
         exposed_to_model: false,
@@ -171,7 +172,7 @@ class ToolLoopRunnerTest < Minitest::Test
       ),
     ]
 
-    TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(definitions: defs)
+    TavernKit::VibeTavern::Tools::Custom::Catalog.new(definitions: defs)
   end
 
   def build_runner(
@@ -246,11 +247,22 @@ class ToolLoopRunnerTest < Minitest::Test
 
     prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
 
+    surface =
+      if effective_mode == :disabled
+        nil
+      else
+        TavernKit::VibeTavern::ToolsBuilder.build(
+          runner_config: runner_config,
+          base_catalog: registry,
+          default_executor: tool_executor_obj,
+        )
+      end
+
     TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.new(
       prompt_runner: prompt_runner,
       runner_config: runner_config,
-      tool_executor: tool_executor_obj,
-      registry: registry,
+      tool_executor: effective_mode == :disabled ? nil : surface.executor,
+      registry: effective_mode == :disabled ? registry : surface.catalog,
       system: system,
       strict: strict,
     )
@@ -1126,9 +1138,9 @@ class ToolLoopRunnerTest < Minitest::Test
 
   def test_tool_definition_strips_empty_required_arrays_for_provider_compatibility
     registry =
-      TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
+      TavernKit::VibeTavern::Tools::Custom::Catalog.new(
         definitions: [
-          TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+          TavernKit::VibeTavern::ToolsBuilder::Definition.new(
             name: "tool_with_empty_required",
             description: "Test tool",
             parameters: {

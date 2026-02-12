@@ -5,7 +5,7 @@ require_relative "test_helper"
 require "easy_talk"
 
 require_relative "../../lib/tavern_kit/vibe_tavern/json_schema"
-require_relative "../../lib/tavern_kit/vibe_tavern/tool_calling/tool_registry"
+require_relative "../../lib/tavern_kit/vibe_tavern/tools_builder/definition"
 
 class JsonSchemaTest < Minitest::Test
   class ExampleSchema
@@ -35,7 +35,7 @@ class JsonSchemaTest < Minitest::Test
 
   def test_tool_definition_accepts_easy_talk_schema_provider
     tool =
-      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
         name: "example",
         description: "Example",
         parameters: ExampleSchema,

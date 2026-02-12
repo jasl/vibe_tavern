@@ -70,8 +70,11 @@ explicit and test-covered.
 
 These rules keep the infra stable across providers/models:
 
-- The infra (`lib/tavern_kit/vibe_tavern`) ships **no default tool definitions**.
-  Tools are injected from the app layer (or eval scripts).
+- The infra (`lib/tavern_kit/vibe_tavern`) ships no default *product* tools.
+  App-specific tools are injected from the app layer (or eval scripts).
+  The infra does include optional protocol tool sources (Agent Skills and MCP),
+  but they are opt-in via configuration and still flow through the same tool
+  calling guardrails.
 - Keep tool schemas small and cross-provider safe.
   - Tool names should be snake_case (avoid `.`).
 - Keep vendor/model quirks out of the core loop.
@@ -95,12 +98,19 @@ Core runner stack:
 
 Tool injection/execution:
 
-- `lib/tavern_kit/vibe_tavern/tool_calling/tool_registry.rb`
+- `lib/tavern_kit/vibe_tavern/tools_builder.rb`
+  - assemble the model-visible `tools:` surface from multiple sources, apply allow/deny,
+    enforce tool-surface limits, and freeze a deterministic snapshot
+- `lib/tavern_kit/vibe_tavern/tools/custom/catalog.rb`
   - app-owned list of tools and their JSON schema
-- `lib/tavern_kit/vibe_tavern/tool_calling/filtered_tool_registry.rb`
-  - allow/deny masking of a registry (both “send surface” and “execution surface”)
+- `lib/tavern_kit/vibe_tavern/tools_builder/filtered_catalog.rb`
+  - allow/deny masking of a catalog (both “send surface” and “execution surface”)
 - `lib/tavern_kit/vibe_tavern/tool_calling/tool_dispatcher.rb`
   - validates tool name + args, executes tool, returns a normalized result envelope
+- `lib/tavern_kit/vibe_tavern/tools_builder/composer.rb`
+  - compose multiple tool-definition sets into one catalog
+- `lib/tavern_kit/vibe_tavern/tools_builder/executor_router.rb`
+  - route tool execution by tool-name prefix (`skills_*`, `mcp_*`, default)
 
 ### Optional: EasyTalk for tool parameter schemas
 
@@ -121,7 +131,7 @@ class StateGetParams
 end
 
 tool =
-  TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+  TavernKit::VibeTavern::ToolsBuilder::Definition.new(
     name: "state_get",
     description: "Read workspace state",
     parameters: StateGetParams, # uses `.json_schema`
@@ -162,6 +172,23 @@ To reduce model variance and prevent context bloat:
   - oversized args are rejected before tool execution (`ARGUMENTS_TOO_LARGE`)
 - `context[:tool_calling][:max_tool_output_bytes]` (default: `200_000`)
   - oversized tool outputs are replaced with a compact failure (`TOOL_OUTPUT_TOO_LARGE`)
+
+### Tool definition surface limits
+
+`MaxTokens` estimates **messages only**; it does not account for the size of the
+`tools:` request payload (tool definitions + JSON Schemas). Large tool surfaces
+can crowd out prompt content or trigger provider-side request limits.
+
+ToolsBuilder enforces:
+
+- `context[:tool_calling][:max_tool_definitions_count]` (default: `128`)
+  - maximum number of model-exposed tools (`exposed_to_model: true`)
+- `context[:tool_calling][:max_tool_definitions_bytes]` (default: `200_000`)
+  - maximum JSON bytes of the model-exposed OpenAI `tools:` array
+
+For determinism, ToolsBuilder snapshots the model-visible tool surface once per
+ToolLoopRunner instance (after allow/deny masking). This prevents tool drift
+across turns and avoids repeatedly materializing tool schemas.
 
 ### Per-turn tool call limit (optional)
 

@@ -16,19 +16,21 @@ Audience:
 ### Design / architecture
 
 1) `docs/vibe_tavern/design/architecture.md`
-2) `docs/vibe_tavern/design/token-estimation.md`
-3) `docs/vibe_tavern/design/macros.md`
-4) `docs/vibe_tavern/design/language-policy.md`
+2) `docs/vibe_tavern/design/skills.md`
+3) `docs/vibe_tavern/design/mcp.md`
+4) `docs/vibe_tavern/design/token-estimation.md`
+5) `docs/vibe_tavern/design/macros.md`
+6) `docs/vibe_tavern/design/language-policy.md`
 
 ### Case studies (reliability)
 
-5) `docs/vibe_tavern/case_studies/tool-calling.md`
-6) `docs/vibe_tavern/case_studies/directives.md`
-7) (Optional) `docs/vibe_tavern/case_studies/ruby-llm.md`
+7) `docs/vibe_tavern/case_studies/tool-calling.md`
+8) `docs/vibe_tavern/case_studies/directives.md`
+9) (Optional) `docs/vibe_tavern/case_studies/ruby-llm.md`
 
 ### Guides
 
-8) `docs/vibe_tavern/guides/model-selection.md`
+10) `docs/vibe_tavern/guides/model-selection.md`
 
 Product backlog (intentionally not locked in yet):
 - `docs/todo/vibe_tavern/deferred-agentic-generation.md`

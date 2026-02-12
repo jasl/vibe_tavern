@@ -3,6 +3,7 @@
 require_relative "../vibe_tavern"
 require_relative "prompt_builder/steps/prepare"
 require_relative "prompt_builder/steps/plan_assembly"
+require_relative "prompt_builder/steps/available_skills"
 require_relative "prompt_builder/steps/language_policy"
 require_relative "output_tags/registration"
 require_relative "infrastructure"
@@ -23,6 +24,7 @@ module TavernKit
     Pipeline = TavernKit::PromptBuilder::Pipeline.new do
       use_step :prepare, TavernKit::VibeTavern::PromptBuilder::Steps::Prepare
       use_step :plan_assembly, TavernKit::VibeTavern::PromptBuilder::Steps::PlanAssembly
+      use_step :available_skills, TavernKit::VibeTavern::PromptBuilder::Steps::AvailableSkills
       use_step :language_policy, TavernKit::VibeTavern::PromptBuilder::Steps::LanguagePolicy
       use_step :max_tokens, TavernKit::PromptBuilder::Steps::MaxTokens
     end

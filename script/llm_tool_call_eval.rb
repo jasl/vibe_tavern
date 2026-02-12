@@ -1027,7 +1027,7 @@ module ToolCallEval
 
   def self.tool_definitions
     [
-      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
         name: "state_get",
         description:
           "Read workspace state (facts/draft/locks/ui_state/versions). " \
@@ -1046,7 +1046,7 @@ module ToolCallEval
           required: [],
         },
       ),
-      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
         name: "state_patch",
         description: "Apply patch operations to draft state (set/delete/append/insert).",
         parameters: {
@@ -1074,7 +1074,7 @@ module ToolCallEval
         },
       ),
       # Include but hide (regression guard): model should never see it.
-      TavernKit::VibeTavern::ToolCalling::ToolDefinition.new(
+      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
         name: "facts_commit",
         description: "Commit a facts proposal (must be triggered by UI/user confirmation).",
         exposed_to_model: false,
@@ -1889,7 +1889,7 @@ process_task =
 
           tool_executor = ToolCallEval::Executor.new(workspace: workspace)
           registry =
-            TavernKit::VibeTavern::ToolCalling::ToolRegistry.new(
+            TavernKit::VibeTavern::Tools::Custom::Catalog.new(
               definitions: ToolCallEval.tool_definitions,
             )
 
@@ -1901,12 +1901,21 @@ process_task =
               llm_options_defaults: llm_options_defaults,
             )
 
+          surface =
+            if effective_tools_enabled
+              TavernKit::VibeTavern::ToolsBuilder.build(
+                runner_config: runner_config,
+                base_catalog: registry,
+                default_executor: tool_executor,
+              )
+            end
+
           runner =
             TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.build(
               client: client,
               runner_config: runner_config,
-              tool_executor: effective_tools_enabled ? tool_executor : nil,
-              registry: registry,
+              tool_executor: effective_tools_enabled ? surface.executor : nil,
+              registry: effective_tools_enabled ? surface.catalog : registry,
               system: system_text,
               strict: false,
             )

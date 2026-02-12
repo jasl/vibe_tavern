@@ -15,6 +15,8 @@ module TavernKit
           :fix_empty_final_user_text,
           :fix_empty_final_disable_tools,
           :fallback_retry_count,
+          :max_tool_definitions_count,
+          :max_tool_definitions_bytes,
           :max_tool_args_bytes,
           :max_tool_output_bytes,
           :max_tool_calls_per_turn,
@@ -31,6 +33,8 @@ module TavernKit
 
           DEFAULT_MAX_TOOL_ARGS_BYTES = 200_000
           DEFAULT_MAX_TOOL_OUTPUT_BYTES = 200_000
+          DEFAULT_MAX_TOOL_DEFINITIONS_COUNT = 128
+          DEFAULT_MAX_TOOL_DEFINITIONS_BYTES = 200_000
 
           def tool_use_enabled?
             tool_use_mode != :disabled
@@ -75,6 +79,17 @@ module TavernKit
 
             fallback_retry_count = integer_or_default(raw.fetch(:fallback_retry_count, 0), default: 0)
 
+            max_tool_definitions_count =
+              positive_int_or_default(
+                raw.fetch(:max_tool_definitions_count, nil),
+                default: DEFAULT_MAX_TOOL_DEFINITIONS_COUNT,
+              )
+            max_tool_definitions_bytes =
+              positive_int_or_default(
+                raw.fetch(:max_tool_definitions_bytes, nil),
+                default: DEFAULT_MAX_TOOL_DEFINITIONS_BYTES,
+              )
+
             max_tool_args_bytes = positive_int_or_default(raw.fetch(:max_tool_args_bytes, nil), default: DEFAULT_MAX_TOOL_ARGS_BYTES)
             max_tool_output_bytes = positive_int_or_default(raw.fetch(:max_tool_output_bytes, nil), default: DEFAULT_MAX_TOOL_OUTPUT_BYTES)
             max_tool_calls_per_turn = positive_int_or_default(raw.fetch(:max_tool_calls_per_turn, nil), default: nil)
@@ -105,6 +120,8 @@ module TavernKit
               fix_empty_final_user_text: fix_empty_final_user_text,
               fix_empty_final_disable_tools: fix_empty_final_disable_tools,
               fallback_retry_count: fallback_retry_count,
+              max_tool_definitions_count: max_tool_definitions_count,
+              max_tool_definitions_bytes: max_tool_definitions_bytes,
               max_tool_args_bytes: max_tool_args_bytes,
               max_tool_output_bytes: max_tool_output_bytes,
               max_tool_calls_per_turn: max_tool_calls_per_turn,

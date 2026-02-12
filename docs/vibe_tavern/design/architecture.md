@@ -90,6 +90,12 @@ PromptBuilder API contract (V2):
 - For known steps, config parsing is strict and typed via step-local
   `Step::Config.from_hash`.
 
+Optional prompt injections (config-driven):
+- Agent Skills metadata (progressive disclosure):
+  `PromptBuilder::Steps::AvailableSkills` reads `context[:skills]` and injects a
+  machine-readable `<available_skills>` system block (metadata only). Skills are
+  backed by an app-injected `Tools::Skills::Store` (`context[:skills][:store]`).
+
 ### 2) Single request boundary: PromptRunner
 
 `lib/tavern_kit/vibe_tavern/prompt_runner.rb`
@@ -124,8 +130,9 @@ PromptRunner contract (after RunnerConfig refactor):
 
 Code:
 - `lib/tavern_kit/vibe_tavern/tool_calling/tool_loop_runner.rb`
-- `lib/tavern_kit/vibe_tavern/tool_calling/tool_registry.rb`
 - `lib/tavern_kit/vibe_tavern/tool_calling/tool_dispatcher.rb`
+- `lib/tavern_kit/vibe_tavern/tools_builder.rb`
+- `lib/tavern_kit/vibe_tavern/tools/custom/catalog.rb`
 
 Responsibilities:
 - parse `tool_calls`, dispatch tools, append tool result messages, loop
@@ -135,9 +142,25 @@ Responsibilities:
   `content` written back into history is forced to `""` (prevents pollution)
 
 Injection points (upper layer):
-- tool list + JSON schema (`ToolRegistry`)
-- tool allow/deny masking (`FilteredToolRegistry`)
+- tool list + JSON schema (`ToolsBuilder::Catalog`; default: `Tools::Custom::Catalog`)
+- tool allow/deny masking (`ToolsBuilder::FilteredCatalog`, a `Catalog` wrapper)
 - transforms/presets (provider/model quirks stay opt-in)
+
+Tool surfaces should be assembled by `TavernKit::VibeTavern::ToolsBuilder`, which:
+- composes multiple tool sources (app tools + optional Skills + optional MCP snapshot)
+- applies allow/deny masking
+- snapshots the model-visible tool surface (and enforces tool surface limits) for determinism
+
+Additional first-class tool sources (optional):
+- Agent Skills (`Tools::Skills::*`): local tools (`skills_list`, `skills_load`,
+  `skills_read_file`) for progressive disclosure of `SKILL.md` packages.
+- MCP (`Tools::MCP::*`): stdio JSON-RPC tool source; remote MCP tools are adapted into
+  local tool names (`mcp_<server_id>__<remote_tool_name>`) and executed through
+  an MCP client.
+
+When wiring multiple tool sources:
+- prefer `TavernKit::VibeTavern::ToolsBuilder` as the canonical composition entrypoint
+- the low-level primitives remain available (`ToolsBuilder::Composer`, `ToolsBuilder::ExecutorRouter`)
 
 ### 4) Structured directives: Schema/Parser/Validator/Runner
 

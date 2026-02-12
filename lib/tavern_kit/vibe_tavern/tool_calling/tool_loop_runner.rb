@@ -4,7 +4,8 @@ require "json"
 require_relative "../prompt_runner"
 require_relative "../runner_config"
 require_relative "../output_tags"
-require_relative "filtered_tool_registry"
+require_relative "../tools/custom/catalog"
+require_relative "tool_dispatcher"
 require_relative "tool_transforms"
 require_relative "tool_call_transforms"
 require_relative "tool_result_transforms"
@@ -61,7 +62,11 @@ module TavernKit
           @model = runner_config.model.to_s
           @tool_executor = tool_executor
           @variables_store = variables_store
-          @registry = registry || ToolRegistry.new
+
+          # Tool surface assembly (allow/deny masking, surface limits, snapshot)
+          # is owned by `TavernKit::VibeTavern::ToolsBuilder`.
+          @registry = registry || TavernKit::VibeTavern::Tools::Custom::Catalog.new
+
           @system = system.to_s
           @strict = strict == true
 
@@ -83,15 +88,6 @@ module TavernKit
           @response_transforms = cfg.response_transforms
           @tool_call_transforms = cfg.tool_call_transforms
           @tool_result_transforms = cfg.tool_result_transforms
-
-          if cfg.tool_allowlist || cfg.tool_denylist
-            @registry =
-              FilteredToolRegistry.new(
-                base: @registry,
-                allow: cfg.tool_allowlist,
-                deny: cfg.tool_denylist,
-              )
-          end
 
           if cfg.tool_use_enabled? && @tool_executor.nil?
             raise ArgumentError, "tool_executor is required when tool_use_mode is enabled"

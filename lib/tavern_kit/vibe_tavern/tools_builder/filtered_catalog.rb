@@ -1,14 +1,16 @@
 # frozen_string_literal: true
 
+require_relative "catalog"
+
 module TavernKit
   module VibeTavern
-    module ToolCalling
-      # Wraps a ToolRegistry and filters the exposed tool surface.
+    module ToolsBuilder
+      # Wraps a tools catalog and filters the exposed tool surface.
       #
       # This is the core primitive behind "tool profiles" / "tool masking":
       # the model only sees a subset of tools, and the dispatcher enforces the
       # same subset when executing tool calls.
-      class FilteredToolRegistry
+      class FilteredCatalog < Catalog
         def initialize(base:, allow: nil, deny: nil)
           @base = base
           @allow = normalize_names(allow)
