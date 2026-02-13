@@ -138,6 +138,25 @@ class AgentCore::AgentTest < Minitest::Test
     assert result.text
   end
 
+  def test_memory_injected_into_system_message
+    memory = AgentCore::Resources::Memory::InMemory.new
+    memory.store(content: "User's favorite color is blue")
+
+    provider = MockProvider.new
+    agent = AgentCore::Agent.build do |b|
+      b.system_prompt = "You are helpful."
+      b.provider = provider
+      b.memory = memory
+    end
+
+    agent.chat("favorite")
+
+    system_message = provider.calls.first[:messages].first
+    assert_equal :system, system_message.role
+    assert_includes system_message.text, "User's favorite color is blue"
+    assert_includes system_message.text, "<relevant_context>"
+  end
+
   def test_multi_turn_conversation
     provider = MockProvider.new
 

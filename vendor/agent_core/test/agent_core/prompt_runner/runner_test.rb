@@ -23,6 +23,21 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     refute result.used_tools?
   end
 
+  def test_system_prompt_is_sent_as_system_message
+    provider = MockProvider.new
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "System instructions",
+      messages: [AgentCore::Message.new(role: :user, content: "Hello")],
+      options: { model: "test" }
+    )
+
+    @runner.run(prompt: prompt, provider: provider)
+
+    call_messages = provider.calls.first[:messages]
+    assert_equal :system, call_messages.first.role
+    assert_equal "System instructions", call_messages.first.text
+  end
+
   def test_run_with_tool_calling
     # First response: assistant wants to call a tool
     tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hello" })
@@ -69,6 +84,41 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert result.used_tools?
     assert_equal 1, result.tool_calls_made.size
     assert_equal "echo", result.tool_calls_made.first[:name]
+  end
+
+  def test_unknown_tool_call_does_not_raise
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "missing_tool", arguments: {})
+    assistant_with_tool = AgentCore::Message.new(
+      role: :assistant,
+      content: "Calling a missing tool",
+      tool_calls: [tool_call]
+    )
+    tool_response = AgentCore::Resources::Provider::Response.new(
+      message: assistant_with_tool,
+      stop_reason: :tool_use
+    )
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Recovered")
+    final_response = AgentCore::Resources::Provider::Response.new(
+      message: final_msg,
+      stop_reason: :end_turn
+    )
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+    registry = AgentCore::Resources::Tools::Registry.new
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+
+    assert_equal "Recovered", result.text
+    assert_equal 1, result.tool_calls_made.size
+    assert_match(/Tool not found:/, result.tool_calls_made.first[:error])
   end
 
   def test_max_turns_limit
@@ -210,7 +260,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     )
 
     assert_raises(ArgumentError) do
-      @runner.run_stream(prompt: prompt, provider: MockProvider.new, max_turns: -1) {}
+      @runner.run_stream(prompt: prompt, provider: MockProvider.new, max_turns: -1) { }
     end
   end
 

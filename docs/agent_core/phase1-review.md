@@ -278,7 +278,7 @@ Return to caller
 | Tools::Policy | ✅ 高 | 授权决策 |
 | PromptBuilder | ✅ 高 | Context→Pipeline→BuiltPrompt，清晰流水线 |
 | PromptRunner | ⚠️ 中偏高 | Runner 承担了 tool loop + stream 处理 + policy 检查 |
-| Agent | ⚠️ 中 | Orchestrator，正常偏大；但 build_events 有逻辑 bug |
+| Agent | ⚠️ 中 | Orchestrator，正常偏大；需要注意线程安全语义与上下文传递 |
 
 **Runner 内聚改进建议**: 将 `execute_tool_calls` 和 `execute_tool_calls_streaming`
 提取为独立的 `ToolExecutor` 类。两个方法高度重复（DRY 违反），也会让 Runner 更精简。
@@ -309,27 +309,24 @@ Return to caller
 
 ### 6.2 未覆盖的路径
 
-- ❌ `Agent#build_events` 的 `@on_event` 路径（有 bug，见 1.2）
-- ❌ `Message.new(role: nil, ...)` 边界
+- ❌ `Agent#build_events` 的 `@on_event` 路径（建议补测试）
 - ❌ `Message.new(content: nil, ...)` 边界
 - ❌ Runner 在 provider 抛出异常时的行为
 - ❌ Registry MCP 路径（没有 MCP Client mock）
 - ❌ Runner streaming 在 MessageComplete 缺失时的行为
-- ❌ `max_turns: 0` 或负值
 - ❌ 空 tool_calls array (`tool_calls: []`)
 - ❌ ToolCall arguments 包含嵌套结构的序列化
-- ❌ Content blocks 为空 Array 的 Message#text
 - ❌ 遗留文件 `test/test_agent_core.rb` 仍存在
 
 ## 7. 遗留问题
 
-1. `test/test_agent_core.rb` 应该删除或合并到新测试中
+1. `test/test_agent_core.rb` 目前保留为空文件（避免 `rake test` 默认加载时报错）；后续可考虑移除该入口或改为 require 真实测试
 2. gemspec 的 `required_ruby_version` 是 `>= 3.3.0`，但项目 `.ruby-version` 是 `4.0.1`
 3. MCP error namespace (`AgentCore::MCP::Error`) 在 Phase 1 定义但 Phase 2 才用
 
 ## 8. 修复优先级与状态
 
-> 全部修复完成于 2026-02-14。修复后测试: 92 runs, 182 assertions, 0 failures。
+> 全部修复完成于 2026-02-14。修复后测试: 98 runs, 196 assertions, 0 failures, 0 errors。
 
 ### P0（必须修复，阻塞后续工作）
 
@@ -365,3 +362,19 @@ Return to caller
 - `test_generic_on_method` — Events#on 通用注册
 - `test_generic_on_unknown_hook_raises` — Events#on 未知 hook 校验
 - `test_per_callback_rescue_continues_to_next` — 回调独立失败
+- `test_system_prompt_is_sent_as_system_message` — Runner 确保 system_prompt 进入 messages
+- `test_unknown_tool_call_does_not_raise` — tool hallucination 时不会直接抛异常
+- `test_memory_injected_into_system_message` — memory 注入确实进入 system message
+- `test_symbolize_keys_*` — `AgentCore::Utils.symbolize_keys` key 归一化规则（Symbol 优先）
+
+### 补充修复（Phase 1 之后发现）
+
+- ✅ `Runner` 没有把 `BuiltPrompt#system_prompt` 发给 Provider，导致 system prompt / memory 注入实际未生效
+- ✅ streaming 模式补齐 `Events`：`llm_request`、`stream_delta`、`llm_response`
+- ✅ tool call 指向未注册 tool 时，`Runner` 捕获 `ToolNotFoundError` 并返回 `ToolResult.error`（不中断整次 run）
+- ✅ 将 `Runner#normalized_options` 抽取为 `AgentCore::Utils.symbolize_keys`，作为公共 Hash key 归一化工具
+
+## 9. 仍建议关注（Phase 2 / Rails 整合前）
+
+1. **执行上下文（context）贯穿**：目前 `ToolPolicy#authorize` / `Tools::Registry#execute` 未接收执行上下文（user/session/permissions），限制了鉴权与审计能力；建议在 `Agent#chat/chat_stream` 增加 `context:` 并向下传递（含 policy + tool 执行）。
+2. **确认流（Decision.confirm）**：`Decision.confirm` 当前会被当作 deny（非 allowed）处理，但没有“需要用户确认”的交互式通道；建议定义 Runner 的行为（例如 emit 事件并中断、或返回可恢复的结果）。

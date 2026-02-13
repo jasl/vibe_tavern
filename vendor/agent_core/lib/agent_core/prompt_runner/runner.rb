@@ -46,9 +46,12 @@ module AgentCore
 
         events ||= Events.new
         messages = prompt.messages.dup
+        apply_system_prompt!(prompt.system_prompt, messages)
         all_new_messages = []
         tool_calls_record = []
         aggregated_usage = nil
+        options = Utils.symbolize_keys(prompt.options)
+        model = options.delete(:model)
         turn = 0
 
         loop do
@@ -69,15 +72,16 @@ module AgentCore
 
           # Build LLM request
           tools = prompt.has_tools? ? prompt.tools : nil
-          events.emit(:llm_request, messages, tools)
+          request_messages = messages.dup.freeze
+          events.emit(:llm_request, request_messages, tools)
 
           # Call LLM
           response = provider.chat(
-            messages: messages,
-            model: prompt.options[:model] || prompt.options["model"],
+            messages: request_messages,
+            model: model,
             tools: tools,
             stream: false,
-            **prompt.options.except(:model, "model")
+            **options
           )
 
           events.emit(:llm_response, response)
@@ -151,9 +155,12 @@ module AgentCore
 
         events ||= Events.new
         messages = prompt.messages.dup
+        apply_system_prompt!(prompt.system_prompt, messages)
         all_new_messages = []
         tool_calls_record = []
         aggregated_usage = nil
+        options = Utils.symbolize_keys(prompt.options)
+        model = options.delete(:model)
         turn = 0
 
         loop do
@@ -174,14 +181,16 @@ module AgentCore
           events.emit(:turn_start, turn)
 
           tools = prompt.has_tools? ? prompt.tools : nil
+          request_messages = messages.dup.freeze
+          events.emit(:llm_request, request_messages, tools)
 
           # Stream LLM response
           stream_enum = provider.chat(
-            messages: messages,
-            model: prompt.options[:model] || prompt.options["model"],
+            messages: request_messages,
+            model: model,
             tools: tools,
             stream: true,
-            **prompt.options.except(:model, "model")
+            **options
           )
 
           # Collect the response from stream events
@@ -192,6 +201,7 @@ module AgentCore
           stream_enum.each do |event|
             # Forward stream events to caller
             yield event if block
+            events.emit(:stream_delta, event)
 
             case event
             when StreamEvent::Done
@@ -225,6 +235,14 @@ module AgentCore
 
           messages << assistant_msg
           all_new_messages << assistant_msg
+          events.emit(
+            :llm_response,
+            Resources::Provider::Response.new(
+              message: assistant_msg,
+              usage: response_usage,
+              stop_reason: response_stop_reason
+            )
+          )
 
           # Handle tool calls
           if assistant_msg&.has_tool_calls? && tools_registry
@@ -293,14 +311,20 @@ module AgentCore
           end
 
           # Execute tool
-          result = tools_registry.execute(name: tc.name, arguments: tc.arguments)
+          result = begin
+            tools_registry.execute(name: tc.name, arguments: tc.arguments)
+          rescue ToolNotFoundError => e
+            Resources::Tools::ToolResult.error(text: e.message)
+          rescue => e
+            Resources::Tools::ToolResult.error(text: "Tool '#{tc.name}' raised: #{e.message}")
+          end
           stream_block&.call(StreamEvent::ToolExecutionEnd.new(
             tool_call_id: tc.id, name: tc.name, result: result, is_error: result.error?
           ))
           events.emit(:tool_result, tc.name, result, tc.id)
           tool_calls_record << {
             name: tc.name, arguments: tc.arguments,
-            error: result.error? ? result.text : nil
+            error: result.error? ? result.text : nil,
           }
 
           Message.new(
@@ -322,6 +346,21 @@ module AgentCore
           tool_calls_made: tool_calls_record,
           stop_reason: stop_reason
         )
+      end
+
+      def apply_system_prompt!(system_prompt, messages)
+        system_text = system_prompt.to_s
+        return messages if system_text.empty?
+
+        system_message = Message.new(role: :system, content: system_text.dup)
+
+        if messages.first&.system?
+          messages[0] = system_message unless messages.first.text == system_text
+        else
+          messages.unshift(system_message)
+        end
+
+        messages
       end
     end
   end

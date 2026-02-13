@@ -1,17 +1,18 @@
 # Phase 1 — Completion Report
 
 > Date: 2026-02-14
-> Status: ✅ Complete (with issues to address)
-> Tests: 83 runs, 172 assertions, 0 failures, 0 errors
+> Status: ✅ Complete
+> Tests: 98 runs, 196 assertions, 0 failures, 0 errors
 
 ## What Was Delivered
 
-### Files (24 source + 8 test)
+### Files (25 source + 9 test)
 
 ```
 lib/agent_core.rb                              # Top-level require, convenience build
 lib/agent_core/version.rb                      # 0.1.0
 lib/agent_core/errors.rb                       # Error hierarchy
+lib/agent_core/utils.rb                        # Shared small utilities (key normalization, etc.)
 lib/agent_core/message.rb                      # Message, ToolCall, ContentBlock, 4 content types
 lib/agent_core/stream_event.rb                 # 13 event classes in StreamEvent module
 lib/agent_core/resources/provider/base.rb      # Abstract LLM provider
@@ -43,6 +44,7 @@ test/agent_core/resources/tools/policy_test.rb # Decision + Base
 test/agent_core/prompt_builder/simple_pipeline_test.rb
 test/agent_core/prompt_runner/runner_test.rb   # Sync, streaming, tools, policy, events
 test/agent_core/agent_test.rb                 # Build, chat, stream, serialize, reset
+test/agent_core/utils_test.rb                  # Utils
 ```
 
 ### Plan Compliance Checklist
@@ -52,14 +54,14 @@ test/agent_core/agent_test.rb                 # Build, chat, stream, serialize, 
 | Message + ContentBlock + ToolCall + StreamEvent | ✅ | |
 | ChatHistory (Base + InMemory) | ✅ | |
 | Memory (Base + InMemory) | ✅ | |
-| Provider (Base + Response + Usage) | ✅ | Missing `#models` method from plan |
+| Provider (Base + Response + Usage) | ✅ | |
 | Tool + ToolResult + ToolDefinition | ✅ | ToolDefinition folded into Tool#to_definition |
 | Tools::Registry | ✅ | |
 | Tool Policy (Base + Decision) | ✅ | |
 | PromptBuilder (Context, Pipeline, SimplePipeline, BuiltPrompt) | ✅ | |
 | PromptRunner (Runner, Events, RunResult) | ✅ | |
 | Agent (Builder, config serialization) | ✅ | |
-| Tests for all of the above | ✅ | 83 tests |
+| Tests for all of the above | ✅ | 98 tests |
 
 ### What Was Deferred to Phase 2
 
