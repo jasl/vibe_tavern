@@ -59,10 +59,9 @@ module LLM
           step_options: step_options,
         )
 
-      prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: effective_client)
-
-      prompt_request =
-        prompt_runner.build_request(
+      generation =
+        TavernKit::VibeTavern::Generation.chat(
+          client: effective_client,
           runner_config: runner_config,
           history: normalized_history,
           system: system,
@@ -71,7 +70,32 @@ module LLM
           dialect: :openai,
         )
 
-      prompt_result = prompt_runner.perform(prompt_request)
+      generation_result = generation.run
+      if generation_result.failure?
+        case generation_result.code
+        when "PROMPT_TOO_LONG"
+          details = generation_result.value.is_a?(Hash) ? generation_result.value : {}
+          return Result.failure(
+            errors: generation_result.errors,
+            code: "PROMPT_TOO_LONG",
+            value: {
+              llm_model: llm_model,
+              estimated_tokens: details.fetch(:estimated_tokens, nil),
+              max_tokens: details.fetch(:max_tokens, nil),
+              reserve_tokens: details.fetch(:reserve_tokens, nil),
+              limit_tokens: details.fetch(:limit_tokens, nil),
+            },
+          )
+        when "LLM_REQUEST_FAILED"
+          return Result.failure(errors: generation_result.errors, code: "LLM_REQUEST_FAILED", value: { llm_model: llm_model })
+        when "INVALID_INPUT"
+          return Result.failure(errors: generation_result.errors, code: "INVALID_INPUT", value: { llm_model: llm_model })
+        else
+          return Result.failure(errors: generation_result.errors, code: "LLM_REQUEST_FAILED", value: { llm_model: llm_model })
+        end
+      end
+
+      prompt_result = generation_result.value.prompt_result
 
       Result.success(
         value: {

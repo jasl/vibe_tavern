@@ -96,7 +96,7 @@ Re-evaluate RubyLLM if we need any of:
 ## If we introduce it later: recommended boundary
 
 - RubyLLM should live in the Rails app layer as a provider SDK.
-- VibeTavern remains the runner/protocol layer (ToolLoopRunner + Directives::Runner).
+- VibeTavern remains the runner/protocol layer (ToolLoopRunner + Directives::Runner), with an optional `Generation` facade.
 - If needed, add a small adapter so VibeTavern can call a RubyLLM-backed client
   while still preserving:
   - raw request override control (for eval/workarounds)

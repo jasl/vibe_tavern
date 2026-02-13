@@ -125,6 +125,26 @@ PromptRunner contract (after RunnerConfig refactor):
   - per-call `llm_options` (strict Symbol keys; reserved keys rejected)
 - no directives parsing and no OutputTags post-processing in PromptRunner itself
 
+### 2.5) Unified run wrapper: Generation (optional)
+
+`lib/tavern_kit/vibe_tavern/generation.rb`
+
+For callers that want a single “run” object with a consistent result shape,
+VibeTavern provides:
+
+- `TavernKit::VibeTavern::Generation` (mode: `:chat`, `:tool_loop`, `:directives`)
+- `TavernKit::VibeTavern::Result` (`success?/failure?`, `value/errors/code`)
+
+`Generation` is a small facade that **delegates** to the existing runners:
+
+- chat: `PromptRunner#build_request` + `PromptRunner#perform`
+- tool loop: `ToolCalling::ToolLoopRunner#run`
+- directives: `Directives::Runner#run`
+
+Chat mode also exposes `#prompt_request` (preview) and computes an `assistant_text`
+field with `OutputTags.transform(...)` applied, while keeping the underlying
+`prompt_result.assistant_message` unmodified (raw provider payload).
+
 ### 3) Tool calling: ToolLoopRunner (+ injected tools)
 
 Code:

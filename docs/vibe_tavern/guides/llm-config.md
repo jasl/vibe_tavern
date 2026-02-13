@@ -86,7 +86,7 @@ Service: `app/services/llm/run_chat.rb`
 
 - DB config (`LLMProvider` / `LLMModel` / `LLMPreset`)
 - `TavernKit::VibeTavern::RunnerConfig`
-- `TavernKit::VibeTavern::PromptRunner`
+- `TavernKit::VibeTavern::Generation` (which uses `PromptRunner` internally)
 - `SimpleInference` transport client
 
 Example:
