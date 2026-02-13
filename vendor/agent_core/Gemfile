@@ -1,0 +1,22 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+# Specify your gem's dependencies in agent_core.gemspec
+gemspec
+
+gem "irb"
+gem "rake", "~> 13"
+
+gem "minitest", "~> 6"
+
+gem "simplecov", require: false
+
+gem "rubocop", "~> 1.21"
+gem "rubocop-rails-omakase", require: false
+
+gem "tokenizers"
+
+gem "httpx"
+gem "simple_inference", path: "../simple_inference"
+gem "easy_talk", path: "../easy_talk"

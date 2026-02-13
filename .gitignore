@@ -128,6 +128,16 @@
 /vendor/logica_rb/tmp/
 /vendor/logica_rb/*.gem
 
+/vendor/agent_core/.bundle/
+/vendor/agent_core/.yardoc
+/vendor/agent_core/_yardoc/
+/vendor/agent_core/coverage/
+/vendor/agent_core/doc/
+/vendor/agent_core/pkg/
+/vendor/agent_core/spec/reports/
+/vendor/agent_core/tmp/
+/vendor/agent_core/*.gem
+
 # Local resources
 /resources
 
