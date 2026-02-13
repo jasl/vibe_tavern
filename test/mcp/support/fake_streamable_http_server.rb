@@ -10,7 +10,8 @@ class McpFakeStreamableHttpServer
               :tools_call_count,
               :last_event_id_requests,
               :not_found_count,
-              :cancelled_requests
+              :cancelled_requests,
+              :authorization_headers
 
   def initialize(
     tools_call_mode:,
@@ -35,6 +36,7 @@ class McpFakeStreamableHttpServer
     @last_event_id_requests = []
     @not_found_count = 0
     @cancelled_requests = []
+    @authorization_headers = []
 
     @sessions = {}
     @pending_sse = {}
@@ -108,6 +110,8 @@ class McpFakeStreamableHttpServer
     method = request.fetch(:method)
     headers = request.fetch(:headers)
     body = request.fetch(:body)
+
+    @mutex.synchronize { @authorization_headers << headers.fetch("authorization", nil) }
 
     case method
     when "POST"

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "securerandom"
 require_relative "../prompt_runner"
 require_relative "../runner_config"
 require_relative "../output_tags"
@@ -13,6 +14,8 @@ require_relative "tool_call_transforms"
 require_relative "tool_result_transforms"
 require_relative "tool_output_limiter"
 require_relative "policies/skills_allowed_tools_policy"
+require_relative "policies/tool_policy"
+require_relative "support/utf8"
 
 module TavernKit
   module VibeTavern
@@ -103,6 +106,9 @@ module TavernKit
           @response_transforms = cfg.response_transforms
           @tool_call_transforms = cfg.tool_call_transforms
           @tool_result_transforms = cfg.tool_result_transforms
+          @tool_policy = cfg.policy
+          @tool_policy_error_mode = cfg.policy_error_mode
+          @event_context_keys = cfg.event_context_keys
 
           if cfg.tool_use_enabled? && @tool_executor.nil?
             raise ArgumentError, "tool_executor is required when tool_use_mode is enabled"
@@ -110,26 +116,37 @@ module TavernKit
 
           @dispatcher =
             if @tool_executor
-              ToolDispatcher.new(executor: @tool_executor, registry: @registry, expose: :model)
+              ToolDispatcher.new(
+                executor: @tool_executor,
+                registry: @registry,
+                expose: :model,
+                policy: @tool_policy,
+                policy_context: @runner_config.context,
+                policy_error_mode: @tool_policy_error_mode,
+              )
             end
         end
 
         def run(user_text:, history: nil, max_turns: DEFAULT_MAX_TURNS, on_event: nil, final_stream: false, &block)
           raise ArgumentError, "model is required" if @model.strip.empty?
 
+          run_id = SecureRandom.uuid
+          set_event_context!(run_id)
+
           event_handler = on_event.respond_to?(:call) ? on_event : nil
           event_handler ||= block
+          @dispatcher.on_policy_error = nil if @dispatcher&.respond_to?(:on_policy_error=)
 
           history = Array(history).dup
           history = history.map { |m| normalize_history_message(m) }
 
           trace = []
           pending_user_text = user_text.to_s
-          tools_enabled = tool_use_enabled?
-          empty_final_fixup_attempted = false
-          any_tool_calls_seen = false
-          any_tool_success_seen = false
-          last_tool_ok_by_name = {}
+            tools_enabled = tool_use_enabled?
+            empty_final_fixup_attempted = false
+            any_tool_calls_seen = false
+            any_tool_success_seen = false
+            last_tool_ok_by_name = {}
 
           max_turns.times do |turn|
             variables_store = @variables_store
@@ -145,12 +162,35 @@ module TavernKit
             tool_result_transforms = @tool_result_transforms
             request_attempts_left = @tool_use_mode == :relaxed ? @tool_calling_fallback_retry_count : 0
 
+            if @dispatcher&.respond_to?(:on_policy_error=)
+              if event_handler
+                @dispatcher.on_policy_error =
+                  lambda do |details|
+                    d = details.is_a?(Hash) ? details : {}
+
+                    emit_event(
+                      event_handler,
+                      :policy_error,
+                      turn: turn,
+                      stage: "call",
+                      tool_call_id: d.fetch(:tool_call_id, nil),
+                      name: d.fetch(:name, nil),
+                      error_class: d.fetch(:error_class, nil),
+                      message: truncate_utf8_bytes(d.fetch(:message, "").to_s, max_bytes: 200),
+                    )
+                  end
+              else
+                @dispatcher.on_policy_error = nil
+              end
+            end
+
             if pending_user_text && !pending_user_text.strip.empty?
               history << TavernKit::PromptBuilder::Message.new(role: :user, content: pending_user_text.to_s)
               pending_user_text = nil
             end
 
             tools = ToolTransforms.apply(tools, tool_transforms, strict: @strict) if tools_enabled && tool_transforms.any?
+            tools = apply_tool_policy_filter(tools, handler: event_handler, turn: turn, tools_enabled: tools_enabled) if tools_enabled
 
             messages = nil
             options = nil
@@ -613,7 +653,15 @@ module TavernKit
                     data: { bytes: arguments_bytes, max_bytes: @max_tool_args_bytes },
                   )
                 else
-                  @dispatcher.execute(name: name, args: args, tool_call_id: id)
+                  begin
+                    @dispatcher.execute(name: name, args: args, tool_call_id: id)
+                  rescue ToolDispatcher::PolicyError => e
+                    raise ToolUseError.new(
+                      "POLICY_ERROR",
+                      e.message.to_s,
+                      details: { turn: turn, tool_call_id: id, tool_name: name },
+                    )
+                  end
                 end
 
               effective_tool_name = result.is_a?(Hash) ? result.fetch(:tool_name, name).to_s : name
@@ -745,6 +793,9 @@ module TavernKit
                 )
               end
 
+              policy_summary = extract_policy_summary(result)
+              mcp_summary = extract_mcp_summary(result)
+
               last_tool_ok_by_name[effective_tool_name] = ok_value
               any_tool_success_seen ||= (ok_value == true)
 
@@ -759,6 +810,8 @@ module TavernKit
                 output_bytes: tool_content.bytesize,
                 output_replaced: output_replaced,
                 error_codes: error_codes,
+                policy: policy_summary,
+                mcp: mcp_summary,
               )
 
               tool_results << {
@@ -812,7 +865,16 @@ module TavernKit
         def emit_event(handler, type, **data)
           return unless handler
 
-          handler.call({ type: type }.merge(data))
+          payload =
+            data.merge(
+              type: type,
+              run_id: @event_run_id,
+              context_type: @event_context_type,
+              context_id: @event_context_id,
+              context: @event_context_snippet,
+            )
+
+          handler.call(payload)
         rescue StandardError
           nil
         end
@@ -886,6 +948,224 @@ module TavernKit
               { code: code, message: message.to_s },
             ],
           }
+        end
+
+        def set_event_context!(run_id)
+          @event_run_id = run_id.to_s
+
+          ctx = @runner_config.context
+
+          @event_context_type = ctx.respond_to?(:type) ? ctx.type&.to_s : nil
+          @event_context_id = ctx.respond_to?(:id) ? ctx.id&.to_s : nil
+
+          @event_context_snippet = build_event_context_snippet(ctx, @event_context_keys)
+        rescue StandardError
+          @event_run_id = run_id.to_s
+          @event_context_type = nil
+          @event_context_id = nil
+          @event_context_snippet = {}
+        end
+
+        def build_event_context_snippet(context, keys)
+          raw =
+            if context.respond_to?(:to_h)
+              context.to_h
+            elsif context.is_a?(Hash)
+              context
+            else
+              {}
+            end
+
+          selected = {}
+
+          Array(keys).each do |key|
+            k = key.to_s.strip
+            next if k.empty?
+
+            ksym = k.to_sym
+            next unless raw.key?(ksym)
+
+            selected[ksym] = truncate_utf8_bytes(raw.fetch(ksym).to_s, max_bytes: 200)
+          end
+
+          selected
+        rescue StandardError
+          {}
+        end
+
+        def truncate_utf8_bytes(value, max_bytes:)
+          ToolCalling::Support::Utf8.truncate_utf8_bytes(value, max_bytes: max_bytes)
+        end
+
+        def apply_tool_policy_filter(tools, handler:, turn:, tools_enabled:)
+          policy = @tool_policy
+          return tools unless tools_enabled && policy
+
+          filtered = nil
+
+          begin
+            filtered = policy.filter_tools(tools: tools, context: @runner_config.context, expose: :model)
+          rescue StandardError => e
+            emit_event(
+              handler,
+              :policy_error,
+              turn: turn,
+              stage: "exposure",
+              error_class: e.class.name,
+              message: truncate_utf8_bytes(e.message.to_s, max_bytes: 200),
+            )
+
+            case @tool_policy_error_mode
+            when :allow
+              return tools
+            when :raise
+              raise ToolUseError.new(
+                "POLICY_ERROR",
+                "tool policy raised while filtering tools: #{e.class}: #{e.message}",
+                details: { turn: turn, stage: "exposure" },
+              )
+            else
+              return []
+            end
+          end
+
+          unless filtered.is_a?(Array) && filtered.all? { |t| t.is_a?(Hash) }
+            emit_event(
+              handler,
+              :policy_error,
+              turn: turn,
+              stage: "exposure",
+              error_class: "InvalidPolicyResult",
+              message: "tool policy returned invalid filtered tools",
+            )
+
+            case @tool_policy_error_mode
+            when :allow
+              return tools
+            when :raise
+              raise ToolUseError.new(
+                "POLICY_ERROR",
+                "tool policy returned invalid filtered tools",
+                details: { turn: turn, stage: "exposure" },
+              )
+            else
+              return []
+            end
+          end
+
+          before_names = extract_tool_names(tools)
+          after_names = extract_tool_names(filtered)
+
+          before_set = before_names.each_with_object({}) { |name, out| out[name] = true }
+          unknown = after_names.reject { |name| before_set.key?(name) }
+
+          if unknown.any? || after_names.size > before_names.size
+            emit_event(
+              handler,
+              :policy_error,
+              turn: turn,
+              stage: "exposure",
+              error_class: "InvalidPolicyResult",
+              message: "tool policy must return a subset of the provided tools",
+            )
+
+            case @tool_policy_error_mode
+            when :allow
+              return tools
+            when :raise
+              raise ToolUseError.new(
+                "POLICY_ERROR",
+                "tool policy returned tools that were not in the registry",
+                details: { turn: turn, stage: "exposure", unknown_tools: unknown.first(20) },
+              )
+            else
+              return []
+            end
+          end
+
+          if after_names.size < before_names.size
+            removed = before_names - after_names
+
+            emit_event(
+              handler,
+              :tools_filtered,
+              turn: turn,
+              before_count: before_names.size,
+              after_count: after_names.size,
+              removed_count: removed.size,
+              removed_sample: removed.first(20),
+            )
+          end
+
+          filtered
+        rescue ToolUseError
+          raise
+        rescue StandardError => e
+          emit_event(
+            handler,
+            :policy_error,
+            turn: turn,
+            stage: "exposure",
+            error_class: e.class.name,
+            message: truncate_utf8_bytes(e.message.to_s, max_bytes: 200),
+          )
+
+          case @tool_policy_error_mode
+          when :allow
+            tools
+          when :raise
+            raise ToolUseError.new(
+              "POLICY_ERROR",
+              "tool policy error while filtering tools: #{e.class}: #{e.message}",
+              details: { turn: turn, stage: "exposure" },
+            )
+          else
+            []
+          end
+        end
+
+        def extract_policy_summary(result)
+          return nil unless result.is_a?(Hash)
+
+          data = result.fetch(:data, nil)
+          data = {} unless data.is_a?(Hash)
+
+          policy = data.fetch(:policy, nil)
+          return nil unless policy.is_a?(Hash)
+
+          outcome = policy.fetch(:outcome, policy.fetch("outcome", nil)).to_s.strip
+          return nil if outcome.empty?
+
+          decision_id = policy.fetch(:decision_id, policy.fetch("decision_id", nil))&.to_s
+          decision_id = nil if decision_id&.strip&.empty?
+
+          reason_codes =
+            Array(policy.fetch(:reason_codes, policy.fetch("reason_codes", nil)))
+              .map { |v| v.to_s.strip }
+              .reject(&:empty?)
+              .uniq
+
+          { outcome: outcome, decision_id: decision_id, reason_codes: reason_codes }
+        rescue StandardError
+          nil
+        end
+
+        def extract_mcp_summary(result)
+          return nil unless result.is_a?(Hash)
+
+          data = result.fetch(:data, nil)
+          data = {} unless data.is_a?(Hash)
+
+          mcp = data.fetch(:mcp, nil)
+          return nil unless mcp.is_a?(Hash)
+
+          server_id = mcp.fetch(:server_id, mcp.fetch("server_id", nil)).to_s.strip
+          remote_tool_name = mcp.fetch(:remote_tool_name, mcp.fetch("remote_tool_name", nil)).to_s.strip
+          return nil if server_id.empty? || remote_tool_name.empty?
+
+          { server_id: server_id, remote_tool_name: remote_tool_name }
+        rescue StandardError
+          nil
         end
 
         def baseline_skills_tool_names

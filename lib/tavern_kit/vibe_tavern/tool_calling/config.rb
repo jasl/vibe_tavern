@@ -12,6 +12,9 @@ module TavernKit
           :tool_failure_policy,
           :tool_allowlist,
           :tool_denylist,
+          :policy,
+          :policy_error_mode,
+          :event_context_keys,
           :fix_empty_final,
           :fix_empty_final_user_text,
           :fix_empty_final_disable_tools,
@@ -93,6 +96,14 @@ module TavernKit
             tool_allowlist = normalize_string_list(raw.fetch(:tool_allowlist, nil))
             tool_denylist = normalize_string_list(raw.fetch(:tool_denylist, nil))
 
+            policy = raw.fetch(:policy, nil)
+            unless policy.nil? || (policy.respond_to?(:filter_tools) && policy.respond_to?(:authorize_call))
+              raise ArgumentError, "tool_calling.policy must respond to #filter_tools and #authorize_call"
+            end
+
+            policy_error_mode = normalize_policy_error_mode(raw.fetch(:policy_error_mode, :deny))
+            event_context_keys = normalize_event_context_keys(raw.fetch(:event_context_keys, nil))
+
             message_transforms = normalize_string_array(raw.fetch(:message_transforms, nil))
             tool_transforms = normalize_string_array(raw.fetch(:tool_transforms, nil))
             response_transforms = normalize_string_array(raw.fetch(:response_transforms, nil))
@@ -109,6 +120,9 @@ module TavernKit
               tool_failure_policy: tool_failure_policy,
               tool_allowlist: tool_allowlist,
               tool_denylist: tool_denylist,
+              policy: policy,
+              policy_error_mode: policy_error_mode,
+              event_context_keys: event_context_keys,
               fix_empty_final: fix_empty_final,
               fix_empty_final_user_text: fix_empty_final_user_text,
               fix_empty_final_disable_tools: fix_empty_final_disable_tools,
@@ -171,6 +185,43 @@ module TavernKit
             Array(value).map { |v| v.to_s.strip }.reject(&:empty?)
           end
           private_class_method :normalize_string_array
+
+          def self.normalize_policy_error_mode(value)
+            mode = value.to_s.strip
+            mode = "deny" if mode.empty?
+            mode = mode.downcase.tr("-", "_")
+
+            case mode
+            when "deny"
+              :deny
+            when "allow"
+              :allow
+            when "raise"
+              :raise
+            else
+              raise ArgumentError, "tool_calling.policy_error_mode must be :deny, :allow, or :raise"
+            end
+          end
+          private_class_method :normalize_policy_error_mode
+
+          def self.normalize_event_context_keys(value)
+            keys =
+              case value
+              when nil
+                []
+              when Array
+                value
+              else
+                [value]
+              end
+
+            keys
+              .map { |v| v.to_s.strip }
+              .reject(&:empty?)
+              .map(&:to_sym)
+              .uniq
+          end
+          private_class_method :normalize_event_context_keys
         end
     end
   end

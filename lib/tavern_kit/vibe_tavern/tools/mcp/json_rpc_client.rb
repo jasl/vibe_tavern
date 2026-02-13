@@ -55,7 +55,22 @@ module TavernKit
               return self if @started
 
               if @transport.respond_to?(:on_stdout_line=)
-                @transport.on_stdout_line = method(:handle_stdout_line)
+                existing_stdout = @transport.respond_to?(:on_stdout_line) ? @transport.on_stdout_line : nil
+                handler = method(:handle_stdout_line)
+
+                if existing_stdout&.respond_to?(:call)
+                  @transport.on_stdout_line =
+                    lambda do |line|
+                      handler.call(line)
+                      begin
+                        existing_stdout.call(line)
+                      rescue StandardError
+                        nil
+                      end
+                    end
+                else
+                  @transport.on_stdout_line = handler
+                end
               end
 
               if @transport.respond_to?(:on_close=)

@@ -27,11 +27,14 @@ Non-goals (intentionally not implemented here):
 
 - `transport: :stdio`
   - requires: `command:` (+ optional `args/env/chdir`)
-  - rejects: HTTP-only fields (`url/headers/open_timeout_s/read_timeout_s/sse_max_reconnects/max_response_bytes`)
+  - optional hooks: `on_stderr_line`, `on_stdout_line` (see notes below)
+  - optional auth injection: `env_provider` (see notes below)
+  - rejects: HTTP-only fields (`url/headers/headers_provider/open_timeout_s/read_timeout_s/sse_max_reconnects/max_response_bytes`)
 - `transport: :streamable_http`
   - requires: `url:`
-  - optional: `headers:` (for `Authorization`, etc.), `open_timeout_s`, `read_timeout_s`, `sse_max_reconnects`, `max_response_bytes`
-  - rejects: stdio-only fields (`command/args/env/chdir`)
+  - optional: `headers:` (for `Authorization`, etc.), `headers_provider`, `open_timeout_s`, `read_timeout_s`, `sse_max_reconnects`, `max_response_bytes`
+  - optional hooks: `on_stderr_line`, `on_stdout_line` (see notes below)
+  - rejects: stdio-only fields (`command/args/env/env_provider/chdir`)
 
 Defaults:
 - `protocol_version`: `Tools::MCP::DEFAULT_PROTOCOL_VERSION` (currently `2025-11-25`)
@@ -41,8 +44,11 @@ Defaults:
 
 Notes:
 - `headers:` often contains secrets (e.g. `Authorization`); avoid logging.
+- `headers_provider:` is called for each outgoing request to compute extra headers (for example: short-lived bearer tokens).
 - the server-assigned `MCP-Session-Id` is treated as sensitive; the transport does not emit it in diagnostics.
 - if a response exceeds limits, the transport returns JSON-RPC errors (e.g. `HTTP_BODY_TOO_LARGE`, `SSE_EVENT_DATA_TOO_LARGE`, `INVALID_SSE_EVENT_DATA`).
+- `on_stdout_line:` receives JSON-RPC message lines (incoming responses/notifications). This can contain sensitive data; avoid logging raw output.
+- `on_stderr_line:` is for transport diagnostics (and stdio subprocess stderr). Treat as untrusted and potentially sensitive.
 
 ## Examples
 
@@ -71,6 +77,46 @@ TavernKit::VibeTavern::Tools::MCP::ServerConfig.new(
   sse_max_reconnects: 20,
 )
 ```
+
+## Auth injection hooks
+
+TavernKit does not implement OAuth flows. Instead, it exposes hooks so the host
+application can inject credentials at runtime.
+
+Streamable HTTP:
+
+```ruby
+TavernKit::VibeTavern::Tools::MCP::ServerConfig.new(
+  id: "remote",
+  transport: :streamable_http,
+  url: "https://mcp.example.com/mcp",
+  headers_provider: -> { { "Authorization" => "Bearer #{token_store.fetch!}" } },
+  on_stderr_line: ->(line) { Rails.logger.debug(line) },
+)
+```
+
+STDIO:
+
+```ruby
+TavernKit::VibeTavern::Tools::MCP::ServerConfig.new(
+  id: "local",
+  transport: :stdio,
+  command: "my-mcp-server",
+  env_provider: -> { { "MCP_TOKEN" => token_store.fetch! } },
+  on_stderr_line: ->(line) { Rails.logger.debug(line) },
+)
+```
+
+## SaaS host TODO (multi-tenant)
+
+This library focuses on protocol correctness and safe defaults. A production
+multi-tenant host must additionally implement:
+
+- Connection/session isolation: key MCP clients by `tenant_id + user_id + server_id + auth_context`, never share sessions across tenants/users.
+- Session lifecycle: idle TTL, logout invalidation, token rotation handling, and policy version changes that force session rebuild.
+- SSRF controls (when server URLs / discovery URLs are user-configurable): HTTPS enforcement, redirect restrictions, private-network blocking, egress proxying, and DNS rebinding mitigations.
+- Secrets management: centralized storage/rotation, least-privilege access, and strict redaction so secrets never enter prompts or logs.
+- Audit logs: append-only/WORM storage, retention policy, log-injection hardening, and decision logging for allow/deny/confirm tool policies.
 
 ## Components
 

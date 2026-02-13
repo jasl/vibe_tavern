@@ -13,9 +13,13 @@ module TavernKit
             :command,
             :args,
             :env,
+            :env_provider,
             :chdir,
             :url,
             :headers,
+            :headers_provider,
+            :on_stdout_line,
+            :on_stderr_line,
             :protocol_version,
             :client_info,
             :capabilities,
@@ -31,9 +35,13 @@ module TavernKit
               command: nil,
               args: nil,
               env: nil,
+              env_provider: nil,
               chdir: nil,
               url: nil,
               headers: nil,
+              headers_provider: nil,
+              on_stdout_line: nil,
+              on_stderr_line: nil,
               protocol_version: nil,
               client_info: nil,
               capabilities: nil,
@@ -51,6 +59,9 @@ module TavernKit
               command = blank?(command) ? nil : command.to_s.strip
               url = blank?(url) ? nil : url.to_s.strip
 
+              on_stdout_line = normalize_optional_callable(on_stdout_line, field: "on_stdout_line")
+              on_stderr_line = normalize_optional_callable(on_stderr_line, field: "on_stderr_line")
+
               case transport
               when :stdio
                 raise ArgumentError, "command is required" if command.nil? || command.empty?
@@ -62,6 +73,10 @@ module TavernKit
                 http_headers = normalize_headers(headers)
                 if !http_headers.nil? && !http_headers.empty?
                   raise ArgumentError, "headers must be empty for stdio transport"
+                end
+
+                if !headers_provider.nil?
+                  raise ArgumentError, "headers_provider must be empty for stdio transport"
                 end
 
                 if !open_timeout_s.nil?
@@ -79,6 +94,8 @@ module TavernKit
                 if !max_response_bytes.nil?
                   raise ArgumentError, "max_response_bytes must be empty for stdio transport"
                 end
+
+                env_provider = normalize_optional_callable(env_provider, field: "env_provider")
               when :streamable_http
                 raise ArgumentError, "url is required" if url.nil? || url.empty?
 
@@ -95,6 +112,10 @@ module TavernKit
                   raise ArgumentError, "env must be empty for streamable_http transport"
                 end
 
+                if !env_provider.nil?
+                  raise ArgumentError, "env_provider must be empty for streamable_http transport"
+                end
+
                 if !blank?(chdir)
                   raise ArgumentError, "chdir must be empty for streamable_http transport"
                 end
@@ -105,8 +126,10 @@ module TavernKit
                 max_response_bytes = normalize_optional_positive_integer(max_response_bytes, field: "max_response_bytes")
 
                 headers = normalize_headers(headers) || {}
+                headers_provider = normalize_optional_callable(headers_provider, field: "headers_provider")
                 args = []
                 env = {}
+                env_provider = nil
                 chdir = nil
               else
                 raise ArgumentError, "unsupported transport: #{transport.inspect}"
@@ -121,9 +144,13 @@ module TavernKit
                 command: command,
                 args: Array(args).map(&:to_s),
                 env: normalize_env(env),
+                env_provider: env_provider,
                 chdir: blank?(chdir) ? nil : chdir.to_s,
                 url: url,
                 headers: headers,
+                headers_provider: headers_provider,
+                on_stdout_line: on_stdout_line,
+                on_stderr_line: on_stderr_line,
                 protocol_version: protocol_version,
                 client_info: client_info.is_a?(Hash) ? client_info : nil,
                 capabilities: capabilities.is_a?(Hash) ? capabilities : {},
@@ -150,9 +177,13 @@ module TavernKit
                 command: value.fetch(:command, nil),
                 args: value.fetch(:args, nil),
                 env: value.fetch(:env, nil),
+                env_provider: value.fetch(:env_provider, nil),
                 chdir: value.fetch(:chdir, nil),
                 url: value.fetch(:url, nil),
                 headers: value.fetch(:headers, nil),
+                headers_provider: value.fetch(:headers_provider, nil),
+                on_stdout_line: value.fetch(:on_stdout_line, nil),
+                on_stderr_line: value.fetch(:on_stderr_line, nil),
                 protocol_version: value.fetch(:protocol_version, nil),
                 client_info: value.fetch(:client_info, nil),
                 capabilities: value.fetch(:capabilities, nil),
@@ -243,6 +274,13 @@ module TavernKit
               raise ArgumentError, "#{field} must be positive" if i <= 0
 
               i
+            end
+
+            def normalize_optional_callable(value, field:)
+              return nil if value.nil?
+              return value if value.respond_to?(:call)
+
+              raise ArgumentError, "#{field} must respond to #call"
             end
           end
       end

@@ -4664,4 +4664,498 @@ class ToolLoopRunnerTest < Minitest::Test
       assert_equal "ALLOWED_TOOLS_POLICY_ERROR", error.code
     end
   end
+
+  def test_tool_policy_filter_tools_removes_tools_from_llm_request
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) { |requests| @requests = requests }
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    policy =
+      Class.new do
+        def filter_tools(tools:, context:, expose:)
+          Array(tools).reject do |tool|
+            fn = tool.is_a?(Hash) ? (tool[:function] || tool["function"]) : nil
+            name = fn.is_a?(Hash) ? (fn[:name] || fn["name"]).to_s : ""
+            name == "state_patch"
+          end
+        end
+
+        def authorize_call(name:, args:, context:, tool_call_id:)
+          TavernKit::VibeTavern::ToolCalling::Policies::Decision.allow
+        end
+      end.new
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        context: { tool_calling: { policy: policy } },
+      )
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    req1 = JSON.parse(requests[0][:body])
+    tool_names = Array(req1["tools"]).map { |t| t.dig("function", "name") }.compact
+
+    assert_includes tool_names, "state_get"
+    refute_includes tool_names, "state_patch"
+  end
+
+  def test_tool_policy_denies_tool_calls_without_executing_the_tool
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_patch",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    policy =
+      Class.new do
+        def filter_tools(tools:, context:, expose:)
+          tools
+        end
+
+        def authorize_call(name:, args:, context:, tool_call_id:)
+          if name.to_s == "state_patch"
+            return TavernKit::VibeTavern::ToolCalling::Policies::Decision.deny(reason_codes: ["NO_WRITES"])
+          end
+
+          TavernKit::VibeTavern::ToolCalling::Policies::Decision.allow
+        end
+      end.new
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        context: { tool_calling: { policy: policy } },
+      )
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_nil workspace.draft["foo"]
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" && m["tool_call_id"] == "call_patch" }
+    refute_nil tool_msg
+
+    payload = JSON.parse(tool_msg.fetch("content"))
+    error_codes = Array(payload["errors"]).map { |e| e["code"] }.compact
+    assert_includes error_codes, "TOOL_POLICY_DENIED"
+
+    policy_data = payload.dig("data", "policy")
+    refute_nil policy_data
+    assert_equal "deny", policy_data.fetch("outcome")
+    assert_equal ["NO_WRITES"], Array(policy_data.fetch("reason_codes"))
+  end
+
+  def test_tool_policy_requires_confirmation_without_executing_the_tool
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_patch",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    policy =
+      Class.new do
+        def filter_tools(tools:, context:, expose:)
+          tools
+        end
+
+        def authorize_call(name:, args:, context:, tool_call_id:)
+          if name.to_s == "state_patch"
+            return TavernKit::VibeTavern::ToolCalling::Policies::Decision.confirm(
+              decision_id: "d1",
+              reason_codes: ["NEEDS_CONFIRMATION"],
+              message: "confirmation required",
+              confirm: { "title" => "Apply changes?" },
+            )
+          end
+
+          TavernKit::VibeTavern::ToolCalling::Policies::Decision.allow
+        end
+      end.new
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        context: { tool_calling: { policy: policy } },
+      )
+
+    runner.run(user_text: "workspace_id=#{workspace.id}")
+
+    assert_nil workspace.draft["foo"]
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" && m["tool_call_id"] == "call_patch" }
+    refute_nil tool_msg
+
+    payload = JSON.parse(tool_msg.fetch("content"))
+    error_codes = Array(payload["errors"]).map { |e| e["code"] }.compact
+    assert_includes error_codes, "TOOL_CONFIRMATION_REQUIRED"
+
+    policy_data = payload.dig("data", "policy")
+    refute_nil policy_data
+    assert_equal "confirm", policy_data.fetch("outcome")
+    assert_equal "d1", policy_data.fetch("decision_id")
+    assert_equal({ "title" => "Apply changes?" }, policy_data.fetch("confirm"))
+  end
+
+  def test_tool_policy_errors_emit_policy_error_event_and_return_tool_policy_error
+    requests = []
+    events = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_patch",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    policy =
+      Class.new do
+        def filter_tools(tools:, context:, expose:)
+          tools
+        end
+
+        def authorize_call(name:, args:, context:, tool_call_id:)
+          raise "boom" if name.to_s == "state_patch"
+
+          TavernKit::VibeTavern::ToolCalling::Policies::Decision.allow
+        end
+      end.new
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        context: { tool_calling: { policy: policy, policy_error_mode: :deny } },
+      )
+
+    runner.run(user_text: "workspace_id=#{workspace.id}", on_event: ->(e) { events << e })
+
+    assert_nil workspace.draft["foo"]
+
+    call_error = events.find { |e| e[:type] == :policy_error && e[:stage] == "call" }
+    refute_nil call_error
+    assert_equal "state_patch", call_error.fetch(:name)
+    assert_equal "call_patch", call_error.fetch(:tool_call_id)
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" && m["tool_call_id"] == "call_patch" }
+    refute_nil tool_msg
+
+    payload = JSON.parse(tool_msg.fetch("content"))
+    error_codes = Array(payload["errors"]).map { |e| e["code"] }.compact
+    assert_includes error_codes, "TOOL_POLICY_ERROR"
+  end
+
+  def test_event_context_keys_are_included_in_tool_loop_events
+    events = []
+    workspace = ToolCallEvalTestWorkspace.new
+
+    client =
+      Class.new do
+        @response_struct = Struct.new(:body)
+
+        class << self
+          attr_reader :response_struct
+        end
+
+        def chat_completions(**_request)
+          body =
+            {
+              "choices" => [
+                { "message" => { "role" => "assistant", "content" => "Done." }, "finish_reason" => "stop" },
+              ],
+            }
+
+          self.class.response_struct.new(body)
+        end
+      end.new
+
+    context = {
+      tenant_id: "t" * 500,
+      user_id: "u1",
+      tool_calling: { event_context_keys: %i[tenant_id] },
+    }
+
+    runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context, tool_use_mode: :disabled)
+
+    runner.run(user_text: "hello", on_event: ->(e) { events << e })
+
+    refute_empty events
+
+    sample = events.first
+    assert sample[:run_id].to_s.length.positive?
+    assert_equal "vibe_tavern", sample[:context_type]
+    assert sample[:context].is_a?(Hash)
+    assert sample[:context][:tenant_id].to_s.bytesize <= 200
+    refute sample[:context].key?(:user_id)
+  end
+
+  def test_policy_error_mode_affects_filter_tools_failure_handling
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) { |requests| @requests = requests }
+
+        define_method(:call) do |env|
+          @requests << env
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate({ choices: [{ message: { role: "assistant", content: "Done." }, finish_reason: "stop" }] }),
+          }
+        end
+      end.new(requests)
+
+    raising_policy =
+      Class.new do
+        def filter_tools(tools:, context:, expose:)
+          raise "boom"
+        end
+
+        def authorize_call(name:, args:, context:, tool_call_id:)
+          TavernKit::VibeTavern::ToolCalling::Policies::Decision.allow
+        end
+      end.new
+
+    workspace = ToolCallEvalTestWorkspace.new
+    client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+
+    runner_deny =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        context: { tool_calling: { policy: raising_policy, policy_error_mode: :deny } },
+      )
+
+    runner_deny.run(user_text: "workspace_id=#{workspace.id}")
+
+    req1 = JSON.parse(requests[0][:body])
+    assert_equal [], req1["tools"]
+
+    requests.clear
+
+    runner_allow =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        context: { tool_calling: { policy: raising_policy, policy_error_mode: :allow } },
+      )
+
+    runner_allow.run(user_text: "workspace_id=#{workspace.id}")
+
+    req2 = JSON.parse(requests[0][:body])
+    tool_names = Array(req2["tools"]).map { |t| t.dig("function", "name") }.compact
+    assert_includes tool_names, "state_patch"
+
+    runner_raise =
+      build_runner(
+        client: client,
+        model: "test-model",
+        workspace: workspace,
+        context: { tool_calling: { policy: raising_policy, policy_error_mode: :raise } },
+      )
+
+    error =
+      assert_raises(TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError) do
+        runner_raise.run(user_text: "workspace_id=#{workspace.id}")
+      end
+    assert_equal "POLICY_ERROR", error.code
+  end
 end

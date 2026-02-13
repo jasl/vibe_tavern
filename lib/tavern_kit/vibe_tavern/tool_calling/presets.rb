@@ -41,6 +41,9 @@ module TavernKit
           tool_failure_policy: nil,
           tool_allowlist: nil,
           tool_denylist: nil,
+          policy: nil,
+          policy_error_mode: nil,
+          event_context_keys: nil,
           fix_empty_final: true,
           fix_empty_final_user_text: nil,
           fix_empty_final_disable_tools: nil,
@@ -66,6 +69,9 @@ module TavernKit
           h[:tool_failure_policy] = tool_failure_policy unless tool_failure_policy.nil?
           h[:tool_allowlist] = tool_allowlist unless tool_allowlist.nil?
           h[:tool_denylist] = tool_denylist unless tool_denylist.nil?
+          h[:policy] = policy unless policy.nil?
+          h[:policy_error_mode] = policy_error_mode unless policy_error_mode.nil?
+          h[:event_context_keys] = event_context_keys unless event_context_keys.nil?
           h[:tool_choice] = tool_choice unless tool_choice.nil?
           h[:max_tool_definitions_count] = max_tool_definitions_count unless max_tool_definitions_count.nil?
           h[:max_tool_definitions_bytes] = max_tool_definitions_bytes unless max_tool_definitions_bytes.nil?

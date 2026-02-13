@@ -18,7 +18,7 @@ module TavernKit
             DEFAULT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
             Token = Struct.new(:cancelled, :reason, keyword_init: true)
-            Job = Data.define(:message, :id, :method, :token)
+            Job = Data.define(:message, :id, :method, :token, :dynamic_headers)
 
             class BodyTooLargeError < StandardError; end
             class InvalidSseEventDataError < StandardError; end
@@ -28,6 +28,7 @@ module TavernKit
             def initialize(
               url:,
               headers: nil,
+              headers_provider: nil,
               timeout_s: MCP::DEFAULT_TIMEOUT_S,
               open_timeout_s: nil,
               read_timeout_s: nil,
@@ -42,6 +43,7 @@ module TavernKit
               raise ArgumentError, "url is required" if @url.empty?
 
               @headers = normalize_headers(headers)
+              @headers_provider = normalize_headers_provider(headers_provider)
 
               @timeout_s = Float(timeout_s)
               raise ArgumentError, "timeout_s must be positive" if @timeout_s <= 0
@@ -114,6 +116,13 @@ module TavernKit
               @mutex.synchronize do
                 raise MCP::Errors::ClosedError, "transport is closed" if @closed
                 raise MCP::Errors::TransportError, "transport is not started" unless @started
+              end
+
+              dynamic_headers = resolve_headers_provider!
+
+              @mutex.synchronize do
+                raise MCP::Errors::ClosedError, "transport is closed" if @closed
+                raise MCP::Errors::TransportError, "transport is not started" unless @started
 
                 token = nil
                 if !id.nil?
@@ -123,7 +132,7 @@ module TavernKit
                   @inflight[id] = token
                 end
 
-                job = Job.new(message: message, id: id, method: method_name, token: token)
+                job = Job.new(message: message, id: id, method: method_name, token: token, dynamic_headers: dynamic_headers)
                 @queue << job
                 @cv.signal
               end
@@ -362,9 +371,9 @@ module TavernKit
               started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
               if method_name == "initialize"
-                handle_post(job, include_protocol_headers: false, include_session_id: false)
+                handle_post(job, include_protocol_headers: false, include_session_id: false, extra_headers: job.dynamic_headers)
               else
-                handle_post(job, include_protocol_headers: true, include_session_id: true)
+                handle_post(job, include_protocol_headers: true, include_session_id: true, extra_headers: job.dynamic_headers)
               end
 
               elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000.0).round(1)
@@ -380,12 +389,16 @@ module TavernKit
               cleanup_inflight(id) if id
             end
 
-            def handle_post(job, include_protocol_headers:, include_session_id:)
+            def handle_post(job, include_protocol_headers:, include_session_id:, extra_headers:)
               id = job.id
               token = job.token
 
               request_headers =
-                build_post_headers(include_protocol_headers: include_protocol_headers, include_session_id: include_session_id)
+                build_post_headers(
+                  include_protocol_headers: include_protocol_headers,
+                  include_session_id: include_session_id,
+                  extra_headers: extra_headers,
+                )
 
               json = JSON.generate(job.message)
 
@@ -632,8 +645,8 @@ module TavernKit
               emit_error_response(id, code: "TRANSPORT_ERROR", message: "#{e.class}: #{e.message}")
             end
 
-            def build_post_headers(include_protocol_headers:, include_session_id:)
-              out = base_headers_for_post
+            def build_post_headers(include_protocol_headers:, include_session_id:, extra_headers:)
+              out = base_headers_for_post(extra_headers: extra_headers)
 
               if include_protocol_headers
                 protocol_version = current_protocol_version!
@@ -649,7 +662,7 @@ module TavernKit
             end
 
             def build_get_headers(last_event_id:)
-              out = base_headers_for_get
+              out = base_headers_for_get(extra_headers: resolve_headers_provider!)
 
               protocol_version = current_protocol_version!
               out[MCP::MCP_PROTOCOL_VERSION_HEADER] = protocol_version
@@ -662,21 +675,23 @@ module TavernKit
               out
             end
 
-            def base_headers_for_post
+            def base_headers_for_post(extra_headers:)
               base = {
                 "Accept" => MCP::HTTP_ACCEPT_POST,
                 "Content-Type" => "application/json",
               }
 
-              merged = base.merge(@headers)
+              extra = normalize_headers(extra_headers)
+              merged = base.merge(@headers).merge(extra)
               merged["Accept"] = MCP::HTTP_ACCEPT_POST
               merged["Content-Type"] = "application/json"
               merged
             end
 
-            def base_headers_for_get
+            def base_headers_for_get(extra_headers:)
               base = { "Accept" => MCP::HTTP_ACCEPT_GET }
-              merged = base.merge(@headers)
+              extra = normalize_headers(extra_headers)
+              merged = base.merge(@headers).merge(extra)
               merged["Accept"] = MCP::HTTP_ACCEPT_GET
               merged
             end
@@ -695,6 +710,32 @@ module TavernKit
 
                 out[key] = v.to_s
               end
+            end
+
+            def normalize_headers_provider(value)
+              return nil if value.nil?
+              return value if value.respond_to?(:call)
+
+              raise ArgumentError, "headers_provider must respond to #call"
+            end
+
+            def resolve_headers_provider!
+              provider = @headers_provider
+              return {} unless provider
+
+              raw = provider.call
+              unless raw.is_a?(Hash)
+                safe_call(@on_stderr_line, "mcp http headers_provider invalid: expected Hash")
+                raise MCP::Errors::TransportError, "headers_provider must return a Hash"
+              end
+
+              normalize_headers(raw)
+            rescue MCP::Errors::TransportError => e
+              safe_call(@on_stderr_line, "mcp http headers_provider error: #{e.message}")
+              raise
+            rescue StandardError => e
+              safe_call(@on_stderr_line, "mcp http headers_provider failed: #{e.class}")
+              raise MCP::Errors::TransportError, "headers_provider failed"
             end
 
             def token_cancelled?(token)
@@ -872,7 +913,7 @@ module TavernKit
 
               msg = { "jsonrpc" => "2.0", "method" => "notifications/cancelled", "params" => params }
 
-              headers = base_headers_for_post
+              headers = base_headers_for_post(extra_headers: resolve_headers_provider!)
               headers[MCP::MCP_PROTOCOL_VERSION_HEADER] = protocol_version.to_s
               headers[MCP::MCP_SESSION_ID_HEADER] = session_id.to_s if session_id && !session_id.to_s.strip.empty?
 
@@ -884,7 +925,7 @@ module TavernKit
             end
 
             def delete_session(session_id:, protocol_version:)
-              headers = base_headers_for_get
+              headers = base_headers_for_get(extra_headers: resolve_headers_provider!)
               headers[MCP::MCP_PROTOCOL_VERSION_HEADER] = protocol_version.to_s
               headers[MCP::MCP_SESSION_ID_HEADER] = session_id.to_s
 

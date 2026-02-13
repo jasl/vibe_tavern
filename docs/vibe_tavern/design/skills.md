@@ -177,3 +177,30 @@ Code:
 - `lib/tavern_kit/vibe_tavern/tool_calling/tool_loop_runner.rb`
 - `lib/tavern_kit/vibe_tavern/tool_calling/policies/skills_allowed_tools_policy.rb`
 - `lib/tavern_kit/vibe_tavern/tools_builder/runtime_filtered_catalog.rb`
+
+## Host governance (tool policy)
+
+`allowed-tools` is authored by skill packages. In SaaS settings, it is not a
+replacement for host-owned authorization and audit controls.
+
+For host control-plane decisions (allow/deny/confirm), use the tool policy hook
+configured via `context[:tool_calling]` (see `docs/vibe_tavern/design/governance.md`).
+
+Relationship when both are enabled:
+- Exposure: tool surface is contracted by skills `allowed-tools` first, then filtered by the host policy.
+- Enforcement: tool execution is blocked if either:
+  - the tool is not in the active skills allow-set (`TOOL_NOT_ALLOWED`), or
+  - the host policy denies/requests confirmation (`TOOL_POLICY_DENIED` / `TOOL_CONFIRMATION_REQUIRED`).
+
+## SaaS host TODO (multi-tenant)
+
+To safely run third-party skills in a multi-tenant environment, the host
+application must implement:
+
+- Skill package governance: installation approval, provenance, and per-tenant/per-workspace isolation.
+- Storage isolation: ensure skills roots and any cached artifacts are scoped to tenant/workspace and cannot be used to escape or exfiltrate host data.
+- Authorization: enforce host-owned allow/deny/confirm policies for tool usage; do not rely on `allowed-tools` alone.
+- Auditing: record skill discovery/loading/file reads and policy decisions (redacted, structured, append-only storage).
+
+Out of scope here:
+- `skills_run_script` sandboxing, confirmations, and resource controls (host-controlled).

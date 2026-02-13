@@ -5,13 +5,14 @@ require_relative "test_helper"
 require_relative "support/fake_streamable_http_server"
 
 class MCPStreamableHttpClientTest < Minitest::Test
-  def build_client(server:, sleep_fn: nil, max_response_bytes: nil)
+  def build_client(server:, sleep_fn: nil, max_response_bytes: nil, headers_provider: nil)
     sleep_fn ||= ->(_seconds) { nil }
 
     transport =
       TavernKit::VibeTavern::Tools::MCP::Transport::StreamableHttp.new(
         url: server.url,
         headers: {},
+        headers_provider: headers_provider,
         timeout_s: 10.0,
         open_timeout_s: 2.0,
         read_timeout_s: 10.0,
@@ -237,6 +238,39 @@ class MCPStreamableHttpClientTest < Minitest::Test
         client.call_tool(name: "echo", arguments: { "text" => "hi" })
       end
     assert_equal "INVALID_SSE_EVENT_DATA", err.code
+  ensure
+    client&.close
+    server&.close
+  end
+
+  def test_headers_provider_is_included_in_initialize_and_requests
+    server = McpFakeStreamableHttpServer.new(tools_call_mode: :json)
+
+    token = "Bearer test"
+    provider = -> { { "Authorization" => token } }
+
+    client = build_client(server: server, headers_provider: provider)
+
+    client.start
+    client.list_tools
+
+    seen = server.authorization_headers.compact
+    assert_operator seen.size, :>=, 2
+    assert seen.all? { |value| value == token }
+  ensure
+    client&.close
+    server&.close
+  end
+
+  def test_headers_provider_errors_raise_transport_error
+    server = McpFakeStreamableHttpServer.new(tools_call_mode: :json)
+    provider = -> { raise "boom" }
+
+    client = build_client(server: server, headers_provider: provider)
+
+    assert_raises(TavernKit::VibeTavern::Tools::MCP::Errors::TransportError) do
+      client.start
+    end
   ensure
     client&.close
     server&.close

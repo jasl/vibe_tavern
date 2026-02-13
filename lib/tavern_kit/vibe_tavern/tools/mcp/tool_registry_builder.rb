@@ -33,21 +33,42 @@ module TavernKit
               transport =
                 case cfg.transport
                 when :stdio
+                  env = cfg.env || {}
+                  if cfg.env_provider
+                    provided_env = cfg.env_provider.call
+                    raise ArgumentError, "env_provider must return a Hash" unless provided_env.is_a?(Hash)
+
+                    normalized_env =
+                      provided_env.each_with_object({}) do |(k, v), out|
+                        key = k.to_s
+                        next if key.strip.empty?
+
+                        out[key] = v.nil? ? nil : v.to_s
+                      end
+
+                    env = env.merge(normalized_env)
+                  end
+
                   MCP::Transport::Stdio.new(
                     command: cfg.command,
                     args: cfg.args || [],
-                    env: cfg.env || {},
+                    env: env,
                     chdir: cfg.chdir,
+                    on_stdout_line: cfg.on_stdout_line,
+                    on_stderr_line: cfg.on_stderr_line,
                   )
                 when :streamable_http
                   MCP::Transport::StreamableHttp.new(
                     url: cfg.url,
                     headers: cfg.headers,
+                    headers_provider: cfg.headers_provider,
                     timeout_s: cfg.timeout_s || MCP::DEFAULT_TIMEOUT_S,
                     open_timeout_s: cfg.open_timeout_s,
                     read_timeout_s: cfg.read_timeout_s,
                     sse_max_reconnects: cfg.sse_max_reconnects,
                     max_response_bytes: cfg.max_response_bytes,
+                    on_stdout_line: cfg.on_stdout_line,
+                    on_stderr_line: cfg.on_stderr_line,
                   )
                 else
                   raise ArgumentError, "unsupported MCP transport: #{cfg.transport.inspect}"
