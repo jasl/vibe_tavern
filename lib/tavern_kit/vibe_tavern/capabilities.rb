@@ -2,13 +2,11 @@
 
 module TavernKit
   module VibeTavern
-    require_relative "capabilities_registry"
-
     Capabilities =
       Data.define(
         :provider,
         :model,
-        :supports_tools,
+        :supports_tool_calling,
         :supports_response_format_json_object,
         :supports_response_format_json_schema,
         :supports_streaming,
@@ -29,7 +27,7 @@ module TavernKit
           # in real-world support. Keep unknown provider/model combinations
           # conservative by default.
           defaults = {
-            supports_tools: true,
+            supports_tool_calling: true,
             supports_response_format_json_object: true,
             supports_response_format_json_schema: false,
             supports_streaming: true,
@@ -38,13 +36,7 @@ module TavernKit
             reserved_response_tokens: 0,
           }
 
-          registry_overrides =
-            TavernKit::VibeTavern::CapabilitiesRegistry.lookup(
-              provider_id: provider_id,
-              model: model_s,
-            )
-
-          merged = defaults.merge(registry_overrides).merge(normalize_overrides(overrides))
+          merged = defaults.merge(normalize_overrides(overrides))
 
           context_window_tokens =
             normalize_optional_positive_int(

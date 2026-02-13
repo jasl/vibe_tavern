@@ -22,7 +22,7 @@ Local servers often differ from OpenRouter/OpenAI in subtle but important ways:
 ## Plan (deferred)
 
 1) Add a local-provider eval preset (base_url/auth + model list) to
-   `script/llm_vibe_tavern_eval.rb`.
+   `script/eval/llm_vibe_tavern_eval.rb`.
 2) Run a small smoke matrix first (TRIALS=1, a few scenarios/models), then expand.
 3) If incompatibilities appear:
    - keep fixes **opt-in** via presets/transforms

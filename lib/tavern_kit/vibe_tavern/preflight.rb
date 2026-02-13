@@ -21,7 +21,7 @@ module TavernKit
           raise ArgumentError, "streaming does not support tool calling or response_format"
         end
 
-        if tools && !capabilities.supports_tools
+        if tools && !capabilities.supports_tool_calling
           raise ArgumentError, "provider/model does not support tools"
         end
 

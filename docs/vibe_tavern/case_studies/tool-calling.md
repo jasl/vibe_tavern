@@ -259,7 +259,7 @@ Tests live under `test/tool_calling/` and intentionally cover:
 ## Live eval harness (optional, OpenRouter)
 
 Script:
-- `script/llm_tool_call_eval.rb`
+- `script/eval/llm_tool_call_eval.rb`
 
 Outputs:
 - `summary.json` and `summary_by_scenario.json` under `tmp/llm_tool_call_eval_reports/<timestamp>/`
@@ -279,35 +279,35 @@ Eval harness note:
 
 ```sh
 # One command: run both tool calling + directives (full preset).
-OPENROUTER_API_KEY=... bundle exec ruby script/llm_vibe_tavern_eval.rb
+OPENROUTER_API_KEY=... bundle exec ruby script/eval/llm_vibe_tavern_eval.rb
 
 # Full matrix (tool calling only): all models + sampling profiles + scenarios + strategies.
-OPENROUTER_API_KEY=... OPENROUTER_EVAL_PRESET=full bundle exec ruby script/llm_tool_call_eval.rb
+OPENROUTER_API_KEY=... OPENROUTER_EVAL_PRESET=full bundle exec ruby script/eval/llm_tool_call_eval.rb
 
 # Stable subset (cheap)
-OPENROUTER_API_KEY=... bundle exec ruby script/llm_tool_call_eval.rb
+OPENROUTER_API_KEY=... bundle exec ruby script/eval/llm_tool_call_eval.rb
 
 # Full catalog
-OPENROUTER_API_KEY=... OPENROUTER_MODEL_FILTER=all bundle exec ruby script/llm_tool_call_eval.rb
+OPENROUTER_API_KEY=... OPENROUTER_MODEL_FILTER=all bundle exec ruby script/eval/llm_tool_call_eval.rb
 
 # All scenarios (heavier)
-OPENROUTER_API_KEY=... OPENROUTER_SCENARIOS=all bundle exec ruby script/llm_tool_call_eval.rb
+OPENROUTER_API_KEY=... OPENROUTER_SCENARIOS=all bundle exec ruby script/eval/llm_tool_call_eval.rb
 
 # Scenario selection (simple/typical/extreme)
-OPENROUTER_API_KEY=... OPENROUTER_SCENARIOS=simple bundle exec ruby script/llm_tool_call_eval.rb
-OPENROUTER_API_KEY=... OPENROUTER_SCENARIOS=typical bundle exec ruby script/llm_tool_call_eval.rb
-OPENROUTER_API_KEY=... OPENROUTER_SCENARIOS=extreme bundle exec ruby script/llm_tool_call_eval.rb
+OPENROUTER_API_KEY=... OPENROUTER_SCENARIOS=simple bundle exec ruby script/eval/llm_tool_call_eval.rb
+OPENROUTER_API_KEY=... OPENROUTER_SCENARIOS=typical bundle exec ruby script/eval/llm_tool_call_eval.rb
+OPENROUTER_API_KEY=... OPENROUTER_SCENARIOS=extreme bundle exec ruby script/eval/llm_tool_call_eval.rb
 
 # Compare eval strategies (baseline vs production-recommended model workarounds).
 # - default: production only
 # - matrix: baseline + production (adds `summary_by_scenario_and_strategy.json`)
-OPENROUTER_API_KEY=... OPENROUTER_STRATEGY_MATRIX=1 bundle exec ruby script/llm_tool_call_eval.rb
+OPENROUTER_API_KEY=... OPENROUTER_STRATEGY_MATRIX=1 bundle exec ruby script/eval/llm_tool_call_eval.rb
 
 # Sampling-parameter matrix (temperature/top_p/top_k/min_p) using predefined profiles.
-# Profiles are defined in script/openrouter_sampling_profiles.rb.
+# Profiles are defined in `script/eval/support/openrouter_sampling_profiles.rb`.
 OPENROUTER_API_KEY=... OPENROUTER_TRIALS=10 \
   OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
-  bundle exec ruby script/llm_tool_call_eval.rb
+  bundle exec ruby script/eval/llm_tool_call_eval.rb
 ```
 
 Troubleshooting:
@@ -315,7 +315,7 @@ Troubleshooting:
 ```sh
 # If a run wrote per-run JSON files but crashed before writing the summary files,
 # regenerate summaries from an existing report directory (no network calls).
-bundle exec ruby script/llm_tool_call_eval_summarize.rb tmp/llm_tool_call_eval_reports/<timestamp>
+bundle exec ruby script/eval/llm_tool_call_eval_summarize.rb tmp/llm_tool_call_eval_reports/<timestamp>
 ```
 
 ### Eval strategies (baseline vs production)
@@ -357,7 +357,7 @@ Command:
 OPENROUTER_TRIALS=5 OPENROUTER_MODEL_FILTER=all \
   OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
   OPENROUTER_STRATEGY_FILTER="raw,baseline,production" \
-  bundle exec ruby script/llm_tool_call_eval.rb
+  bundle exec ruby script/eval/llm_tool_call_eval.rb
 ```
 
 Snapshot: 2026-02-08 (OpenRouter), 17 models, 5 scenarios, 5 trials per model/profile/strategy.

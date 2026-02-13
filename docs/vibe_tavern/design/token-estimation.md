@@ -158,7 +158,7 @@ are blank/missing, `ENV["TOKEN_ESTIMATION__TOKENIZER_ROOT"]` is used as a fallba
 Download/update them with:
 
 ```sh
-script/download_tokenizers.rb
+script/eval/download_tokenizers.rb
 ```
 
 Options:
@@ -178,10 +178,10 @@ Notes:
 Audit mapping against current eval model set:
 
 ```sh
-script/llm_token_estimator_registry_audit.rb --strict
+script/eval/llm_token_estimator_registry_audit.rb --strict
 ```
 
-This scans model declarations from eval scripts and reports:
+This audits model ids from `script/eval/support/openrouter_models.rb` and reports:
 
 - model id -> canonical hint
 - backend family + source metadata

@@ -31,6 +31,7 @@ Audience:
 ### Guides
 
 10) `docs/vibe_tavern/guides/model-selection.md`
+11) `docs/vibe_tavern/guides/llm-config.md`
 
 Product backlog (intentionally not locked in yet):
 - `docs/todo/vibe_tavern/deferred-agentic-generation.md`
@@ -42,10 +43,11 @@ Product backlog (intentionally not locked in yet):
 These scripts are optional (networked) and are used to build a
 model×sampling-profile capability matrix:
 
-- Tool calling: `script/llm_tool_call_eval.rb`
-- Directives: `script/llm_directives_eval.rb`
-- Full preset (runs both): `script/llm_vibe_tavern_eval.rb`
+- Tool calling: `script/eval/llm_tool_call_eval.rb`
+- Directives: `script/eval/llm_directives_eval.rb`
+- Full preset (runs both): `script/eval/llm_vibe_tavern_eval.rb`
 - Model selection notes: `docs/vibe_tavern/guides/model-selection.md`
-- Shared sampling profiles: `script/openrouter_sampling_profiles.rb`
+- Shared model catalog: `script/eval/support/openrouter_models.rb`
+- Shared sampling profiles: `script/eval/support/openrouter_sampling_profiles.rb`
 
 Deterministic (CI) coverage is under `test/tool_calling/`.

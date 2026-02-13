@@ -7,13 +7,15 @@ require "securerandom"
 require "thread"
 require "time"
 
-require_relative "openrouter_sampling_profiles"
+require_relative "support/openrouter_sampling_profiles"
+require_relative "support/openrouter_models"
+require_relative "support/capabilities_registry"
 
 # Default settings
 ENV["RAILS_ENV"] ||= "development"
 
 # Load Rails environment (for SimpleInference + VibeTavern pipeline)
-require_relative "../config/environment"
+require_relative "../../config/environment"
 
 module LanguagePolicyEval
   class ModelCatalog
@@ -421,24 +423,9 @@ selected_language_policies =
 
 MODEL_CATALOG =
   LanguagePolicyEval::ModelCatalog.build do
-    # Keep this list in sync with script/llm_tool_call_eval.rb (model IDs + tags).
-    model "deepseek/deepseek-v3.2:nitro", tags: %w[deepseek ds]
-    model "deepseek/deepseek-chat-v3-0324:nitro", tags: %w[deepseek ds chat]
-    model "x-ai/grok-4.1-fast", tags: %w[x_ai grok]
-    model "google/gemini-2.5-flash:nitro", tags: %w[google gemini stable]
-    model "google/gemini-3-flash-preview:nitro", tags: %w[google gemini]
-    model "google/gemini-3-pro-preview:nitro", tags: %w[google gemini]
-    model "anthropic/claude-opus-4.6:nitro", tags: %w[anthropic claude stable]
-    model "openai/gpt-5.2-chat:nitro", tags: %w[openai gpt]
-    model "openai/gpt-5.2:nitro", tags: %w[openai gpt stable]
-    model "minimax/minimax-m2-her", tags: %w[minimax]
-    model "minimax/minimax-m2.1:nitro", tags: %w[minimax]
-    model "qwen/qwen3-30b-a3b-instruct-2507:nitro", tags: %w[qwen stable]
-    model "qwen/qwen3-next-80b-a3b-instruct:nitro", tags: %w[qwen stable]
-    model "qwen/qwen3-235b-a22b-2507:nitro", tags: %w[qwen stable]
-    model "z-ai/glm-4.7:nitro", tags: %w[z_ai glm]
-    model "z-ai/glm-4.7-flash:nitro", tags: %w[z_ai glm]
-    model "moonshotai/kimi-k2.5:nitro", tags: %w[moonshot kimi]
+    VibeTavernEval::OpenRouterModels.entries.each do |entry|
+      model entry.id, tags: entry.tags
+    end
   end
 
 model_filter = ENV.fetch("OPENROUTER_MODEL_FILTER", "stable").to_s
@@ -721,6 +708,7 @@ process_task =
           model: model,
           context: context,
           llm_options_defaults: llm_options_defaults,
+          capabilities_overrides: VibeTavernEval::CapabilitiesRegistry.lookup(provider_id: "openrouter", model: model),
         )
 
       prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)

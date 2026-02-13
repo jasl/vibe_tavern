@@ -150,8 +150,10 @@ Tests:
 
 ### Phase 3: Structured directives support (capabilities + best-effort mapping)
 
-Update `lib/tavern_kit/vibe_tavern/capabilities_registry.rb` to include explicit
-provider defaults:
+Update the app-owned capabilities source (DB `LLMModel` columns and/or injected
+`capabilities_overrides:`) and the eval harness registry
+(`script/eval/support/capabilities_registry.rb`) to include explicit provider
+defaults:
 
 - `anthropic`: start conservative:
   - `supports_response_format_json_object: false`
@@ -216,8 +218,8 @@ App-layer integration (Rails):
 ### Phase 6: Eval harness + docs
 
 - Extend existing eval scripts to support native providers (smoke matrix first):
-  - `script/llm_tool_call_eval.rb`
-  - `script/llm_directives_eval.rb`
+  - `script/eval/llm_tool_call_eval.rb`
+  - `script/eval/llm_directives_eval.rb`
 - Document:
   - credential configuration for Anthropic + Google
   - known limitations per provider (tools/schema/streaming)

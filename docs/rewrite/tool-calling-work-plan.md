@@ -199,7 +199,7 @@ Acceptance:
 
 ### 16) Add live eval harness for directives (OpenRouter, optional)
 
-- [x] Add `script/llm_directives_eval.rb` (modeled after `llm_tool_call_eval.rb`):
+- [x] Add `script/eval/llm_directives_eval.rb` (modeled after `llm_tool_call_eval.rb`):
   - scenario set focused on protocol correctness (not business logic)
   - metrics: parse_ok/schema_ok, error categories, latency percentiles
   - default `provider.require_parameters=true` for structured-output requests
@@ -223,6 +223,6 @@ Acceptance:
 
 ### 18) Sampling parameter matrix (eval scripts)
 
-- [x] Add `script/openrouter_sampling_profiles.rb` (sampling profiles catalog + recommended params).
-- [x] Update `script/llm_directives_eval.rb` and `script/llm_tool_call_eval.rb` to run `models × sampling_profiles` (and tool eval also `× fallback` profiles).
+- [x] Add `script/eval/support/openrouter_sampling_profiles.rb` (sampling profiles catalog + recommended params).
+- [x] Update `script/eval/llm_directives_eval.rb` and `script/eval/llm_tool_call_eval.rb` to run `models × sampling_profiles` (and tool eval also `× fallback` profiles).
 - [x] Update docs to cover new env knobs: `OPENROUTER_SAMPLING_PROFILE_FILTER` and `OPENROUTER_LLM_OPTIONS_DEFAULTS_JSON`.

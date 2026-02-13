@@ -52,6 +52,10 @@ module TavernKit
           hf_repo: "zai-org/GLM-4.7",
         },
         {
+          hint: "glm-5",
+          hf_repo: "zai-org/GLM-5",
+        },
+        {
           hint: "glm-4.7-flash",
           hf_repo: "zai-org/GLM-4.7-Flash",
         },
@@ -60,8 +64,40 @@ module TavernKit
           tokenizer_family: :tiktoken,
         },
         {
+          hint: "gpt-5.2",
+          tokenizer_family: :tiktoken,
+        },
+        {
+          hint: "gpt-5.2-chat",
+          tokenizer_family: :tiktoken,
+        },
+        {
+          hint: "x-ai/grok-4.1-fast",
+          tokenizer_family: :tiktoken,
+        },
+        {
+          hint: "anthropic/claude-opus-4.6",
+          tokenizer_family: :tiktoken,
+        },
+        {
+          hint: "google/gemini-2.5-flash",
+          tokenizer_family: :tiktoken,
+        },
+        {
+          hint: "google/gemini-3-flash-preview",
+          tokenizer_family: :tiktoken,
+        },
+        {
+          hint: "google/gemini-3-pro-preview",
+          tokenizer_family: :tiktoken,
+        },
+        {
           hint: "minimax-m2.1",
           hf_repo: "MiniMaxAI/MiniMax-M2.1",
+        },
+        {
+          hint: "minimax-m2.5",
+          hf_repo: "MiniMaxAI/MiniMax-M2.1", # TODO: switch to MiniMax-M2.5 when its open sourced
         },
       ].freeze
 
@@ -84,9 +120,11 @@ module TavernKit
         return "qwen3-30b-a3b-instruct" if token.include?("qwen3-30b-a3b-instruct")
         return "qwen3" if token.include?("qwen3")
 
+        return "glm-5" if token.include?("glm-5")
         return "glm-4.7-flash" if token.include?("glm-4.7-flash")
         return "glm-4.7" if token.include?("glm-4.7")
         return "kimi-k2.5" if token.include?("kimi-k2.5")
+        return "minimax-m2.5" if token.include?("minimax-m2.5")
         return "minimax-m2.1" if token.include?("minimax-m2")
 
         base

@@ -5,6 +5,15 @@ require_relative "test_helper"
 require_relative "../../lib/tavern_kit/vibe_tavern/directives/runner"
 
 class DirectivesRunnerTest < Minitest::Test
+  OPENROUTER_CAPABILITIES =
+    {
+      supports_tool_calling: true,
+      supports_response_format_json_object: true,
+      supports_response_format_json_schema: true,
+      supports_streaming: true,
+      supports_parallel_tool_calls: true,
+    }.freeze
+
   def build_runner_config(
     context: nil,
     llm_options_defaults: nil,
@@ -20,9 +29,18 @@ class DirectivesRunnerTest < Minitest::Test
         llm_options_defaults: llm_options_defaults,
       )
 
-    return config unless capabilities_overrides.is_a?(Hash)
+    default_overrides =
+      if provider.to_s.strip.downcase == "openrouter"
+        OPENROUTER_CAPABILITIES
+      else
+        {}
+      end
 
-    capabilities = config.capabilities.with(**capabilities_overrides)
+    combined_overrides = TavernKit::Utils.deep_merge_hashes(default_overrides, capabilities_overrides || {})
+
+    return config if combined_overrides.empty?
+
+    capabilities = config.capabilities.with(**combined_overrides)
     config.with(capabilities: capabilities)
   end
 
@@ -575,7 +593,11 @@ class DirectivesRunnerTest < Minitest::Test
       end.new(requests)
 
     client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
-    runner_config = build_runner_config(context: { directives: { modes: [:json_schema] } })
+    runner_config =
+      build_runner_config(
+        context: { directives: { modes: [:json_schema] } },
+        capabilities_overrides: { supports_response_format_json_schema: true, supports_parallel_tool_calls: true },
+      )
     runner = build_runner(client: client, runner_config: runner_config)
 
     result =

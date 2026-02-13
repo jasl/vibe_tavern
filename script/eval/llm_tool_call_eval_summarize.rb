@@ -5,14 +5,14 @@ require "json"
 require "pathname"
 require "time"
 
-root = Pathname.new(__dir__).join("..").expand_path
+root = Pathname.new(__dir__).join("../..").expand_path
 
 raw_report_dir = ARGV.fetch(0, nil).to_s.strip
 raw_report_dir = ENV.fetch("OPENROUTER_REPORT_DIR", "").to_s.strip if raw_report_dir.empty?
 
 if raw_report_dir.empty?
-  warn "Usage: bundle exec ruby script/llm_tool_call_eval_summarize.rb tmp/llm_tool_call_eval_reports/<timestamp>"
-  warn "  or:  OPENROUTER_REPORT_DIR=tmp/llm_tool_call_eval_reports/<timestamp> bundle exec ruby script/llm_tool_call_eval_summarize.rb"
+  warn "Usage: bundle exec ruby script/eval/llm_tool_call_eval_summarize.rb tmp/llm_tool_call_eval_reports/<timestamp>"
+  warn "  or:  OPENROUTER_REPORT_DIR=tmp/llm_tool_call_eval_reports/<timestamp> bundle exec ruby script/eval/llm_tool_call_eval_summarize.rb"
   exit 2
 end
 

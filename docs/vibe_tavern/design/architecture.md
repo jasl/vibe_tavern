@@ -42,8 +42,8 @@ To keep call sites consistent, we use a single entrypoint object:
   - `OutputTags::Config`
 - producing a capabilities snapshot (`Capabilities.resolve`) used for routing
   decisions and strict invariants
-  - registry-driven overrides live in:
-    - `lib/tavern_kit/vibe_tavern/capabilities_registry.rb`
+  - provider/model quirks are not hardcoded at runtime; callers inject
+    `capabilities_overrides:` (Rails app: DB-backed `LLMModel` columns)
   - unknown provider/model defaults are intentionally conservative (do not
     assume `json_schema` support)
   - capabilities can optionally include prompt budget fields:
@@ -51,8 +51,7 @@ To keep call sites consistent, we use a single entrypoint object:
     - `reserved_response_tokens` (tokens reserved for the model response)
     - when configured, the VibeTavern pipeline enforces the prompt budget via
       `TavernKit::PromptBuilder::Steps::MaxTokens` (step name: `:max_tokens`)
-    - global defaults can be set via:
-      `TavernKit::VibeTavern::CapabilitiesRegistry.configure_default_overrides(...)`
+    - budgets are typically injected via `RunnerConfig.build(capabilities_overrides: ...)`
 
 Hard invariants are enforced centrally in:
 - `lib/tavern_kit/vibe_tavern/preflight.rb`
@@ -217,8 +216,8 @@ Deterministic (CI):
   guardrails without network flakiness.
 
 Optional live eval (OpenRouter):
-- `script/llm_tool_call_eval.rb`
-- `script/llm_directives_eval.rb`
+- `script/eval/llm_tool_call_eval.rb`
+- `script/eval/llm_directives_eval.rb`
 
 These build model/provider capability matrices and surface:
 - success rate by scenario/profile/mode

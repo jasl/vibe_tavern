@@ -30,7 +30,7 @@ class PromptRunnerTest < Minitest::Test
     runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
     runner_config =
       build_runner_config(
-        capabilities_overrides: { supports_tools: false },
+        capabilities_overrides: { supports_tool_calling: false },
       )
 
     error =
@@ -216,7 +216,10 @@ class PromptRunnerTest < Minitest::Test
 
   def test_prompt_runner_filters_parallel_tool_calls_from_request_when_unsupported
     runner = TavernKit::VibeTavern::PromptRunner.new(client: Object.new)
-    supported = build_runner_config
+    supported =
+      build_runner_config(
+        capabilities_overrides: { supports_parallel_tool_calls: true },
+      )
     unsupported =
       build_runner_config(
         capabilities_overrides: { supports_parallel_tool_calls: false },

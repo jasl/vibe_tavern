@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.2].define(version: 2026_01_28_144050) do
+ActiveRecord::Schema[8.2].define(version: 2026_02_12_090200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -42,6 +42,59 @@ ActiveRecord::Schema[8.2].define(version: 2026_01_28_144050) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
+  create_table "llm_models", force: :cascade do |t|
+    t.text "comment"
+    t.datetime "connection_tested_at"
+    t.integer "context_window_tokens", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: false, null: false
+    t.string "key"
+    t.bigint "llm_provider_id", null: false
+    t.integer "message_overhead_tokens"
+    t.string "model", null: false
+    t.string "name", null: false
+    t.boolean "supports_parallel_tool_calls", default: false, null: false
+    t.boolean "supports_response_format_json_object", default: false, null: false
+    t.boolean "supports_response_format_json_schema", default: false, null: false
+    t.boolean "supports_streaming", default: false, null: false
+    t.boolean "supports_tool_calling", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_llm_models_on_key", unique: true
+    t.index ["llm_provider_id", "model"], name: "index_llm_models_on_llm_provider_id_and_model", unique: true
+    t.index ["llm_provider_id"], name: "index_llm_models_on_llm_provider_id"
+    t.check_constraint "context_window_tokens >= 0", name: "llm_models_context_window_tokens_non_negative"
+    t.check_constraint "message_overhead_tokens IS NULL OR message_overhead_tokens >= 0", name: "llm_models_message_overhead_tokens_non_negative"
+  end
+
+  create_table "llm_presets", force: :cascade do |t|
+    t.text "comment"
+    t.datetime "created_at", null: false
+    t.string "key"
+    t.bigint "llm_model_id", null: false
+    t.jsonb "llm_options_overrides", default: {}, null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["llm_model_id", "key"], name: "index_llm_presets_on_llm_model_id_and_key", unique: true, where: "(key IS NOT NULL)"
+    t.index ["llm_model_id"], name: "index_llm_presets_on_llm_model_id"
+  end
+
+  create_table "llm_providers", force: :cascade do |t|
+    t.string "api_format", default: "openai", null: false
+    t.text "api_key"
+    t.string "api_prefix", null: false
+    t.string "base_url", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "headers", default: {}, null: false
+    t.jsonb "llm_options_defaults", default: {}, null: false
+    t.integer "message_overhead_tokens", default: 0, null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_llm_providers_on_name", unique: true
+    t.check_constraint "message_overhead_tokens >= 0", name: "llm_providers_message_overhead_tokens_non_negative"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "llm_models", "llm_providers"
+  add_foreign_key "llm_presets", "llm_models"
 end

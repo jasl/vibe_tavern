@@ -8,7 +8,7 @@ require "time"
 ENV["RAILS_ENV"] ||= "development"
 
 # Load Rails environment (for SimpleInference + app dependencies)
-require_relative "../config/environment"
+require_relative "../../config/environment"
 
 api_key = ENV.fetch("OPENROUTER_API_KEY", "").to_s.strip
 if api_key.empty?

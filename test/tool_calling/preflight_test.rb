@@ -10,7 +10,7 @@ class PreflightTest < Minitest::Test
   end
 
   def test_validate_request_rejects_unsupported_tools
-    capabilities = build_capabilities(supports_tools: false)
+    capabilities = build_capabilities(supports_tool_calling: false)
 
     error =
       assert_raises(ArgumentError) do

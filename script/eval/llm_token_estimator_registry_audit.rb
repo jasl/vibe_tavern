@@ -6,31 +6,27 @@ require "optparse"
 require "set"
 
 ENV["RAILS_ENV"] ||= "development"
-require_relative "../config/environment"
+require_relative "../../config/environment"
+require_relative "support/openrouter_models"
 
 module LlmTokenEstimatorRegistryAudit
   module_function
 
-  DEFAULT_SCRIPT_PATHS = [
-    "script/llm_directives_eval.rb",
-    "script/llm_tool_call_eval.rb",
-    "script/llm_language_policy_eval.rb",
-  ].freeze
+  DEFAULT_MODELS = VibeTavernEval::OpenRouterModels.ids.freeze
 
   def run(argv)
     options = parse_options(argv)
-    scripts = resolve_script_paths(options.fetch(:scripts))
-    models = collect_models(scripts: scripts)
+    models = normalize_models(options.fetch(:models))
 
     if models.empty?
-      warn "No models found in: #{scripts.join(", ")}"
+      warn "No models selected."
       return 2
     end
 
     registry = TavernKit::VibeTavern::TokenEstimation.registry(root: Rails.root)
     rows = models.to_a.sort.map { |model| build_row(model: model, registry: registry) }
 
-    print_rows(rows: rows, format: options.fetch(:format), scripts: scripts)
+    print_rows(rows: rows, format: options.fetch(:format), models_source: options.fetch(:models_source))
     print_summary(rows: rows)
 
     return 1 if options.fetch(:strict) && rows.any? { |row| row.fetch(:status) != "hit" }
@@ -40,16 +36,21 @@ module LlmTokenEstimatorRegistryAudit
 
   def parse_options(argv)
     opts = {
-      scripts: DEFAULT_SCRIPT_PATHS.dup,
+      models: DEFAULT_MODELS.dup,
+      models_source: "openrouter_eval_catalog",
       format: "table",
       strict: false,
     }
 
     OptionParser.new do |parser|
-      parser.banner = "Usage: script/llm_token_estimator_registry_audit.rb [options]"
+      parser.banner = "Usage: script/eval/llm_token_estimator_registry_audit.rb [options]"
 
-      parser.on("--scripts x,y,z", Array, "Script paths to scan for model declarations") do |list|
-        opts[:scripts] = list.map(&:to_s).map(&:strip).reject(&:empty?)
+      parser.on("--models x,y,z", Array, "Model ids to audit (default: OpenRouter eval catalog)") do |list|
+        selected = list.map(&:to_s).map(&:strip).reject(&:empty?)
+        next if selected.empty?
+
+        opts[:models] = selected
+        opts[:models_source] = "cli"
       end
 
       parser.on("--format FORMAT", "Output format: table|jsonl") do |value|
@@ -72,31 +73,8 @@ module LlmTokenEstimatorRegistryAudit
     opts
   end
 
-  def resolve_script_paths(paths)
-    Array(paths).map do |path|
-      expanded = Pathname.new(path.to_s)
-      expanded = Rails.root.join(expanded) if expanded.relative?
-      expanded.cleanpath
-    end
-  end
-
-  def collect_models(scripts:)
-    models = Set.new
-
-    scripts.each do |path|
-      unless path.exist?
-        warn "Missing script: #{path}"
-        next
-      end
-
-      path.each_line do |line|
-        next unless line =~ /model\s+"([^"]+)"/
-
-        models << Regexp.last_match(1).to_s
-      end
-    end
-
-    models
+  def normalize_models(list)
+    Set.new(Array(list).map { |m| m.to_s.strip }.reject(&:empty?))
   end
 
   def build_row(model:, registry:)
@@ -125,13 +103,13 @@ module LlmTokenEstimatorRegistryAudit
     }
   end
 
-  def print_rows(rows:, format:, scripts:)
+  def print_rows(rows:, format:, models_source:)
     case format
     when "jsonl"
       rows.each { |row| puts JSON.generate(row) }
     else
       puts "Token Estimator Registry Audit"
-      puts "scripts: #{scripts.join(", ")}"
+      puts "models_source: #{models_source}"
       puts "rows: #{rows.size}"
       puts
 

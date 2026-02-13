@@ -7,13 +7,15 @@ require "securerandom"
 require "thread"
 require "time"
 
-require_relative "openrouter_sampling_profiles"
+require_relative "support/openrouter_sampling_profiles"
+require_relative "support/openrouter_models"
+require_relative "support/capabilities_registry"
 
 # Default settings
 ENV["RAILS_ENV"] ||= "development"
 
 # Load Rails environment
-require_relative "../config/environment"
+require_relative "../../config/environment"
 
 module ToolCallEval
   class ModelCatalog
@@ -577,23 +579,9 @@ build_http_adapter =
 
 MODEL_CATALOG =
   ToolCallEval::ModelCatalog.build do
-    model "deepseek/deepseek-v3.2:nitro", workarounds: [:deepseek_openrouter_compat], tags: %w[deepseek ds]
-    model "deepseek/deepseek-chat-v3-0324:nitro", workarounds: [:deepseek_openrouter_compat], tags: %w[deepseek ds chat]
-    model "x-ai/grok-4.1-fast", tags: %w[x_ai grok]
-    model "google/gemini-2.5-flash:nitro", workarounds: [:gemini_openrouter_compat], tags: %w[google gemini stable]
-    model "google/gemini-3-flash-preview:nitro", workarounds: [:gemini_openrouter_compat], tags: %w[google gemini]
-    model "google/gemini-3-pro-preview:nitro", workarounds: [:gemini_openrouter_compat], tags: %w[google gemini]
-    model "anthropic/claude-opus-4.6:nitro", tags: %w[anthropic claude stable]
-    model "openai/gpt-5.2-chat:nitro", tags: %w[openai gpt]
-    model "openai/gpt-5.2:nitro", tags: %w[openai gpt stable]
-    model "minimax/minimax-m2-her", workarounds: [:tool_use_disabled], tags: %w[minimax]
-    model "minimax/minimax-m2.1:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[minimax]
-    model "qwen/qwen3-30b-a3b-instruct-2507:nitro", tags: %w[qwen stable]
-    model "qwen/qwen3-next-80b-a3b-instruct:nitro", tags: %w[qwen stable]
-    model "qwen/qwen3-235b-a22b-2507:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[qwen stable]
-    model "z-ai/glm-4.7:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[z_ai glm]
-    model "z-ai/glm-4.7-flash:nitro", workarounds: [:content_tag_tool_call_fallback], tags: %w[z_ai glm]
-    model "moonshotai/kimi-k2.5:nitro", tags: %w[moonshot kimi]
+    VibeTavernEval::OpenRouterModels.entries.each do |entry|
+      model entry.id, workarounds: entry.workarounds_for(:tool_call), tags: entry.tags
+    end
   end
 
 DEFAULT_MODELS = MODEL_CATALOG.ids.freeze
@@ -1899,6 +1887,7 @@ process_task =
               model: model,
               context: context,
               llm_options_defaults: llm_options_defaults,
+              capabilities_overrides: VibeTavernEval::CapabilitiesRegistry.lookup(provider_id: "openrouter", model: model),
             )
 
           tool_surface =

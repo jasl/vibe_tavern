@@ -61,7 +61,7 @@ Command:
 OPENROUTER_API_KEY=... OPENROUTER_JOBS=2 OPENROUTER_TRIALS=5 OPENROUTER_MODEL_FILTER=all \
   OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
   OPENROUTER_STRATEGY_FILTER="raw,baseline,production" \
-  bundle exec ruby script/llm_directives_eval.rb
+  bundle exec ruby script/eval/llm_directives_eval.rb
 ```
 
 Strategy summary:
@@ -114,7 +114,7 @@ Tool calling snapshot command:
 OPENROUTER_TRIALS=5 OPENROUTER_MODEL_FILTER=all \
   OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
   OPENROUTER_STRATEGY_FILTER="raw,baseline,production" \
-  bundle exec ruby script/llm_tool_call_eval.rb
+  bundle exec ruby script/eval/llm_tool_call_eval.rb
 ```
 
 Tool calling summary (tool scenarios only):
@@ -406,11 +406,11 @@ CI tests:
 - deterministic adapter-based tests for parser/validator and Directives::Runner integration
 
 Live eval (optional):
-  - `script/llm_directives_eval.rb` (OpenRouter) to build a model/provider capability matrix
+  - `script/eval/llm_directives_eval.rb` (OpenRouter) to build a model/provider capability matrix
     and track parse/schema success rate + latency percentiles.
     - Quick start (full preset, runs both tool calling + directives):
-      - `OPENROUTER_API_KEY=... bundle exec ruby script/llm_vibe_tavern_eval.rb`
-    - Full matrix (directives only): `OPENROUTER_API_KEY=... OPENROUTER_EVAL_PRESET=full bundle exec ruby script/llm_directives_eval.rb`
+      - `OPENROUTER_API_KEY=... bundle exec ruby script/eval/llm_vibe_tavern_eval.rb`
+    - Full matrix (directives only): `OPENROUTER_API_KEY=... OPENROUTER_EVAL_PRESET=full bundle exec ruby script/eval/llm_directives_eval.rb`
     - Outputs `summary.json`, `summary_by_scenario.json`, and `summary_by_scenario_and_strategy.json` under `tmp/llm_directives_eval_reports/<timestamp>/`.
     - Scenario selection:
       - `OPENROUTER_SCENARIOS=default` (all scenarios)
@@ -422,7 +422,7 @@ Live eval (optional):
 	      - Shorthand (single strategy): `OPENROUTER_SEMANTIC_REPAIR=1` (production)
     - Sampling params are driven by **sampling profiles** (matrix-friendly).
       - By default, the script uses `OPENROUTER_SAMPLING_PROFILE_FILTER=default` (no temperature/top_p override).
-      - Profiles are defined in `script/openrouter_sampling_profiles.rb`.
+      - Profiles are defined in `script/eval/support/openrouter_sampling_profiles.rb`.
       - Applicability is enforced by default: profiles only run on matching models (`OPENROUTER_SAMPLING_PROFILE_ENFORCE_APPLICABILITY=1`).
       - Optional global overrides:
       - `OPENROUTER_LLM_OPTIONS_DEFAULTS_JSON='{\"temperature\":1.0,\"top_p\":0.95}'`
@@ -440,7 +440,7 @@ Command:
 ```sh
 OPENROUTER_TRIALS=10 OPENROUTER_MODEL_FILTER=all \
   OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
-  bundle exec ruby script/llm_directives_eval.rb
+  bundle exec ruby script/eval/llm_directives_eval.rb
 ```
 
 Summary:
@@ -509,7 +509,7 @@ Command:
 OPENROUTER_TRIALS=10 OPENROUTER_MODEL_FILTER=all \
   OPENROUTER_SAMPLING_PROFILE_FILTER="default,recommended,conversation,creative,tool_calling" \
   OPENROUTER_SEMANTIC_REPAIR=1 \
-  bundle exec ruby script/llm_directives_eval.rb
+  bundle exec ruby script/eval/llm_directives_eval.rb
 ```
 
 Summary:

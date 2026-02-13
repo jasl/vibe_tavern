@@ -46,6 +46,8 @@ class VibeTavernTokenEstimationTest < ActiveSupport::TestCase
     assert_equal "gpt-5.2", TavernKit::VibeTavern::TokenEstimation.canonical_model_hint("openai/gpt-5.2:nitro")
     assert_equal "kimi-k2.5", TavernKit::VibeTavern::TokenEstimation.canonical_model_hint("moonshotai/kimi-k2.5:nitro")
     assert_equal "minimax-m2.1", TavernKit::VibeTavern::TokenEstimation.canonical_model_hint("minimax/minimax-m2-her")
+    assert_equal "minimax-m2.5", TavernKit::VibeTavern::TokenEstimation.canonical_model_hint("minimax/minimax-m2.5:nitro")
+    assert_equal "glm-5", TavernKit::VibeTavern::TokenEstimation.canonical_model_hint("z-ai/glm-5:nitro")
 
     assert_equal "google/gemini-2.5-flash", TavernKit::VibeTavern::TokenEstimation.canonical_model_hint("google/gemini-2.5-flash:nitro")
   end
@@ -84,6 +86,26 @@ class VibeTavernTokenEstimationTest < ActiveSupport::TestCase
             source_hint: "kimi-k2.5",
           },
           registry.fetch("kimi-k2.5"),
+        )
+
+        assert_equal(
+          {
+            tokenizer_family: :hf_tokenizers,
+            tokenizer_path: "/example/root/vendor/tokenizers/glm-5/tokenizer.json",
+            source_hint: "glm-5",
+            source_repo: "zai-org/GLM-5",
+          },
+          registry.fetch("glm-5"),
+        )
+
+        assert_equal(
+          {
+            tokenizer_family: :hf_tokenizers,
+            tokenizer_path: "/example/root/vendor/tokenizers/minimax-m2.5/tokenizer.json",
+            source_hint: "minimax-m2.5",
+            source_repo: "MiniMaxAI/MiniMax-M2.1",
+          },
+          registry.fetch("minimax-m2.5"),
         )
       end
     end

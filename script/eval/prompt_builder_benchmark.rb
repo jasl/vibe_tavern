@@ -7,12 +7,12 @@ require "time"
 ENV["RAILS_ENV"] ||= "development"
 
 # Boot Bundler/Bootsnap without loading full Rails.
-require_relative "../config/boot"
+require_relative "../../config/boot"
 
 require "tavern_kit"
 
 # App-owned pipeline (not loaded by the gem).
-require_relative "../lib/tavern_kit/vibe_tavern/pipeline"
+require_relative "../../lib/tavern_kit/vibe_tavern/pipeline"
 
 module PromptBuilderBenchmark
   module_function

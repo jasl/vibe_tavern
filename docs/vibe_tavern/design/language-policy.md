@@ -117,8 +117,8 @@ This is applied by protocol runners to:
 ## Evaluation harnesses
 
 Networked (optional):
-- `script/llm_language_policy_eval.rb` (chat-only focus: verbatim zones, tags, drift)
-- `script/llm_vibe_tavern_eval.rb` (full run matrix, includes language policy dimension)
+- `script/eval/llm_language_policy_eval.rb` (chat-only focus: verbatim zones, tags, drift)
+- `script/eval/llm_vibe_tavern_eval.rb` (full run matrix, includes language policy dimension)
 
 Deterministic coverage:
 - pipeline + step behavior is pinned by unit tests under `test/`

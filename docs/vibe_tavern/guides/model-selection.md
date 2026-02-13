@@ -19,7 +19,7 @@ OPENROUTER_MODEL_FILTER=stable \
 OPENROUTER_SCENARIOS=simple \
 OPENROUTER_TRIALS=1 \
 OPENROUTER_JOBS=1 \
-script/llm_vibe_tavern_eval.rb
+script/eval/llm_vibe_tavern_eval.rb
 ```
 
 Reports are written under:
@@ -33,7 +33,12 @@ Reports are written under:
 The eval scripts support **sampling profiles** (a small catalog of per-model
 sampling params) via:
 
-- `script/openrouter_sampling_profiles.rb`
+- `script/eval/support/openrouter_sampling_profiles.rb`
+
+In the Rails app, the “production recommended” subset is intentionally duplicated
+into `db/seeds/llm.rb` and stored as one `LLMPreset(key: "default")` per seeded
+OpenRouter `LLMModel`, so the app can use the same defaults without requiring
+`script/*` code.
 
 In `strategy=production`, the eval harness will **auto-select** the first
 `recommended` sampling profile that matches the model **when you only requested**
@@ -69,7 +74,7 @@ Known caveats from the 2026-02-09 smoke run:
 - Tool calling failures were entirely from `qwen/qwen3-next-80b-a3b-instruct:nitro`
   returning empty final completions (no HTTP error).
 - Directives passed for all stable models, but some require workarounds (see the
-  `MODEL_CATALOG` `workarounds:` in `script/llm_directives_eval.rb`).
+  `workarounds:` in `script/eval/support/openrouter_models.rb`).
 - Language policy had a single empty `assistant_text` case (`openai/gpt-5.2:nitro`
   + `ja-JP` + `verbatim_zones`), which is why the eval harness retries empty
   responses by default.
@@ -89,7 +94,7 @@ to see the trace/attempts (and the exact failure category).
 
 ### Tool calling (reliability-first)
 
-- Prefer models that pass `script/llm_tool_call_eval.rb` under the `production`
+- Prefer models that pass `script/eval/llm_tool_call_eval.rb` under the `production`
   strategy, with sequential tool calls (`parallel_tool_calls: false`).
 - If a model returns empty completions during finalization (e.g. completion
   tokens are `0` with no HTTP error), treat tool calling as **not supported**
@@ -97,7 +102,7 @@ to see the trace/attempts (and the exact failure category).
 
 ### Directives (structured output)
 
-- Use `script/llm_directives_eval.rb` as the gate: if a model passes the default
+- Use `script/eval/llm_directives_eval.rb` as the gate: if a model passes the default
   scenarios across the strategies you care about, it’s usually safe for UI IR.
 - Some providers/models require workarounds (encoded in the eval catalogs and
   presets). Treat those presets as part of “model selection”, not as optional
@@ -125,11 +130,9 @@ to keep reports from being dominated by transient upstream issues.
 
 ## Keeping the model list current
 
-The “stable” lists live in the `MODEL_CATALOG` blocks under:
+The eval model list (ids/tags/workarounds) lives in:
 
-- `script/llm_tool_call_eval.rb`
-- `script/llm_directives_eval.rb`
-- `script/llm_language_policy_eval.rb`
+- `script/eval/support/openrouter_models.rb`
 
-Keep them in sync when adding/removing models, and update this doc with any
-model-specific caveats (tool calling quirks, directives mode limitations, etc.).
+Update it when adding/removing models, and update this doc with any model-specific
+caveats (tool calling quirks, directives mode limitations, etc.).
