@@ -6,7 +6,7 @@ module TavernKit
       module MCP
         module Transport
           class Base
-            attr_accessor :on_stdout_line, :on_stderr_line
+            attr_accessor :on_stdout_line, :on_stderr_line, :on_close
 
             def start = raise NotImplementedError
             def send_message(_hash) = raise NotImplementedError

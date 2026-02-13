@@ -97,7 +97,7 @@ module TavernKit
         },
         {
           hint: "minimax-m2.5",
-          hf_repo: "MiniMaxAI/MiniMax-M2.1", # TODO: switch to MiniMax-M2.5 when its open sourced
+          hf_repo: "MiniMaxAI/MiniMax-M2.5",
         },
       ].freeze
 

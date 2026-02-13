@@ -32,16 +32,24 @@ module TavernKit
             seen = {}
             metas = []
 
-            each_skill_dir do |skill_dir|
+            each_skill_dir do |skill_dir, skill_real|
               skill_md_path = File.join(skill_dir, "SKILL.md")
               next unless File.file?(skill_md_path)
 
-              content = read_skill_md_for_frontmatter(skill_md_path)
+              skill_md_real =
+                begin
+                  ensure_realpath_within_dir!(base_dir: skill_real, abs_path: skill_md_path, label: "SKILL.md")
+                rescue ArgumentError
+                  raise if @strict
+
+                  next
+                end
+              content = read_skill_md_for_frontmatter(skill_md_real)
               frontmatter, =
                 Frontmatter.parse(
                   content,
                   expected_name: File.basename(skill_dir),
-                  path: skill_md_path,
+                  path: skill_md_real,
                   strict: @strict,
                 )
               next if frontmatter.nil?
@@ -71,18 +79,24 @@ module TavernKit
             metas
           end
 
-          def load_skill(name:)
+          def load_skill(name:, max_bytes: nil)
             meta = find_skill_metadata!(name.to_s)
             skill_dir = meta.location
             skill_md_path = File.join(skill_dir, "SKILL.md")
             raise ArgumentError, "SKILL.md not found for skill: #{meta.name}" unless File.file?(skill_md_path)
 
-            content = File.read(skill_md_path)
+            max_bytes = max_bytes.nil? ? DEFAULT_MAX_BYTES : Integer(max_bytes)
+            raise ArgumentError, "max_bytes must be positive" if max_bytes <= 0
+
+            skill_real = File.realpath(skill_dir.to_s)
+            skill_md_real = ensure_realpath_within_dir!(base_dir: skill_real, abs_path: skill_md_path, label: "SKILL.md")
+
+            content, truncated = read_file_prefix(skill_md_real, max_bytes: max_bytes, label: "SKILL.md")
             frontmatter, body_markdown =
               Frontmatter.parse(
                 content,
                 expected_name: File.basename(skill_dir),
-                path: skill_md_path,
+                path: skill_md_real,
                 strict: true,
               )
 
@@ -100,6 +114,7 @@ module TavernKit
             Skill.new(
               meta: loaded_meta,
               body_markdown: body_markdown.to_s,
+              body_truncated: truncated,
               files_index: index_files(skill_dir),
             )
           end
@@ -144,15 +159,60 @@ module TavernKit
             @dirs.each do |root|
               next unless File.directory?(root)
 
-              Dir.children(root).sort.each do |entry|
+              base_real =
+                begin
+                  File.realpath(root.to_s)
+                rescue Errno::ENOENT, Errno::EACCES, Errno::ENOTDIR, Errno::EINVAL, SystemCallError => e
+                  raise ArgumentError, "Failed to scan skills dir: #{root} (#{e.class}: #{e.message})" if @strict
+
+                  next
+                end
+
+              entries =
+                begin
+                  Dir.children(root).sort
+                rescue Errno::ENOENT, Errno::EACCES, Errno::ENOTDIR, Errno::EINVAL, SystemCallError => e
+                  raise ArgumentError, "Failed to scan skills dir: #{root} (#{e.class}: #{e.message})" if @strict
+
+                  next
+                end
+
+              entries.each do |entry|
                 next if entry.start_with?(".")
 
                 skill_dir = File.join(root, entry)
                 next unless File.directory?(skill_dir)
 
-                block.call(skill_dir)
+                skill_real =
+                  begin
+                    File.realpath(skill_dir.to_s)
+                  rescue Errno::ENOENT, Errno::EACCES, Errno::ENOTDIR, Errno::EINVAL, SystemCallError => e
+                    raise ArgumentError, "Failed to read skill directory: #{skill_dir} (#{e.class}: #{e.message})" if @strict
+
+                    next
+                  end
+                unless within_dir?(base_real, skill_real)
+                  raise ArgumentError, "Skill directory escapes skills root: #{skill_dir}" if @strict
+
+                  next
+                end
+
+                block.call(skill_dir, skill_real)
               end
             end
+          end
+
+          def ensure_realpath_within_dir!(base_dir:, abs_path:, label:)
+            base = File.realpath(base_dir.to_s)
+            target = File.realpath(abs_path.to_s)
+
+            unless within_dir?(base, target)
+              raise ArgumentError, "Invalid skill #{label} path"
+            end
+
+            target
+          rescue Errno::ENOENT, Errno::EACCES, Errno::ENOTDIR, Errno::EINVAL, SystemCallError
+            raise ArgumentError, "Invalid skill #{label} path"
           end
 
           def read_skill_md_for_frontmatter(path)
@@ -214,7 +274,7 @@ module TavernKit
 
             base_real = File.realpath(skill_dir.to_s)
             dir_real = File.realpath(dir.to_s)
-            return [] unless dir_real.start_with?(base_real + File::SEPARATOR)
+            return [] unless within_dir?(base_real, dir_real)
 
             Dir.children(dir).sort.filter_map do |entry|
               next if entry.start_with?(".")
@@ -263,7 +323,7 @@ module TavernKit
             base = File.expand_path(base_dir.to_s)
             target = File.expand_path(File.join(base, rel_path))
 
-            unless target.start_with?(base + File::SEPARATOR) || target == base
+            unless within_dir?(base, target)
               raise ArgumentError, "Invalid skill file path: #{rel_path}"
             end
 
@@ -274,13 +334,26 @@ module TavernKit
             base = File.realpath(skill_dir.to_s)
             target = File.realpath(abs_path.to_s)
 
-            unless target.start_with?(base + File::SEPARATOR)
+            unless within_dir?(base, target)
               raise ArgumentError, "Invalid skill file path: #{rel_path}"
             end
 
             true
           rescue Errno::ENOENT, Errno::EACCES, Errno::ENOTDIR, Errno::EINVAL, SystemCallError
             raise ArgumentError, "Invalid skill file path: #{rel_path}"
+          end
+
+          def within_dir?(base_dir, target_path)
+            base = base_dir.to_s
+            target = target_path.to_s
+            return true if target == base
+
+            target.start_with?(dir_prefix(base))
+          end
+
+          def dir_prefix(path)
+            path = path.to_s
+            path.end_with?(File::SEPARATOR) ? path : (path + File::SEPARATOR)
           end
 
           def read_file_limited(path, max_bytes:, label:)
@@ -297,6 +370,24 @@ module TavernKit
             end
 
             data.to_s
+          end
+
+          def read_file_prefix(path, max_bytes:, label:)
+            max_bytes = Integer(max_bytes)
+            raise ArgumentError, "max_bytes must be positive" if max_bytes <= 0
+
+            raw =
+              File.open(path, "rb") do |io|
+                io.read(max_bytes + 1)
+              end
+            raw = raw.to_s
+
+            truncated = raw.bytesize > max_bytes
+            data = truncated ? raw.byteslice(0, max_bytes).to_s : raw
+
+            [data, truncated]
+          rescue Errno::ENOENT, Errno::EACCES, Errno::ENOTDIR, Errno::EINVAL, SystemCallError => e
+            raise ArgumentError, "Failed to read #{label}: #{e.class}: #{e.message}"
           end
 
           def normalize_utf8(value)

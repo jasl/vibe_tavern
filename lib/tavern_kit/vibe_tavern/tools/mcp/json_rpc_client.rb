@@ -58,6 +58,10 @@ module TavernKit
                 @transport.on_stdout_line = method(:handle_stdout_line)
               end
 
+              if @transport.respond_to?(:on_close=)
+                @transport.on_close = method(:handle_transport_close)
+              end
+
               @transport.start
               @started = true
             end
@@ -65,7 +69,7 @@ module TavernKit
             self
           end
 
-          def request(method, params = {})
+          def request(method, params = {}, timeout_s: nil)
             method_name = method.to_s
             raise ArgumentError, "method is required" if method_name.strip.empty?
 
@@ -91,7 +95,7 @@ module TavernKit
               raise e
             end
 
-            await_pending!(id, pending, method_name)
+            await_pending!(id, pending, method_name, timeout_s: timeout_s)
           end
 
           def notify(method, params = nil)
@@ -114,11 +118,13 @@ module TavernKit
             pending = nil
 
             @pending_mutex.synchronize do
-              return nil if @closed
-
-              @closed = true
-              pending = @pending.dup
-              @pending.clear
+              if @closed
+                pending = nil
+              else
+                @closed = true
+                pending = @pending.dup
+                @pending.clear
+              end
             end
 
             pending&.each_value do |p|
@@ -136,8 +142,11 @@ module TavernKit
 
           private
 
-          def await_pending!(id, pending, method_name)
-            deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @timeout_s
+          def await_pending!(id, pending, method_name, timeout_s:)
+            timeout_s = timeout_s.nil? ? @timeout_s : Float(timeout_s)
+            raise ArgumentError, "timeout_s must be positive" if timeout_s <= 0
+
+            deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_s
 
             pending.mutex.synchronize do
               until pending.done
@@ -175,10 +184,42 @@ module TavernKit
               code = err.fetch("code", nil)
               message = err.fetch("message", nil)
               data = err.fetch("data", nil)
+
+              case code.to_s
+              when "CLOSED"
+                raise MCP::Errors::ClosedError, message.to_s
+              when "TRANSPORT_CLOSED"
+                raise MCP::Errors::TransportError, message.to_s
+              end
+
               raise MCP::JsonRpcError.new(code, message, data: data)
             end
 
             pending.result
+          end
+
+          def handle_transport_close(details = nil)
+            pending = nil
+
+            @pending_mutex.synchronize do
+              return nil if @closed
+
+              @closed = true
+              pending = @pending.dup
+              @pending.clear
+            end
+
+            pending&.each_value do |p|
+              p.mutex.synchronize do
+                p.done = true
+                p.error = { "code" => "TRANSPORT_CLOSED", "message" => "transport closed", "data" => details }
+                p.cv.broadcast
+              end
+            end
+
+            nil
+          rescue StandardError
+            nil
           end
 
           def handle_stdout_line(line)

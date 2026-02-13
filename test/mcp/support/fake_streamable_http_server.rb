@@ -15,12 +15,15 @@ class McpFakeStreamableHttpServer
   def initialize(
     tools_call_mode:,
     retry_ms: nil,
+    returned_protocol_version: nil,
     invalidate_session_after_first_tools_list: false,
     tools_call_delay_s: nil,
     tools_call_result_text_bytes: nil
   )
     @tools_call_mode = tools_call_mode
     @retry_ms = retry_ms
+    @returned_protocol_version = returned_protocol_version.to_s.strip
+    @returned_protocol_version = nil if @returned_protocol_version.empty?
     @invalidate_session_after_first_tools_list = invalidate_session_after_first_tools_list
     @tools_call_delay_s = tools_call_delay_s.nil? ? nil : Float(tools_call_delay_s)
     @tools_call_result_text_bytes =
@@ -233,7 +236,8 @@ class McpFakeStreamableHttpServer
     session_id = SecureRandom.uuid
     @mutex.synchronize { @sessions[session_id] = true }
 
-    protocol_version = msg.dig("params", "protocolVersion").to_s
+    protocol_version = @returned_protocol_version.to_s
+    protocol_version = msg.dig("params", "protocolVersion").to_s if protocol_version.strip.empty?
     protocol_version = "2025-11-25" if protocol_version.strip.empty?
 
     result = {

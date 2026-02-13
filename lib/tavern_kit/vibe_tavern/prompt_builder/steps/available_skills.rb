@@ -41,7 +41,11 @@ module TavernKit
             metas = store.list_skills
             return if metas.empty?
 
-            xml = build_xml(metas, include_location: skills_cfg.include_location)
+            xml =
+              build_xml(
+                metas,
+                include_location: skills_cfg.include_location,
+              )
             return if xml.strip.empty?
 
             insert_block!(ctx, xml, skills_count: metas.size)
@@ -52,35 +56,36 @@ module TavernKit
 
             def build_xml(metas, include_location:)
               include_location = include_location == true
+              build_agentskills_xml_v1(metas, include_location: include_location)
+            end
 
+            def build_agentskills_xml_v1(metas, include_location:)
               lines = []
               lines << "<available_skills>"
 
               metas.each do |meta|
-                name = xml_escape_attr(meta.name)
-                description = xml_escape_attr(meta.description)
+                lines << "  <skill>"
+                lines << "    <name>#{xml_escape_text(meta.name)}</name>"
+                lines << "    <description>#{xml_escape_text(meta.description)}</description>"
 
-                attrs = %(name="#{name}" description="#{description}")
                 if include_location
-                  location = xml_escape_attr(meta.location)
-                  attrs = %(#{attrs} location="#{location}")
+                  skill_md_path = File.expand_path(File.join(meta.location.to_s, "SKILL.md"))
+                  lines << "    <location>#{xml_escape_text(skill_md_path)}</location>"
                 end
 
-                lines << "  <skill #{attrs} />"
+                lines << "  </skill>"
               end
 
               lines << "</available_skills>"
               lines.join("\n")
             end
 
-            def xml_escape_attr(value)
+            def xml_escape_text(value)
               value
                 .to_s
                 .gsub("&", "&amp;")
                 .gsub("<", "&lt;")
                 .gsub(">", "&gt;")
-                .gsub("\"", "&quot;")
-                .gsub("'", "&apos;")
             end
 
             def insert_block!(ctx, xml, skills_count:)

@@ -66,8 +66,8 @@ class SkillsPromptInjectionStepTest < Minitest::Test
       assert skills_index < user_index
 
       content = messages.fetch(skills_index).fetch(:content).to_s
-      assert_includes content, %(name="foo")
-      assert_includes content, %(description="Foo skill")
+      assert_includes content, "<name>foo</name>"
+      assert_includes content, "<description>Foo skill</description>"
     end
   end
 
@@ -125,7 +125,8 @@ class SkillsPromptInjectionStepTest < Minitest::Test
       refute_nil skills_msg
 
       content = skills_msg.fetch(:content).to_s
-      assert_includes content, %(location="#{File.expand_path(skill_dir)}")
+      skill_md_path = File.expand_path(File.join(skill_dir, "SKILL.md"))
+      assert_includes content, "<location>#{skill_md_path}</location>"
     end
   end
 end

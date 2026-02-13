@@ -141,4 +141,60 @@ class SkillsFrontmatterTest < Minitest::Test
     assert_nil frontmatter
     assert_includes body, "Body"
   end
+
+  def test_parse_accepts_allowed_tools_dash_key_and_skill_metadata_normalizes
+    content = <<~MD
+      ---
+      name: foo
+      description: Foo skill
+      allowed-tools: skills_list skills_load
+      metadata:
+        author: me
+      ---
+      Body
+    MD
+
+    frontmatter, =
+      TavernKit::VibeTavern::Tools::Skills::Frontmatter.parse(
+        content,
+        expected_name: "foo",
+        strict: true,
+      )
+
+    meta =
+      TavernKit::VibeTavern::Tools::Skills::SkillMetadata.new(
+        name: frontmatter.fetch(:name),
+        description: frontmatter.fetch(:description),
+        location: "/tmp/foo",
+        metadata: frontmatter.fetch(:metadata),
+        allowed_tools: frontmatter.fetch(:allowed_tools),
+      )
+
+    assert_equal ["skills_list", "skills_load"], meta.allowed_tools
+    assert_equal "skills_list skills_load", meta.allowed_tools_raw
+  end
+
+  def test_parse_rejects_non_string_metadata_values_in_strict_mode
+    content = <<~MD
+      ---
+      name: foo
+      description: Foo skill
+      metadata:
+        author: me
+        version: 1
+      ---
+      Body
+    MD
+
+    error = assert_raises(ArgumentError) { TavernKit::VibeTavern::Tools::Skills::Frontmatter.parse(content, strict: true) }
+    assert_includes error.message, "frontmatter.metadata"
+
+    frontmatter, =
+      TavernKit::VibeTavern::Tools::Skills::Frontmatter.parse(
+        content,
+        strict: false,
+      )
+    refute_nil frontmatter
+    assert_equal({ "author" => "me", "version" => "1" }, frontmatter.fetch(:metadata))
+  end
 end

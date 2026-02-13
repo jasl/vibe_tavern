@@ -3,6 +3,8 @@
 require_relative "test_helper"
 
 require "securerandom"
+require "fileutils"
+require "tmpdir"
 require_relative "../../lib/tavern_kit/vibe_tavern/tool_calling/presets"
 require_relative "../../lib/tavern_kit/vibe_tavern/tools_builder"
 
@@ -173,6 +175,31 @@ class ToolLoopRunnerTest < Minitest::Test
     ]
 
     TavernKit::VibeTavern::Tools::Custom::Catalog.new(definitions: defs)
+  end
+
+  def write_skill(root, name:, description: "Test skill", allowed_tools: nil, body: "Body")
+    skill_dir = File.join(root, name)
+    FileUtils.mkdir_p(skill_dir)
+
+    allowed_line =
+      if allowed_tools.nil?
+        ""
+      else
+        "allowed-tools: #{allowed_tools}\n"
+      end
+
+    File.write(
+      File.join(skill_dir, "SKILL.md"),
+      <<~MD,
+        ---
+        name: #{name}
+        description: #{description}
+        #{allowed_line}---
+        #{body}
+      MD
+    )
+
+    skill_dir
   end
 
   def build_runner(
@@ -4138,5 +4165,503 @@ class ToolLoopRunnerTest < Minitest::Test
     req2 = JSON.parse(requests[1][:body])
     assert_nil req2["tools"]
     assert_nil req2["tool_choice"]
+  end
+
+  def test_allowed_tools_enforcement_filters_tools_exposed_to_model
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: { name: "skills_load", arguments: JSON.generate({ name: "foo" }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      write_skill(skills_root, name: "foo", description: "Foo skill", allowed_tools: "state_get", body: "Hello")
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+
+      context = { skills: { enabled: true, store: store, allowed_tools_enforcement: :enforce } }
+
+      workspace = ToolCallEvalTestWorkspace.new
+      client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+      runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
+
+      runner.run(user_text: "workspace_id=#{workspace.id}")
+    end
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_names = req2["tools"].map { |t| t.dig("function", "name") }.compact
+
+    assert_includes tool_names, "state_get"
+    refute_includes tool_names, "state_patch"
+    assert_includes tool_names, "skills_list"
+    assert_includes tool_names, "skills_load"
+    assert_includes tool_names, "skills_read_file"
+  end
+
+  def test_allowed_tools_enforcement_blocks_tools_in_same_turn
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          body = JSON.parse(env[:body])
+          user_content = Array(body["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "user" }&.fetch("content", nil).to_s
+          workspace_id = user_content[%r{\Aworkspace_id=(.+)\z}, 1].to_s
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: { name: "skills_load", arguments: JSON.generate({ name: "foo" }) },
+                        },
+                        {
+                          id: "call_2",
+                          type: "function",
+                          function: {
+                            name: "state_patch",
+                            arguments: JSON.generate(
+                              {
+                                workspace_id: workspace_id,
+                                ops: [{ op: "set", path: "/draft/foo", value: "bar" }],
+                              }
+                            ),
+                          },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    events = []
+
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      write_skill(skills_root, name: "foo", description: "Foo skill", allowed_tools: "state_get", body: "Hello")
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+
+      context = { skills: { enabled: true, store: store, allowed_tools_enforcement: :enforce } }
+
+      workspace = ToolCallEvalTestWorkspace.new
+      client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+      runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
+
+      result = runner.run(user_text: "workspace_id=#{workspace.id}", on_event: ->(e) { events << e })
+
+      assert_equal "Done.", result[:assistant_text]
+      assert_nil workspace.draft["foo"]
+
+      t0 = result[:trace].find { |t| t[:turn] == 0 }
+      refute_nil t0
+
+      state_patch = Array(t0[:tool_results]).find { |tr| tr[:name] == "state_patch" }
+      refute_nil state_patch
+      assert_includes Array(state_patch[:error_codes]), "TOOL_NOT_ALLOWED"
+    end
+
+    blocked = events.find { |e| e[:type] == :tool_call_blocked && e[:name] == "state_patch" }
+    refute_nil blocked
+    assert_equal "foo", blocked.fetch(:skill_name)
+  end
+
+  def test_allowed_tools_enforcement_ignores_invalid_allowlist_by_default
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: { name: "skills_load", arguments: JSON.generate({ name: "foo" }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      write_skill(skills_root, name: "foo", description: "Foo skill", allowed_tools: "does_not_exist", body: "Hello")
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+
+      context = {
+        skills: {
+          enabled: true,
+          store: store,
+          allowed_tools_enforcement: :enforce,
+          allowed_tools_invalid_allowlist: :ignore,
+        },
+      }
+
+      workspace = ToolCallEvalTestWorkspace.new
+      client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+      runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
+
+      runner.run(user_text: "workspace_id=#{workspace.id}")
+    end
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_names = req2["tools"].map { |t| t.dig("function", "name") }.compact
+    assert_includes tool_names, "state_patch"
+
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" }
+    refute_nil tool_msg
+
+    payload = JSON.parse(tool_msg.fetch("content"))
+    warning_codes = Array(payload["warnings"]).map { |w| w["code"] }.compact
+    assert_includes warning_codes, "ALLOWED_TOOLS_IGNORED"
+  end
+
+  def test_allowed_tools_enforcement_supports_glob_patterns
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: { name: "skills_load", arguments: JSON.generate({ name: "foo" }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      write_skill(skills_root, name: "foo", description: "Foo skill", allowed_tools: "state_*", body: "Hello")
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+
+      context = { skills: { enabled: true, store: store, allowed_tools_enforcement: :enforce } }
+
+      workspace = ToolCallEvalTestWorkspace.new
+      client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+      runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
+
+      runner.run(user_text: "workspace_id=#{workspace.id}")
+    end
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_names = req2["tools"].map { |t| t.dig("function", "name") }.compact
+
+    assert_includes tool_names, "state_get"
+    assert_includes tool_names, "state_patch"
+    assert_includes tool_names, "skills_list"
+    assert_includes tool_names, "skills_load"
+    assert_includes tool_names, "skills_read_file"
+  end
+
+  def test_allowed_tools_enforcement_invalid_allowlist_mode_enforce_baseline_only
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          response_body =
+            if @call_count == 1
+              {
+                choices: [
+                  {
+                    message: {
+                      role: "assistant",
+                      content: "",
+                      tool_calls: [
+                        {
+                          id: "call_1",
+                          type: "function",
+                          function: { name: "skills_load", arguments: JSON.generate({ name: "foo" }) },
+                        },
+                      ],
+                    },
+                    finish_reason: "tool_calls",
+                  },
+                ],
+              }
+            else
+              {
+                choices: [
+                  { message: { role: "assistant", content: "Done." }, finish_reason: "stop" },
+                ],
+              }
+            end
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body: JSON.generate(response_body),
+          }
+        end
+      end.new(requests)
+
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      write_skill(skills_root, name: "foo", description: "Foo skill", allowed_tools: "does_not_exist", body: "Hello")
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+
+      context = {
+        skills: {
+          enabled: true,
+          store: store,
+          allowed_tools_enforcement: :enforce,
+          allowed_tools_invalid_allowlist: :enforce,
+        },
+      }
+
+      workspace = ToolCallEvalTestWorkspace.new
+      client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+      runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
+
+      runner.run(user_text: "workspace_id=#{workspace.id}")
+    end
+
+    req2 = JSON.parse(requests[1][:body])
+    tool_names = req2["tools"].map { |t| t.dig("function", "name") }.compact
+
+    refute_includes tool_names, "state_get"
+    refute_includes tool_names, "state_patch"
+    assert_includes tool_names, "skills_list"
+    assert_includes tool_names, "skills_load"
+    assert_includes tool_names, "skills_read_file"
+
+    tool_msg = Array(req2["messages"]).find { |m| m.is_a?(Hash) && m["role"] == "tool" }
+    refute_nil tool_msg
+
+    payload = JSON.parse(tool_msg.fetch("content"))
+    warning_codes = Array(payload["warnings"]).map { |w| w["code"] }.compact
+    assert_includes warning_codes, "ALLOWED_TOOLS_ENFORCED"
+  end
+
+  def test_allowed_tools_enforcement_invalid_allowlist_mode_error_raises
+    requests = []
+
+    adapter =
+      Class.new(SimpleInference::HTTPAdapter) do
+        define_method(:initialize) do |requests|
+          @requests = requests
+          @call_count = 0
+        end
+
+        define_method(:call) do |env|
+          @requests << env
+          @call_count += 1
+
+          {
+            status: 200,
+            headers: { "content-type" => "application/json" },
+            body:
+              JSON.generate(
+                {
+                  choices: [
+                    {
+                      message: {
+                        role: "assistant",
+                        content: "",
+                        tool_calls: [
+                          {
+                            id: "call_1",
+                            type: "function",
+                            function: { name: "skills_load", arguments: JSON.generate({ name: "foo" }) },
+                          },
+                        ],
+                      },
+                      finish_reason: "tool_calls",
+                    },
+                  ],
+                }
+              ),
+          }
+        end
+      end.new(requests)
+
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      write_skill(skills_root, name: "foo", description: "Foo skill", allowed_tools: "does_not_exist", body: "Hello")
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+
+      context = {
+        skills: {
+          enabled: true,
+          store: store,
+          allowed_tools_enforcement: :enforce,
+          allowed_tools_invalid_allowlist: :error,
+        },
+      }
+
+      workspace = ToolCallEvalTestWorkspace.new
+      client = SimpleInference::Client.new(base_url: "http://example.com", api_key: "secret", adapter: adapter)
+      runner = build_runner(client: client, model: "test-model", workspace: workspace, context: context)
+
+      error =
+        assert_raises(TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError) do
+          runner.run(user_text: "workspace_id=#{workspace.id}")
+        end
+
+      assert_equal "ALLOWED_TOOLS_POLICY_ERROR", error.code
+    end
   end
 end

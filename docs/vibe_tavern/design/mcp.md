@@ -35,6 +35,7 @@ Non-goals (intentionally not implemented here):
 
 Defaults:
 - `protocol_version`: `Tools::MCP::DEFAULT_PROTOCOL_VERSION` (currently `2025-11-25`)
+- supported protocol versions: `Tools::MCP::SUPPORTED_PROTOCOL_VERSIONS`
 - `timeout_s`: `Tools::MCP::DEFAULT_TIMEOUT_S`
 - `max_response_bytes` (streamable_http only): 8 MB (applies to JSON bodies and per-event SSE `data`)
 
@@ -77,6 +78,7 @@ TavernKit::VibeTavern::Tools::MCP::ServerConfig.new(
   - spawns a subprocess via `Open3.popen3`
   - reads stdout/stderr line-by-line in background threads
   - writes newline-delimited JSON messages to stdin
+  - if the subprocess exits unexpectedly, pending requests fail immediately (no timeout wait)
 - `Tools::MCP::Transport::StreamableHttp`
   - sends one JSON-RPC message per HTTP `POST` (requests and notifications)
   - stores server-assigned session id (`MCP-Session-Id`) from the `initialize` response
@@ -84,12 +86,16 @@ TavernKit::VibeTavern::Tools::MCP::ServerConfig.new(
   - handles `text/event-stream` responses for a request, including disconnect + resume via `GET` + `Last-Event-ID`
   - maps HTTP `404` (when a session id is present) to JSON-RPC error code `MCP_SESSION_NOT_FOUND`
   - supports best-effort cancellation (`notifications/cancelled`) when the JSON-RPC client times out
+  - `#close` ensures the worker thread is terminated (kills as a last resort)
 - `Tools::MCP::SseParser`
   - incremental SSE parser used by `StreamableHttp` for per-request SSE responses
 - `Tools::MCP::JsonRpcClient`
   - manages request ids, pending requests, and timeouts
+  - supports per-request timeout overrides via `#request(..., timeout_s: ...)`
 - `Tools::MCP::Client`
   - performs MCP handshake and exposes `#list_tools` / `#call_tool`
+  - rejects unsupported negotiated protocol versions (fails fast on `start`)
+  - supports per-request timeouts via `timeout_s:` on `#list_tools` / `#call_tool`
   - on `MCP_SESSION_NOT_FOUND`:
     - `#list_tools`: re-initializes and retries once (idempotent)
     - `#call_tool`: re-initializes for future calls, but does not auto-retry (avoid repeating side effects)

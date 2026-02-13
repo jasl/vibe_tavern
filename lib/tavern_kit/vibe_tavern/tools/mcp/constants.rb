@@ -5,6 +5,7 @@ module TavernKit
     module Tools
       module MCP
         DEFAULT_PROTOCOL_VERSION = "2025-11-25"
+        SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-03-26"].freeze
         DEFAULT_TIMEOUT_S = 10.0
         DEFAULT_MAX_BYTES = 200_000
 

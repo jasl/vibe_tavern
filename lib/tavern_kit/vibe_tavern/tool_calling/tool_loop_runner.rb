@@ -5,11 +5,14 @@ require_relative "../prompt_runner"
 require_relative "../runner_config"
 require_relative "../output_tags"
 require_relative "../tools/custom/catalog"
+require_relative "../tools/skills/config"
+require_relative "../tools_builder/runtime_filtered_catalog"
 require_relative "tool_dispatcher"
 require_relative "tool_transforms"
 require_relative "tool_call_transforms"
 require_relative "tool_result_transforms"
 require_relative "tool_output_limiter"
+require_relative "policies/skills_allowed_tools_policy"
 
 module TavernKit
   module VibeTavern
@@ -61,7 +64,23 @@ module TavernKit
 
           # Tool surface assembly (allow/deny masking, surface limits, snapshot)
           # is owned by `TavernKit::VibeTavern::ToolsBuilder`.
-          @registry = registry || TavernKit::VibeTavern::Tools::Custom::Catalog.new
+          @registry_base = registry || TavernKit::VibeTavern::Tools::Custom::Catalog.new
+          @skills_config = TavernKit::VibeTavern::Tools::Skills::Config.from_context(runner_config.context)
+
+          available_tool_names = extract_tool_names(@registry_base.openai_tools(expose: :model))
+          @skills_allowed_tools_policy =
+            Policies::SkillsAllowedToolsPolicy.new(
+              mode: @skills_config.allowed_tools_enforcement,
+              invalid_allowlist_mode: @skills_config.allowed_tools_invalid_allowlist,
+              available_tool_names: available_tool_names,
+              baseline_tool_names: baseline_skills_tool_names,
+            )
+
+          @registry =
+            TavernKit::VibeTavern::ToolsBuilder::RuntimeFilteredCatalog.new(
+              base: @registry_base,
+              allow_set_fn: -> { @skills_allowed_tools_policy.allow_set },
+            )
 
           @system = system.to_s
           @strict = strict == true
@@ -314,6 +333,8 @@ module TavernKit
               },
               tool_calls: tool_calls_summary,
             }
+
+            trace_entry[:skills_allowed_tools] = skills_allowed_tools_trace_section
 
             content_stripped = false
             content_sample = nil
@@ -688,6 +709,20 @@ module TavernKit
                 tool_content = JSON.generate(result)
               end
 
+              if maybe_apply_skills_allowed_tools_policy(result, turn: turn, tool_call_id: id, handler: event_handler)
+                begin
+                  updated = JSON.generate(result)
+
+                  if updated.bytesize <= @max_tool_output_bytes
+                    tool_content = updated
+                  end
+                rescue StandardError
+                  nil
+                end
+
+                trace_entry[:skills_allowed_tools] = skills_allowed_tools_trace_section
+              end
+
               effective_tool_name = result.is_a?(Hash) ? result.fetch(:tool_name, effective_tool_name).to_s : effective_tool_name
 
               tool_elapsed_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
@@ -698,6 +733,17 @@ module TavernKit
                 else
                   []
                 end
+
+              if error_codes.include?("TOOL_NOT_ALLOWED") && tool_blocked_by_allowed_tools?(effective_tool_name)
+                emit_event(
+                  event_handler,
+                  :tool_call_blocked,
+                  turn: turn,
+                  tool_call_id: id,
+                  name: effective_tool_name,
+                  skill_name: @skills_allowed_tools_policy.active_skill_name,
+                )
+              end
 
               last_tool_ok_by_name[effective_tool_name] = ok_value
               any_tool_success_seen ||= (ok_value == true)
@@ -840,6 +886,146 @@ module TavernKit
               { code: code, message: message.to_s },
             ],
           }
+        end
+
+        def baseline_skills_tool_names
+          @baseline_skills_tool_names ||= %w[skills_list skills_load skills_read_file].freeze
+        end
+
+        def skills_allowed_tools_trace_section
+          allow_set = @skills_allowed_tools_policy.allow_set
+          change = @skills_allowed_tools_policy.last_change_details
+          change = {} unless change.is_a?(Hash)
+
+          {
+            mode: @skills_allowed_tools_policy.mode.to_s,
+            invalid_allowlist_mode: @skills_allowed_tools_policy.invalid_allowlist_mode.to_s,
+            enforced: !allow_set.nil?,
+            skill_name: @skills_allowed_tools_policy.active_skill_name,
+            allow_set_count: allow_set ? allow_set.size : 0,
+            allow_set_sample: allow_set ? allow_set.keys.first(20) : [],
+            ignored_reason: change.fetch(:ignored_reason, nil),
+          }
+        rescue StandardError
+          { mode: "unknown", enforced: false }
+        end
+
+        def maybe_apply_skills_allowed_tools_policy(result, turn:, tool_call_id:, handler:)
+          return false unless @skills_allowed_tools_policy.mode == :enforce
+          return false unless result.is_a?(Hash)
+          return false unless result.fetch(:tool_name, nil).to_s == "skills_load"
+          return false unless result.fetch(:ok, false) == true
+
+          data = result.fetch(:data, {})
+          data = {} unless data.is_a?(Hash)
+
+          skill_name = data.fetch(:name, "").to_s
+          allowed_tools = data.fetch(:allowed_tools, nil)
+          allowed_tools_raw = data.fetch(:allowed_tools_raw, nil)
+
+          allowed_tools_list =
+            case allowed_tools
+            when String
+              allowed_tools.split(/\s+/)
+            else
+              Array(allowed_tools)
+            end
+          allowed_tools_list = allowed_tools_list.map { |v| v.to_s.strip }.reject(&:empty?)
+
+          begin
+            @skills_allowed_tools_policy.activate!(
+              skill_name: skill_name,
+              allowed_tools: allowed_tools_list,
+              allowed_tools_raw: allowed_tools_raw,
+            )
+          rescue ArgumentError => e
+            raise ToolUseError.new(
+              "ALLOWED_TOOLS_POLICY_ERROR",
+              e.message.to_s,
+              details: {
+                turn: turn,
+                tool_call_id: tool_call_id,
+                skill_name: skill_name,
+                allowed_tools: allowed_tools_list,
+                allowed_tools_raw: allowed_tools_raw,
+              },
+            )
+          end
+
+          change = @skills_allowed_tools_policy.last_change_details
+          return false unless change.is_a?(Hash)
+
+          emit_event(
+            handler,
+            :skills_allowed_tools_policy_changed,
+            turn: turn,
+            skill_name: skill_name,
+            allowed_tools_count: allowed_tools_list.size,
+            allow_set_count: change.fetch(:allow_set_count, 0),
+            mode: @skills_allowed_tools_policy.mode.to_s,
+            invalid_allowlist_mode: @skills_allowed_tools_policy.invalid_allowlist_mode.to_s,
+            enforced: change.fetch(:enforced, false),
+            ignored_reason: change.fetch(:ignored_reason, nil),
+            allow_set_sample: change.fetch(:allow_set_sample, []),
+          )
+
+          warning = build_allowed_tools_warning(change)
+          if warning
+            warnings = result.fetch(:warnings, [])
+            warnings = [] unless warnings.is_a?(Array)
+            warnings = warnings.dup
+            warnings << warning
+            result[:warnings] = warnings
+          end
+
+          true
+        end
+
+        def build_allowed_tools_warning(change)
+          return nil unless change.is_a?(Hash)
+
+          if change.fetch(:enforced, false) == true
+            { code: "ALLOWED_TOOLS_ENFORCED", message: "allowed-tools policy is enforced for the active skill" }
+          elsif change.fetch(:ignored_reason, nil).to_s == "NO_MATCHES"
+            { code: "ALLOWED_TOOLS_IGNORED", message: "allowed-tools policy ignored: NO_MATCHES" }
+          else
+            nil
+          end
+        rescue StandardError
+          nil
+        end
+
+        def tool_blocked_by_allowed_tools?(tool_name)
+          return false unless @skills_allowed_tools_policy.active?
+
+          name = tool_name.to_s
+          base_allowed = @registry_base.include?(name, expose: :model)
+          runtime_allowed = @registry.include?(name, expose: :model)
+
+          if !base_allowed && name.include?(".")
+            underscored = name.tr(".", "_")
+            base_allowed = @registry_base.include?(underscored, expose: :model)
+            runtime_allowed = @registry.include?(underscored, expose: :model)
+          end
+
+          base_allowed && !runtime_allowed
+        rescue StandardError
+          false
+        end
+
+        def extract_tool_names(tools)
+          Array(tools).filter_map do |tool|
+            next unless tool.is_a?(Hash)
+
+            fn = tool.fetch(:function, nil)
+            fn = tool.fetch("function", nil) unless fn.is_a?(Hash)
+            next unless fn.is_a?(Hash)
+
+            name = fn.fetch(:name, fn.fetch("name", nil)).to_s.strip
+            next if name.empty?
+
+            name
+          end
         end
 
         def normalize_tool_calls_payload(value)

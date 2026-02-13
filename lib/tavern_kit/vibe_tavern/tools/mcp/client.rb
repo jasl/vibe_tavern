@@ -52,7 +52,7 @@ module TavernKit
             self
           end
 
-          def list_tools(cursor: nil)
+          def list_tools(cursor: nil, timeout_s: nil)
             params = {}
             cursor = cursor.to_s.strip
             params["cursor"] = cursor unless cursor.empty?
@@ -62,7 +62,7 @@ module TavernKit
             begin
               attempt += 1
 
-              result = @rpc.request("tools/list", params.empty? ? {} : params)
+              result = @rpc.request("tools/list", params.empty? ? {} : params, timeout_s: timeout_s)
               result.is_a?(Hash) ? result : {}
             rescue MCP::JsonRpcError => e
               raise unless e.code.to_s == "MCP_SESSION_NOT_FOUND"
@@ -73,12 +73,12 @@ module TavernKit
             end
           end
 
-          def call_tool(name:, arguments: {})
+          def call_tool(name:, arguments: {}, timeout_s: nil)
             tool_name = name.to_s
             raise ArgumentError, "name is required" if tool_name.strip.empty?
 
             args = arguments.is_a?(Hash) ? arguments : {}
-            result = @rpc.request("tools/call", { "name" => tool_name, "arguments" => args })
+            result = @rpc.request("tools/call", { "name" => tool_name, "arguments" => args }, timeout_s: timeout_s)
             result.is_a?(Hash) ? result : {}
           rescue MCP::JsonRpcError => e
             if e.code.to_s == "MCP_SESSION_NOT_FOUND"
@@ -126,7 +126,20 @@ module TavernKit
             @instructions = result.fetch("instructions", nil)
 
             returned_protocol_version = result.fetch("protocolVersion", nil).to_s.strip
-            @protocol_version = returned_protocol_version.empty? ? @protocol_version : returned_protocol_version
+            negotiated_protocol_version = returned_protocol_version.empty? ? @protocol_version : returned_protocol_version
+            unless MCP::SUPPORTED_PROTOCOL_VERSIONS.include?(negotiated_protocol_version)
+              begin
+                @rpc.close
+              rescue StandardError
+                nil
+              end
+
+              raise MCP::Errors::ProtocolVersionNotSupportedError,
+                    "Unsupported MCP protocol version: #{negotiated_protocol_version.inspect} " \
+                    "(supported: #{MCP::SUPPORTED_PROTOCOL_VERSIONS.join(", ")})"
+            end
+
+            @protocol_version = negotiated_protocol_version
 
             if @transport.respond_to?(:protocol_version=)
               @transport.protocol_version = @protocol_version

@@ -8,6 +8,7 @@ module TavernKit
           class TimeoutError < StandardError; end
           class ClosedError < StandardError; end
           class TransportError < StandardError; end
+          class ProtocolVersionNotSupportedError < StandardError; end
         end
       end
     end

@@ -43,6 +43,8 @@ class SkillsExecutorTest < Minitest::Test
       loaded = executor.call(name: "skills_load", args: { "name" => "foo" })
       assert_equal true, loaded.fetch(:ok)
       assert_equal "foo", loaded.fetch(:data).fetch(:name)
+      assert_equal [], loaded.fetch(:data).fetch(:allowed_tools)
+      assert_nil loaded.fetch(:data).fetch(:allowed_tools_raw)
       assert_includes loaded.fetch(:data).fetch(:body_markdown), "Hello from foo"
       assert_includes loaded.fetch(:data).fetch(:files), "references/x.md"
 
@@ -84,6 +86,28 @@ class SkillsExecutorTest < Minitest::Test
       invalid = executor.call(name: "skills_read_file", args: { "name" => "foo", "path" => "../x" })
       assert_equal false, invalid.fetch(:ok)
       assert_equal "INVALID_PATH", invalid.fetch(:errors).first.fetch(:code)
+    end
+  end
+
+  def test_skills_load_emits_warning_when_skill_md_is_truncated
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      write_skill(skills_root, name: "foo", description: "Foo skill", body: ("a" * 5000))
+
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+      executor = TavernKit::VibeTavern::ToolCalling::Executors::SkillsExecutor.new(store: store, max_bytes: 200)
+
+      loaded = executor.call(name: "skills_load", args: { "name" => "foo" })
+      assert_equal true, loaded.fetch(:ok)
+
+      body = loaded.fetch(:data).fetch(:body_markdown).to_s
+      assert_operator body.bytesize, :<=, 200
+
+      codes = loaded.fetch(:warnings).map { |w| w.fetch(:code, w.fetch("code", nil)) }.compact
+      assert_includes codes, "CONTENT_TRUNCATED"
+      assert_equal ["CONTENT_TRUNCATED"], codes.uniq
     end
   end
 end

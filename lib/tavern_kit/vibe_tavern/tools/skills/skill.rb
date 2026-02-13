@@ -10,9 +10,10 @@ module TavernKit
           Data.define(
             :meta,
             :body_markdown,
+            :body_truncated,
             :files_index,
           ) do
-            def initialize(meta:, body_markdown:, files_index: nil)
+            def initialize(meta:, body_markdown:, body_truncated: false, files_index: nil)
               raise ArgumentError, "meta must be a Tools::Skills::SkillMetadata" unless meta.is_a?(SkillMetadata)
 
               normalized_index = normalize_files_index(files_index)
@@ -20,6 +21,7 @@ module TavernKit
               super(
                 meta: meta,
                 body_markdown: body_markdown.to_s,
+                body_truncated: body_truncated == true,
                 files_index: normalized_index,
               )
             end

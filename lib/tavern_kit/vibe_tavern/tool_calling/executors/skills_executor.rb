@@ -31,20 +31,33 @@ module TavernKit
               skill_name = fetch_arg(args, "name")
               raise ArgumentError, "name is required" if skill_name.empty?
 
-              skill = @store.load_skill(name: skill_name)
+              skill = @store.load_skill(name: skill_name, max_bytes: @max_bytes)
               body = normalize_utf8(skill.body_markdown.to_s)
 
               warnings = []
+              truncated = (skill.respond_to?(:body_truncated) && skill.body_truncated)
               if body.bytesize > @max_bytes
                 body = body.byteslice(0, @max_bytes).to_s
                 body = normalize_utf8(body)
-                warnings << { code: "CONTENT_TRUNCATED", message: "SKILL.md body exceeded size limit and was truncated" }
+                truncated = true
+              end
+              if truncated
+                warnings << { code: "CONTENT_TRUNCATED", message: "SKILL.md exceeded size limit and was truncated" }
               end
 
               files =
                 skill.files_index.values.flatten.sort
 
-              envelope = ok_envelope(tool_name, name: skill.meta.name, description: skill.meta.description, body_markdown: body, files: files)
+              envelope =
+                ok_envelope(
+                  tool_name,
+                  name: skill.meta.name,
+                  description: skill.meta.description,
+                  allowed_tools: skill.meta.allowed_tools,
+                  allowed_tools_raw: skill.meta.allowed_tools_raw,
+                  body_markdown: body,
+                  files: files,
+                )
               envelope[:warnings] = warnings if warnings.any?
               envelope
             when "skills_read_file"

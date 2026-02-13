@@ -33,6 +33,7 @@ module TavernKit
 
               @stdout_thread = nil
               @stderr_thread = nil
+              @monitor_thread = nil
             end
 
             def start
@@ -63,6 +64,37 @@ module TavernKit
                 @stderr_thread =
                   Thread.new do
                     read_lines(stderr) { |line| safe_call(@on_stderr_line, line) }
+                  end
+
+                @monitor_thread =
+                  Thread.new do
+                    status =
+                      begin
+                        wait_thr.value
+                      rescue StandardError
+                        nil
+                      end
+
+                    closed = nil
+                    on_close = nil
+                    pid = nil
+
+                    @mutex.synchronize do
+                      closed = @closed
+                      on_close = @on_close
+                      pid = @pid
+                    end
+
+                    unless closed
+                      details = {
+                        pid: pid,
+                        exitstatus: status&.exitstatus,
+                        termsig: status&.termsig,
+                        success: status&.success?,
+                      }.compact
+
+                      safe_call_close(on_close, details)
+                    end
                   end
 
                 @started = true
@@ -102,6 +134,7 @@ module TavernKit
               pid = nil
               stdout_thread = nil
               stderr_thread = nil
+              monitor_thread = nil
 
               @mutex.synchronize do
                 return nil if @closed
@@ -115,6 +148,7 @@ module TavernKit
                 pid = @pid
                 stdout_thread = @stdout_thread
                 stderr_thread = @stderr_thread
+                monitor_thread = @monitor_thread
 
                 @stdin = nil
                 @stdout = nil
@@ -123,6 +157,7 @@ module TavernKit
                 @pid = nil
                 @stdout_thread = nil
                 @stderr_thread = nil
+                @monitor_thread = nil
               end
 
               safe_close(stdin)
@@ -145,6 +180,7 @@ module TavernKit
 
               stdout_thread&.join(0.2)
               stderr_thread&.join(0.2)
+              monitor_thread&.join(0.2)
 
               nil
             rescue ArgumentError, TypeError
@@ -169,6 +205,14 @@ module TavernKit
               return unless callable&.respond_to?(:call)
 
               callable.call(line.to_s)
+            rescue StandardError
+              nil
+            end
+
+            def safe_call_close(callable, details)
+              return unless callable&.respond_to?(:call)
+
+              callable.call(details)
             rescue StandardError
               nil
             end

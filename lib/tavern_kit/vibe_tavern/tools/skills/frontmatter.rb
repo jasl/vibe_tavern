@@ -8,6 +8,8 @@ module TavernKit
       module Skills
         module Frontmatter
           NAME_PATTERN = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/.freeze
+          MAX_DESCRIPTION_CHARS = 1024
+          MAX_COMPATIBILITY_CHARS = 500
 
           module_function
 
@@ -49,8 +51,8 @@ module TavernKit
             end
 
             frontmatter = symbolize_top_level(parsed)
-            metadata = normalize_metadata(frontmatter.fetch(:metadata, nil))
-            return invalid(strict, "frontmatter.metadata must be a Hash", body_string) if metadata.nil?
+            metadata, metadata_error = normalize_metadata(frontmatter.fetch(:metadata, nil), strict: strict)
+            return invalid(strict, metadata_error, body_string) if metadata.nil?
 
             frontmatter[:metadata] = metadata
 
@@ -59,6 +61,18 @@ module TavernKit
 
             return invalid(strict, "frontmatter.name is required", body_string) if name.empty?
             return invalid(strict, "frontmatter.description is required", body_string) if description.empty?
+
+            if strict && description.length > MAX_DESCRIPTION_CHARS
+              return invalid(strict, "frontmatter.description must be <= #{MAX_DESCRIPTION_CHARS} chars", body_string)
+            end
+
+            compatibility = frontmatter.fetch(:compatibility, nil)
+            compatibility = compatibility.to_s.strip unless compatibility.nil?
+            compatibility = nil if compatibility&.empty?
+            if strict && compatibility && compatibility.length > MAX_COMPATIBILITY_CHARS
+              return invalid(strict, "frontmatter.compatibility must be <= #{MAX_COMPATIBILITY_CHARS} chars", body_string)
+            end
+            frontmatter[:compatibility] = compatibility if frontmatter.key?(:compatibility)
 
             unless valid_name?(name)
               return invalid(strict, "invalid skill name: #{name.inspect}", body_string)
@@ -103,21 +117,37 @@ module TavernKit
               key = k.to_s.strip
               next if key.empty?
 
+              key = key.tr("-", "_")
               out[key.to_sym] = v
             end
           end
           private_class_method :symbolize_top_level
 
-          def normalize_metadata(value)
-            return {} if value.nil?
-            return nil unless value.is_a?(Hash)
+          def normalize_metadata(value, strict:)
+            return [{}, nil] if value.nil?
 
-            value.each_with_object({}) do |(k, v), out|
+            unless value.is_a?(Hash)
+              return [nil, "frontmatter.metadata must be a Hash"]
+            end
+
+            out = {}
+
+            value.each do |k, v|
               key = k.to_s
               next if key.strip.empty?
 
-              out[key] = v
+              if strict
+                unless v.is_a?(String)
+                  return [nil, "frontmatter.metadata must be a string-to-string map"]
+                end
+
+                out[key] = v
+              else
+                out[key] = v.to_s
+              end
             end
+
+            [out, nil]
           end
           private_class_method :normalize_metadata
 

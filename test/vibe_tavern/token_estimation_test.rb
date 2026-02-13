@@ -103,7 +103,7 @@ class VibeTavernTokenEstimationTest < ActiveSupport::TestCase
             tokenizer_family: :hf_tokenizers,
             tokenizer_path: "/example/root/vendor/tokenizers/minimax-m2.5/tokenizer.json",
             source_hint: "minimax-m2.5",
-            source_repo: "MiniMaxAI/MiniMax-M2.1",
+            source_repo: "MiniMaxAI/MiniMax-M2.5",
           },
           registry.fetch("minimax-m2.5"),
         )

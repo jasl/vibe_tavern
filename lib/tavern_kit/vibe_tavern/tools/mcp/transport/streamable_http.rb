@@ -196,13 +196,44 @@ module TavernKit
                 @cv.broadcast
               end
 
-              worker&.join(timeout_s)
+              deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_s
+              grace_s = [0.2, timeout_s].min
 
-              if session_id && protocol_version && !protocol_version.to_s.strip.empty?
+              worker&.join(grace_s)
+
+              if worker&.alive?
                 begin
-                  delete_session(session_id: session_id, protocol_version: protocol_version)
+                  stream_client&.close
                 rescue StandardError
                   nil
+                end
+
+                begin
+                  client&.close if client&.respond_to?(:close)
+                rescue StandardError
+                  nil
+                end
+
+                remaining_s = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+                worker.join(remaining_s) if remaining_s.positive?
+
+                if worker.alive?
+                  worker.kill
+                  worker.join(0.1)
+                end
+              elsif session_id && protocol_version && !protocol_version.to_s.strip.empty?
+                remaining_s = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+                if remaining_s.positive?
+                  begin
+                    deleter =
+                      Thread.new do
+                        delete_session(session_id: session_id, protocol_version: protocol_version)
+                      end
+                    deleter.join([0.2, remaining_s].min)
+                    deleter.kill if deleter.alive?
+                  rescue StandardError
+                    nil
+                  end
                 end
               end
 
@@ -282,6 +313,40 @@ module TavernKit
               end
             rescue StandardError => e
               safe_call(@on_stderr_line, "mcp streamable_http worker error: #{e.class}: #{e.message}")
+              on_close = nil
+              client = nil
+              stream_client = nil
+              notify = false
+
+              details = { error_class: e.class.name, message: e.message.to_s }
+
+              @mutex.synchronize do
+                notify = !@closed
+                @closed = true
+
+                on_close = @on_close
+                client = @client
+                stream_client = @stream_client
+
+                @queue.clear
+                @inflight.clear
+
+                @cv.broadcast
+              end
+
+              begin
+                stream_client&.close
+              rescue StandardError
+                nil
+              end
+
+              begin
+                client&.close if client&.respond_to?(:close)
+              rescue StandardError
+                nil
+              end
+
+              safe_call_close(on_close, details) if notify
             end
 
             def process_job(job)
@@ -837,6 +902,14 @@ module TavernKit
               return unless callable&.respond_to?(:call)
 
               callable.call(line.to_s)
+            rescue StandardError
+              nil
+            end
+
+            def safe_call_close(callable, details)
+              return unless callable&.respond_to?(:call)
+
+              callable.call(details)
             rescue StandardError
               nil
             end

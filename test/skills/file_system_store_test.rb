@@ -212,4 +212,80 @@ class SkillsFileSystemStoreTest < Minitest::Test
       assert_equal [], metas
     end
   end
+
+  def test_list_skills_skips_skill_dirs_that_escape_skills_root_via_symlink_in_non_strict_mode
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      outside_dir = File.join(tmp, "outside_skill")
+      FileUtils.mkdir_p(outside_dir)
+      File.write(
+        File.join(outside_dir, "SKILL.md"),
+        <<~MD,
+          ---
+          name: foo
+          description: Foo
+          ---
+          Body
+        MD
+      )
+
+      begin
+        FileUtils.ln_s(outside_dir, File.join(skills_root, "foo"))
+      rescue NotImplementedError, SystemCallError => e
+        skip "symlinks not supported: #{e.class}: #{e.message}"
+      end
+
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: false)
+      metas = store.list_skills
+      assert_equal [], metas
+    end
+  end
+
+  def test_list_skills_raises_when_skill_dir_escapes_skills_root_via_symlink_in_strict_mode
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      outside_dir = File.join(tmp, "outside_skill")
+      FileUtils.mkdir_p(outside_dir)
+      File.write(
+        File.join(outside_dir, "SKILL.md"),
+        <<~MD,
+          ---
+          name: foo
+          description: Foo
+          ---
+          Body
+        MD
+      )
+
+      begin
+        FileUtils.ln_s(outside_dir, File.join(skills_root, "foo"))
+      rescue NotImplementedError, SystemCallError => e
+        skip "symlinks not supported: #{e.class}: #{e.message}"
+      end
+
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+      error = assert_raises(ArgumentError) { store.list_skills }
+      assert_includes error.message, "escapes skills root"
+    end
+  end
+
+  def test_load_skill_truncates_body_when_max_bytes_exceeded
+    Dir.mktmpdir do |tmp|
+      skills_root = File.join(tmp, "skills")
+      FileUtils.mkdir_p(skills_root)
+
+      big_body = "a" * 5000
+      write_skill(skills_root, name: "foo", description: "Foo skill", body: big_body)
+
+      store = TavernKit::VibeTavern::Tools::Skills::FileSystemStore.new(dirs: [skills_root], strict: true)
+      skill = store.load_skill(name: "foo", max_bytes: 200)
+
+      assert_equal true, skill.body_truncated
+      assert_operator skill.body_markdown.bytesize, :<=, 200
+    end
+  end
 end

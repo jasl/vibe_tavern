@@ -65,7 +65,8 @@ STDIN.each_line do |line|
 
   case method_name
   when "initialize"
-    protocol_version = params.fetch("protocolVersion", "2025-11-25").to_s
+    protocol_version = ENV.fetch("MCP_FAKE_RETURN_PROTOCOL_VERSION", "").to_s
+    protocol_version = params.fetch("protocolVersion", "2025-11-25").to_s if protocol_version.strip.empty?
     result = {
       "protocolVersion" => protocol_version,
       "serverInfo" => { "name" => "mcp_fake_server", "version" => "1.0.0" },
@@ -75,6 +76,8 @@ STDIN.each_line do |line|
 
     reply(id, result: result)
   when "tools/list"
+    exit!(1) if ENV.fetch("MCP_FAKE_EXIT_ON_TOOLS_LIST", "").to_s == "1"
+
     cursor = params.fetch("cursor", "").to_s
     if cursor.empty?
       reply(id, result: { "tools" => TOOLS_PAGE_1, "nextCursor" => "page2" })
