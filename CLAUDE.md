@@ -1,13 +1,42 @@
-# Vibe Tavern (Rails) - AI Dev Guardrails
+# Vibe Tavern - AI Agent Application
 
-This repo rewrites the legacy TavernKit codebase, available locally at
-`resources/tavern_kit` (symlink, not committed).
+## Memory
 
-- Rails app rewrite source: `resources/tavern_kit/playground`
-- Embedded gem rewrite source: `resources/tavern_kit`
-- Upstream repo: `https://github.com/jasl/tavern_kit`
-Primary goal: reduce "vibe coding" churn by enforcing consistent boundaries,
-small diffs, and test-driven feedback.
+### Me
+jasl (jasl.lightsworn@gmail.com) - Project owner & developer.
+
+### Active Project
+| Name | What | Location |
+|------|------|----------|
+| **AgentCore** | New Agent engine gem (4 modules: Resources, Prompt Builder, Prompt Runner, Agent) | `vendor/agent_core/` |
+| **Chat UI** | Web-based chat interface (pi-mono style) | TBD |
+
+### Key Terms
+| Term | Meaning |
+|------|---------|
+| TavernKit | Original gem (`vendor/tavern_kit/`) - character cards, chat history, lore |
+| AgentCore | New gem (`vendor/agent_core/`) - agent engine being built |
+| lib/tavern_kit | App extensions (`lib/tavern_kit/vibe_tavern/`) - tools, MCP, skills, directives |
+| pi-mono | Reference: minimal agent loop (4 tools + skills) at `resources/pi-mono` |
+| openclaw | Reference: full agent app (end goal) at `resources/openclaw` |
+| MCP | Model Context Protocol (Anthropic's tool protocol) |
+| Skills | Markdown-based tool definitions with frontmatter |
+
+### Preferences
+- Small diffs, test-driven, document frequently
+- Builder pattern for Agent (serializable configs)
+- Gem = library not framework; app handles IO/persistence
+- First-principles primitives, compose for complexity
+
+> Full glossary: memory/glossary.md | Projects: memory/projects/ | Context: memory/context/
+
+---
+
+## Dev Guardrails
+
+This repo is evolving from a TavernKit rewrite into an **Agent application**.
+Legacy reference: `resources/tavern_kit` (symlink, not committed).
+Primary goal: build a reliable, safe, powerful Agent core + web Chat UI.
 
 ## Stack (Assumptions)
 

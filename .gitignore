@@ -17,6 +17,7 @@
 /.ruby-lsp
 /.vscode
 /.claude/settings.local.json
+/memory
 
 # Ignore bundler config.
 /.bundle
