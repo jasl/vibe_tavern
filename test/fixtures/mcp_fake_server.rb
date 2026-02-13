@@ -65,7 +65,7 @@ STDIN.each_line do |line|
 
   case method_name
   when "initialize"
-    protocol_version = params.fetch("protocolVersion", "2024-11-05").to_s
+    protocol_version = params.fetch("protocolVersion", "2025-11-25").to_s
     result = {
       "protocolVersion" => protocol_version,
       "serverInfo" => { "name" => "mcp_fake_server", "version" => "1.0.0" },

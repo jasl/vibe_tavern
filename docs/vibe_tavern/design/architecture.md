@@ -153,9 +153,9 @@ Tool surfaces should be assembled by `TavernKit::VibeTavern::ToolsBuilder`, whic
 Additional first-class tool sources (optional):
 - Agent Skills (`Tools::Skills::*`): local tools (`skills_list`, `skills_load`,
   `skills_read_file`) for progressive disclosure of `SKILL.md` packages.
-- MCP (`Tools::MCP::*`): stdio JSON-RPC tool source; remote MCP tools are adapted into
-  local tool names (`mcp_<server_id>__<remote_tool_name>`) and executed through
-  an MCP client.
+- MCP (`Tools::MCP::*`): JSON-RPC tool source over `:stdio` or `:streamable_http`;
+  remote MCP tools are adapted into local tool names (`mcp_<server_id>__<remote_tool_name>`)
+  and executed through an MCP client.
 
 When wiring multiple tool sources:
 - prefer `TavernKit::VibeTavern::ToolsBuilder` as the canonical composition entrypoint

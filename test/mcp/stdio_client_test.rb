@@ -17,7 +17,7 @@ class MCPStdioClientTest < Minitest::Test
     client =
       TavernKit::VibeTavern::Tools::MCP::Client.new(
         transport: transport,
-        protocol_version: "2024-11-05",
+        protocol_version: "2025-11-25",
         client_info: { "name" => "test", "version" => "0" },
         capabilities: {},
         timeout_s: 5.0,

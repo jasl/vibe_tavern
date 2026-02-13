@@ -46,24 +46,7 @@ module TavernKit
 
             @rpc.start
 
-            result =
-              @rpc.request(
-                "initialize",
-                {
-                  "protocolVersion" => @protocol_version,
-                  "clientInfo" => @client_info,
-                  "capabilities" => @capabilities,
-                },
-              )
-            result = {} unless result.is_a?(Hash)
-
-            @server_info = result.fetch("serverInfo", nil)
-            @server_capabilities = result.fetch("capabilities", nil)
-            @instructions = result.fetch("instructions", nil)
-            returned_protocol_version = result.fetch("protocolVersion", nil).to_s.strip
-            @protocol_version = returned_protocol_version.empty? ? @protocol_version : returned_protocol_version
-
-            @rpc.notify("notifications/initialized")
+            initialize_session!
 
             @started = true
             self
@@ -74,8 +57,20 @@ module TavernKit
             cursor = cursor.to_s.strip
             params["cursor"] = cursor unless cursor.empty?
 
-            result = @rpc.request("tools/list", params.empty? ? {} : params)
-            result.is_a?(Hash) ? result : {}
+            attempt = 0
+
+            begin
+              attempt += 1
+
+              result = @rpc.request("tools/list", params.empty? ? {} : params)
+              result.is_a?(Hash) ? result : {}
+            rescue MCP::JsonRpcError => e
+              raise unless e.code.to_s == "MCP_SESSION_NOT_FOUND"
+              raise if attempt > 1
+
+              reinitialize_session!
+              retry
+            end
           end
 
           def call_tool(name:, arguments: {})
@@ -85,6 +80,16 @@ module TavernKit
             args = arguments.is_a?(Hash) ? arguments : {}
             result = @rpc.request("tools/call", { "name" => tool_name, "arguments" => args })
             result.is_a?(Hash) ? result : {}
+          rescue MCP::JsonRpcError => e
+            if e.code.to_s == "MCP_SESSION_NOT_FOUND"
+              begin
+                reinitialize_session!
+              rescue StandardError
+                nil
+              end
+            end
+
+            raise
           end
 
           def close
@@ -102,6 +107,36 @@ module TavernKit
 
           def default_client_info
             { "name" => "vibe_tavern", "version" => TavernKit::VERSION.to_s }
+          end
+
+          def initialize_session!
+            result =
+              @rpc.request(
+                "initialize",
+                {
+                  "protocolVersion" => @protocol_version,
+                  "clientInfo" => @client_info,
+                  "capabilities" => @capabilities,
+                },
+              )
+            result = {} unless result.is_a?(Hash)
+
+            @server_info = result.fetch("serverInfo", nil)
+            @server_capabilities = result.fetch("capabilities", nil)
+            @instructions = result.fetch("instructions", nil)
+
+            returned_protocol_version = result.fetch("protocolVersion", nil).to_s.strip
+            @protocol_version = returned_protocol_version.empty? ? @protocol_version : returned_protocol_version
+
+            if @transport.respond_to?(:protocol_version=)
+              @transport.protocol_version = @protocol_version
+            end
+
+            @rpc.notify("notifications/initialized")
+          end
+
+          def reinitialize_session!
+            initialize_session!
           end
         end
       end

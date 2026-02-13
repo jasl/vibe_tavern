@@ -7,6 +7,7 @@ require_relative "server_config"
 require_relative "snapshot"
 require_relative "tool_adapter"
 require_relative "transport/stdio"
+require_relative "transport/streamable_http"
 
 module TavernKit
   module VibeTavern
@@ -30,12 +31,27 @@ module TavernKit
               raise ArgumentError, "duplicate server id: #{server_id}" if clients.key?(server_id)
 
               transport =
-                MCP::Transport::Stdio.new(
-                  command: cfg.command,
-                  args: cfg.args || [],
-                  env: cfg.env || {},
-                  chdir: cfg.chdir,
-                )
+                case cfg.transport
+                when :stdio
+                  MCP::Transport::Stdio.new(
+                    command: cfg.command,
+                    args: cfg.args || [],
+                    env: cfg.env || {},
+                    chdir: cfg.chdir,
+                  )
+                when :streamable_http
+                  MCP::Transport::StreamableHttp.new(
+                    url: cfg.url,
+                    headers: cfg.headers,
+                    timeout_s: cfg.timeout_s || MCP::DEFAULT_TIMEOUT_S,
+                    open_timeout_s: cfg.open_timeout_s,
+                    read_timeout_s: cfg.read_timeout_s,
+                    sse_max_reconnects: cfg.sse_max_reconnects,
+                    max_response_bytes: cfg.max_response_bytes,
+                  )
+                else
+                  raise ArgumentError, "unsupported MCP transport: #{cfg.transport.inspect}"
+                end
 
               client =
                 MCP::Client.new(

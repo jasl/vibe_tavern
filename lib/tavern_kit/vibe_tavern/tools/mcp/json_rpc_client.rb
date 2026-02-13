@@ -150,6 +150,23 @@ module TavernKit
 
             unless pending.done
               @pending_mutex.synchronize { @pending.delete(id) }
+              begin
+                if method_name != "initialize"
+                  if @transport.respond_to?(:cancel_request)
+                    @transport.cancel_request(id, reason: "timeout")
+                  else
+                    @transport.send_message(
+                      {
+                        "jsonrpc" => "2.0",
+                        "method" => "notifications/cancelled",
+                        "params" => { "requestId" => id, "reason" => "timeout" },
+                      },
+                    )
+                  end
+                end
+              rescue StandardError
+                nil
+              end
               raise MCP::Errors::TimeoutError, "MCP request timed out: #{method_name}"
             end
 
