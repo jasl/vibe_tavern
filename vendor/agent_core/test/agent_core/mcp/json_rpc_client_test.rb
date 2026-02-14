@@ -76,6 +76,25 @@ class AgentCore::MCP::JsonRpcClientTest < Minitest::Test
     assert_same result1, result2
   end
 
+  def test_start_does_not_deadlock_when_transport_emits_stdout_during_start
+    transport = Class.new(MockTransport) do
+      def start
+        super
+        on_stdout_line&.call(JSON.generate({ "jsonrpc" => "2.0", "id" => 1, "result" => { "ok" => true } }))
+        self
+      end
+    end.new
+
+    client = AgentCore::MCP::JsonRpcClient.new(transport: transport)
+
+    thread = Thread.new { client.start }
+    refute_nil thread.join(1.0), "start should not deadlock"
+
+    assert_same client, thread.value
+  ensure
+    client&.close
+  end
+
   def test_start_after_close_raises
     @client.start
     @client.close

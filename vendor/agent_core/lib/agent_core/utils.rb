@@ -102,5 +102,43 @@ module AgentCore
     rescue URI::InvalidURIError
       nil
     end
+
+    # Normalize an MCP tool definition hash to AgentCore conventions.
+    #
+    # MCP uses JSON (string keys) and may use camelCase fields (e.g., inputSchema).
+    # This helper normalizes to symbol keys and snake_case for AgentCore internals.
+    #
+    # @param value [Hash, nil]
+    # @return [Hash, nil] { name:, description:, input_schema: }
+    def normalize_mcp_tool_definition(value)
+      return nil if value.nil?
+      raise ArgumentError, "Expected Hash, got #{value.class}" unless value.is_a?(Hash)
+
+      name = value.fetch("name", "").to_s.strip
+      return nil if name.empty?
+
+      description = value.fetch("description", "").to_s
+      input_schema = value.fetch("inputSchema", value.fetch("input_schema", value.fetch("parameters", {})))
+      input_schema = {} unless input_schema.is_a?(Hash)
+
+      { name: name, description: description, input_schema: input_schema }
+    end
+
+    # Normalize an MCP tools/call result hash to AgentCore conventions.
+    #
+    # MCP uses "isError"; AgentCore uses "error".
+    #
+    # @param value [Hash, nil]
+    # @return [Hash] { content:, error: }
+    def normalize_mcp_tool_call_result(value)
+      return { content: [{ type: :text, text: value.to_s }], error: false } unless value.is_a?(Hash)
+
+      content = value.fetch("content", nil)
+      content = [{ type: :text, text: value.to_s }] unless content.is_a?(Array)
+
+      error = value.fetch("isError", value.fetch("error", false))
+
+      { content: content, error: !!error }
+    end
   end
 end

@@ -89,6 +89,63 @@ class AgentCore::MCP::Transport::StdioTest < Minitest::Test
     assert_equal "test", parsed["method"]
   end
 
+  def test_send_message_does_not_interleave_across_threads
+    received = []
+    received_mutex = Mutex.new
+
+    transport = AgentCore::MCP::Transport::Stdio.new(
+      command: "cat",
+      on_stdout_line: ->(line) { received_mutex.synchronize { received << line } },
+    )
+    transport.start
+
+    thread_count = 5
+    messages_per_thread = 30
+    expected = thread_count * messages_per_thread
+
+    threads =
+      thread_count.times.map do |t|
+        Thread.new do
+          messages_per_thread.times do |i|
+            id = t * messages_per_thread + i + 1
+            transport.send_message(
+              {
+                "jsonrpc" => "2.0",
+                "id" => id,
+                "method" => "test",
+                "params" => { "payload" => ("x" * 200) },
+              },
+            )
+          end
+        end
+      end
+
+    threads.each(&:join)
+
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2.0
+    loop do
+      size = received_mutex.synchronize { received.size }
+      break if size >= expected
+      break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+      sleep(0.01)
+    end
+
+    transport.close(timeout_s: 2.0)
+
+    lines = received_mutex.synchronize { received.dup }
+    assert_equal expected, lines.size
+
+    parsed_ids =
+      lines.map do |line|
+        JSON.parse(line).fetch("id")
+      end.sort
+
+    assert_equal (1..expected).to_a, parsed_ids
+  ensure
+    transport&.close(timeout_s: 1.0)
+  end
+
   def test_send_message_returns_true
     transport = AgentCore::MCP::Transport::Stdio.new(command: "cat")
     transport.start

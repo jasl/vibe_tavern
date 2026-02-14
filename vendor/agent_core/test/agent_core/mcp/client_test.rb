@@ -32,8 +32,16 @@ class AgentCore::MCP::ClientTest < Minitest::Test
       if response
         Thread.new do
           sleep(0.01)
-          result = response.is_a?(Proc) ? response.call(hash) : response
-          on_stdout_line&.call(JSON.generate({ "jsonrpc" => "2.0", "id" => id, "result" => result }))
+          payload = response.is_a?(Proc) ? response.call(hash) : response
+          rpc = { "jsonrpc" => "2.0", "id" => id }
+
+          if payload.is_a?(Hash) && (payload.key?("result") || payload.key?("error"))
+            rpc.merge!(payload)
+          else
+            rpc["result"] = payload
+          end
+
+          on_stdout_line&.call(JSON.generate(rpc))
         end
       end
 
@@ -224,6 +232,31 @@ class AgentCore::MCP::ClientTest < Minitest::Test
 
     assert_raises(ArgumentError) { client.call_tool(name: "") }
     assert_raises(ArgumentError) { client.call_tool(name: "  ") }
+  ensure
+    client&.close
+  end
+
+  def test_call_tool_reinitializes_and_retries_on_session_not_found
+    calls = 0
+    @transport.responses["tools/call"] =
+      lambda do |_msg|
+        calls += 1
+        if calls == 1
+          { "error" => { "code" => "MCP_SESSION_NOT_FOUND", "message" => "no session" } }
+        else
+          { "content" => [{ "type" => "text", "text" => "ok" }] }
+        end
+      end
+
+    client = AgentCore::MCP::Client.new(transport: @transport)
+    client.start
+
+    result = client.call_tool(name: "read_file", arguments: {})
+    assert_equal 2, calls
+    assert_equal "ok", result["content"].first["text"]
+
+    init_calls = @transport.sent_messages.count { |m| m["method"] == "initialize" }
+    assert_equal 2, init_calls
   ensure
     client&.close
   end

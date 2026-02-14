@@ -4,6 +4,19 @@ require "test_helper"
 require "agent_core/mcp/transport/streamable_http"
 
 class AgentCore::MCP::Transport::StreamableHttpTest < Minitest::Test
+  class CloseCountingClient
+    def initialize
+      @close_calls = 0
+    end
+
+    attr_reader :close_calls
+
+    def close
+      @close_calls += 1
+      nil
+    end
+  end
+
   def test_initialize_requires_url
     assert_raises(ArgumentError) do
       AgentCore::MCP::Transport::StreamableHttp.new(url: "")
@@ -106,6 +119,25 @@ class AgentCore::MCP::Transport::StreamableHttpTest < Minitest::Test
     transport = build_transport(url: "https://example.com/mcp")
     transport.close(timeout_s: 1.0)
     transport.close(timeout_s: 1.0)
+  end
+
+  def test_close_closes_http_clients_once_when_worker_alive
+    transport = build_transport(url: "https://example.com/mcp")
+    client = CloseCountingClient.new
+    stream_client = CloseCountingClient.new
+    worker = Thread.new { sleep 5 }
+
+    transport.instance_variable_set(:@worker, worker)
+    transport.instance_variable_set(:@client, client)
+    transport.instance_variable_set(:@stream_client, stream_client)
+
+    transport.close(timeout_s: 0.2)
+
+    assert_equal 1, client.close_calls
+    assert_equal 1, stream_client.close_calls
+  ensure
+    worker&.kill
+    worker&.join(0.1)
   end
 
   def test_close_negative_timeout_returns_nil

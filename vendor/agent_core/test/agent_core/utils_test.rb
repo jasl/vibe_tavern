@@ -15,4 +15,31 @@ class AgentCore::UtilsTest < Minitest::Test
     input = { model: "a", "model" => "b" }
     assert_equal({ model: "a" }, AgentCore::Utils.symbolize_keys(input))
   end
+
+  def test_normalize_mcp_tool_definition
+    raw = { "name" => "read_file", "description" => "Read a file", "inputSchema" => { "type" => "object" } }
+    normalized = AgentCore::Utils.normalize_mcp_tool_definition(raw)
+
+    assert_equal "read_file", normalized[:name]
+    assert_equal "Read a file", normalized[:description]
+    assert_equal({ "type" => "object" }, normalized[:input_schema])
+  end
+
+  def test_normalize_mcp_tool_definition_nil_when_name_blank
+    assert_nil AgentCore::Utils.normalize_mcp_tool_definition({ "name" => "  " })
+  end
+
+  def test_normalize_mcp_tool_call_result_maps_is_error
+    raw = { "content" => [{ "type" => "text", "text" => "oops" }], "isError" => true }
+    normalized = AgentCore::Utils.normalize_mcp_tool_call_result(raw)
+
+    assert_equal [{ "type" => "text", "text" => "oops" }], normalized[:content]
+    assert_equal true, normalized[:error]
+  end
+
+  def test_normalize_mcp_tool_call_result_falls_back_to_text
+    normalized = AgentCore::Utils.normalize_mcp_tool_call_result("not a hash")
+    assert_equal [{ type: :text, text: "not a hash" }], normalized[:content]
+    assert_equal false, normalized[:error]
+  end
 end

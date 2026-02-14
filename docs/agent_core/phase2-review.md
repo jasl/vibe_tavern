@@ -8,48 +8,56 @@
 
 ### 1.1 Client#call_tool re-raises after failed reinitialize
 
-**文件**: `mcp/client.rb` L98-115
+**文件**: `mcp/client.rb`
 
 ```ruby
 def call_tool(name:, arguments: {}, timeout_s: nil)
-  # ...
-  result = @rpc.request("tools/call", ...)
-  result.is_a?(Hash) ? result : {}
-rescue AgentCore::MCP::JsonRpcError => e
-  if e.code.to_s == "MCP_SESSION_NOT_FOUND"
-    begin
-      reinitialize_session!
-    rescue StandardError
-      nil  # ← swallowed
-    end
-  end
+  attempt = 0
 
-  raise  # ← always re-raises the original JsonRpcError
+  begin
+    attempt += 1
+    result = @rpc.request("tools/call", { "name" => tool_name, "arguments" => args }, timeout_s: timeout_s)
+    result.is_a?(Hash) ? result : {}
+  rescue AgentCore::MCP::JsonRpcError => e
+    raise unless e.code.to_s == "MCP_SESSION_NOT_FOUND"
+    raise if attempt > 1
+
+    reinitialize_session!
+    retry
+  end
 end
 ```
 
-`call_tool` 捕获 `MCP_SESSION_NOT_FOUND` 并尝试 `reinitialize_session!`，但**无论重初始化成功与否都会 re-raise 原始 error**。与 `list_tools` 的 `retry` 模式不同：`list_tools` 在 reinitialize 后 retry 请求。
+原实现中 `call_tool` 捕获 `MCP_SESSION_NOT_FOUND` 并尝试 `reinitialize_session!`，但**无论重初始化成功与否都会 re-raise 原始 error**。与 `list_tools` 的 `retry` 模式不同：`list_tools` 在 reinitialize 后 retry 请求。
 
-**影响**: `call_tool` 的自动重连永远不会成功——它重连 session 后不 retry 请求。
+**影响**: 自动重连永远不会成功——它重连 session 后不 retry 请求。
 
-**建议**: 对齐 `list_tools` 的 pattern：reinitialize 后 `retry`（限制 1 次）。
+**状态**: ✅ 已修复 — 对齐 `list_tools`：reinitialize 后 retry（限制 1 次），并补充了单测覆盖该分支。
 
 ### 1.2 JsonRpcClient#start 在 Mutex 内启动 transport
 
-**文件**: `mcp/json_rpc_client.rb` L50-83
+**文件**: `mcp/json_rpc_client.rb`
 
 ```ruby
 def start
   @pending_mutex.synchronize do
-    # ... setup callbacks ...
-    @transport.start    # ← 在锁内
+    # ... state + callback wiring ...
+    @starting = true
+  end
+
+  wire_transport_callbacks!
+  @transport.start  # ← 移到锁外（避免 transport 同步回调导致死锁）
+
+  @pending_mutex.synchronize do
     @started = true
+    @starting = false
+    @start_cv.broadcast
   end
   self
 end
 ```
 
-`@transport.start` 在 `@pending_mutex.synchronize` 内执行。Stdio transport 的 `start` 会 `popen3`
+原实现中 `@transport.start` 在 `@pending_mutex.synchronize` 内执行。Stdio transport 的 `start` 会 `popen3`
 并创建 3 个线程。如果 transport start 阻塞或抛出异常，会持有 `@pending_mutex`，阻塞所有其他操作。
 
 **影响**: 正常情况下 `popen3` 很快返回，不太会真正阻塞。但设计上 transport start
@@ -57,6 +65,8 @@ end
 
 **建议**: 将 transport start 移到锁外（setup callbacks 在锁内，start 在锁外），
 或者使用两段式：锁内设状态 + 锁外启动 + 锁内确认。
+
+**状态**: ✅ 已修复 — `start` 采用两段式启动，避免锁内调用 `transport.start`；并添加回归测试覆盖 “transport 在 start 同步 emit stdout” 的死锁场景。
 
 ## 2. Design Issues (Should Fix)
 
@@ -86,6 +96,8 @@ worker alive 分支会 close client 两次。虽然 `safe_close_client` 有 resc
 
 **建议**: 使用 flag 或 `||=` 追踪是否已经 close。
 
+**状态**: ✅ 已修复 — worker alive 分支 close 后将 local `client/stream_client` 置 nil，避免重复 close；并补充了单测验证 close 只调用一次。
+
 ### 2.2 ToolAdapter 只做 name mapping，不做 schema 转换
 
 **文件**: `mcp/tool_adapter.rb`
@@ -97,7 +109,7 @@ worker alive 分支会 close client 两次。虽然 `safe_close_client` 有 resc
 **影响**: App 层需要自己做 schema → Tool 转换。这可能是有意的（gem 不知道具体 Tool API），
 但 Phase 2 plan 承诺了 ToolAdapter 完成此转换。
 
-**建议**: 添加 `ToolAdapter.to_tool(server_id:, remote_tool:)` 或在文档中说明此为 deferred。
+**状态**: ✅ 已澄清 — Phase 2 completion 文档已更正：ToolAdapter 只负责本地 tool name mapping；schema → Tool 转换作为 deferred 项保留在后续阶段（或由 app 层完成）。
 
 ### 2.3 FileSystemStore#find_skill_metadata! 每次 load_skill 都 re-scan 全部
 
@@ -143,7 +155,7 @@ timeout 使用 `CLOCK_MONOTONIC` 避免系统时间跳变。
 ### 3.2 ✅ Transport::Stdio — 正确
 
 `@mutex` 保护 `@started, @closed, @stdin, @stdout` 等状态。
-`send_message` 在锁外写 stdin（单线程写，IO 本身是线程安全的 for single-writer）。
+`send_message` 在锁外写 stdin，并用独立的 `@write_mutex` 串行化 write+newline+flush（避免多线程并发导致 JSON 行 interleave）。
 `close` 通过 SIGTERM → SIGKILL 级联，配合 `wait_with_timeout` 轮询。
 三个后台线程（stdout reader, stderr reader, monitor）独立运行，不持有共享锁。
 
@@ -266,13 +278,11 @@ App/Agent
   ↓
 MCP::Client.start → Transport.start → 子进程/HTTP
   ↓
-Client.list_tools → JsonRpcClient.request → Transport.send_message
-  ↓                                            ↓
-  ← response ← JsonRpcClient.handle_response ← Transport callback
+Registry.register_mcp_client → Client.list_tools (paginate) → JsonRpcClient.request → Transport.send_message
+  ↓                                                                    ↓
+  ← tools page ← JsonRpcClient.handle_response ← Transport callback
   ↓
-ToolAdapter.local_tool_name → Registry.register
-  ↓
-Client.call_tool → same flow → ToolResult
+Registry.execute (MCP tool) → Client.call_tool → normalize (content + error) → ToolResult
 
 Skills::FileSystemStore
   ↓
@@ -329,7 +339,7 @@ read_skill_file → validate path → read file → String
 ### 6.2 未覆盖或薄弱的路径
 
 - ❌ StreamableHttp 集成测试（需要 httpx，排除在 SimpleCov 之外）
-- ❌ Client `call_tool` 的 `MCP_SESSION_NOT_FOUND` 重连路径（见 1.1，逻辑有 bug）
+- ✅ Client `call_tool` 的 `MCP_SESSION_NOT_FOUND` 重连路径（1 次 retry）已修复并测试覆盖
 - ⚠️ JsonRpcClient 并发测试（多线程同时 request）— 有 Mutex 保护但无并发测试
 - ⚠️ FileSystemStore 符号链接攻击测试 — 有 realpath 保护但测试中用了真实 fixture（非 symlink）
 - ⚠️ Stdio transport 进程崩溃时的 on_close callback 触发 — 有实现但难以在 CI 中稳定测试
@@ -337,7 +347,7 @@ read_skill_file → validate path → read file → String
 ### 6.3 测试数据统计
 
 ```
-Total: 578 runs, 1118 assertions, 0 failures, 0 errors
+Total: 575 runs, 1112 assertions, 0 failures, 0 errors
 ```
 
 Phase 2 新增测试覆盖：
@@ -407,16 +417,16 @@ JSON wire protocol 中（string keys in hashes），不作为 Ruby 方法名或 
 
 ### P0（必须修复，阻塞后续工作）
 
-1. **Client#call_tool 重连后不 retry** (1.1) — 需要对齐 list_tools 的 retry 模式
+1. ✅ **Client#call_tool 重连后不 retry** (1.1) — 已对齐 list_tools 的 retry 模式（限制 1 次）
 
 ### P1（应尽快修复）
 
-2. **JsonRpcClient#start 在锁内启动 transport** (1.2) — 低概率问题但设计不佳
-3. **ToolAdapter 缺少 schema 转换** (2.2) — 或明确标注为 deferred
+2. ✅ **JsonRpcClient#start 在锁内启动 transport** (1.2) — 已采用两段式启动并补充回归测试
+3. ✅ **ToolAdapter 缺少 schema 转换** (2.2) — 已在文档中明确该功能为 deferred（ToolAdapter 仅负责 name mapping）
 
 ### P2（改进，不阻塞）
 
-4. StreamableHttp close 路径双重 close (2.1) — 功能正确，代码可改进
+4. ✅ StreamableHttp close 路径双重 close (2.1) — 已避免重复 close，并补充单测覆盖
 5. FileSystemStore find_skill_metadata! 无缓存 (2.3) — app 可缓存，gem 无需
 6. resolve_headers_provider! 并发安全文档化 (3.4) — 添加注释
 

@@ -13,6 +13,8 @@ module AgentCore
       # graceful shutdown (SIGTERM → SIGKILL).
       #
       # Thread-safe: uses a Mutex for startup/close coordination.
+      # send_message is serialized with a dedicated write mutex to ensure
+      # newline-delimited JSON messages do not interleave across threads.
       # Three background threads: stdout reader, stderr reader, process monitor.
       class Stdio < Base
         # @param command [String] The command to execute
@@ -31,6 +33,7 @@ module AgentCore
           @on_stderr_line = on_stderr_line
 
           @mutex = Mutex.new
+          @write_mutex = Mutex.new
           @started = false
           @closed = false
 
@@ -123,9 +126,11 @@ module AgentCore
           stdin = @mutex.synchronize { @stdin }
           raise AgentCore::MCP::TransportError, "transport is not started" unless stdin
 
-          stdin.write(json)
-          stdin.write("\n")
-          stdin.flush
+          @write_mutex.synchronize do
+            stdin.write(json)
+            stdin.write("\n")
+            stdin.flush
+          end
 
           true
         rescue IOError, SystemCallError => e

@@ -42,6 +42,8 @@ module AgentCore
         @pending_mutex = Mutex.new
         @next_id = 1
         @started = false
+        @starting = false
+        @start_cv = ConditionVariable.new
         @closed = false
       end
 
@@ -52,31 +54,47 @@ module AgentCore
           raise AgentCore::MCP::ClosedError, "client is closed" if @closed
           return self if @started
 
-          if @transport.respond_to?(:on_stdout_line=)
-            existing_stdout = @transport.respond_to?(:on_stdout_line) ? @transport.on_stdout_line : nil
-            handler = method(:handle_stdout_line)
-
-            if existing_stdout&.respond_to?(:call)
-              @transport.on_stdout_line =
-                lambda do |line|
-                  handler.call(line)
-                  begin
-                    existing_stdout.call(line)
-                  rescue StandardError
-                    nil
-                  end
-                end
-            else
-              @transport.on_stdout_line = handler
-            end
+          while @starting
+            @start_cv.wait(@pending_mutex)
+            raise AgentCore::MCP::ClosedError, "client is closed" if @closed
+            return self if @started
           end
 
-          if @transport.respond_to?(:on_close=)
-            @transport.on_close = method(:handle_transport_close)
-          end
+          @starting = true
+        end
 
+        begin
+          wire_transport_callbacks!
           @transport.start
-          @started = true
+        rescue StandardError
+          @pending_mutex.synchronize do
+            @starting = false
+            @start_cv.broadcast
+          end
+          raise
+        end
+
+        should_close_transport = false
+
+        @pending_mutex.synchronize do
+          if @closed
+            should_close_transport = true
+          else
+            @started = true
+          end
+
+          @starting = false
+          @start_cv.broadcast
+        end
+
+        if should_close_transport
+          begin
+            @transport.close if @transport.respond_to?(:close)
+          rescue StandardError
+            nil
+          end
+
+          raise AgentCore::MCP::ClosedError, "client is closed"
         end
 
         self
@@ -152,6 +170,7 @@ module AgentCore
             @closed = true
             pending = @pending.dup
             @pending.clear
+            @start_cv.broadcast if @starting
           end
         end
 
@@ -235,6 +254,7 @@ module AgentCore
           @closed = true
           pending = @pending.dup
           @pending.clear
+          @start_cv.broadcast if @starting
         end
 
         pending&.each_value do |p|
@@ -247,6 +267,33 @@ module AgentCore
 
         nil
       rescue StandardError
+        nil
+      end
+
+      def wire_transport_callbacks!
+        if @transport.respond_to?(:on_stdout_line=)
+          existing_stdout = @transport.respond_to?(:on_stdout_line) ? @transport.on_stdout_line : nil
+          handler = method(:handle_stdout_line)
+
+          if existing_stdout&.respond_to?(:call)
+            @transport.on_stdout_line =
+              lambda do |line|
+                handler.call(line)
+                begin
+                  existing_stdout.call(line)
+                rescue StandardError
+                  nil
+                end
+              end
+          else
+            @transport.on_stdout_line = handler
+          end
+        end
+
+        if @transport.respond_to?(:on_close=)
+          @transport.on_close = method(:handle_transport_close)
+        end
+
         nil
       end
 

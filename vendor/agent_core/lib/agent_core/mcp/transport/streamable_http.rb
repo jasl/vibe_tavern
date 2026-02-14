@@ -225,6 +225,8 @@ module AgentCore
           if worker&.alive?
             safe_close_client(stream_client)
             safe_close_client(client)
+            stream_client = nil
+            client = nil
 
             remaining_s = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
             worker.join(remaining_s) if remaining_s.positive?

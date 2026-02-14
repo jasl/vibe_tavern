@@ -100,18 +100,19 @@ module AgentCore
         raise ArgumentError, "name is required" if tool_name.strip.empty?
 
         args = arguments.is_a?(Hash) ? arguments : {}
-        result = @rpc.request("tools/call", { "name" => tool_name, "arguments" => args }, timeout_s: timeout_s)
-        result.is_a?(Hash) ? result : {}
-      rescue AgentCore::MCP::JsonRpcError => e
-        if e.code.to_s == "MCP_SESSION_NOT_FOUND"
-          begin
-            reinitialize_session!
-          rescue StandardError
-            nil
-          end
-        end
+        attempt = 0
 
-        raise
+        begin
+          attempt += 1
+          result = @rpc.request("tools/call", { "name" => tool_name, "arguments" => args }, timeout_s: timeout_s)
+          result.is_a?(Hash) ? result : {}
+        rescue AgentCore::MCP::JsonRpcError => e
+          raise unless e.code.to_s == "MCP_SESSION_NOT_FOUND"
+          raise if attempt > 1
+
+          reinitialize_session!
+          retry
+        end
       end
 
       # Close the client.

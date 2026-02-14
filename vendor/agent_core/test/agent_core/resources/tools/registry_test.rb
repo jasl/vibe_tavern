@@ -3,6 +3,29 @@
 require "test_helper"
 
 class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
+  class FakeMcpClient
+    def initialize(pages:, call_result:)
+      @pages = pages
+      @call_result = call_result
+      @list_calls = []
+      @call_calls = []
+    end
+
+    attr_reader :list_calls, :call_calls
+
+    def list_tools(cursor: nil, timeout_s: nil)
+      _timeout_s = timeout_s
+      @list_calls << cursor
+      @pages.fetch(cursor, { "tools" => [] })
+    end
+
+    def call_tool(name:, arguments: {}, timeout_s: nil)
+      _timeout_s = timeout_s
+      @call_calls << { name: name, arguments: arguments }
+      @call_result
+    end
+  end
+
   def setup
     @registry = AgentCore::Resources::Tools::Registry.new
     @echo_tool = AgentCore::Resources::Tools::Tool.new(
@@ -39,6 +62,42 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
     assert_raises(AgentCore::ToolNotFoundError) do
       @registry.execute(name: "nonexistent", arguments: {})
     end
+  end
+
+  def test_register_mcp_client_registers_all_pages
+    client = FakeMcpClient.new(
+      pages: {
+        nil => {
+          "tools" => [{ "name" => "tool_a", "description" => "A", "inputSchema" => {} }],
+          "nextCursor" => "page2",
+        },
+        "page2" => {
+          "tools" => [{ "name" => "tool_b", "description" => "B", "inputSchema" => {} }],
+        },
+      },
+      call_result: { "content" => [{ "type" => "text", "text" => "ok" }], "isError" => false },
+    )
+
+    @registry.register_mcp_client(client, prefix: "mcp_")
+
+    assert @registry.include?("mcp_tool_a")
+    assert @registry.include?("mcp_tool_b")
+    assert_equal [nil, "page2"], client.list_calls
+  end
+
+  def test_execute_mcp_tool_normalizes_is_error
+    client = FakeMcpClient.new(
+      pages: {
+        nil => { "tools" => [{ "name" => "fail", "description" => "fails", "inputSchema" => {} }] },
+      },
+      call_result: { "content" => [{ "type" => "text", "text" => "oops" }], "isError" => true },
+    )
+
+    @registry.register_mcp_client(client)
+    result = @registry.execute(name: "fail", arguments: {})
+
+    assert_equal "oops", result.text
+    assert_equal true, result.error?
   end
 
   def test_definitions_generic

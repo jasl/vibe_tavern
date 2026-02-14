@@ -3,7 +3,7 @@
 require "test_helper"
 
 class AgentCore::Resources::Skills::FileSystemStoreTest < Minitest::Test
-  FIXTURES_DIR = File.expand_path("../../../fixtures/skills", __FILE__)
+  FIXTURES_DIR = File.expand_path("../../../fixtures/skills", __dir__)
 
   def setup
     @store = AgentCore::Resources::Skills::FileSystemStore.new(dirs: [FIXTURES_DIR])

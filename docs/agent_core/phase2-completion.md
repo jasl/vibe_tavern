@@ -2,7 +2,7 @@
 
 > Date: 2026-02-14
 > Status: ✅ Complete
-> Tests: 578 runs, 1118 assertions, 0 failures, 0 errors
+> Tests: 575 runs, 1112 assertions, 0 failures, 0 errors
 
 ## What Was Delivered
 
@@ -19,7 +19,7 @@ lib/agent_core/mcp/json_rpc_client.rb                  # JSON-RPC 2.0 request/re
 lib/agent_core/mcp/client.rb                           # High-level MCP client (initialize, list_tools, call_tool)
 lib/agent_core/mcp/server_config.rb                    # ServerConfig Data.define (command, args, env, url, headers)
 lib/agent_core/mcp/sse_parser.rb                       # SSE (Server-Sent Events) incremental parser
-lib/agent_core/mcp/tool_adapter.rb                     # MCP tool schema → AgentCore::Resources::Tools::Tool
+lib/agent_core/mcp/tool_adapter.rb                     # MCP tool name mapping helpers (local name builder)
 lib/agent_core/mcp/transport/base.rb                   # Abstract transport (send_message, receive, close)
 lib/agent_core/mcp/transport/stdio.rb                  # Stdio transport (stdin/stdout JSON-RPC)
 lib/agent_core/mcp/transport/streamable_http.rb        # Streamable HTTP transport (httpx, optional dep)
@@ -84,11 +84,11 @@ test/agent_core/resources/tools/registry_test.rb  # Removed duplicate ToolTest/T
 ### Test Fixtures
 
 ```
-test/agent_core/fixtures/skills/example-skill/SKILL.md
-test/agent_core/fixtures/skills/another-skill/SKILL.md
-test/agent_core/fixtures/skills/another-skill/scripts/setup.sh
-test/agent_core/fixtures/skills/another-skill/references/guide.md
-test/agent_core/fixtures/skills/another-skill/assets/logo.txt
+test/fixtures/skills/example-skill/SKILL.md
+test/fixtures/skills/another-skill/SKILL.md
+test/fixtures/skills/another-skill/scripts/setup.sh
+test/fixtures/skills/another-skill/references/guide.md
+test/fixtures/skills/another-skill/assets/logo.txt
 ```
 
 ## Plan Compliance Checklist
@@ -101,9 +101,9 @@ test/agent_core/fixtures/skills/another-skill/assets/logo.txt
 | MCP Transport::Stdio | ✅ | |
 | MCP Transport::StreamableHttp | ✅ | Optional dep (httpx), not auto-required |
 | MCP SseParser | ✅ | |
-| MCP JsonRpcClient (request/notify/batch) | ✅ | |
+| MCP JsonRpcClient (request/notify) | ✅ | |
 | MCP Client (initialize/list_tools/call_tool) | ✅ | |
-| MCP ToolAdapter (MCP schema → Tool) | ✅ | |
+| MCP ToolAdapter (tool name mapping) | ✅ | |
 | Skills SkillMetadata (Data.define) | ✅ | |
 | Skills Skill (Data.define) | ✅ | |
 | Skills Frontmatter parser | ✅ | Strict + lenient modes |
@@ -150,16 +150,14 @@ Agent ──→ PromptBuilder ──→ Resources (ChatHistory, Memory, Tools, S
   └──→ PromptRunner ───────────┘
   │
   └──→ MCP (Client → JsonRpcClient → Transport)
-              ↓
-         ToolAdapter → Resources::Tools::Tool
 ```
 
-MCP and Skills are leaf modules — they depend on Resources::Tools but nothing depends on them
-except the Agent orchestration layer.
+MCP is an independent leaf module (pure JSON-RPC + transports). Skills lives under
+`Resources::Skills` but does not depend on Tools.
 
 ## What Was Deferred
 
 - `Registry#register_skill` — connecting Skills to the tool registry
 - File system watcher for live skill reload
-- MCP session resumption / reconnection logic
+- Full MCP session reconnection/backoff strategy (beyond one-shot reinitialize on session-not-found)
 - StreamableHttp integration tests (requires httpx)

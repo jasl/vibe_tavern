@@ -59,8 +59,9 @@ module AgentCore
         # @param prefix [String, nil] Optional prefix for tool names (e.g., "mcp_server1_")
         # @return [self]
         def register_mcp_client(client, prefix: nil)
+          tools = list_all_mcp_tool_definitions(client)
+
           @mutex.synchronize do
-            tools = client.list_tools
             @mcp_clients[client.object_id] = client
 
             tools.each do |tool_def|
@@ -117,9 +118,9 @@ module AgentCore
             original_name = tool_info[:original_name]
             begin
               mcp_result = client.call_tool(name: original_name, arguments: arguments)
-              result_hash = mcp_result.is_a?(Hash) ? AgentCore::Utils.symbolize_keys(mcp_result) : {}
+              result_hash = AgentCore::Utils.normalize_mcp_tool_call_result(mcp_result)
               ToolResult.new(
-                content: result_hash[:content] || [{ type: :text, text: mcp_result.to_s }],
+                content: result_hash[:content],
                 error: result_hash.fetch(:error, false)
               )
             rescue => e
@@ -186,6 +187,31 @@ module AgentCore
           else
             { name: name, description: desc, parameters: params }
           end
+        end
+
+        def list_all_mcp_tool_definitions(client)
+          cursor = nil
+          seen = {}
+          out = []
+
+          loop do
+            page = client.list_tools(cursor: cursor)
+            page = {} unless page.is_a?(Hash)
+
+            Array(page.fetch("tools", nil)).each do |tool_def|
+              normalized = AgentCore::Utils.normalize_mcp_tool_definition(tool_def)
+              out << normalized if normalized
+            end
+
+            next_cursor = page.fetch("nextCursor", "").to_s.strip
+            break if next_cursor.empty?
+            break if seen[next_cursor]
+
+            seen[next_cursor] = true
+            cursor = next_cursor
+          end
+
+          out
         end
       end
     end
