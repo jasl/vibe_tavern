@@ -49,7 +49,7 @@ module AgentCore
           system_prompt: system_prompt,
           messages: messages.map { |m| m.respond_to?(:to_h) ? m.to_h : m },
           tools: tools,
-          options: options
+          options: options,
         }
       end
     end

@@ -69,7 +69,7 @@ module AgentCore
           stop_sequences: stop_sequences,
           max_turns: max_turns,
           context_window: context_window,
-          reserved_output_tokens: reserved_output_tokens.nonzero?
+          reserved_output_tokens: reserved_output_tokens.nonzero?,
         }.compact
       end
 
@@ -88,7 +88,7 @@ module AgentCore
         @stop_sequences = h[:stop_sequences] if h.key?(:stop_sequences)
         @max_turns = h[:max_turns] if h.key?(:max_turns)
         @context_window = h[:context_window] if h.key?(:context_window)
-        @reserved_output_tokens = h[:reserved_output_tokens] if h.key?(:reserved_output_tokens)
+        @reserved_output_tokens = h[:reserved_output_tokens] || 0 if h.key?(:reserved_output_tokens)
         self
       end
 
@@ -107,6 +107,28 @@ module AgentCore
 
       def validate!
         raise ConfigurationError, "provider is required" unless provider
+
+        if context_window
+          unless context_window.is_a?(Integer) && context_window.positive?
+            raise ConfigurationError, "context_window must be a positive Integer (got #{context_window.inspect})"
+          end
+        end
+
+        rot = reserved_output_tokens || 0
+        unless rot.is_a?(Integer) && rot >= 0
+          raise ConfigurationError, "reserved_output_tokens must be a non-negative Integer (got #{rot.inspect})"
+        end
+
+        if context_window && rot >= context_window
+          raise ConfigurationError, "reserved_output_tokens must be less than context_window " \
+                                    "(got reserved_output_tokens=#{rot}, context_window=#{context_window})"
+        end
+
+        if token_counter
+          unless token_counter.respond_to?(:count_messages) && token_counter.respond_to?(:count_tools)
+            raise ConfigurationError, "token_counter must respond to #count_messages and #count_tools"
+          end
+        end
       end
     end
   end

@@ -50,7 +50,7 @@ class AgentCore::MessageTest < Minitest::Test
   def test_text_with_content_blocks
     blocks = [
       AgentCore::TextContent.new(text: "Hello "),
-      AgentCore::TextContent.new(text: "world!")
+      AgentCore::TextContent.new(text: "world!"),
     ]
     msg = AgentCore::Message.new(role: :assistant, content: blocks)
     assert_equal "Hello world!", msg.text

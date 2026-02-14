@@ -11,7 +11,7 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
       parameters: {
         type: "object",
         properties: { text: { type: "string" } },
-        required: ["text"]
+        required: ["text"],
       }
     ) { |args, context:| AgentCore::Resources::Tools::ToolResult.success(text: args[:text] || args["text"]) }
   end
@@ -23,7 +23,7 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
   end
 
   def test_register_many
-    tool2 = AgentCore::Resources::Tools::Tool.new(name: "noop", description: "no-op") {}
+    tool2 = AgentCore::Resources::Tools::Tool.new(name: "noop", description: "no-op") { }
     @registry.register_many([@echo_tool, tool2])
     assert_equal 2, @registry.size
   end
@@ -108,7 +108,7 @@ class AgentCore::Resources::Tools::ToolTest < Minitest::Test
       name: "test",
       description: "test tool",
       parameters: { type: "object" }
-    ) {}
+    ) { }
 
     defn = tool.to_definition
     assert_equal "test", defn[:name]
@@ -132,7 +132,7 @@ class AgentCore::Resources::Tools::ToolResultTest < Minitest::Test
   def test_multi_content
     result = AgentCore::Resources::Tools::ToolResult.with_content([
       { type: "text", text: "line 1" },
-      { type: "text", text: "line 2" }
+      { type: "text", text: "line 2" },
     ])
     assert_equal "line 1\nline 2", result.text
   end

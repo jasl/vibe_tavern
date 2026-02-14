@@ -164,7 +164,7 @@ module AgentCore
         description: description,
         system_prompt: system_prompt,
         model: model,
-        max_turns: max_turns
+        max_turns: max_turns,
       }
       # Include LLM options at top level (same as Builder#to_config)
       config[:temperature] = @llm_options[:temperature] if @llm_options[:temperature]

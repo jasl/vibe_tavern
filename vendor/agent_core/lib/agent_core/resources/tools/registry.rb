@@ -73,7 +73,7 @@ module AgentCore
               @mcp_tools[tool_name] = {
                 client: client,
                 definition: tool_def,
-                original_name: tool_def[:name]
+                original_name: tool_def[:name],
               }
             end
           end

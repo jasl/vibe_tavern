@@ -45,7 +45,7 @@ class AgentCore::Resources::ChatHistory::InMemoryTest < Minitest::Test
   def test_append_many
     msgs = [
       AgentCore::Message.new(role: :user, content: "a"),
-      AgentCore::Message.new(role: :assistant, content: "b")
+      AgentCore::Message.new(role: :assistant, content: "b"),
     ]
     @history.append_many(msgs)
     assert_equal 2, @history.size

@@ -12,6 +12,23 @@ class AgentCore::Resources::TokenCounter::HeuristicTest < Minitest::Test
     assert_equal 4, @counter.count_text("Hello, world!")
   end
 
+  def test_count_text_non_ascii_defaults_to_one_char_per_token
+    # 2 non-ASCII chars → ceil(2/1.0) = 2
+    assert_equal 2, @counter.count_text("你好")
+  end
+
+  def test_count_text_mixed_ascii_and_non_ascii
+    # "Hello你好": 5 ASCII chars → ceil(5/4.0) = 2
+    # 2 non-ASCII chars → ceil(2/1.0) = 2
+    assert_equal 4, @counter.count_text("Hello你好")
+  end
+
+  def test_custom_non_ascii_chars_per_token
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new(non_ascii_chars_per_token: 2.0)
+    # 2 non-ASCII chars → ceil(2/2.0) = 1
+    assert_equal 1, counter.count_text("你好")
+  end
+
   def test_count_text_empty_string
     assert_equal 0, @counter.count_text("")
   end
@@ -41,10 +58,20 @@ class AgentCore::Resources::TokenCounter::HeuristicTest < Minitest::Test
     end
   end
 
+  def test_invalid_non_ascii_chars_per_token_raises
+    assert_raises(ArgumentError) do
+      AgentCore::Resources::TokenCounter::Heuristic.new(non_ascii_chars_per_token: 0)
+    end
+
+    assert_raises(ArgumentError) do
+      AgentCore::Resources::TokenCounter::Heuristic.new(non_ascii_chars_per_token: -1)
+    end
+  end
+
   def test_count_messages
     msgs = [
       AgentCore::Message.new(role: :user, content: "Hello!"),       # 6 chars → 2 tokens + 4 overhead = 6
-      AgentCore::Message.new(role: :assistant, content: "Hi there!") # 9 chars → 3 tokens + 4 overhead = 7
+      AgentCore::Message.new(role: :assistant, content: "Hi there!"), # 9 chars → 3 tokens + 4 overhead = 7
     ]
     result = @counter.count_messages(msgs)
     assert_equal 13, result
@@ -57,7 +84,7 @@ class AgentCore::Resources::TokenCounter::HeuristicTest < Minitest::Test
 
   def test_count_tools
     tools = [
-      { name: "read", description: "Read a file", parameters: { type: "object" } }
+      { name: "read", description: "Read a file", parameters: { type: "object" } },
     ]
     result = @counter.count_tools(tools)
     assert result > 0

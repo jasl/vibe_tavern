@@ -64,7 +64,7 @@ module AgentCore
             output_tokens: output_tokens,
             cache_creation_tokens: cache_creation_tokens,
             cache_read_tokens: cache_read_tokens,
-            total_tokens: total_tokens
+            total_tokens: total_tokens,
           }
         end
 

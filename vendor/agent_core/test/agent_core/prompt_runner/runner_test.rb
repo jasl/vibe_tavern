@@ -318,8 +318,36 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     end
 
     assert err.estimated_tokens > 10
+    assert_equal err.estimated_tokens, err.message_tokens + err.tool_tokens
     assert_equal 10, err.context_window
+    assert_equal 0, err.tool_tokens
+    assert_equal 10, err.limit
     # Provider should NOT have been called
+    assert_equal 0, provider.calls.size
+  end
+
+  def test_preflight_emits_error_event_before_raising
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new
+    provider = MockProvider.new
+    events = AgentCore::PromptRunner::Events.new
+
+    errors = []
+    events.on_error { |e, recoverable| errors << [e.class, recoverable] }
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "You are a helpful assistant.",
+      messages: [AgentCore::Message.new(role: :user, content: "Hello " * 100)],
+      options: { model: "test" }
+    )
+
+    assert_raises(AgentCore::ContextWindowExceededError) do
+      @runner.run(
+        prompt: prompt, provider: provider, events: events,
+        token_counter: counter, context_window: 10, reserved_output_tokens: 0
+      )
+    end
+
+    assert_equal [[AgentCore::ContextWindowExceededError, false]], errors
     assert_equal 0, provider.calls.size
   end
 
@@ -384,13 +412,17 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
+    events_received = []
     assert_raises(AgentCore::ContextWindowExceededError) do
       @runner.run_stream(
         prompt: prompt, provider: provider,
         token_counter: counter, context_window: 50, reserved_output_tokens: 0
-      ) { }
+      ) { |event| events_received << event }
     end
 
+    event_types = events_received.map(&:type)
+    assert_includes event_types, :turn_start
+    assert_includes event_types, :error
     assert_equal 0, provider.calls.size
   end
 end

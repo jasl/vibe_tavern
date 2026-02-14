@@ -78,11 +78,16 @@ module AgentCore
           request_messages = messages.dup.freeze
 
           # Preflight token check
-          preflight_token_check!(
-            messages: request_messages, tools: tools,
-            token_counter: token_counter, context_window: context_window,
-            reserved_output_tokens: reserved_output_tokens
-          )
+          begin
+            preflight_token_check!(
+              messages: request_messages, tools: tools,
+              token_counter: token_counter, context_window: context_window,
+              reserved_output_tokens: reserved_output_tokens
+            )
+          rescue ContextWindowExceededError => e
+            events.emit(:error, e, false)
+            raise
+          end
 
           events.emit(:llm_request, request_messages, tools)
 
@@ -201,11 +206,17 @@ module AgentCore
           request_messages = messages.dup.freeze
 
           # Preflight token check
-          preflight_token_check!(
-            messages: request_messages, tools: tools,
-            token_counter: token_counter, context_window: context_window,
-            reserved_output_tokens: reserved_output_tokens
-          )
+          begin
+            preflight_token_check!(
+              messages: request_messages, tools: tools,
+              token_counter: token_counter, context_window: context_window,
+              reserved_output_tokens: reserved_output_tokens
+            )
+          rescue ContextWindowExceededError => e
+            yield StreamEvent::ErrorEvent.new(error: e.message, recoverable: false) if block
+            events.emit(:error, e, false)
+            raise
+          end
 
           events.emit(:llm_request, request_messages, tools)
 
@@ -382,6 +393,19 @@ module AgentCore
       def preflight_token_check!(messages:, tools:, token_counter:, context_window:, reserved_output_tokens:)
         return unless token_counter && context_window
 
+        unless context_window.is_a?(Integer) && context_window.positive?
+          raise ArgumentError, "context_window must be a positive Integer (got #{context_window.inspect})"
+        end
+
+        unless reserved_output_tokens.is_a?(Integer) && reserved_output_tokens >= 0
+          raise ArgumentError, "reserved_output_tokens must be a non-negative Integer (got #{reserved_output_tokens.inspect})"
+        end
+
+        if reserved_output_tokens >= context_window
+          raise ArgumentError, "reserved_output_tokens must be less than context_window " \
+                               "(got reserved_output_tokens=#{reserved_output_tokens}, context_window=#{context_window})"
+        end
+
         msg_tokens = token_counter.count_messages(messages)
         tool_tokens = tools ? token_counter.count_tools(tools) : 0
         estimated = msg_tokens + tool_tokens
@@ -391,8 +415,11 @@ module AgentCore
 
         raise ContextWindowExceededError.new(
           estimated_tokens: estimated,
+          message_tokens: msg_tokens,
+          tool_tokens: tool_tokens,
           context_window: context_window,
-          reserved_output: reserved_output_tokens
+          reserved_output: reserved_output_tokens,
+          limit: limit
         )
       end
 

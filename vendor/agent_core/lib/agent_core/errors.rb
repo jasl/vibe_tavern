@@ -57,14 +57,26 @@ module AgentCore
 
   # Raised when the estimated prompt tokens exceed the context window.
   class ContextWindowExceededError < Error
-    attr_reader :estimated_tokens, :context_window, :reserved_output
+    attr_reader :estimated_tokens, :message_tokens, :tool_tokens, :context_window, :reserved_output, :limit
 
-    def initialize(message = nil, estimated_tokens: nil, context_window: nil, reserved_output: 0)
+    def initialize(
+      message = nil,
+      estimated_tokens: nil,
+      message_tokens: nil,
+      tool_tokens: nil,
+      context_window: nil,
+      reserved_output: 0,
+      limit: nil
+    )
       @estimated_tokens = estimated_tokens
+      @message_tokens = message_tokens
+      @tool_tokens = tool_tokens
       @context_window = context_window
       @reserved_output = reserved_output
-      super(message || "Estimated #{estimated_tokens} prompt tokens exceeds limit #{context_window - reserved_output} " \
-                        "(context_window: #{context_window}, reserved_output: #{reserved_output})")
+      @limit = limit || (context_window && reserved_output ? context_window - reserved_output : nil)
+
+      super(message || "Estimated #{estimated_tokens} prompt tokens exceeds limit #{self.limit} " \
+                        "(messages: #{message_tokens}, tools: #{tool_tokens}, context_window: #{context_window}, reserved_output: #{reserved_output})")
     end
   end
 

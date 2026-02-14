@@ -43,7 +43,7 @@ class AgentCore::PromptBuilder::SimplePipelineTest < Minitest::Test
   def test_injects_memory_context
     memory_entries = [
       AgentCore::Resources::Memory::Entry.new(id: "1", content: "User likes Ruby"),
-      AgentCore::Resources::Memory::Entry.new(id: "2", content: "Project uses Rails 8")
+      AgentCore::Resources::Memory::Entry.new(id: "2", content: "Project uses Rails 8"),
     ]
 
     context = AgentCore::PromptBuilder::Context.new(
@@ -74,7 +74,7 @@ class AgentCore::PromptBuilder::SimplePipelineTest < Minitest::Test
   def test_includes_tool_definitions
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
-      AgentCore::Resources::Tools::Tool.new(name: "read", description: "Read file", parameters: {}) {}
+      AgentCore::Resources::Tools::Tool.new(name: "read", description: "Read file", parameters: {}) { }
     )
 
     context = AgentCore::PromptBuilder::Context.new(

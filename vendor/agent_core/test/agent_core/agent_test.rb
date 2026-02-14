@@ -213,6 +213,56 @@ class AgentCore::AgentTest < Minitest::Test
     assert_equal 1, provider.calls.size
   end
 
+  def test_build_rejects_invalid_token_budget_config
+    assert_raises(AgentCore::ConfigurationError) do
+      AgentCore::Agent.build do |b|
+        b.provider = MockProvider.new
+        b.context_window = 0
+      end
+    end
+
+    assert_raises(AgentCore::ConfigurationError) do
+      AgentCore::Agent.build do |b|
+        b.provider = MockProvider.new
+        b.reserved_output_tokens = -1
+      end
+    end
+
+    assert_raises(AgentCore::ConfigurationError) do
+      AgentCore::Agent.build do |b|
+        b.provider = MockProvider.new
+        b.context_window = 100
+        b.reserved_output_tokens = 100
+      end
+    end
+  end
+
+  def test_build_rejects_token_counter_without_required_interface
+    bad_counter = Class.new do
+      def count_messages(_messages)
+        0
+      end
+    end.new
+
+    assert_raises(AgentCore::ConfigurationError) do
+      AgentCore::Agent.build do |b|
+        b.provider = MockProvider.new
+        b.token_counter = bad_counter
+      end
+    end
+  end
+
+  def test_from_config_nil_reserved_output_tokens_is_treated_as_zero
+    config = {
+      name: "NilReserved",
+      context_window: 10_000,
+      reserved_output_tokens: nil,
+    }
+
+    agent = AgentCore::Agent.from_config(config, provider: MockProvider.new)
+    assert_equal 0, agent.reserved_output_tokens
+  end
+
   def test_config_roundtrip_with_token_budget
     provider = MockProvider.new
 

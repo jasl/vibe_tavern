@@ -60,7 +60,7 @@ module AgentCore
           {
             name: name,
             description: description,
-            parameters: parameters
+            parameters: parameters,
           }
         end
 
@@ -69,7 +69,7 @@ module AgentCore
           {
             name: name,
             description: description,
-            input_schema: parameters
+            input_schema: parameters,
           }
         end
 
@@ -80,8 +80,8 @@ module AgentCore
             function: {
               name: name,
               description: description,
-              parameters: parameters
-            }
+              parameters: parameters,
+            },
           }
         end
       end
