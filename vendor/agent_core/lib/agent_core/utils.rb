@@ -67,6 +67,26 @@ module AgentCore
       normalized == "application/octet-stream" ? nil : normalized
     end
 
+    # Assert that all keys in a Hash are Symbols.
+    #
+    # Raises ArgumentError if any key is not a Symbol. Used to enforce
+    # the symbol-keys convention at API boundaries.
+    #
+    # @param value [Hash]
+    # @param path [String] Human-readable context for error messages
+    # @return [nil]
+    def assert_symbol_keys!(value, path: "value")
+      raise ArgumentError, "#{path} must be a Hash" unless value.is_a?(Hash)
+
+      value.each_key do |key|
+        unless key.is_a?(Symbol)
+          raise ArgumentError, "#{path} keys must be Symbols (got #{key.class})"
+        end
+      end
+
+      nil
+    end
+
     # Extract a filename from a URL (best-effort).
     #
     # @param url [String, nil]

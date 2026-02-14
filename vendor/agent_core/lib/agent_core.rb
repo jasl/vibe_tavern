@@ -23,6 +23,16 @@ require_relative "agent_core/resources/tools/policy/base"
 require_relative "agent_core/resources/token_counter/base"
 require_relative "agent_core/resources/token_counter/heuristic"
 
+# MCP (Model Context Protocol)
+require_relative "agent_core/mcp"
+
+# Skills
+require_relative "agent_core/resources/skills/skill_metadata"
+require_relative "agent_core/resources/skills/skill"
+require_relative "agent_core/resources/skills/frontmatter"
+require_relative "agent_core/resources/skills/store"
+require_relative "agent_core/resources/skills/file_system_store"
+
 # Prompt Builder
 require_relative "agent_core/prompt_builder/context"
 require_relative "agent_core/prompt_builder/built_prompt"
