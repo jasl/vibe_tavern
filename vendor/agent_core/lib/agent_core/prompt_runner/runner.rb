@@ -342,10 +342,7 @@ module AgentCore
               events.emit(:tool_result, tc.name, error_result, tc.id)
               tool_calls_record << { name: tc.name, arguments: tc.arguments, error: decision.reason }
 
-              next Message.new(
-                role: :tool_result, content: error_result.text,
-                tool_call_id: tc.id, name: tc.name
-              )
+              next tool_result_to_message(error_result, tool_call_id: tc.id, name: tc.name)
             end
           end
 
@@ -425,16 +422,33 @@ module AgentCore
       # (backward compatible). When it contains images or other media, uses an
       # Array of ContentBlock objects so providers can serialize them correctly.
       def tool_result_to_message(result, tool_call_id:, name:)
-        content = if result.has_non_text_content?
-          result.to_content_blocks
+        content_blocks = nil
+        conversion_error = nil
+
+        if result.has_non_text_content?
+          begin
+            content_blocks = result.to_content_blocks
+          rescue => e
+            conversion_error = e
+          end
+        end
+
+        content = if content_blocks
+          content_blocks
+        elsif conversion_error
+          fallback_text = result.text
+          prefix = "Tool '#{name}' returned invalid multimodal content: #{conversion_error.message}"
+          fallback_text.empty? ? prefix : "#{prefix}\n\n#{fallback_text}"
         else
           result.text
         end
 
+        is_error = conversion_error ? true : result.error?
+
         Message.new(
           role: :tool_result, content: content,
           tool_call_id: tool_call_id, name: name,
-          metadata: { is_error: result.error? }
+          metadata: { is_error: is_error }
         )
       end
 

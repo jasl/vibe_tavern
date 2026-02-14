@@ -378,3 +378,4 @@ Return to caller
 
 1. **执行上下文（context）贯穿**：目前 `ToolPolicy#authorize` / `Tools::Registry#execute` 未接收执行上下文（user/session/permissions），限制了鉴权与审计能力；建议在 `Agent#chat/chat_stream` 增加 `context:` 并向下传递（含 policy + tool 执行）。
 2. **确认流（Decision.confirm）**：`Decision.confirm` 当前会被当作 deny（非 allowed）处理，但没有“需要用户确认”的交互式通道；建议定义 Runner 的行为（例如 emit 事件并中断、或返回可恢复的结果）。
+3. **多模态 URL source 安全**：AgentCore 支持 `Image/Document/AudioContent` 的 `source_type: :url`，但 URL fetch 的安全（SSRF/内网访问/大小限制）应由 app/provider adapter 负责；建议默认禁用 URL source 或做 allowlist 校验（见 `docs/agent_core/multimodal.md`）。

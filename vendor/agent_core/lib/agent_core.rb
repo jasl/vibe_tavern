@@ -2,6 +2,7 @@
 
 require_relative "agent_core/version"
 require_relative "agent_core/errors"
+require_relative "agent_core/configuration"
 require_relative "agent_core/utils"
 
 # Core data types

@@ -15,7 +15,15 @@ module AgentCore
         # @param is_error [Boolean] Whether this result represents an error
         # @param metadata [Hash] Optional metadata (timing, byte counts, etc.)
         def initialize(content:, is_error: false, metadata: {})
-          @content = Array(content).freeze
+          normalized = Array(content).map do |block|
+            if block.is_a?(Hash)
+              block
+            else
+              { type: "text", text: block.to_s }
+            end
+          end
+
+          @content = normalized.map(&:freeze).freeze
           @is_error = is_error
           @metadata = (metadata || {}).freeze
         end

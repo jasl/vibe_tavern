@@ -138,9 +138,56 @@ class AgentCore::ContentBlockTest < Minitest::Test
     assert_nil ic.data
   end
 
+  def test_image_content_url_can_be_disabled_by_config
+    AgentCore.configure { |c| c.allow_url_media_sources = false }
+
+    assert_raises(ArgumentError) do
+      AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg")
+    end
+  ensure
+    AgentCore.reset_config!
+  end
+
+  def test_image_content_url_scheme_can_be_restricted_by_config
+    AgentCore.configure do |c|
+      c.allowed_media_url_schemes = %w[https]
+    end
+
+    assert_raises(ArgumentError) do
+      AgentCore::ImageContent.new(source_type: :url, url: "http://example.com/img.jpg")
+    end
+
+    ic = AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg")
+    assert_equal :url, ic.source_type
+  ensure
+    AgentCore.reset_config!
+  end
+
+  def test_media_source_validator_hook_can_reject
+    AgentCore.configure do |c|
+      c.media_source_validator = lambda do |block|
+        block.source_type != :url
+      end
+    end
+
+    assert_raises(ArgumentError) do
+      AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg")
+    end
+
+    ic = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "iVBOR")
+    assert_equal :base64, ic.source_type
+  ensure
+    AgentCore.reset_config!
+  end
+
   def test_image_content_url_with_media_type
     ic = AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg", media_type: "image/jpeg")
     assert_equal "image/jpeg", ic.media_type
+  end
+
+  def test_image_content_effective_media_type_infers_from_url
+    ic = AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/photo.jpg")
+    assert_equal "image/jpeg", ic.effective_media_type
   end
 
   def test_image_content_base64_requires_data
@@ -195,8 +242,10 @@ class AgentCore::ContentBlockTest < Minitest::Test
     a = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "abc")
     b = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "abc")
     c = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "xyz")
+    d = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/jpeg", data: "abc")
     assert_equal a, b
     refute_equal a, c
+    refute_equal a, d
   end
 
   def test_image_data_is_frozen
@@ -225,6 +274,11 @@ class AgentCore::ContentBlockTest < Minitest::Test
     )
     assert_equal :url, dc.source_type
     assert_equal "https://example.com/doc.pdf", dc.url
+  end
+
+  def test_document_content_effective_media_type_infers_from_filename_or_url
+    dc = AgentCore::DocumentContent.new(source_type: :url, url: "https://example.com/report.pdf")
+    assert_equal "application/pdf", dc.effective_media_type
   end
 
   def test_document_content_text_based
@@ -290,6 +344,11 @@ class AgentCore::ContentBlockTest < Minitest::Test
     assert_equal "https://example.com/audio.mp3", ac.url
   end
 
+  def test_audio_content_effective_media_type_infers_from_url
+    ac = AgentCore::AudioContent.new(source_type: :url, url: "https://example.com/audio.mp3")
+    assert_equal "audio/mpeg", ac.effective_media_type
+  end
+
   def test_audio_content_validation
     assert_raises(ArgumentError) { AgentCore::AudioContent.new(source_type: :base64, data: "x") }
     assert_raises(ArgumentError) { AgentCore::AudioContent.new(source_type: :url) }
@@ -304,6 +363,16 @@ class AgentCore::ContentBlockTest < Minitest::Test
     restored = AgentCore::AudioContent.from_h(h)
     assert_equal ac, restored
     assert_equal "Hello", restored.transcript
+  end
+
+  def test_audio_content_equality
+    a = AgentCore::AudioContent.new(source_type: :base64, media_type: "audio/wav", data: "UklGR", transcript: "Hello")
+    b = AgentCore::AudioContent.new(source_type: :base64, media_type: "audio/wav", data: "UklGR", transcript: "Hello")
+    c = AgentCore::AudioContent.new(source_type: :base64, media_type: "audio/wav", data: "UklGR", transcript: "World")
+    d = AgentCore::AudioContent.new(source_type: :base64, media_type: "audio/mp3", data: "UklGR", transcript: "Hello")
+    assert_equal a, b
+    refute_equal a, c
+    refute_equal a, d
   end
 
   # --- ContentBlock.from_h dispatch ---

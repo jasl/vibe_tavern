@@ -181,4 +181,14 @@ class AgentCore::Resources::Tools::ToolResultTest < Minitest::Test
     assert_instance_of AgentCore::DocumentContent, blocks[1]
     assert_equal "report.pdf", blocks[1].filename
   end
+
+  def test_non_hash_blocks_are_normalized_to_text
+    result = AgentCore::Resources::Tools::ToolResult.with_content(["hello"])
+    assert_equal "hello", result.text
+    refute result.has_non_text_content?
+    blocks = result.to_content_blocks
+    assert_equal 1, blocks.size
+    assert_instance_of AgentCore::TextContent, blocks[0]
+    assert_equal "hello", blocks[0].text
+  end
 end

@@ -527,6 +527,54 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_kind_of String, tool_result_msg.content
     assert_equal "hi", tool_result_msg.content
   end
+
+  def test_tool_result_invalid_multimodal_content_falls_back_to_text_error
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "screenshot", arguments: {})
+    assistant_with_tool = AgentCore::Message.new(
+      role: :assistant, content: "Taking a screenshot.",
+      tool_calls: [tool_call]
+    )
+    tool_response = AgentCore::Resources::Provider::Response.new(
+      message: assistant_with_tool,
+      usage: AgentCore::Resources::Provider::Usage.new(input_tokens: 10, output_tokens: 5),
+      stop_reason: :tool_use
+    )
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(
+      message: final_msg,
+      usage: AgentCore::Resources::Provider::Usage.new(input_tokens: 15, output_tokens: 5),
+      stop_reason: :end_turn
+    )
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "screenshot", description: "Take screenshot", parameters: {}) do |_args, context:|
+        AgentCore::Resources::Tools::ToolResult.with_content([
+          { type: "text", text: "Screenshot captured" },
+          # Invalid: base64 image missing media_type triggers ImageContent validation error
+          { type: "image", source_type: "base64", data: "iVBOR" },
+        ])
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "You are helpful.",
+      messages: [AgentCore::Message.new(role: :user, content: "Take a screenshot")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+
+    tool_result_msg = result.messages.find { |m| m.tool_result? }
+    assert tool_result_msg
+    assert_kind_of String, tool_result_msg.content
+    assert_includes tool_result_msg.content, "invalid multimodal content"
+    assert tool_result_msg.metadata[:is_error]
+  end
 end
 
 class AgentCore::PromptRunner::EventsTest < Minitest::Test

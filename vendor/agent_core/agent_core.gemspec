@@ -37,6 +37,8 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
+  spec.add_dependency "marcel", "~> 1.1"
+
   # No runtime dependencies — the gem is a library of primitives.
   # The host app brings its own HTTP client, database adapter, etc.
 end

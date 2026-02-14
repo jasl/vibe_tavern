@@ -192,6 +192,8 @@ module AgentCore
     private
 
     def validate_media_source!
+      cfg = AgentCore.config
+
       raise ArgumentError, "source_type is required" if source_type.nil?
       unless VALID_SOURCE_TYPES.include?(source_type)
         raise ArgumentError, "source_type must be one of: #{VALID_SOURCE_TYPES.join(", ")} (got #{source_type.inspect})"
@@ -202,7 +204,27 @@ module AgentCore
         raise ArgumentError, "data is required for base64 source" if data.nil? || data.empty?
         raise ArgumentError, "media_type is required for base64 source" if media_type.nil? || media_type.empty?
       when :url
+        raise ArgumentError, "url sources are disabled" unless cfg.allow_url_media_sources
         raise ArgumentError, "url is required for url source" if url.nil? || url.empty?
+
+        if (allowed_schemes = cfg.allowed_media_url_schemes)
+          allowed = Array(allowed_schemes).map(&:to_s).map(&:downcase)
+          require "uri"
+          uri = begin
+            URI.parse(url.to_s)
+          rescue URI::InvalidURIError => e
+            raise ArgumentError, "url is invalid: #{e.message}"
+          end
+          scheme = uri.scheme&.downcase
+          unless scheme && allowed.include?(scheme)
+            raise ArgumentError, "url scheme must be one of: #{allowed.join(", ")} (got #{scheme.inspect})"
+          end
+        end
+      end
+
+      if (validator = cfg.media_source_validator)
+        allowed = validator.call(self)
+        raise ArgumentError, "media source rejected by policy" unless allowed
       end
     end
   end
@@ -224,13 +246,17 @@ module AgentCore
 
     def initialize(source_type:, data: nil, media_type: nil, url: nil)
       @source_type = source_type&.to_sym
-      @data = data.freeze
-      @media_type = media_type
-      @url = url.freeze
+      @data = data.is_a?(String) ? data.dup.freeze : data
+      @media_type = Utils.normalize_mime_type(media_type)&.freeze
+      @url = url.is_a?(String) ? url.dup.freeze : url
       validate_media_source!
     end
 
     def type = :image
+
+    def effective_media_type
+      media_type || Utils.infer_mime_type(Utils.filename_from_url(url))
+    end
 
     def to_h
       h = { type: :image, source_type: source_type }
@@ -244,7 +270,8 @@ module AgentCore
       other.is_a?(ImageContent) &&
         source_type == other.source_type &&
         data == other.data &&
-        url == other.url
+        url == other.url &&
+        media_type == other.media_type
     end
 
     def self.from_h(hash)
@@ -278,22 +305,26 @@ module AgentCore
 
     def initialize(source_type:, data: nil, media_type: nil, url: nil, filename: nil, title: nil)
       @source_type = source_type&.to_sym
-      @data = data.freeze
-      @media_type = media_type
-      @url = url.freeze
-      @filename = filename
-      @title = title
+      @data = data.is_a?(String) ? data.dup.freeze : data
+      @media_type = Utils.normalize_mime_type(media_type)&.freeze
+      @url = url.is_a?(String) ? url.dup.freeze : url
+      @filename = filename.is_a?(String) ? filename.dup.freeze : filename
+      @title = title.is_a?(String) ? title.dup.freeze : title
       validate_media_source!
     end
 
     def type = :document
 
-    # Whether the document's media_type is a text-based format.
-    def text_based?
-      TEXT_MEDIA_TYPES.include?(media_type)
+    def effective_media_type
+      media_type || Utils.infer_mime_type(filename || Utils.filename_from_url(url))
     end
 
-    # Returns text content for text-based documents (base64-decoded), nil otherwise.
+    # Whether the document's media_type is a text-based format.
+    def text_based?
+      TEXT_MEDIA_TYPES.include?(effective_media_type)
+    end
+
+    # Returns text content for text-based documents (as provided in data), nil otherwise.
     def text
       return nil unless text_based? && source_type == :base64 && data
       data
@@ -344,14 +375,18 @@ module AgentCore
 
     def initialize(source_type:, data: nil, media_type: nil, url: nil, transcript: nil)
       @source_type = source_type&.to_sym
-      @data = data.freeze
-      @media_type = media_type
-      @url = url.freeze
-      @transcript = transcript
+      @data = data.is_a?(String) ? data.dup.freeze : data
+      @media_type = Utils.normalize_mime_type(media_type)&.freeze
+      @url = url.is_a?(String) ? url.dup.freeze : url
+      @transcript = transcript.is_a?(String) ? transcript.dup.freeze : transcript
       validate_media_source!
     end
 
     def type = :audio
+
+    def effective_media_type
+      media_type || Utils.infer_mime_type(Utils.filename_from_url(url))
+    end
 
     # Returns transcript text (for token counting and fallback rendering).
     def text
@@ -371,7 +406,9 @@ module AgentCore
       other.is_a?(AudioContent) &&
         source_type == other.source_type &&
         data == other.data &&
-        url == other.url
+        url == other.url &&
+        media_type == other.media_type &&
+        transcript == other.transcript
     end
 
     def self.from_h(hash)
