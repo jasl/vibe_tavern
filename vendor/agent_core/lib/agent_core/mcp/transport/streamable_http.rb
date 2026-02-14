@@ -326,14 +326,15 @@ module AgentCore
           @client = session
           @stream_client = session.plugin(:stream).with(timeout: timeout_opts)
 
+          sse_timeout_opts = timeout_opts.merge(request_timeout: nil, read_timeout: nil)
           sse_base_session =
             if base == ::HTTPX
-              ::HTTPX.with(timeout: timeout_opts)
+              ::HTTPX.with(timeout: sse_timeout_opts)
             else
-              base.with(timeout: timeout_opts)
+              base.with(timeout: sse_timeout_opts)
             end
 
-          @sse_stream_client = sse_base_session.plugin(:stream).with(timeout: timeout_opts)
+          @sse_stream_client = sse_base_session.plugin(:stream).with(timeout: sse_timeout_opts)
         end
 
         def require_httpx!
