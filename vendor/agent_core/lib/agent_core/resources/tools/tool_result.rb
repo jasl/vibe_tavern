@@ -17,7 +17,18 @@ module AgentCore
         def initialize(content:, is_error: false, metadata: {})
           normalized = Array(content).map do |block|
             if block.is_a?(Hash)
-              block
+              type = block[:type] || block["type"]
+              if type.nil?
+                if block.key?("text")
+                  block.merge("type" => "text")
+                elsif block.key?(:text)
+                  block.merge(type: "text")
+                else
+                  { type: "text", text: block.to_s }
+                end
+              else
+                block
+              end
             else
               { type: "text", text: block.to_s }
             end

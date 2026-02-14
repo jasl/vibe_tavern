@@ -191,4 +191,16 @@ class AgentCore::Resources::Tools::ToolResultTest < Minitest::Test
     assert_instance_of AgentCore::TextContent, blocks[0]
     assert_equal "hello", blocks[0].text
   end
+
+  def test_hash_block_without_type_is_treated_as_text
+    result = AgentCore::Resources::Tools::ToolResult.with_content([{ text: "hello" }])
+    assert_equal "hello", result.text
+    refute result.has_non_text_content?
+  end
+
+  def test_hash_block_without_type_with_string_keys_is_treated_as_text
+    result = AgentCore::Resources::Tools::ToolResult.with_content([{ "text" => "hello" }])
+    assert_equal "hello", result.text
+    refute result.has_non_text_content?
+  end
 end
