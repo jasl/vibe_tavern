@@ -41,7 +41,8 @@ module AgentCore
       # @param max_turns [Integer] Maximum tool-calling turns
       # @param events [Events, nil] Event callbacks
       # @return [RunResult]
-      def run(prompt:, provider:, tools_registry: nil, tool_policy: nil, max_turns: DEFAULT_MAX_TURNS, events: nil)
+      def run(prompt:, provider:, tools_registry: nil, tool_policy: nil, max_turns: DEFAULT_MAX_TURNS, events: nil,
+              token_counter: nil, context_window: nil, reserved_output_tokens: 0)
         raise ArgumentError, "max_turns must be >= 1, got #{max_turns}" if max_turns < 1
 
         events ||= Events.new
@@ -50,6 +51,7 @@ module AgentCore
         all_new_messages = []
         tool_calls_record = []
         aggregated_usage = nil
+        per_turn_usage = []
         options = Utils.symbolize_keys(prompt.options)
         model = options.delete(:model)
         turn = 0
@@ -64,7 +66,8 @@ module AgentCore
               turns: turn - 1,
               usage: aggregated_usage,
               tool_calls_record: tool_calls_record,
-              stop_reason: :max_turns
+              stop_reason: :max_turns,
+              per_turn_usage: per_turn_usage
             )
           end
 
@@ -73,6 +76,14 @@ module AgentCore
           # Build LLM request
           tools = prompt.has_tools? ? prompt.tools : nil
           request_messages = messages.dup.freeze
+
+          # Preflight token check
+          preflight_token_check!(
+            messages: request_messages, tools: tools,
+            token_counter: token_counter, context_window: context_window,
+            reserved_output_tokens: reserved_output_tokens
+          )
+
           events.emit(:llm_request, request_messages, tools)
 
           # Call LLM
@@ -88,6 +99,7 @@ module AgentCore
 
           # Track usage
           if response.usage
+            per_turn_usage << response.usage
             aggregated_usage = aggregated_usage ? aggregated_usage + response.usage : response.usage
           end
 
@@ -100,7 +112,8 @@ module AgentCore
               turns: turn,
               usage: aggregated_usage,
               tool_calls_record: tool_calls_record,
-              stop_reason: :error
+              stop_reason: :error,
+              per_turn_usage: per_turn_usage
             )
           end
 
@@ -134,7 +147,8 @@ module AgentCore
               turns: turn,
               usage: aggregated_usage,
               tool_calls_record: tool_calls_record,
-              stop_reason: response.stop_reason || :end_turn
+              stop_reason: response.stop_reason || :end_turn,
+              per_turn_usage: per_turn_usage
             )
           end
         end
@@ -150,7 +164,8 @@ module AgentCore
       # @param events [Events, nil] Event callbacks
       # @yield [StreamEvent] Stream events
       # @return [RunResult]
-      def run_stream(prompt:, provider:, tools_registry: nil, tool_policy: nil, max_turns: DEFAULT_MAX_TURNS, events: nil, &block)
+      def run_stream(prompt:, provider:, tools_registry: nil, tool_policy: nil, max_turns: DEFAULT_MAX_TURNS, events: nil,
+                     token_counter: nil, context_window: nil, reserved_output_tokens: 0, &block)
         raise ArgumentError, "max_turns must be >= 1, got #{max_turns}" if max_turns < 1
 
         events ||= Events.new
@@ -159,6 +174,7 @@ module AgentCore
         all_new_messages = []
         tool_calls_record = []
         aggregated_usage = nil
+        per_turn_usage = []
         options = Utils.symbolize_keys(prompt.options)
         model = options.delete(:model)
         turn = 0
@@ -173,7 +189,8 @@ module AgentCore
               turns: turn - 1,
               usage: aggregated_usage,
               tool_calls_record: tool_calls_record,
-              stop_reason: :max_turns
+              stop_reason: :max_turns,
+              per_turn_usage: per_turn_usage
             )
           end
 
@@ -182,6 +199,14 @@ module AgentCore
 
           tools = prompt.has_tools? ? prompt.tools : nil
           request_messages = messages.dup.freeze
+
+          # Preflight token check
+          preflight_token_check!(
+            messages: request_messages, tools: tools,
+            token_counter: token_counter, context_window: context_window,
+            reserved_output_tokens: reserved_output_tokens
+          )
+
           events.emit(:llm_request, request_messages, tools)
 
           # Stream LLM response
@@ -214,6 +239,7 @@ module AgentCore
 
           # Track usage
           if response_usage
+            per_turn_usage << response_usage
             aggregated_usage = aggregated_usage ? aggregated_usage + response_usage : response_usage
           end
 
@@ -229,7 +255,8 @@ module AgentCore
               turns: turn,
               usage: aggregated_usage,
               tool_calls_record: tool_calls_record,
-              stop_reason: :error
+              stop_reason: :error,
+              per_turn_usage: per_turn_usage
             )
           end
 
@@ -273,7 +300,8 @@ module AgentCore
               turns: turn,
               usage: aggregated_usage,
               tool_calls_record: tool_calls_record,
-              stop_reason: response_stop_reason
+              stop_reason: response_stop_reason,
+              per_turn_usage: per_turn_usage
             )
           end
         end
@@ -335,7 +363,7 @@ module AgentCore
         end
       end
 
-      def build_result(all_new_messages:, turns:, usage:, tool_calls_record:, stop_reason:)
+      def build_result(all_new_messages:, turns:, usage:, tool_calls_record:, stop_reason:, per_turn_usage: [])
         final = all_new_messages.reverse.find { |m| m.assistant? } || all_new_messages.last
 
         RunResult.new(
@@ -344,7 +372,27 @@ module AgentCore
           turns: turns,
           usage: usage,
           tool_calls_made: tool_calls_record,
-          stop_reason: stop_reason
+          stop_reason: stop_reason,
+          per_turn_usage: per_turn_usage
+        )
+      end
+
+      # Raise ContextWindowExceededError if estimated tokens exceed the limit.
+      # No-op when token_counter or context_window is nil (opt-in).
+      def preflight_token_check!(messages:, tools:, token_counter:, context_window:, reserved_output_tokens:)
+        return unless token_counter && context_window
+
+        msg_tokens = token_counter.count_messages(messages)
+        tool_tokens = tools ? token_counter.count_tools(tools) : 0
+        estimated = msg_tokens + tool_tokens
+        limit = context_window - reserved_output_tokens
+
+        return if estimated <= limit
+
+        raise ContextWindowExceededError.new(
+          estimated_tokens: estimated,
+          context_window: context_window,
+          reserved_output: reserved_output_tokens
         )
       end
 

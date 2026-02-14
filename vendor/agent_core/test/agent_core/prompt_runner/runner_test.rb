@@ -285,6 +285,114 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     result = @runner.run(prompt: prompt, provider: nil_msg_provider)
     assert_equal :error, result.stop_reason
   end
+
+  # --- Token budget preflight tests ---
+
+  def test_no_token_counter_runs_normally
+    # Backward compatibility: no token_counter = no check
+    provider = MockProvider.new
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider)
+    assert_equal "Mock response", result.text
+  end
+
+  def test_preflight_raises_when_exceeding_context_window
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new
+    provider = MockProvider.new
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "You are a helpful assistant.",
+      messages: [AgentCore::Message.new(role: :user, content: "Hello " * 100)],
+      options: { model: "test" }
+    )
+
+    err = assert_raises(AgentCore::ContextWindowExceededError) do
+      @runner.run(
+        prompt: prompt, provider: provider,
+        token_counter: counter, context_window: 10, reserved_output_tokens: 0
+      )
+    end
+
+    assert err.estimated_tokens > 10
+    assert_equal 10, err.context_window
+    # Provider should NOT have been called
+    assert_equal 0, provider.calls.size
+  end
+
+  def test_preflight_passes_when_within_budget
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new
+    provider = MockProvider.new
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "Hi",
+      messages: [AgentCore::Message.new(role: :user, content: "Hello")],
+      options: { model: "test" }
+    )
+
+    result = @runner.run(
+      prompt: prompt, provider: provider,
+      token_counter: counter, context_window: 100_000, reserved_output_tokens: 1000
+    )
+
+    assert_equal "Mock response", result.text
+    assert_equal 1, provider.calls.size
+  end
+
+  def test_preflight_accounts_for_reserved_output_tokens
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new
+    provider = MockProvider.new
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "System",
+      messages: [AgentCore::Message.new(role: :user, content: "Hi")],
+      options: { model: "test" }
+    )
+
+    # Estimate is small, but with large reserved_output it should exceed
+    # "System" + "Hi" ~= 2 + 4 + 1 + 4 = ~11 tokens
+    # context_window: 15, reserved: 10 → limit = 5 → should exceed
+    assert_raises(AgentCore::ContextWindowExceededError) do
+      @runner.run(
+        prompt: prompt, provider: provider,
+        token_counter: counter, context_window: 15, reserved_output_tokens: 10
+      )
+    end
+  end
+
+  def test_per_turn_usage_tracked
+    provider = MockProvider.new
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider)
+    assert_equal 1, result.per_turn_usage.size
+    assert_equal 10, result.per_turn_usage.first.input_tokens
+    assert_equal 5, result.per_turn_usage.first.output_tokens
+  end
+
+  def test_preflight_stream_raises_when_exceeding
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new
+    provider = MockProvider.new
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "x" * 1000,
+      messages: [AgentCore::Message.new(role: :user, content: "y" * 1000)],
+      options: { model: "test" }
+    )
+
+    assert_raises(AgentCore::ContextWindowExceededError) do
+      @runner.run_stream(
+        prompt: prompt, provider: provider,
+        token_counter: counter, context_window: 50, reserved_output_tokens: 0
+      ) { }
+    end
+
+    assert_equal 0, provider.calls.size
+  end
 end
 
 class AgentCore::PromptRunner::EventsTest < Minitest::Test

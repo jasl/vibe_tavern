@@ -19,6 +19,8 @@ require_relative "agent_core/resources/tools/tool"
 require_relative "agent_core/resources/tools/tool_result"
 require_relative "agent_core/resources/tools/registry"
 require_relative "agent_core/resources/tools/policy/base"
+require_relative "agent_core/resources/token_counter/base"
+require_relative "agent_core/resources/token_counter/heuristic"
 
 # Prompt Builder
 require_relative "agent_core/prompt_builder/context"

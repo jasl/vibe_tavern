@@ -15,7 +15,11 @@ module AgentCore
       # Runtime dependencies (not serialized)
       attr_accessor :provider, :chat_history, :memory,
                     :tools_registry, :tool_policy,
-                    :prompt_pipeline, :on_event
+                    :prompt_pipeline, :on_event,
+                    :token_counter
+
+      # Token budget (serializable)
+      attr_accessor :context_window, :reserved_output_tokens
 
       def initialize
         # Defaults
@@ -29,6 +33,10 @@ module AgentCore
         @stop_sequences = nil
         @max_turns = 10
 
+        # Token budget
+        @context_window = nil
+        @reserved_output_tokens = 0
+
         # Runtime
         @provider = nil
         @chat_history = nil
@@ -37,6 +45,7 @@ module AgentCore
         @tool_policy = nil
         @prompt_pipeline = nil
         @on_event = nil
+        @token_counter = nil
       end
 
       # Build the Agent instance.
@@ -58,7 +67,9 @@ module AgentCore
           max_tokens: max_tokens,
           top_p: top_p,
           stop_sequences: stop_sequences,
-          max_turns: max_turns
+          max_turns: max_turns,
+          context_window: context_window,
+          reserved_output_tokens: reserved_output_tokens.nonzero?
         }.compact
       end
 
@@ -76,6 +87,8 @@ module AgentCore
         @top_p = h[:top_p] if h.key?(:top_p)
         @stop_sequences = h[:stop_sequences] if h.key?(:stop_sequences)
         @max_turns = h[:max_turns] if h.key?(:max_turns)
+        @context_window = h[:context_window] if h.key?(:context_window)
+        @reserved_output_tokens = h[:reserved_output_tokens] if h.key?(:reserved_output_tokens)
         self
       end
 

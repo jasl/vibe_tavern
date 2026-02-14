@@ -31,7 +31,8 @@ module AgentCore
   class Agent
     attr_reader :name, :description, :system_prompt, :model,
                 :provider, :chat_history, :memory, :tools_registry,
-                :tool_policy, :prompt_pipeline, :max_turns
+                :tool_policy, :prompt_pipeline, :max_turns,
+                :token_counter, :context_window, :reserved_output_tokens
 
     # Build an agent using the Builder DSL.
     # @yield [Builder]
@@ -52,7 +53,7 @@ module AgentCore
     # @param tool_policy [Resources::Tools::Policy::Base, nil]
     # @param prompt_pipeline [PromptBuilder::Pipeline, nil]
     # @return [Agent]
-    def self.from_config(config, provider:, chat_history: nil, memory: nil, tools_registry: nil, tool_policy: nil, prompt_pipeline: nil)
+    def self.from_config(config, provider:, chat_history: nil, memory: nil, tools_registry: nil, tool_policy: nil, prompt_pipeline: nil, token_counter: nil)
       build do |b|
         b.load_config(config)
         b.provider = provider
@@ -61,6 +62,7 @@ module AgentCore
         b.tools_registry = tools_registry
         b.tool_policy = tool_policy
         b.prompt_pipeline = prompt_pipeline
+        b.token_counter = token_counter
       end
     end
 
@@ -81,6 +83,9 @@ module AgentCore
       @tool_policy = builder.tool_policy
       @prompt_pipeline = builder.prompt_pipeline || PromptBuilder::SimplePipeline.new
       @on_event = builder.on_event
+      @token_counter = builder.token_counter
+      @context_window = builder.context_window
+      @reserved_output_tokens = builder.reserved_output_tokens || 0
 
       # Internal
       @runner = PromptRunner::Runner.new
@@ -105,7 +110,10 @@ module AgentCore
         tools_registry: tools_registry,
         tool_policy: tool_policy,
         max_turns: max_turns,
-        events: events
+        events: events,
+        token_counter: token_counter,
+        context_window: context_window,
+        reserved_output_tokens: reserved_output_tokens
       )
 
       # 3. Update chat history with new messages
@@ -134,6 +142,9 @@ module AgentCore
         tool_policy: tool_policy,
         max_turns: max_turns,
         events: events,
+        token_counter: token_counter,
+        context_window: context_window,
+        reserved_output_tokens: reserved_output_tokens,
         &block
       )
 
@@ -160,6 +171,8 @@ module AgentCore
       config[:max_tokens] = @llm_options[:max_tokens] if @llm_options[:max_tokens]
       config[:top_p] = @llm_options[:top_p] if @llm_options[:top_p]
       config[:stop_sequences] = @llm_options[:stop_sequences] if @llm_options[:stop_sequences]
+      config[:context_window] = context_window if context_window
+      config[:reserved_output_tokens] = reserved_output_tokens if reserved_output_tokens.nonzero?
       config.compact
     end
 

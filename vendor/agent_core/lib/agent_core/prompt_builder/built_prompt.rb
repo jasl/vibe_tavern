@@ -24,6 +24,26 @@ module AgentCore
         tools && !tools.empty?
       end
 
+      # Estimate total token count for this prompt.
+      #
+      # Includes system prompt, messages, and tool definitions.
+      # Useful for pre-flight budget checks outside the Runner.
+      #
+      # @param token_counter [Resources::TokenCounter::Base] Token counter implementation
+      # @return [Hash] { messages: Integer, tools: Integer, total: Integer }
+      def estimate_tokens(token_counter:)
+        all_messages = if system_prompt && !system_prompt.empty?
+          [Message.new(role: :system, content: system_prompt)] + messages.to_a
+        else
+          messages.to_a
+        end
+
+        msg_tokens = token_counter.count_messages(all_messages)
+        tool_tokens = has_tools? ? token_counter.count_tools(tools) : 0
+
+        { messages: msg_tokens, tools: tool_tokens, total: msg_tokens + tool_tokens }
+      end
+
       def to_h
         {
           system_prompt: system_prompt,

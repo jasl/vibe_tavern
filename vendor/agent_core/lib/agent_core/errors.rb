@@ -55,6 +55,19 @@ module AgentCore
     end
   end
 
+  # Raised when the estimated prompt tokens exceed the context window.
+  class ContextWindowExceededError < Error
+    attr_reader :estimated_tokens, :context_window, :reserved_output
+
+    def initialize(message = nil, estimated_tokens: nil, context_window: nil, reserved_output: 0)
+      @estimated_tokens = estimated_tokens
+      @context_window = context_window
+      @reserved_output = reserved_output
+      super(message || "Estimated #{estimated_tokens} prompt tokens exceeds limit #{context_window - reserved_output} " \
+                        "(context_window: #{context_window}, reserved_output: #{reserved_output})")
+    end
+  end
+
   # Raised when streaming encounters an error.
   class StreamError < Error; end
 

@@ -175,4 +175,59 @@ class AgentCore::AgentTest < Minitest::Test
     # Messages should include prior history + new user message
     assert second_call[:messages].size > 1
   end
+
+  def test_chat_with_token_counter_raises_on_exceed
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new
+    provider = MockProvider.new
+
+    agent = AgentCore::Agent.build do |b|
+      b.provider = provider
+      b.system_prompt = "You are helpful."
+      b.token_counter = counter
+      b.context_window = 10  # very small
+      b.reserved_output_tokens = 0
+    end
+
+    assert_raises(AgentCore::ContextWindowExceededError) do
+      agent.chat("This message should exceed the tiny context window")
+    end
+
+    # Provider should not have been called
+    assert_equal 0, provider.calls.size
+  end
+
+  def test_chat_with_token_counter_succeeds_within_budget
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new
+    provider = MockProvider.new
+
+    agent = AgentCore::Agent.build do |b|
+      b.provider = provider
+      b.system_prompt = "Hi"
+      b.token_counter = counter
+      b.context_window = 100_000
+      b.reserved_output_tokens = 4096
+    end
+
+    result = agent.chat("Hello")
+    assert_equal "Mock response", result.text
+    assert_equal 1, provider.calls.size
+  end
+
+  def test_config_roundtrip_with_token_budget
+    provider = MockProvider.new
+
+    agent = AgentCore::Agent.build do |b|
+      b.provider = provider
+      b.context_window = 200_000
+      b.reserved_output_tokens = 8192
+    end
+
+    config = agent.to_config
+    assert_equal 200_000, config[:context_window]
+    assert_equal 8192, config[:reserved_output_tokens]
+
+    restored = AgentCore::Agent.from_config(config, provider: provider)
+    assert_equal 200_000, restored.context_window
+    assert_equal 8192, restored.reserved_output_tokens
+  end
 end
