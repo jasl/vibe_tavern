@@ -355,7 +355,7 @@ read_skill_file → validate path → read file → String
 ### 6.3 测试数据统计
 
 ```
-Total: 589 runs, 1246 assertions, 0 failures, 0 errors
+Total: 595 runs, 1261 assertions, 0 failures, 0 errors
 ```
 
 Phase 2 新增测试覆盖：
@@ -408,6 +408,9 @@ JSON wire protocol 中（string keys in hashes），不作为 Ruby 方法名或 
 
 `Frontmatter.parse` 使用 `YAML.safe_load`（隐含在标准 parse 中），
 不允许自定义类实例化。metadata values 强制为 string。
+
+并且在 strict 模式下对齐 Agent Skills spec（见 `resources/agentskills/docs/specification.mdx`）：
+仅允许标准字段（name/description/license/compatibility/metadata/allowed-tools），并对 skill name 做 NFKC 规范化与 unicode 字母/数字+`-` 校验。
 
 ### 8.3 进程安全 (Stdio) ✅
 

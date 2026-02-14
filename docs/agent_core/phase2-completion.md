@@ -2,7 +2,7 @@
 
 > Date: 2026-02-14
 > Status: ✅ Complete
-> Tests: 589 runs, 1246 assertions, 0 failures, 0 errors
+> Tests: 595 runs, 1261 assertions, 0 failures, 0 errors
 
 ## What Was Delivered
 
@@ -27,7 +27,7 @@ lib/agent_core/mcp/transport/streamable_http.rb        # Streamable HTTP transpo
 # Skills — Markdown-based agent capabilities (5 files)
 lib/agent_core/resources/skills/skill_metadata.rb      # SkillMetadata Data.define (name, description, location, ...)
 lib/agent_core/resources/skills/skill.rb               # Skill Data.define (meta, body_markdown, files_index)
-lib/agent_core/resources/skills/frontmatter.rb         # YAML frontmatter parser with strict/lenient modes
+lib/agent_core/resources/skills/frontmatter.rb         # YAML frontmatter parser (Agent Skills spec, strict/lenient)
 lib/agent_core/resources/skills/store.rb               # Abstract Store (list_skills, load_skill, read_skill_file)
 lib/agent_core/resources/skills/file_system_store.rb   # Filesystem-backed Store with security (realpath, traversal)
 ```
@@ -111,7 +111,7 @@ test/fixtures/skills/another-skill/assets/logo.txt
 | Skills Store (abstract) | ✅ | |
 | Skills FileSystemStore | ✅ | Security: realpath, traversal checks |
 | Skills under Resources namespace | ✅ | Refactored from AgentCore::Skills to AgentCore::Resources::Skills |
-| Tests for all of the above | ✅ | 589 runs |
+| Tests for all of the above | ✅ | 595 runs |
 | Coverage expansion for Phase 1 gaps | ✅ | 12 new/expanded test files |
 
 ## Architecture Notes

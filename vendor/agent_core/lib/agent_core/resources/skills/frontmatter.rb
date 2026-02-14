@@ -10,7 +10,8 @@ module AgentCore
       # Frontmatter is delimited by `---` lines at the top of the file.
       # Supports strict mode (raises on errors) and lenient mode (returns nil).
       module Frontmatter
-        NAME_PATTERN = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/.freeze
+        # Allowed top-level frontmatter fields per Agent Skills spec.
+        ALLOWED_FIELDS = %i[name description license allowed_tools metadata compatibility].freeze
         MAX_DESCRIPTION_CHARS = 1024
         MAX_COMPATIBILITY_CHARS = 500
 
@@ -61,13 +62,31 @@ module AgentCore
           end
 
           frontmatter = symbolize_top_level(parsed)
-          metadata, metadata_error = normalize_metadata(frontmatter.fetch(:metadata, nil), strict: strict)
+          extra_fields = frontmatter.keys - ALLOWED_FIELDS
+          if extra_fields.any?
+            return invalid(
+              strict,
+              "Unexpected fields in frontmatter: #{extra_fields.map(&:to_s).sort.join(", ")}. " \
+              "Only #{ALLOWED_FIELDS.map(&:to_s).sort} are allowed.",
+              body_string
+            )
+          end
+
+          metadata, metadata_error = normalize_metadata(frontmatter.fetch(:metadata, nil))
           return invalid(strict, metadata_error, body_string) if metadata.nil?
 
           frontmatter[:metadata] = metadata
 
-          name = frontmatter.fetch(:name, nil).to_s.strip
-          description = frontmatter.fetch(:description, nil).to_s.strip
+          name_value = frontmatter.fetch(:name, nil)
+          description_value = frontmatter.fetch(:description, nil)
+
+          if strict
+            return invalid(strict, "frontmatter.name must be a non-empty string", body_string) unless name_value.is_a?(String)
+            return invalid(strict, "frontmatter.description must be a non-empty string", body_string) unless description_value.is_a?(String)
+          end
+
+          name = normalize_name(name_value)
+          description = description_value.to_s.strip
 
           return invalid(strict, "frontmatter.name is required", body_string) if name.empty?
           return invalid(strict, "frontmatter.description is required", body_string) if description.empty?
@@ -76,13 +95,26 @@ module AgentCore
             return invalid(strict, "frontmatter.description must be <= #{MAX_DESCRIPTION_CHARS} chars", body_string)
           end
 
-          compatibility = frontmatter.fetch(:compatibility, nil)
-          compatibility = compatibility.to_s.strip unless compatibility.nil?
-          compatibility = nil if compatibility&.empty?
-          if strict && compatibility && compatibility.length > MAX_COMPATIBILITY_CHARS
-            return invalid(strict, "frontmatter.compatibility must be <= #{MAX_COMPATIBILITY_CHARS} chars", body_string)
+          if frontmatter.key?(:compatibility)
+            compatibility_raw = frontmatter.fetch(:compatibility, nil)
+
+            if strict && !compatibility_raw.is_a?(String)
+              return invalid(strict, "frontmatter.compatibility must be a string", body_string)
+            end
+
+            compatibility = compatibility_raw.to_s.strip
+            if strict && compatibility.empty?
+              return invalid(strict, "frontmatter.compatibility must be 1-#{MAX_COMPATIBILITY_CHARS} chars", body_string)
+            end
+
+            compatibility = nil if compatibility.empty?
+
+            if strict && compatibility && compatibility.length > MAX_COMPATIBILITY_CHARS
+              return invalid(strict, "frontmatter.compatibility must be <= #{MAX_COMPATIBILITY_CHARS} chars", body_string)
+            end
+
+            frontmatter[:compatibility] = compatibility
           end
-          frontmatter[:compatibility] = compatibility if frontmatter.key?(:compatibility)
 
           unless valid_name?(name)
             return invalid(strict, "invalid skill name: #{name.inspect}", body_string)
@@ -104,11 +136,20 @@ module AgentCore
         # @param name [String]
         # @return [Boolean]
         def valid_name?(name)
-          name = name.to_s
-          return false if name.empty?
-          return false if name.bytesize > 64
+          normalized = normalize_name(name)
+          return false if normalized.empty?
+          return false if normalized.length > 64
 
-          NAME_PATTERN.match?(name)
+          return false if normalized != normalized.downcase
+          return false if normalized.start_with?("-") || normalized.end_with?("-")
+          return false if normalized.include?("--")
+
+          normalized.each_char do |ch|
+            next if ch == "-"
+            return false unless alnum_char?(ch)
+          end
+
+          true
         end
 
         def expected_skill_name(expected_name:, path:)
@@ -122,7 +163,7 @@ module AgentCore
             expected = nil if expected.empty?
           end
 
-          expected
+          expected ? normalize_name(expected) : nil
         end
         private_class_method :expected_skill_name
 
@@ -137,7 +178,7 @@ module AgentCore
         end
         private_class_method :symbolize_top_level
 
-        def normalize_metadata(value, strict:)
+        def normalize_metadata(value)
           return [{}, nil] if value.nil?
 
           unless value.is_a?(Hash)
@@ -150,20 +191,25 @@ module AgentCore
             key = k.to_s
             next if key.strip.empty?
 
-            if strict
-              unless v.is_a?(String)
-                return [nil, "frontmatter.metadata must be a string-to-string map"]
-              end
-
-              out[key] = v
-            else
-              out[key] = v.to_s
-            end
+            out[key] = v.to_s
           end
 
           [out, nil]
         end
         private_class_method :normalize_metadata
+
+        def normalize_name(value)
+          s = value.to_s.strip
+          return "" if s.empty?
+
+          s.unicode_normalize(:nfkc)
+        end
+        private_class_method :normalize_name
+
+        def alnum_char?(ch)
+          ch.match?(/\A[\p{L}\p{N}]\z/)
+        end
+        private_class_method :alnum_char?
 
         def invalid(strict, message, body_string)
           raise ArgumentError, message if strict

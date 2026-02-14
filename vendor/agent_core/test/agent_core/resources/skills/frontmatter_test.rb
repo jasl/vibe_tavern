@@ -179,9 +179,8 @@ class AgentCore::Resources::Skills::FrontmatterTest < Minitest::Test
       Body
     MD
 
-    assert_raises(ArgumentError) do
-      AgentCore::Resources::Skills::Frontmatter.parse(content, strict: true)
-    end
+    frontmatter, = AgentCore::Resources::Skills::Frontmatter.parse(content, strict: true)
+    assert_equal "42", frontmatter[:metadata]["count"]
   end
 
   def test_metadata_values_coerced_lenient
@@ -306,5 +305,78 @@ class AgentCore::Resources::Skills::FrontmatterTest < Minitest::Test
     assert_raises(ArgumentError) do
       AgentCore::Resources::Skills::Frontmatter.parse(content, path: "/skills/correct-name/SKILL.md", strict: true)
     end
+  end
+
+  def test_rejects_unknown_fields_strict
+    content = <<~MD
+      ---
+      name: my-skill
+      description: A test skill.
+      extra-field: no
+      ---
+      Body
+    MD
+
+    assert_raises(ArgumentError) do
+      AgentCore::Resources::Skills::Frontmatter.parse(content, strict: true)
+    end
+  end
+
+  def test_unknown_fields_lenient_returns_nil_frontmatter
+    content = <<~MD
+      ---
+      name: my-skill
+      description: A test skill.
+      extra-field: no
+      ---
+      Body
+    MD
+
+    frontmatter, body = AgentCore::Resources::Skills::Frontmatter.parse(content, strict: false)
+    assert_nil frontmatter
+    assert_includes body, "Body"
+  end
+
+  def test_name_must_be_string_strict
+    content = <<~MD
+      ---
+      name: 123
+      description: A test skill.
+      ---
+      Body
+    MD
+
+    assert_raises(ArgumentError) do
+      AgentCore::Resources::Skills::Frontmatter.parse(content, strict: true)
+    end
+  end
+
+  def test_description_must_be_string_strict
+    content = <<~MD
+      ---
+      name: my-skill
+      description: 123
+      ---
+      Body
+    MD
+
+    assert_raises(ArgumentError) do
+      AgentCore::Resources::Skills::Frontmatter.parse(content, strict: true)
+    end
+  end
+
+  def test_unicode_skill_name
+    assert AgentCore::Resources::Skills::Frontmatter.valid_name?("数据分析")
+
+    content = <<~MD
+      ---
+      name: 数据分析
+      description: A test skill.
+      ---
+      Body
+    MD
+
+    frontmatter, = AgentCore::Resources::Skills::Frontmatter.parse(content, expected_name: "数据分析")
+    assert_equal "数据分析", frontmatter[:name]
   end
 end

@@ -18,6 +18,7 @@ class AgentCore::Resources::Skills::FileSystemStoreTest < Minitest::Test
     names = skills.map(&:name)
     assert_includes names, "example-skill"
     assert_includes names, "another-skill"
+    assert_includes names, "lowercase-skill"
   end
 
   def test_list_skills_sorted_by_name
@@ -60,6 +61,15 @@ class AgentCore::Resources::Skills::FileSystemStoreTest < Minitest::Test
     assert_includes skill.body_markdown, "# Example Skill"
     assert_includes skill.body_markdown, "Use this skill to test things."
     assert_equal false, skill.body_truncated
+  end
+
+  def test_load_skill_accepts_lowercase_skill_md
+    skill = @store.load_skill(name: "lowercase-skill")
+
+    assert_instance_of AgentCore::Resources::Skills::Skill, skill
+    assert_equal "lowercase-skill", skill.meta.name
+    assert_equal "MIT", skill.meta.license
+    assert_includes skill.body_markdown, "verify that the store accepts"
   end
 
   def test_load_skill_files_index

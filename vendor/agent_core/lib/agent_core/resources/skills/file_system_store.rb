@@ -17,6 +17,7 @@ module AgentCore
         SKILL_MD_FRONTMATTER_MAX_BYTES = 50_000
         ALLOWED_TOP_DIRS = %w[scripts references assets].freeze
         REL_PATH_PATTERN = /\A(?:scripts|references|assets)\/[^\/]+\z/.freeze
+        SKILL_MD_FILENAMES = %w[SKILL.md skill.md].freeze
 
         # @param dirs [Array<String>, String] Directories to scan for skills
         # @param strict [Boolean] Whether to raise on errors or skip silently
@@ -33,12 +34,16 @@ module AgentCore
           metas = []
 
           each_skill_dir do |skill_dir, skill_real|
-            skill_md_path = File.join(skill_dir, "SKILL.md")
-            next unless File.file?(skill_md_path)
+            skill_md_path = find_skill_md(skill_dir)
+            next unless skill_md_path
 
             skill_md_real =
               begin
-                ensure_realpath_within_dir!(base_dir: skill_real, abs_path: skill_md_path, label: "SKILL.md")
+                ensure_realpath_within_dir!(
+                  base_dir: skill_real,
+                  abs_path: skill_md_path,
+                  label: File.basename(skill_md_path),
+                )
               rescue ArgumentError
                 raise if @strict
 
@@ -83,14 +88,21 @@ module AgentCore
         def load_skill(name:, max_bytes: nil)
           meta = find_skill_metadata!(name.to_s)
           skill_dir = meta.location
-          skill_md_path = File.join(skill_dir, "SKILL.md")
-          raise ArgumentError, "SKILL.md not found for skill: #{meta.name}" unless File.file?(skill_md_path)
+          skill_md_path = find_skill_md(skill_dir)
+          unless skill_md_path
+            raise ArgumentError, "SKILL.md not found for skill: #{meta.name}"
+          end
 
           max_bytes = max_bytes.nil? ? DEFAULT_MAX_BYTES : Integer(max_bytes)
           raise ArgumentError, "max_bytes must be positive" if max_bytes <= 0
 
           skill_real = File.realpath(skill_dir.to_s)
-          skill_md_real = ensure_realpath_within_dir!(base_dir: skill_real, abs_path: skill_md_path, label: "SKILL.md")
+          skill_md_real =
+            ensure_realpath_within_dir!(
+              base_dir: skill_real,
+              abs_path: skill_md_path,
+              label: File.basename(skill_md_path),
+            )
 
           content, truncated = read_file_prefix(skill_md_real, max_bytes: max_bytes, label: "SKILL.md")
           frontmatter, body_markdown =
@@ -260,6 +272,15 @@ module AgentCore
           raise ArgumentError, "Unknown skill: #{name}" unless meta
 
           meta
+        end
+
+        def find_skill_md(skill_dir)
+          SKILL_MD_FILENAMES.each do |name|
+            path = File.join(skill_dir, name)
+            return path if File.file?(path)
+          end
+
+          nil
         end
 
         def index_files(skill_dir)
