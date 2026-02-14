@@ -4,6 +4,9 @@ module AgentCore
   module Utils
     module_function
 
+    DEFAULT_MAX_TOOL_ARGS_BYTES = 200_000
+    DEFAULT_MAX_TOOL_OUTPUT_BYTES = 200_000
+
     # Shallow-convert Hash keys to Symbols.
     #
     # Symbol keys take precedence over their String equivalents.
@@ -55,6 +58,37 @@ module AgentCore
         value
       end
     end
+
+    def truncate_utf8_bytes(value, max_bytes:)
+      max_bytes = Integer(max_bytes)
+      return "" if max_bytes <= 0
+
+      str = normalize_utf8(value)
+      return str if str.bytesize <= max_bytes
+
+      sliced = str.byteslice(0, max_bytes).to_s
+      sliced = sliced.dup.force_encoding(Encoding::UTF_8)
+
+      while !sliced.valid_encoding? && sliced.bytesize.positive?
+        sliced = sliced.byteslice(0, sliced.bytesize - 1).to_s
+        sliced.force_encoding(Encoding::UTF_8)
+      end
+
+      sliced.valid_encoding? ? sliced : ""
+    rescue ArgumentError, TypeError
+      ""
+    end
+
+    def normalize_utf8(value)
+      str = value.to_s
+      str = str.dup.force_encoding(Encoding::UTF_8)
+      return str if str.valid_encoding?
+
+      str.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "\uFFFD")
+    rescue Encoding::UndefinedConversionError, Encoding::InvalidByteSequenceError
+      str.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "\uFFFD")
+    end
+    private_class_method :normalize_utf8
 
     # Normalize a MIME type string (lowercase, strip parameters).
     #
@@ -161,5 +195,95 @@ module AgentCore
 
       { content: content, error: !!error }
     end
+
+    def normalize_json_schema(value)
+      case value
+      when Hash
+        value.each_with_object({}) do |(k, v), out|
+          next if k.to_s == "required" && v.is_a?(Array) && v.empty?
+
+          out[k] = normalize_json_schema(v)
+        end
+      when Array
+        value.map { |v| normalize_json_schema(v) }
+      else
+        value
+      end
+    end
+
+    def normalize_tool_call_id(value, used:, fallback:)
+      base_id = value.to_s.strip
+      base_id = fallback.to_s if base_id.empty?
+      base_id = "tc_1" if base_id.strip.empty?
+
+      id = base_id
+      n = 2
+      while used.key?(id)
+        id = "#{base_id}__#{n}"
+        n += 1
+      end
+
+      used[id] = true
+      id
+    end
+
+    def parse_tool_arguments(value, max_bytes: DEFAULT_MAX_TOOL_ARGS_BYTES)
+      max_bytes = Integer(max_bytes)
+      raise ArgumentError, "max_bytes must be positive" if max_bytes <= 0
+
+      return [{}, nil] if value.nil?
+
+      require "json"
+
+      if value.is_a?(Hash) || value.is_a?(Array)
+        normalized = deep_symbolize_keys(value)
+
+        begin
+          json = JSON.generate(normalized)
+        rescue StandardError
+          return [{}, :invalid_json]
+        end
+
+        return [{}, :too_large] if json.bytesize > max_bytes
+
+        return [normalized, nil] if normalized.is_a?(Hash)
+
+        return [{}, :invalid_json]
+      end
+
+      str = normalize_tool_arguments_string(value.to_s)
+      return [{}, nil] if str.empty?
+      return [{}, :too_large] if str.bytesize > max_bytes
+
+      parsed = JSON.parse(str)
+      if parsed.is_a?(String)
+        inner = parsed.strip
+        return [{}, :too_large] if inner.bytesize > max_bytes
+
+        begin
+          parsed2 = JSON.parse(inner)
+          parsed = parsed2 unless parsed2.nil?
+        rescue JSON::ParserError
+          return [{}, :invalid_json]
+        end
+      end
+
+      return [deep_symbolize_keys(parsed), nil] if parsed.is_a?(Hash)
+
+      [{}, :invalid_json]
+    rescue JSON::ParserError
+      [{}, :invalid_json]
+    end
+
+    def normalize_tool_arguments_string(value)
+      str = value.to_s.strip
+      return str if str.empty?
+
+      fenced = str.match(/\A```(?:json)?\s*(.*?)\s*```\z/mi)
+      return str unless fenced
+
+      fenced[1].to_s.strip
+    end
+    private_class_method :normalize_tool_arguments_string
   end
 end

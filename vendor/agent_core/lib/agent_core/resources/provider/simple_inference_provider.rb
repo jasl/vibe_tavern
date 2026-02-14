@@ -41,6 +41,10 @@ module AgentCore
 
           request_options = @request_defaults.merge(sanitize_options(options))
 
+          if request_tools && !request_options.key?(:parallel_tool_calls)
+            request_options[:parallel_tool_calls] = false
+          end
+
           if stream
             stream_chat(client: client, request: request, options: request_options)
           else
@@ -69,9 +73,8 @@ module AgentCore
         end
 
         def sanitize_options(options)
-          out = options.dup
+          out = Utils.symbolize_keys(options)
           out.delete(:stream)
-          out.delete("stream")
           out
         end
 
@@ -107,9 +110,11 @@ module AgentCore
           require_simple_inference!
 
           stream_options = options.fetch(:stream_options, nil)
+          stream_options = Utils.deep_symbolize_keys(stream_options) if stream_options.is_a?(Hash)
+
           if @stream_include_usage && (stream_options.nil? || stream_options.is_a?(Hash))
             stream_options ||= {}
-            stream_options[:include_usage] = true unless stream_options.key?(:include_usage) || stream_options.key?("include_usage")
+            stream_options[:include_usage] = true unless stream_options.key?(:include_usage)
           end
 
           stream_request = request.merge(options)
@@ -122,6 +127,7 @@ module AgentCore
 
             tool_states = {}
             tool_started = {}
+            used_tool_call_ids = {}
 
             client.chat_completions_stream(**stream_request) do |event|
               delta = ::SimpleInference::OpenAI.chat_completion_chunk_delta(event)
@@ -142,7 +148,12 @@ module AgentCore
 
               each_tool_call_delta(tool_deltas) do |idx, id, name, arguments_delta|
                 state = tool_states[idx] ||= { id: nil, name: nil, arguments: +"" }
-                state[:id] ||= id if id
+                state[:id] ||=
+                  Utils.normalize_tool_call_id(
+                    id,
+                    used: used_tool_call_ids,
+                    fallback: "tc_#{idx + 1}",
+                  )
                 state[:name] ||= name if name
 
                 if state[:id] && state[:name] && !tool_started[state[:id]]
@@ -221,6 +232,7 @@ module AgentCore
         def stop_reason_from_finish_reason(value)
           case value.to_s
           when "tool_calls" then :tool_use
+          when "function_call" then :tool_use
           when "length" then :max_tokens
           when "stop_sequence" then :stop_sequence
           else :end_turn
@@ -228,46 +240,66 @@ module AgentCore
         end
 
         def tool_calls_from_openai_message(msg)
-          tool_calls = msg.fetch("tool_calls", nil)
-          out = []
+          h = Utils.symbolize_keys(msg)
 
-          Array(tool_calls).each do |tc|
-            next unless tc.is_a?(Hash)
+          tool_calls_raw = h.fetch(:tool_calls, nil)
+          tool_calls =
+            case tool_calls_raw
+            when Array then tool_calls_raw
+            when Hash then [tool_calls_raw]
+            else []
+            end
 
-            id = tc.fetch("id", nil).to_s.strip
-            fn = tc.fetch("function", nil)
-            fn = {} unless fn.is_a?(Hash)
+          parsed = []
 
-            name = fn.fetch("name", nil).to_s.strip
-            args_str = fn.fetch("arguments", nil).to_s
+          tool_calls.each do |tc_raw|
+            next unless tc_raw.is_a?(Hash)
 
+            tc = Utils.symbolize_keys(tc_raw)
+            fn = Utils.symbolize_keys(tc.fetch(:function, nil))
+
+            name = fn.fetch(:name, nil).to_s.strip
             next if name.empty?
-            id = "tc_#{out.size + 1}" if id.empty?
 
-            out << ToolCall.new(id: id, name: name, arguments: parse_tool_arguments(args_str))
+            args_hash, parse_error = Utils.parse_tool_arguments(fn.fetch(:arguments, nil))
+
+            parsed << {
+              id: tc.fetch(:id, nil).to_s.strip,
+              name: name,
+              arguments: args_hash,
+              arguments_parse_error: parse_error,
+            }
           end
 
-          # Back-compat: older OpenAI-compatible providers use function_call.
-          if out.empty?
-            fc = msg.fetch("function_call", nil)
-            if fc.is_a?(Hash)
-              name = fc.fetch("name", nil).to_s.strip
-              args_str = fc.fetch("arguments", nil).to_s
-              out << ToolCall.new(id: "tc_1", name: name, arguments: parse_tool_arguments(args_str)) unless name.empty?
+          if parsed.empty?
+            fc_raw = h.fetch(:function_call, nil)
+            if fc_raw.is_a?(Hash)
+              fc = Utils.symbolize_keys(fc_raw)
+              name = fc.fetch(:name, nil).to_s.strip
+              unless name.empty?
+                args_hash, parse_error = Utils.parse_tool_arguments(fc.fetch(:arguments, nil))
+                parsed << { id: "", name: name, arguments: args_hash, arguments_parse_error: parse_error }
+              end
             end
           end
 
-          out
-        end
+          used = {}
 
-        def parse_tool_arguments(json_string)
-          raw = json_string.to_s.strip
-          return {} if raw.empty?
+          parsed.map.with_index do |data, idx|
+            id =
+              Utils.normalize_tool_call_id(
+                data.fetch(:id),
+                used: used,
+                fallback: "tc_#{idx + 1}",
+              )
 
-          parsed = JSON.parse(raw)
-          Utils.deep_symbolize_keys(parsed)
-        rescue JSON::ParserError
-          {}
+            ToolCall.new(
+              id: id,
+              name: data.fetch(:name),
+              arguments: data.fetch(:arguments),
+              arguments_parse_error: data.fetch(:arguments_parse_error),
+            )
+          end
         end
 
         def build_openai_messages(messages)
@@ -290,6 +322,9 @@ module AgentCore
 
             if role == "assistant" && msg.has_tool_calls?
               out["tool_calls"] = msg.tool_calls.map { |tc| openai_tool_call(tc) }
+              if out["content"].is_a?(String) && out["content"].strip.empty?
+                out["content"] = nil
+              end
             end
 
             out
@@ -401,25 +436,34 @@ module AgentCore
 
             h = Utils.symbolize_keys(tool)
 
+            name = ""
+            description = ""
+            parameters = {}
+
             if h[:type].to_s == "function" && h[:function].is_a?(Hash)
-              tool
+              fn = Utils.symbolize_keys(h.fetch(:function))
+              name = fn.fetch(:name, "").to_s
+              description = fn.fetch(:description, "").to_s
+              parameters = fn.fetch(:parameters, {})
             else
               name = h.fetch(:name, "").to_s
-              raise ArgumentError, "tool name is required" if name.strip.empty?
-
               description = h.fetch(:description, "").to_s
               parameters = h.fetch(:parameters, {})
-              parameters = {} unless parameters.is_a?(Hash)
-
-              {
-                "type" => "function",
-                "function" => {
-                  "name" => name,
-                  "description" => description,
-                  "parameters" => parameters,
-                },
-              }
             end
+
+            raise ArgumentError, "tool name is required" if name.strip.empty?
+
+            parameters = {} unless parameters.is_a?(Hash)
+            parameters = Utils.normalize_json_schema(parameters)
+
+            {
+              "type" => "function",
+              "function" => {
+                "name" => name,
+                "description" => description,
+                "parameters" => parameters,
+              },
+            }
           end.compact
         end
 
@@ -444,15 +488,17 @@ module AgentCore
         def build_tool_calls_from_states(tool_states)
           tool_states
             .sort_by { |idx, _| idx }
-            .filter_map do |_idx, state|
+            .filter_map do |idx, state|
               id = state.fetch(:id, nil).to_s.strip
               name = state.fetch(:name, nil).to_s.strip
               args = state.fetch(:arguments, "").to_s
 
               next if name.empty?
-              id = "tc_#{name}" if id.empty?
 
-              ToolCall.new(id: id, name: name, arguments: parse_tool_arguments(args))
+              id = "tc_#{idx + 1}" if id.empty?
+
+              args_hash, parse_error = Utils.parse_tool_arguments(args)
+              ToolCall.new(id: id, name: name, arguments: args_hash, arguments_parse_error: parse_error)
             end
         end
       end

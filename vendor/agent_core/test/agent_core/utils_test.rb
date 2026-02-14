@@ -55,4 +55,80 @@ class AgentCore::UtilsTest < Minitest::Test
     assert_equal [{ type: :text, text: "not a hash" }], normalized[:content]
     assert_equal false, normalized[:error]
   end
+
+  def test_parse_tool_arguments_blank
+    args, err = AgentCore::Utils.parse_tool_arguments("   ")
+    assert_equal({}, args)
+    assert_nil err
+  end
+
+  def test_parse_tool_arguments_json_string
+    args, err = AgentCore::Utils.parse_tool_arguments("{\"a\":1}")
+    assert_equal({ a: 1 }, args)
+    assert_nil err
+  end
+
+  def test_parse_tool_arguments_fenced_json_string
+    args, err = AgentCore::Utils.parse_tool_arguments("```json\n{\"a\":1}\n```")
+    assert_equal({ a: 1 }, args)
+    assert_nil err
+  end
+
+  def test_parse_tool_arguments_double_encoded_json_string
+    raw = "\"{\\\"a\\\":1}\""
+    args, err = AgentCore::Utils.parse_tool_arguments(raw)
+    assert_equal({ a: 1 }, args)
+    assert_nil err
+  end
+
+  def test_parse_tool_arguments_hash
+    args, err = AgentCore::Utils.parse_tool_arguments({ "a" => 1, "b" => { "c" => 2 } })
+    assert_equal({ a: 1, b: { c: 2 } }, args)
+    assert_nil err
+  end
+
+  def test_parse_tool_arguments_array_is_invalid
+    args, err = AgentCore::Utils.parse_tool_arguments([1, 2, 3])
+    assert_equal({}, args)
+    assert_equal :invalid_json, err
+  end
+
+  def test_parse_tool_arguments_too_large
+    long_value = "x" * 10
+    args, err = AgentCore::Utils.parse_tool_arguments("{\"a\":\"#{long_value}\"}", max_bytes: 5)
+    assert_equal({}, args)
+    assert_equal :too_large, err
+  end
+
+  def test_normalize_tool_call_id_ensures_unique_and_fills_blank
+    used = {}
+    id1 = AgentCore::Utils.normalize_tool_call_id("", used: used, fallback: "tc_1")
+    id2 = AgentCore::Utils.normalize_tool_call_id("tc_1", used: used, fallback: "tc_2")
+    id3 = AgentCore::Utils.normalize_tool_call_id("tc_1", used: used, fallback: "tc_3")
+
+    assert_equal "tc_1", id1
+    assert_equal "tc_1__2", id2
+    assert_equal "tc_1__3", id3
+  end
+
+  def test_normalize_json_schema_omits_empty_required_arrays
+    schema = {
+      "type" => "object",
+      "properties" => { "a" => { "type" => "string", "required" => [] } },
+      "required" => [],
+    }
+
+    normalized = AgentCore::Utils.normalize_json_schema(schema)
+
+    refute normalized.key?("required")
+    refute normalized.dig("properties", "a").key?("required")
+  end
+
+  def test_truncate_utf8_bytes_handles_invalid_utf8
+    invalid = "\xC3".dup.force_encoding(Encoding::UTF_8)
+    out = AgentCore::Utils.truncate_utf8_bytes(invalid, max_bytes: 1)
+
+    assert out.valid_encoding?
+    assert out.bytesize <= 1
+  end
 end

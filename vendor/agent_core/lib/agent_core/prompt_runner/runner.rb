@@ -31,6 +31,7 @@ module AgentCore
     #   end
     class Runner
       DEFAULT_MAX_TURNS = 10
+      DEFAULT_FIX_EMPTY_FINAL_USER_TEXT = "Please provide your final answer."
 
       # Run a prompt to completion (synchronous).
       #
@@ -42,8 +43,17 @@ module AgentCore
       # @param events [Events, nil] Event callbacks
       # @return [RunResult]
       def run(prompt:, provider:, tools_registry: nil, tool_policy: nil, max_turns: DEFAULT_MAX_TURNS, events: nil,
-              token_counter: nil, context_window: nil, reserved_output_tokens: 0)
+              token_counter: nil, context_window: nil, reserved_output_tokens: 0,
+              fix_empty_final: true, fix_empty_final_user_text: DEFAULT_FIX_EMPTY_FINAL_USER_TEXT,
+              fix_empty_final_disable_tools: true, max_tool_output_bytes: Utils::DEFAULT_MAX_TOOL_OUTPUT_BYTES,
+              max_tool_calls_per_turn: nil)
         raise ArgumentError, "max_turns must be >= 1, got #{max_turns}" if max_turns < 1
+
+        max_tool_output_bytes = Integer(max_tool_output_bytes)
+        raise ArgumentError, "max_tool_output_bytes must be positive" if max_tool_output_bytes <= 0
+
+        fix_empty_final_user_text = fix_empty_final_user_text.to_s
+        fix_empty_final_user_text = DEFAULT_FIX_EMPTY_FINAL_USER_TEXT if fix_empty_final_user_text.strip.empty?
 
         events ||= Events.new
         messages = prompt.messages.dup
@@ -55,6 +65,9 @@ module AgentCore
         options = Utils.symbolize_keys(prompt.options)
         model = options.delete(:model)
         turn = 0
+        tools_enabled = true
+        empty_final_fixup_attempted = false
+        any_tool_calls_seen = false
 
         loop do
           turn += 1
@@ -74,7 +87,7 @@ module AgentCore
           events.emit(:turn_start, turn)
 
           # Build LLM request
-          tools = prompt.has_tools? ? prompt.tools : nil
+          tools = tools_enabled && prompt.has_tools? ? prompt.tools : nil
           request_messages = messages.dup.freeze
 
           # Preflight token check
@@ -122,17 +135,66 @@ module AgentCore
             )
           end
 
+          tool_calls = assistant_msg.tool_calls || []
+
+          effective_max_tool_calls_per_turn =
+            if max_tool_calls_per_turn
+              limit = Integer(max_tool_calls_per_turn)
+              raise ArgumentError, "max_tool_calls_per_turn must be positive" if limit <= 0
+              limit
+            elsif options.fetch(:parallel_tool_calls, nil) == false
+              1
+            end
+
+          if tools_registry && tools && effective_max_tool_calls_per_turn && tool_calls.size > effective_max_tool_calls_per_turn
+            ignored = tool_calls.drop(effective_max_tool_calls_per_turn)
+
+            ignored.each do |tc|
+              tool_calls_record << {
+                name: tc.name,
+                arguments: tc.arguments,
+                error: "ignored: max_tool_calls_per_turn=#{effective_max_tool_calls_per_turn}",
+              }
+            end
+
+            tool_calls = tool_calls.first(effective_max_tool_calls_per_turn)
+
+            assistant_msg =
+              Message.new(
+                role: assistant_msg.role,
+                content: assistant_msg.content,
+                tool_calls: tool_calls.empty? ? nil : tool_calls,
+                tool_call_id: assistant_msg.tool_call_id,
+                name: assistant_msg.name,
+                metadata: assistant_msg.metadata,
+              )
+          elsif tools.nil? && assistant_msg.has_tool_calls?
+            assistant_msg =
+              Message.new(
+                role: assistant_msg.role,
+                content: assistant_msg.content,
+                tool_calls: nil,
+                tool_call_id: assistant_msg.tool_call_id,
+                name: assistant_msg.name,
+                metadata: assistant_msg.metadata,
+              )
+            tool_calls = []
+          end
+
           messages << assistant_msg
           all_new_messages << assistant_msg
 
+          any_tool_calls_seen ||= tool_calls.any? if tools_registry && tools
+
           # Check if we need to execute tool calls
-          if response.has_tool_calls? && tools_registry
+          if tool_calls.any? && tools_registry && tools
             tool_results = execute_tool_calls(
-              tool_calls: response.tool_calls,
+              tool_calls: tool_calls,
               tools_registry: tools_registry,
               tool_policy: tool_policy,
               events: events,
               tool_calls_record: tool_calls_record,
+              max_tool_output_bytes: max_tool_output_bytes,
               stream_block: nil
             )
 
@@ -145,6 +207,21 @@ module AgentCore
             events.emit(:turn_end, turn, all_new_messages)
             # Continue loop for next LLM call with tool results
           else
+            if fix_empty_final &&
+                !empty_final_fixup_attempted &&
+                tools_registry &&
+                any_tool_calls_seen &&
+                assistant_msg.assistant? &&
+                assistant_msg.text.to_s.strip.empty?
+              empty_final_fixup_attempted = true
+              tools_enabled = false if fix_empty_final_disable_tools
+              events.emit(:turn_end, turn, all_new_messages)
+              user_msg = Message.new(role: :user, content: fix_empty_final_user_text)
+              messages << user_msg
+              all_new_messages << user_msg
+              next
+            end
+
             # No tool calls — this is the final response
             events.emit(:turn_end, turn, all_new_messages)
             return build_result(
@@ -170,8 +247,17 @@ module AgentCore
       # @yield [StreamEvent] Stream events
       # @return [RunResult]
       def run_stream(prompt:, provider:, tools_registry: nil, tool_policy: nil, max_turns: DEFAULT_MAX_TURNS, events: nil,
-                     token_counter: nil, context_window: nil, reserved_output_tokens: 0, &block)
+                     token_counter: nil, context_window: nil, reserved_output_tokens: 0,
+                     fix_empty_final: true, fix_empty_final_user_text: DEFAULT_FIX_EMPTY_FINAL_USER_TEXT,
+                     fix_empty_final_disable_tools: true, max_tool_output_bytes: Utils::DEFAULT_MAX_TOOL_OUTPUT_BYTES,
+                     max_tool_calls_per_turn: nil, &block)
         raise ArgumentError, "max_turns must be >= 1, got #{max_turns}" if max_turns < 1
+
+        max_tool_output_bytes = Integer(max_tool_output_bytes)
+        raise ArgumentError, "max_tool_output_bytes must be positive" if max_tool_output_bytes <= 0
+
+        fix_empty_final_user_text = fix_empty_final_user_text.to_s
+        fix_empty_final_user_text = DEFAULT_FIX_EMPTY_FINAL_USER_TEXT if fix_empty_final_user_text.strip.empty?
 
         events ||= Events.new
         messages = prompt.messages.dup
@@ -183,6 +269,9 @@ module AgentCore
         options = Utils.symbolize_keys(prompt.options)
         model = options.delete(:model)
         turn = 0
+        tools_enabled = true
+        empty_final_fixup_attempted = false
+        any_tool_calls_seen = false
 
         loop do
           turn += 1
@@ -202,7 +291,7 @@ module AgentCore
           yield StreamEvent::TurnStart.new(turn_number: turn) if block
           events.emit(:turn_start, turn)
 
-          tools = prompt.has_tools? ? prompt.tools : nil
+          tools = tools_enabled && prompt.has_tools? ? prompt.tools : nil
           request_messages = messages.dup.freeze
 
           # Preflight token check
@@ -282,14 +371,66 @@ module AgentCore
             )
           )
 
-          # Handle tool calls
-          if assistant_msg&.has_tool_calls? && tools_registry
+          effective_max_tool_calls_per_turn =
+            if max_tool_calls_per_turn
+              limit = Integer(max_tool_calls_per_turn)
+              raise ArgumentError, "max_tool_calls_per_turn must be positive" if limit <= 0
+              limit
+            elsif options.fetch(:parallel_tool_calls, nil) == false
+              1
+            end
+
+          tool_calls = assistant_msg.tool_calls || []
+
+          if tools_registry && tools && effective_max_tool_calls_per_turn && tool_calls.size > effective_max_tool_calls_per_turn
+            ignored = tool_calls.drop(effective_max_tool_calls_per_turn)
+
+            ignored.each do |tc|
+              tool_calls_record << {
+                name: tc.name,
+                arguments: tc.arguments,
+                error: "ignored: max_tool_calls_per_turn=#{effective_max_tool_calls_per_turn}",
+              }
+            end
+
+            tool_calls = tool_calls.first(effective_max_tool_calls_per_turn)
+
+            assistant_msg =
+              Message.new(
+                role: assistant_msg.role,
+                content: assistant_msg.content,
+                tool_calls: tool_calls.empty? ? nil : tool_calls,
+                tool_call_id: assistant_msg.tool_call_id,
+                name: assistant_msg.name,
+                metadata: assistant_msg.metadata,
+              )
+            messages[-1] = assistant_msg
+            all_new_messages[-1] = assistant_msg
+          elsif tools.nil? && assistant_msg.has_tool_calls?
+            assistant_msg =
+              Message.new(
+                role: assistant_msg.role,
+                content: assistant_msg.content,
+                tool_calls: nil,
+                tool_call_id: assistant_msg.tool_call_id,
+                name: assistant_msg.name,
+                metadata: assistant_msg.metadata,
+              )
+            tool_calls = []
+            messages[-1] = assistant_msg
+            all_new_messages[-1] = assistant_msg
+          end
+
+          any_tool_calls_seen ||= tool_calls.any? if tools_registry && tools
+
+          if tool_calls.any? && tools_registry && tools
             tool_results = execute_tool_calls(
-              tool_calls: assistant_msg.tool_calls,
+              tool_calls: tool_calls,
               tools_registry: tools_registry,
               tool_policy: tool_policy,
               events: events,
               tool_calls_record: tool_calls_record,
+              max_tool_output_bytes: max_tool_output_bytes,
               stream_block: block
             )
 
@@ -301,6 +442,22 @@ module AgentCore
             yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg) if block
             events.emit(:turn_end, turn, all_new_messages)
           else
+            if fix_empty_final &&
+                !empty_final_fixup_attempted &&
+                tools_registry &&
+                any_tool_calls_seen &&
+                assistant_msg.assistant? &&
+                assistant_msg.text.to_s.strip.empty?
+              empty_final_fixup_attempted = true
+              tools_enabled = false if fix_empty_final_disable_tools
+              yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg) if block
+              events.emit(:turn_end, turn, all_new_messages)
+              user_msg = Message.new(role: :user, content: fix_empty_final_user_text)
+              messages << user_msg
+              all_new_messages << user_msg
+              next
+            end
+
             yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg) if block
             events.emit(:turn_end, turn, all_new_messages)
 
@@ -322,12 +479,38 @@ module AgentCore
 
       # Execute tool calls, optionally emitting stream events.
       # Unified implementation for both sync and streaming modes.
-      def execute_tool_calls(tool_calls:, tools_registry:, tool_policy:, events:, tool_calls_record:, stream_block: nil)
+      def execute_tool_calls(tool_calls:, tools_registry:, tool_policy:, events:, tool_calls_record:, max_tool_output_bytes:,
+                             stream_block: nil)
         tool_calls.map do |tc|
           stream_block&.call(StreamEvent::ToolExecutionStart.new(
             tool_call_id: tc.id, name: tc.name, arguments: tc.arguments
           ))
           events.emit(:tool_call, tc.name, tc.arguments, tc.id)
+
+          if tc.respond_to?(:arguments_valid?) && !tc.arguments_valid?
+            parse_error = tc.respond_to?(:arguments_parse_error) ? tc.arguments_parse_error : :invalid_json
+            error_text =
+              case parse_error
+              when :too_large
+                "Tool call arguments are too large. Retry with smaller arguments."
+              else
+                "Invalid JSON in tool call arguments. Retry with arguments as a JSON object only."
+              end
+            error_result = Resources::Tools::ToolResult.error(text: error_text)
+
+            stream_block&.call(StreamEvent::ToolExecutionEnd.new(
+              tool_call_id: tc.id, name: tc.name, result: error_result, error: true
+            ))
+            events.emit(:tool_result, tc.name, error_result, tc.id)
+            tool_calls_record << { name: tc.name, arguments: tc.arguments, error: parse_error.to_s }
+
+            next tool_result_to_message(
+              error_result,
+              tool_call_id: tc.id,
+              name: tc.name,
+              max_tool_output_bytes: max_tool_output_bytes,
+            )
+          end
 
           # Check policy
           if tool_policy
@@ -342,28 +525,50 @@ module AgentCore
               events.emit(:tool_result, tc.name, error_result, tc.id)
               tool_calls_record << { name: tc.name, arguments: tc.arguments, error: decision.reason }
 
-              next tool_result_to_message(error_result, tool_call_id: tc.id, name: tc.name)
+              next tool_result_to_message(
+                error_result,
+                tool_call_id: tc.id,
+                name: tc.name,
+                max_tool_output_bytes: max_tool_output_bytes,
+              )
+            end
+          end
+
+          requested_name = tc.name.to_s
+          execute_name = requested_name
+          unless tools_registry.include?(execute_name)
+            if execute_name.include?(".")
+              underscored = execute_name.tr(".", "_")
+              execute_name = underscored if tools_registry.include?(underscored)
             end
           end
 
           # Execute tool
           result = begin
-            tools_registry.execute(name: tc.name, arguments: tc.arguments)
+            tools_registry.execute(name: execute_name, arguments: tc.arguments)
           rescue ToolNotFoundError => e
             Resources::Tools::ToolResult.error(text: e.message)
           rescue => e
-            Resources::Tools::ToolResult.error(text: "Tool '#{tc.name}' raised: #{e.message}")
+            Resources::Tools::ToolResult.error(text: "Tool '#{requested_name}' raised: #{e.message}")
           end
+
+          result = limit_tool_result(result, max_bytes: max_tool_output_bytes, tool_name: execute_name)
+
           stream_block&.call(StreamEvent::ToolExecutionEnd.new(
             tool_call_id: tc.id, name: tc.name, result: result, error: result.error?
           ))
           events.emit(:tool_result, tc.name, result, tc.id)
           tool_calls_record << {
-            name: tc.name, arguments: tc.arguments,
+            name: requested_name, executed_name: execute_name, arguments: tc.arguments,
             error: result.error? ? result.text : nil,
           }
 
-          tool_result_to_message(result, tool_call_id: tc.id, name: tc.name)
+          tool_result_to_message(
+            result,
+            tool_call_id: tc.id,
+            name: requested_name,
+            max_tool_output_bytes: max_tool_output_bytes,
+          )
         end
       end
 
@@ -421,7 +626,7 @@ module AgentCore
       # When the result contains only text blocks, uses a simple String content
       # (backward compatible). When it contains images or other media, uses an
       # Array of ContentBlock objects so providers can serialize them correctly.
-      def tool_result_to_message(result, tool_call_id:, name:)
+      def tool_result_to_message(result, tool_call_id:, name:, max_tool_output_bytes:)
         content_blocks = nil
         conversion_error = nil
 
@@ -443,6 +648,10 @@ module AgentCore
           result.text
         end
 
+        if content.is_a?(String) && content.bytesize > max_tool_output_bytes
+          content = Utils.truncate_utf8_bytes(content, max_bytes: max_tool_output_bytes)
+        end
+
         error = conversion_error ? true : result.error?
 
         Message.new(
@@ -450,6 +659,41 @@ module AgentCore
           tool_call_id: tool_call_id, name: name,
           metadata: { error: error }
         )
+      end
+
+      def limit_tool_result(result, max_bytes:, tool_name:)
+        return result unless result.is_a?(Resources::Tools::ToolResult)
+
+        estimated_bytes = estimate_tool_result_bytes(result)
+        return result unless estimated_bytes.is_a?(Integer)
+        return result if estimated_bytes <= max_bytes
+
+        marker = "\n\n[truncated]"
+        text = result.text.to_s
+
+        replacement_text =
+          if text.strip.empty?
+            "Tool '#{tool_name}' output omitted because it exceeded the size limit (max_bytes=#{max_bytes})."
+          elsif max_bytes <= marker.bytesize
+            Utils.truncate_utf8_bytes(marker, max_bytes: max_bytes)
+          else
+            Utils.truncate_utf8_bytes(text, max_bytes: max_bytes - marker.bytesize) + marker
+          end
+
+        Resources::Tools::ToolResult.new(
+          content: [{ type: :text, text: replacement_text }],
+          error: result.error?,
+          metadata: result.metadata.merge(truncated: true, estimated_bytes: estimated_bytes, max_bytes: max_bytes)
+        )
+      rescue StandardError
+        result
+      end
+
+      def estimate_tool_result_bytes(result)
+        require "json"
+        JSON.generate({ content: result.content, error: result.error? }).bytesize
+      rescue StandardError
+        result.text.to_s.bytesize
       end
 
       def apply_system_prompt!(system_prompt, messages)

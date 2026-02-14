@@ -65,7 +65,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     # Set up tools
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
-      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, context:|
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
         AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
       end
     )
@@ -84,6 +84,214 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert result.used_tools?
     assert_equal 1, result.tool_calls_made.size
     assert_equal "echo", result.tool_calls_made.first[:name]
+  end
+
+  def test_tool_call_with_invalid_arguments_is_not_executed
+    executed = false
+
+    tool_call =
+      AgentCore::ToolCall.new(
+        id: "tc_1",
+        name: "echo",
+        arguments: {},
+        arguments_parse_error: :invalid_json
+      )
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        executed = true
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+
+    refute executed
+    assert_equal 1, result.tool_calls_made.size
+    assert_equal "invalid_json", result.tool_calls_made.first[:error]
+  end
+
+  def test_tool_output_is_truncated_when_exceeding_limit
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "big", arguments: {})
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "big", description: "Big", parameters: {}) do |_args, **|
+        AgentCore::Resources::Tools::ToolResult.success(text: "a" * 1000)
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result =
+      @runner.run(
+        prompt: prompt, provider: provider,
+        tools_registry: registry,
+        max_tool_output_bytes: 100
+      )
+
+    tool_result_msg = result.messages.find(&:tool_result?)
+    assert tool_result_msg
+    assert_kind_of String, tool_result_msg.content
+    assert_includes tool_result_msg.content, "[truncated]"
+    assert_operator tool_result_msg.content.bytesize, :<=, 100
+  end
+
+  def test_dot_tool_name_falls_back_to_underscored_tool
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "foo.bar", arguments: {})
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    executed = []
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "foo_bar", description: "Foo", parameters: {}) do |_args, **|
+        executed << :foo_bar
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+
+    assert_equal [:foo_bar], executed
+    assert_equal 1, result.tool_calls_made.size
+    assert_equal "foo.bar", result.tool_calls_made.first[:name]
+    assert_equal "foo_bar", result.tool_calls_made.first[:executed_name]
+
+    tool_result_msg = result.messages.find(&:tool_result?)
+    assert_equal "ok", tool_result_msg.content
+  end
+
+  def test_max_tool_calls_per_turn_trims_and_records_ignored_calls
+    tool_call1 = AgentCore::ToolCall.new(id: "tc_1", name: "a", arguments: {})
+    tool_call2 = AgentCore::ToolCall.new(id: "tc_2", name: "b", arguments: {})
+    assistant_with_tools =
+      AgentCore::Message.new(
+        role: :assistant,
+        content: "Calling tools",
+        tool_calls: [tool_call1, tool_call2]
+      )
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tools, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    executed = []
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "a", description: "A", parameters: {}) do |_args, **|
+        executed << :a
+        AgentCore::Resources::Tools::ToolResult.success(text: "a_ok")
+      end
+    )
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "b", description: "B", parameters: {}) do |_args, **|
+        executed << :b
+        AgentCore::Resources::Tools::ToolResult.success(text: "b_ok")
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result =
+      @runner.run(
+        prompt: prompt, provider: provider,
+        tools_registry: registry,
+        max_tool_calls_per_turn: 1
+      )
+
+    assert_equal [:a], executed
+    assert_equal 2, result.tool_calls_made.size
+    assert_equal "b", result.tool_calls_made.first[:name]
+    assert_includes result.tool_calls_made.first[:error], "ignored: max_tool_calls_per_turn=1"
+
+    assistant_msg = result.messages.find { |m| m.assistant? && m.has_tool_calls? }
+    assert assistant_msg
+    assert_equal ["a"], assistant_msg.tool_calls.map(&:name)
+  end
+
+  def test_fix_empty_final_retries_without_tools
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    empty_final_msg = AgentCore::Message.new(role: :assistant, content: "")
+    empty_final_response = AgentCore::Resources::Provider::Response.new(message: empty_final_msg, stop_reason: :end_turn)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Final answer")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, empty_final_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+
+    assert_equal "Final answer", result.text
+    assert_equal 3, provider.calls.size
+    assert_nil provider.calls[2][:tools]
+    assert_equal "Please provide your final answer.", provider.calls[2][:messages].last.text
+
+    fixup_msg = result.messages.find { |m| m.user? && m.text == "Please provide your final answer." }
+    assert fixup_msg
   end
 
   def test_unknown_tool_call_does_not_raise
@@ -106,6 +314,11 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
 
     provider = MockProvider.new(responses: [tool_response, final_response])
     registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
 
     prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
       system_prompt: "test",
@@ -136,7 +349,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
 
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
-      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, context:|
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
         AgentCore::Resources::Tools::ToolResult.success(text: "echoed")
       end
     )
@@ -190,7 +403,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
 
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
-      AgentCore::Resources::Tools::Tool.new(name: "dangerous", description: "bad", parameters: {}) do |args, context:|
+      AgentCore::Resources::Tools::Tool.new(name: "dangerous", description: "bad", parameters: {}) do |_args, **|
         AgentCore::Resources::Tools::ToolResult.success(text: "should not run")
       end
     )
@@ -454,7 +667,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     # Register a tool that returns text + image
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
-      AgentCore::Resources::Tools::Tool.new(name: "screenshot", description: "Take screenshot", parameters: {}) do |_args, context:|
+      AgentCore::Resources::Tools::Tool.new(name: "screenshot", description: "Take screenshot", parameters: {}) do |_args, **|
         AgentCore::Resources::Tools::ToolResult.with_content([
           { type: "text", text: "Screenshot captured" },
           { type: "image", source_type: "base64", media_type: "image/png", data: "iVBOR" },
@@ -507,7 +720,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
 
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
-      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, context:|
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
         AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
       end
     )
@@ -551,7 +764,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
 
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
-      AgentCore::Resources::Tools::Tool.new(name: "screenshot", description: "Take screenshot", parameters: {}) do |_args, context:|
+      AgentCore::Resources::Tools::Tool.new(name: "screenshot", description: "Take screenshot", parameters: {}) do |_args, **|
         AgentCore::Resources::Tools::ToolResult.with_content([
           { type: "text", text: "Screenshot captured" },
           # Invalid: base64 image missing media_type triggers ImageContent validation error
