@@ -13,7 +13,7 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
         properties: { text: { type: "string" } },
         required: ["text"],
       }
-    ) { |args, context:| AgentCore::Resources::Tools::ToolResult.success(text: args[:text] || args["text"]) }
+    ) { |args, context:| AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, "")) }
   end
 
   def test_register_and_find

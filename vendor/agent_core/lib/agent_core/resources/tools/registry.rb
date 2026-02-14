@@ -117,9 +117,10 @@ module AgentCore
             original_name = tool_info[:original_name]
             begin
               mcp_result = client.call_tool(name: original_name, arguments: arguments)
+              result_hash = mcp_result.is_a?(Hash) ? AgentCore::Utils.symbolize_keys(mcp_result) : {}
               ToolResult.new(
-                content: mcp_result[:content] || [{ type: "text", text: mcp_result.to_s }],
-                is_error: mcp_result[:isError] || false
+                content: result_hash[:content] || [{ type: :text, text: mcp_result.to_s }],
+                error: result_hash.fetch(:error, false)
               )
             rescue => e
               ToolResult.error(text: "MCP tool '#{original_name}' failed: #{e.message}")
@@ -173,8 +174,9 @@ module AgentCore
         end
 
         def format_mcp_definition(name, definition, format)
-          desc = definition[:description] || ""
-          params = definition[:inputSchema] || definition[:parameters] || {}
+          desc = definition.fetch(:description, "").to_s
+          params = definition.fetch(:input_schema) { definition.fetch(:parameters, {}) }
+          params = {} unless params.is_a?(Hash)
 
           case format
           when :anthropic

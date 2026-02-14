@@ -155,7 +155,7 @@ module AgentCore
       when :document then DocumentContent.from_h(h)
       when :audio then AudioContent.from_h(h)
       when :tool_use then ToolUseContent.new(id: h[:id], name: h[:name], input: h[:input])
-      when :tool_result then ToolResultContent.new(tool_use_id: h[:tool_use_id], content: h[:content], is_error: h[:is_error])
+      when :tool_result then ToolResultContent.new(tool_use_id: h[:tool_use_id], content: h[:content], error: h[:error])
       else
         TextContent.new(text: h[:text] || h.to_s)
       end
@@ -446,19 +446,19 @@ module AgentCore
 
   # Tool result content block.
   class ToolResultContent
-    attr_reader :tool_use_id, :content, :is_error
+    attr_reader :tool_use_id, :content, :error
 
-    def initialize(tool_use_id:, content:, is_error: false)
+    def initialize(tool_use_id:, content:, error: false)
       @tool_use_id = tool_use_id
       @content = content
-      @is_error = is_error
+      @error = !!error
     end
 
     def type = :tool_result
-    def error? = is_error
+    def error? = error
 
     def to_h
-      { type: :tool_result, tool_use_id: tool_use_id, content: content, is_error: is_error }
+      { type: :tool_result, tool_use_id: tool_use_id, content: content, error: error }
     end
 
     def ==(other)

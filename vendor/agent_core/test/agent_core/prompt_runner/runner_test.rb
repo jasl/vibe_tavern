@@ -66,7 +66,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
       AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, context:|
-        AgentCore::Resources::Tools::ToolResult.success(text: args[:text] || args["text"] || "")
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
       end
     )
 
@@ -508,7 +508,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
       AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, context:|
-        AgentCore::Resources::Tools::ToolResult.success(text: args[:text] || args["text"] || "")
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
       end
     )
 
@@ -573,7 +573,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert tool_result_msg
     assert_kind_of String, tool_result_msg.content
     assert_includes tool_result_msg.content, "invalid multimodal content"
-    assert tool_result_msg.metadata[:is_error]
+    assert tool_result_msg.metadata[:error]
   end
 end
 

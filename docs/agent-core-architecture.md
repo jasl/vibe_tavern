@@ -105,7 +105,7 @@ AgentCore::Resources::Tools::Tool  # Native tool
 
 AgentCore::Resources::Tools::ToolResult
   # content: Array<ContentBlock>  (text, image, etc.)
-  # is_error: Boolean
+  # error: Boolean
   # metadata: Hash
 ```
 

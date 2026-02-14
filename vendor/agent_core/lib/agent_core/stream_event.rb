@@ -104,17 +104,17 @@ module AgentCore
 
     # Tool execution has finished.
     class ToolExecutionEnd
-      attr_reader :tool_call_id, :name, :result, :is_error
+      attr_reader :tool_call_id, :name, :result, :error
 
-      def initialize(tool_call_id:, name:, result:, is_error: false)
+      def initialize(tool_call_id:, name:, result:, error: false)
         @tool_call_id = tool_call_id
         @name = name
         @result = result
-        @is_error = is_error
+        @error = !!error
       end
 
       def type = :tool_execution_end
-      def error? = is_error
+      def error? = error
     end
 
     # A new turn (LLM call) has started.

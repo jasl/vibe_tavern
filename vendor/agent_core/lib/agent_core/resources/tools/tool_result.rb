@@ -8,51 +8,35 @@ module AgentCore
       # Contains content blocks (text, images, etc.) and error status.
       # Normalized across all tool sources (native, MCP, skills).
       class ToolResult
-        attr_reader :content, :is_error, :metadata
+        attr_reader :content, :error, :metadata
 
         # @param content [Array<Hash>] Content blocks
-        #   Each block: { type: "text", text: "..." } or { type: "image", ... }
-        # @param is_error [Boolean] Whether this result represents an error
+        #   Each block: { type: :text, text: "..." } or { type: :image, ... }
+        # @param error [Boolean] Whether this result represents an error
         # @param metadata [Hash] Optional metadata (timing, byte counts, etc.)
-        def initialize(content:, is_error: false, metadata: {})
+        def initialize(content:, error: false, metadata: {})
           normalized = Array(content).map do |block|
-            if block.is_a?(Hash)
-              type = block[:type] || block["type"]
-              if type.nil?
-                if block.key?("text")
-                  block.merge("type" => "text")
-                elsif block.key?(:text)
-                  block.merge(type: "text")
-                else
-                  { type: "text", text: block.to_s }
-                end
-              else
-                block
-              end
-            else
-              { type: "text", text: block.to_s }
-            end
+            normalize_block(block)
           end
 
           @content = normalized.map(&:freeze).freeze
-          @is_error = is_error
+          @error = !!error
           @metadata = (metadata || {}).freeze
         end
 
-        def error? = is_error
+        def error? = error
 
         # Convenience: get text content as a single string.
         def text
           content.filter_map { |block|
-            block[:text] || block["text"] if block[:type]&.to_s == "text" || block["type"]&.to_s == "text"
+            block[:text] if block[:type] == :text
           }.join("\n")
         end
 
         # Whether this result contains non-text content blocks (images, documents, etc.).
         def has_non_text_content?
           content.any? { |block|
-            block_type = (block[:type] || block["type"])&.to_s
-            block_type && block_type != "text"
+            block[:type] && block[:type] != :text
           }
         end
 
@@ -67,14 +51,14 @@ module AgentCore
         end
 
         def to_h
-          { content: content, is_error: is_error, metadata: metadata }
+          { content: content, error: error, metadata: metadata }
         end
 
         # Build a successful text result.
         def self.success(text:, metadata: {})
           new(
-            content: [{ type: "text", text: text }],
-            is_error: false,
+            content: [{ type: :text, text: text }],
+            error: false,
             metadata: metadata
           )
         end
@@ -82,15 +66,49 @@ module AgentCore
         # Build an error result.
         def self.error(text:, metadata: {})
           new(
-            content: [{ type: "text", text: text }],
-            is_error: true,
+            content: [{ type: :text, text: text }],
+            error: true,
             metadata: metadata
           )
         end
 
         # Build a result with multiple content blocks.
-        def self.with_content(blocks, is_error: false, metadata: {})
-          new(content: blocks, is_error: is_error, metadata: metadata)
+        def self.with_content(blocks, error: false, metadata: {})
+          new(content: blocks, error: error, metadata: metadata)
+        end
+
+        private
+
+        def normalize_block(block)
+          unless block.is_a?(Hash)
+            return { type: :text, text: block.to_s }
+          end
+
+          h = AgentCore::Utils.symbolize_keys(block)
+          h = normalize_type!(h)
+          h = normalize_source_type!(h)
+
+          if h[:type].nil?
+            return h.key?(:text) ? h.merge(type: :text) : { type: :text, text: block.to_s }
+          end
+
+          h
+        end
+
+        def normalize_type!(hash)
+          type = hash[:type]
+          return hash if type.nil?
+
+          sym = type.is_a?(Symbol) ? type : type.to_s.to_sym
+          sym == type ? hash : hash.merge(type: sym)
+        end
+
+        def normalize_source_type!(hash)
+          st = hash[:source_type]
+          return hash if st.nil?
+
+          sym = st.is_a?(Symbol) ? st : st.to_s.to_sym
+          sym == st ? hash : hash.merge(source_type: sym)
         end
       end
     end

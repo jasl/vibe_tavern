@@ -337,7 +337,7 @@ module AgentCore
                 text: "Tool call denied: #{decision.reason}"
               )
               stream_block&.call(StreamEvent::ToolExecutionEnd.new(
-                tool_call_id: tc.id, name: tc.name, result: error_result, is_error: true
+                tool_call_id: tc.id, name: tc.name, result: error_result, error: true
               ))
               events.emit(:tool_result, tc.name, error_result, tc.id)
               tool_calls_record << { name: tc.name, arguments: tc.arguments, error: decision.reason }
@@ -355,7 +355,7 @@ module AgentCore
             Resources::Tools::ToolResult.error(text: "Tool '#{tc.name}' raised: #{e.message}")
           end
           stream_block&.call(StreamEvent::ToolExecutionEnd.new(
-            tool_call_id: tc.id, name: tc.name, result: result, is_error: result.error?
+            tool_call_id: tc.id, name: tc.name, result: result, error: result.error?
           ))
           events.emit(:tool_result, tc.name, result, tc.id)
           tool_calls_record << {
@@ -443,12 +443,12 @@ module AgentCore
           result.text
         end
 
-        is_error = conversion_error ? true : result.error?
+        error = conversion_error ? true : result.error?
 
         Message.new(
           role: :tool_result, content: content,
           tool_call_id: tool_call_id, name: name,
-          metadata: { is_error: is_error }
+          metadata: { error: error }
         )
       end
 
