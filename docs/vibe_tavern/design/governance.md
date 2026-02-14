@@ -106,4 +106,3 @@ should additionally implement:
 - Decision logs: store `{ decision_id, reason_codes, outcome }` with trace IDs.
 - Confirmation UI: render `TOOL_CONFIRMATION_REQUIRED` confirmations and resume safely.
 - Multi-tenant isolation: ensure `context` includes tenant/user/workspace identifiers and that runtime state never crosses tenants.
-

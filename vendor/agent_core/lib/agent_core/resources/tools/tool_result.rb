@@ -29,6 +29,24 @@ module AgentCore
           }.join("\n")
         end
 
+        # Whether this result contains non-text content blocks (images, documents, etc.).
+        def has_non_text_content?
+          content.any? { |block|
+            block_type = (block[:type] || block["type"])&.to_s
+            block_type && block_type != "text"
+          }
+        end
+
+        # Convert content hash blocks to ContentBlock objects.
+        #
+        # Used by the Runner to build Messages with proper content blocks
+        # when tool results include images or other media.
+        #
+        # @return [Array<ContentBlock>] Array of typed content block objects
+        def to_content_blocks
+          content.map { |block| AgentCore::ContentBlock.from_h(block) }
+        end
+
         def to_h
           { content: content, is_error: is_error, metadata: metadata }
         end

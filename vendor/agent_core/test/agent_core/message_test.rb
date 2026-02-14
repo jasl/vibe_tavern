@@ -119,11 +119,194 @@ class AgentCore::ContentBlockTest < Minitest::Test
     assert_equal({ type: :text, text: "hello" }, tc.to_h)
   end
 
-  def test_image_content
-    ic = AgentCore::ImageContent.new(source: { type: "base64", data: "abc" }, media_type: "image/png")
+  # --- ImageContent ---
+
+  def test_image_content_base64
+    ic = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "iVBOR")
     assert_equal :image, ic.type
+    assert_equal :base64, ic.source_type
     assert_equal "image/png", ic.media_type
+    assert_equal "iVBOR", ic.data
+    assert_nil ic.url
   end
+
+  def test_image_content_url
+    ic = AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg")
+    assert_equal :image, ic.type
+    assert_equal :url, ic.source_type
+    assert_equal "https://example.com/img.jpg", ic.url
+    assert_nil ic.data
+  end
+
+  def test_image_content_url_with_media_type
+    ic = AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg", media_type: "image/jpeg")
+    assert_equal "image/jpeg", ic.media_type
+  end
+
+  def test_image_content_base64_requires_data
+    assert_raises(ArgumentError) do
+      AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png")
+    end
+  end
+
+  def test_image_content_base64_requires_media_type
+    assert_raises(ArgumentError) do
+      AgentCore::ImageContent.new(source_type: :base64, data: "iVBOR")
+    end
+  end
+
+  def test_image_content_url_requires_url
+    assert_raises(ArgumentError) do
+      AgentCore::ImageContent.new(source_type: :url)
+    end
+  end
+
+  def test_image_content_requires_source_type
+    assert_raises(ArgumentError) do
+      AgentCore::ImageContent.new(source_type: nil, data: "x", media_type: "image/png")
+    end
+  end
+
+  def test_image_content_rejects_invalid_source_type
+    assert_raises(ArgumentError) do
+      AgentCore::ImageContent.new(source_type: :file, data: "x", media_type: "image/png")
+    end
+  end
+
+  def test_image_content_serialization_roundtrip_base64
+    ic = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "iVBOR")
+    h = ic.to_h
+    restored = AgentCore::ImageContent.from_h(h)
+    assert_equal ic, restored
+    assert_equal :base64, restored.source_type
+    assert_equal "iVBOR", restored.data
+  end
+
+  def test_image_content_serialization_roundtrip_url
+    ic = AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg", media_type: "image/jpeg")
+    h = ic.to_h
+    restored = AgentCore::ImageContent.from_h(h)
+    assert_equal ic, restored
+    assert_equal :url, restored.source_type
+    assert_equal "https://example.com/img.jpg", restored.url
+  end
+
+  def test_image_content_equality
+    a = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "abc")
+    b = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "abc")
+    c = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "xyz")
+    assert_equal a, b
+    refute_equal a, c
+  end
+
+  def test_image_data_is_frozen
+    ic = AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "abc")
+    assert ic.data.frozen?
+  end
+
+  # --- DocumentContent ---
+
+  def test_document_content_base64_pdf
+    dc = AgentCore::DocumentContent.new(
+      source_type: :base64, media_type: "application/pdf", data: "JVBERi",
+      filename: "report.pdf", title: "Q4 Report"
+    )
+    assert_equal :document, dc.type
+    assert_equal :base64, dc.source_type
+    assert_equal "application/pdf", dc.media_type
+    assert_equal "JVBERi", dc.data
+    assert_equal "report.pdf", dc.filename
+    assert_equal "Q4 Report", dc.title
+  end
+
+  def test_document_content_url
+    dc = AgentCore::DocumentContent.new(
+      source_type: :url, url: "https://example.com/doc.pdf", media_type: "application/pdf"
+    )
+    assert_equal :url, dc.source_type
+    assert_equal "https://example.com/doc.pdf", dc.url
+  end
+
+  def test_document_content_text_based
+    dc = AgentCore::DocumentContent.new(
+      source_type: :base64, media_type: "text/plain", data: "Hello world"
+    )
+    assert dc.text_based?
+    assert_equal "Hello world", dc.text
+  end
+
+  def test_document_content_binary_not_text_based
+    dc = AgentCore::DocumentContent.new(
+      source_type: :base64, media_type: "application/pdf", data: "JVBERi"
+    )
+    refute dc.text_based?
+    assert_nil dc.text
+  end
+
+  def test_document_content_validation
+    assert_raises(ArgumentError) { AgentCore::DocumentContent.new(source_type: :base64, data: "x") }
+    assert_raises(ArgumentError) { AgentCore::DocumentContent.new(source_type: :url) }
+  end
+
+  def test_document_content_serialization_roundtrip
+    dc = AgentCore::DocumentContent.new(
+      source_type: :base64, media_type: "application/pdf", data: "JVBERi",
+      filename: "report.pdf", title: "Q4"
+    )
+    h = dc.to_h
+    restored = AgentCore::DocumentContent.from_h(h)
+    assert_equal dc, restored
+    assert_equal "report.pdf", restored.filename
+    assert_equal "Q4", restored.title
+  end
+
+  # --- AudioContent ---
+
+  def test_audio_content_base64_with_transcript
+    ac = AgentCore::AudioContent.new(
+      source_type: :base64, media_type: "audio/wav", data: "UklGR",
+      transcript: "Hello world"
+    )
+    assert_equal :audio, ac.type
+    assert_equal :base64, ac.source_type
+    assert_equal "audio/wav", ac.media_type
+    assert_equal "UklGR", ac.data
+    assert_equal "Hello world", ac.transcript
+    assert_equal "Hello world", ac.text
+  end
+
+  def test_audio_content_without_transcript
+    ac = AgentCore::AudioContent.new(
+      source_type: :base64, media_type: "audio/wav", data: "UklGR"
+    )
+    assert_nil ac.text
+  end
+
+  def test_audio_content_url
+    ac = AgentCore::AudioContent.new(
+      source_type: :url, url: "https://example.com/audio.mp3"
+    )
+    assert_equal :url, ac.source_type
+    assert_equal "https://example.com/audio.mp3", ac.url
+  end
+
+  def test_audio_content_validation
+    assert_raises(ArgumentError) { AgentCore::AudioContent.new(source_type: :base64, data: "x") }
+    assert_raises(ArgumentError) { AgentCore::AudioContent.new(source_type: :url) }
+  end
+
+  def test_audio_content_serialization_roundtrip
+    ac = AgentCore::AudioContent.new(
+      source_type: :base64, media_type: "audio/wav", data: "UklGR",
+      transcript: "Hello"
+    )
+    h = ac.to_h
+    restored = AgentCore::AudioContent.from_h(h)
+    assert_equal ac, restored
+    assert_equal "Hello", restored.transcript
+  end
+
+  # --- ContentBlock.from_h dispatch ---
 
   def test_from_h_text
     block = AgentCore::ContentBlock.from_h({ type: "text", text: "hi" })
@@ -132,7 +315,61 @@ class AgentCore::ContentBlockTest < Minitest::Test
   end
 
   def test_from_h_image
-    block = AgentCore::ContentBlock.from_h({ type: "image", source: { url: "http://x" } })
+    block = AgentCore::ContentBlock.from_h({
+      type: "image", source_type: "base64", data: "abc", media_type: "image/png",
+    })
     assert_instance_of AgentCore::ImageContent, block
+    assert_equal :base64, block.source_type
+  end
+
+  def test_from_h_document
+    block = AgentCore::ContentBlock.from_h({
+      type: "document", source_type: "base64", data: "JVBERi", media_type: "application/pdf",
+    })
+    assert_instance_of AgentCore::DocumentContent, block
+    assert_equal :base64, block.source_type
+  end
+
+  def test_from_h_audio
+    block = AgentCore::ContentBlock.from_h({
+      type: "audio", source_type: "base64", data: "UklGR", media_type: "audio/wav",
+      transcript: "Hello",
+    })
+    assert_instance_of AgentCore::AudioContent, block
+    assert_equal "Hello", block.transcript
+  end
+
+  def test_from_h_unknown_falls_back_to_text
+    block = AgentCore::ContentBlock.from_h({ type: "unknown", text: "fallback" })
+    assert_instance_of AgentCore::TextContent, block
+    assert_equal "fallback", block.text
+  end
+
+  # --- Message with multimodal content ---
+
+  def test_message_with_mixed_content_blocks
+    blocks = [
+      AgentCore::TextContent.new(text: "Here's the image: "),
+      AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "iVBOR"),
+    ]
+    msg = AgentCore::Message.new(role: :user, content: blocks)
+    assert_equal "Here's the image: ", msg.text
+    assert_equal 2, msg.content.size
+  end
+
+  def test_message_serialization_with_multimodal_content
+    blocks = [
+      AgentCore::TextContent.new(text: "Look at this"),
+      AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "abc"),
+      AgentCore::DocumentContent.new(source_type: :base64, media_type: "application/pdf", data: "JVBERi"),
+    ]
+    msg = AgentCore::Message.new(role: :user, content: blocks)
+    h = msg.to_h
+
+    restored = AgentCore::Message.from_h(h)
+    assert_equal 3, restored.content.size
+    assert_instance_of AgentCore::TextContent, restored.content[0]
+    assert_instance_of AgentCore::ImageContent, restored.content[1]
+    assert_instance_of AgentCore::DocumentContent, restored.content[2]
   end
 end

@@ -68,7 +68,7 @@ class AgentCore::Resources::TokenCounter::HeuristicTest < Minitest::Test
     end
   end
 
-  def test_count_messages
+  def test_count_messages_string_content
     msgs = [
       AgentCore::Message.new(role: :user, content: "Hello!"),       # 6 chars → 2 tokens + 4 overhead = 6
       AgentCore::Message.new(role: :assistant, content: "Hi there!"), # 9 chars → 3 tokens + 4 overhead = 7
@@ -77,9 +77,89 @@ class AgentCore::Resources::TokenCounter::HeuristicTest < Minitest::Test
     assert_equal 13, result
   end
 
+  def test_count_messages_array_content_with_text_blocks
+    msgs = [
+      AgentCore::Message.new(role: :user, content: [
+        AgentCore::TextContent.new(text: "Hello!"),       # 6 chars → 2 tokens
+        AgentCore::TextContent.new(text: "Hi there!"),    # 9 chars → 3 tokens
+      ]),
+    ]
+    # 2 + 3 text tokens + 4 overhead = 9
+    result = @counter.count_messages(msgs)
+    assert_equal 9, result
+  end
+
+  def test_count_messages_with_image_block
+    msgs = [
+      AgentCore::Message.new(role: :user, content: [
+        AgentCore::TextContent.new(text: "Look:"),  # 5 chars → 2 tokens
+        AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "iVBOR"),
+      ]),
+    ]
+    # 2 text + 1600 image + 4 overhead = 1606
+    result = @counter.count_messages(msgs)
+    assert_equal 1606, result
+  end
+
+  def test_count_messages_with_document_block_binary
+    msgs = [
+      AgentCore::Message.new(role: :user, content: [
+        AgentCore::DocumentContent.new(source_type: :base64, media_type: "application/pdf", data: "JVBERi"),
+      ]),
+    ]
+    # 2000 document + 4 overhead = 2004
+    result = @counter.count_messages(msgs)
+    assert_equal 2004, result
+  end
+
+  def test_count_messages_with_document_block_text_based
+    msgs = [
+      AgentCore::Message.new(role: :user, content: [
+        AgentCore::DocumentContent.new(source_type: :base64, media_type: "text/plain", data: "Hello world!"),
+      ]),
+    ]
+    # "Hello world!" = 12 chars → ceil(12/4) = 3 text tokens + 4 overhead = 7
+    result = @counter.count_messages(msgs)
+    assert_equal 7, result
+  end
+
+  def test_count_messages_with_audio_block_with_transcript
+    msgs = [
+      AgentCore::Message.new(role: :user, content: [
+        AgentCore::AudioContent.new(source_type: :base64, media_type: "audio/wav", data: "UklGR", transcript: "Hello world!"),
+      ]),
+    ]
+    # "Hello world!" = 12 chars → ceil(12/4) = 3 text tokens + 4 overhead = 7
+    result = @counter.count_messages(msgs)
+    assert_equal 7, result
+  end
+
+  def test_count_messages_with_audio_block_without_transcript
+    msgs = [
+      AgentCore::Message.new(role: :user, content: [
+        AgentCore::AudioContent.new(source_type: :base64, media_type: "audio/wav", data: "UklGR"),
+      ]),
+    ]
+    # 1000 audio + 4 overhead = 1004
+    result = @counter.count_messages(msgs)
+    assert_equal 1004, result
+  end
+
   def test_count_messages_empty
     assert_equal 0, @counter.count_messages([])
     assert_equal 0, @counter.count_messages(nil)
+  end
+
+  def test_count_content_block_dispatches_correctly
+    assert_equal 1600, @counter.count_content_block(
+      AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "x")
+    )
+    assert_equal 2000, @counter.count_content_block(
+      AgentCore::DocumentContent.new(source_type: :base64, media_type: "application/pdf", data: "x")
+    )
+    assert_equal 1000, @counter.count_content_block(
+      AgentCore::AudioContent.new(source_type: :base64, media_type: "audio/wav", data: "x")
+    )
   end
 
   def test_count_tools
@@ -103,8 +183,7 @@ class AgentCore::Resources::TokenCounter::BaseTest < Minitest::Test
     end
   end
 
-  def test_count_messages_delegates_to_count_text
-    # Create a simple counter that always returns text length
+  def test_count_messages_string_content_delegates_to_count_text
     counter = Class.new(AgentCore::Resources::TokenCounter::Base) do
       def count_text(text)
         text.to_s.length
@@ -114,5 +193,37 @@ class AgentCore::Resources::TokenCounter::BaseTest < Minitest::Test
     msgs = [AgentCore::Message.new(role: :user, content: "ab")]
     # "ab" = 2 chars + 4 overhead = 6
     assert_equal 6, counter.count_messages(msgs)
+  end
+
+  def test_count_messages_array_content_dispatches_blocks
+    counter = Class.new(AgentCore::Resources::TokenCounter::Base) do
+      def count_text(text)
+        text.to_s.length
+      end
+    end.new
+
+    msgs = [
+      AgentCore::Message.new(role: :user, content: [
+        AgentCore::TextContent.new(text: "hi"),  # 2 chars
+        AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "x"),
+      ]),
+    ]
+    # 2 text + 1600 image + 4 overhead = 1606
+    assert_equal 1606, counter.count_messages(msgs)
+  end
+
+  def test_count_image_can_be_overridden
+    counter = Class.new(AgentCore::Resources::TokenCounter::Base) do
+      def count_text(text) = text.to_s.length
+      def count_image(_block) = 500
+    end.new
+
+    msgs = [
+      AgentCore::Message.new(role: :user, content: [
+        AgentCore::ImageContent.new(source_type: :base64, media_type: "image/png", data: "x"),
+      ]),
+    ]
+    # 500 image + 4 overhead = 504
+    assert_equal 504, counter.count_messages(msgs)
   end
 end

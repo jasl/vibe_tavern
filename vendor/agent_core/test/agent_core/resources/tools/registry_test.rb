@@ -136,4 +136,49 @@ class AgentCore::Resources::Tools::ToolResultTest < Minitest::Test
     ])
     assert_equal "line 1\nline 2", result.text
   end
+
+  def test_has_non_text_content_false_for_text_only
+    result = AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+    refute result.has_non_text_content?
+  end
+
+  def test_has_non_text_content_true_for_image
+    result = AgentCore::Resources::Tools::ToolResult.with_content([
+      { type: "text", text: "Here's the screenshot" },
+      { type: "image", source_type: "base64", media_type: "image/png", data: "iVBOR" },
+    ])
+    assert result.has_non_text_content?
+  end
+
+  def test_has_non_text_content_works_with_string_keys
+    result = AgentCore::Resources::Tools::ToolResult.with_content([
+      { "type" => "text", "text" => "ok" },
+      { "type" => "image", "source_type" => "base64", "media_type" => "image/png", "data" => "x" },
+    ])
+    assert result.has_non_text_content?
+  end
+
+  def test_to_content_blocks_converts_hashes
+    result = AgentCore::Resources::Tools::ToolResult.with_content([
+      { type: "text", text: "Here's the image" },
+      { type: "image", source_type: "base64", media_type: "image/png", data: "iVBOR" },
+    ])
+    blocks = result.to_content_blocks
+    assert_equal 2, blocks.size
+    assert_instance_of AgentCore::TextContent, blocks[0]
+    assert_equal "Here's the image", blocks[0].text
+    assert_instance_of AgentCore::ImageContent, blocks[1]
+    assert_equal :base64, blocks[1].source_type
+    assert_equal "image/png", blocks[1].media_type
+  end
+
+  def test_to_content_blocks_with_document
+    result = AgentCore::Resources::Tools::ToolResult.with_content([
+      { type: "text", text: "File contents:" },
+      { type: "document", source_type: "base64", media_type: "application/pdf", data: "JVBERi", filename: "report.pdf" },
+    ])
+    blocks = result.to_content_blocks
+    assert_instance_of AgentCore::DocumentContent, blocks[1]
+    assert_equal "report.pdf", blocks[1].filename
+  end
 end

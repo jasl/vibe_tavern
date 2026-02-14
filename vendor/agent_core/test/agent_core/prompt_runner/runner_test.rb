@@ -425,6 +425,108 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_includes event_types, :error
     assert_equal 0, provider.calls.size
   end
+
+  # --- Multimodal tool results ---
+
+  def test_tool_result_with_image_preserves_content_blocks
+    # First response: assistant calls a screenshot tool
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "screenshot", arguments: {})
+    assistant_with_tool = AgentCore::Message.new(
+      role: :assistant, content: "Taking a screenshot.",
+      tool_calls: [tool_call]
+    )
+    tool_response = AgentCore::Resources::Provider::Response.new(
+      message: assistant_with_tool,
+      usage: AgentCore::Resources::Provider::Usage.new(input_tokens: 10, output_tokens: 5),
+      stop_reason: :tool_use
+    )
+
+    # Second response: final text
+    final_msg = AgentCore::Message.new(role: :assistant, content: "I can see the page.")
+    final_response = AgentCore::Resources::Provider::Response.new(
+      message: final_msg,
+      usage: AgentCore::Resources::Provider::Usage.new(input_tokens: 20, output_tokens: 10),
+      stop_reason: :end_turn
+    )
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    # Register a tool that returns text + image
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "screenshot", description: "Take screenshot", parameters: {}) do |_args, context:|
+        AgentCore::Resources::Tools::ToolResult.with_content([
+          { type: "text", text: "Screenshot captured" },
+          { type: "image", source_type: "base64", media_type: "image/png", data: "iVBOR" },
+        ])
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "You are helpful.",
+      messages: [AgentCore::Message.new(role: :user, content: "Take a screenshot")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+
+    # Find the tool_result message in the conversation
+    tool_result_msg = result.messages.find { |m| m.tool_result? }
+    assert tool_result_msg, "Expected a tool_result message"
+
+    # Content should be an array of ContentBlock objects, not a plain string
+    assert_kind_of Array, tool_result_msg.content
+    assert_equal 2, tool_result_msg.content.size
+    assert_instance_of AgentCore::TextContent, tool_result_msg.content[0]
+    assert_instance_of AgentCore::ImageContent, tool_result_msg.content[1]
+    assert_equal :base64, tool_result_msg.content[1].source_type
+    assert_equal "image/png", tool_result_msg.content[1].media_type
+  end
+
+  def test_tool_result_text_only_stays_as_string
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    assistant_with_tool = AgentCore::Message.new(
+      role: :assistant, content: "Echoing.",
+      tool_calls: [tool_call]
+    )
+    tool_response = AgentCore::Resources::Provider::Response.new(
+      message: assistant_with_tool,
+      usage: AgentCore::Resources::Provider::Usage.new(input_tokens: 10, output_tokens: 5),
+      stop_reason: :tool_use
+    )
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(
+      message: final_msg,
+      usage: AgentCore::Resources::Provider::Usage.new(input_tokens: 15, output_tokens: 5),
+      stop_reason: :end_turn
+    )
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, context:|
+        AgentCore::Resources::Tools::ToolResult.success(text: args[:text] || args["text"] || "")
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "You are helpful.",
+      messages: [AgentCore::Message.new(role: :user, content: "Echo hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+
+    tool_result_msg = result.messages.find { |m| m.tool_result? }
+    assert tool_result_msg
+    # Text-only results stay as simple strings (backward compatible)
+    assert_kind_of String, tool_result_msg.content
+    assert_equal "hi", tool_result_msg.content
+  end
 end
 
 class AgentCore::PromptRunner::EventsTest < Minitest::Test

@@ -151,7 +151,9 @@ module AgentCore
       h = hash.transform_keys(&:to_sym)
       case h[:type]&.to_sym
       when :text then TextContent.new(text: h[:text])
-      when :image then ImageContent.new(source: h[:source], media_type: h[:media_type])
+      when :image then ImageContent.from_h(h)
+      when :document then DocumentContent.from_h(h)
+      when :audio then AudioContent.from_h(h)
       when :tool_use then ToolUseContent.new(id: h[:id], name: h[:name], input: h[:input])
       when :tool_result then ToolResultContent.new(tool_use_id: h[:tool_use_id], content: h[:content], is_error: h[:is_error])
       else
@@ -179,25 +181,208 @@ module AgentCore
     end
   end
 
-  # Image content block.
-  class ImageContent
-    attr_reader :source, :media_type
+  # Shared validation logic for media content blocks (image, document, audio).
+  #
+  # Provides source_type-based validation:
+  #   :base64 — requires data + media_type
+  #   :url    — requires url
+  module MediaSourceValidation
+    VALID_SOURCE_TYPES = %i[base64 url].freeze
 
-    def initialize(source:, media_type: nil)
-      @source = source.freeze
+    private
+
+    def validate_media_source!
+      raise ArgumentError, "source_type is required" if source_type.nil?
+      unless VALID_SOURCE_TYPES.include?(source_type)
+        raise ArgumentError, "source_type must be one of: #{VALID_SOURCE_TYPES.join(", ")} (got #{source_type.inspect})"
+      end
+
+      case source_type
+      when :base64
+        raise ArgumentError, "data is required for base64 source" if data.nil? || data.empty?
+        raise ArgumentError, "media_type is required for base64 source" if media_type.nil? || media_type.empty?
+      when :url
+        raise ArgumentError, "url is required for url source" if url.nil? || url.empty?
+      end
+    end
+  end
+
+  # Image content block.
+  #
+  # Supports both base64-encoded data and URL references.
+  # Provider layer converts to API-specific format (Anthropic, OpenAI, Google).
+  #
+  # @example Base64 image
+  #   ImageContent.new(source_type: :base64, media_type: "image/png", data: "iVBOR...")
+  #
+  # @example URL image
+  #   ImageContent.new(source_type: :url, url: "https://example.com/photo.jpg")
+  class ImageContent
+    include MediaSourceValidation
+
+    attr_reader :source_type, :data, :media_type, :url
+
+    def initialize(source_type:, data: nil, media_type: nil, url: nil)
+      @source_type = source_type&.to_sym
+      @data = data.freeze
       @media_type = media_type
+      @url = url.freeze
+      validate_media_source!
     end
 
     def type = :image
 
     def to_h
-      h = { type: :image, source: source }
+      h = { type: :image, source_type: source_type }
+      h[:data] = data if data
       h[:media_type] = media_type if media_type
+      h[:url] = url if url
       h
     end
 
     def ==(other)
-      other.is_a?(ImageContent) && source == other.source
+      other.is_a?(ImageContent) &&
+        source_type == other.source_type &&
+        data == other.data &&
+        url == other.url
+    end
+
+    def self.from_h(hash)
+      h = hash.transform_keys(&:to_sym)
+      new(
+        source_type: h[:source_type],
+        data: h[:data],
+        media_type: h[:media_type],
+        url: h[:url]
+      )
+    end
+  end
+
+  # Document content block (PDF, plain text, HTML, CSV, etc.).
+  #
+  # Provider layer converts to API-specific format. For providers that
+  # don't support documents natively, the app can extract text first.
+  #
+  # @example Base64 PDF
+  #   DocumentContent.new(source_type: :base64, media_type: "application/pdf", data: "JVBERi...", filename: "report.pdf")
+  #
+  # @example URL document
+  #   DocumentContent.new(source_type: :url, url: "https://example.com/doc.pdf", media_type: "application/pdf")
+  class DocumentContent
+    include MediaSourceValidation
+
+    # Text-based MIME types where data can be counted as text tokens.
+    TEXT_MEDIA_TYPES = %w[text/plain text/html text/csv text/markdown].freeze
+
+    attr_reader :source_type, :data, :media_type, :url, :filename, :title
+
+    def initialize(source_type:, data: nil, media_type: nil, url: nil, filename: nil, title: nil)
+      @source_type = source_type&.to_sym
+      @data = data.freeze
+      @media_type = media_type
+      @url = url.freeze
+      @filename = filename
+      @title = title
+      validate_media_source!
+    end
+
+    def type = :document
+
+    # Whether the document's media_type is a text-based format.
+    def text_based?
+      TEXT_MEDIA_TYPES.include?(media_type)
+    end
+
+    # Returns text content for text-based documents (base64-decoded), nil otherwise.
+    def text
+      return nil unless text_based? && source_type == :base64 && data
+      data
+    end
+
+    def to_h
+      h = { type: :document, source_type: source_type }
+      h[:data] = data if data
+      h[:media_type] = media_type if media_type
+      h[:url] = url if url
+      h[:filename] = filename if filename
+      h[:title] = title if title
+      h
+    end
+
+    def ==(other)
+      other.is_a?(DocumentContent) &&
+        source_type == other.source_type &&
+        data == other.data &&
+        url == other.url &&
+        media_type == other.media_type
+    end
+
+    def self.from_h(hash)
+      h = hash.transform_keys(&:to_sym)
+      new(
+        source_type: h[:source_type],
+        data: h[:data],
+        media_type: h[:media_type],
+        url: h[:url],
+        filename: h[:filename],
+        title: h[:title]
+      )
+    end
+  end
+
+  # Audio content block.
+  #
+  # Supports base64-encoded audio and URL references.
+  # Optional transcript for providers that don't support native audio input.
+  #
+  # @example Base64 audio with transcript
+  #   AudioContent.new(source_type: :base64, media_type: "audio/wav", data: "UklGR...", transcript: "Hello world")
+  class AudioContent
+    include MediaSourceValidation
+
+    attr_reader :source_type, :data, :media_type, :url, :transcript
+
+    def initialize(source_type:, data: nil, media_type: nil, url: nil, transcript: nil)
+      @source_type = source_type&.to_sym
+      @data = data.freeze
+      @media_type = media_type
+      @url = url.freeze
+      @transcript = transcript
+      validate_media_source!
+    end
+
+    def type = :audio
+
+    # Returns transcript text (for token counting and fallback rendering).
+    def text
+      transcript
+    end
+
+    def to_h
+      h = { type: :audio, source_type: source_type }
+      h[:data] = data if data
+      h[:media_type] = media_type if media_type
+      h[:url] = url if url
+      h[:transcript] = transcript if transcript
+      h
+    end
+
+    def ==(other)
+      other.is_a?(AudioContent) &&
+        source_type == other.source_type &&
+        data == other.data &&
+        url == other.url
+    end
+
+    def self.from_h(hash)
+      h = hash.transform_keys(&:to_sym)
+      new(
+        source_type: h[:source_type],
+        data: h[:data],
+        media_type: h[:media_type],
+        url: h[:url],
+        transcript: h[:transcript]
+      )
     end
   end
 

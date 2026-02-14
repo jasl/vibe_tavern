@@ -366,11 +366,7 @@ module AgentCore
             error: result.error? ? result.text : nil,
           }
 
-          Message.new(
-            role: :tool_result, content: result.text,
-            tool_call_id: tc.id, name: tc.name,
-            metadata: { is_error: result.error? }
-          )
+          tool_result_to_message(result, tool_call_id: tc.id, name: tc.name)
         end
       end
 
@@ -420,6 +416,25 @@ module AgentCore
           context_window: context_window,
           reserved_output: reserved_output_tokens,
           limit: limit
+        )
+      end
+
+      # Convert a ToolResult to a Message, preserving multimodal content blocks.
+      #
+      # When the result contains only text blocks, uses a simple String content
+      # (backward compatible). When it contains images or other media, uses an
+      # Array of ContentBlock objects so providers can serialize them correctly.
+      def tool_result_to_message(result, tool_call_id:, name:)
+        content = if result.has_non_text_content?
+          result.to_content_blocks
+        else
+          result.text
+        end
+
+        Message.new(
+          role: :tool_result, content: content,
+          tool_call_id: tool_call_id, name: name,
+          metadata: { is_error: result.error? }
         )
       end
 
