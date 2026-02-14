@@ -144,6 +144,15 @@ when "retry"
 
 **影响**: 不太会遇到（server 通常发纯数字），接受现状。
 
+### 2.5 值对象相等性（==）遗漏字段
+
+**文件**: `message.rb`
+
+`DocumentContent / ToolUseContent / ToolResultContent / Message` 的 `==` 之前只比较了部分字段，
+会导致不同 filename/title/input/content/error/name/metadata 的对象被判等。
+
+**状态**: ✅ 已修复 — `==` 对齐为比较全部公开字段，保持值对象语义一致，并补充单测覆盖差异字段。
+
 ## 3. 并发安全审查
 
 ### 3.1 ✅ JsonRpcClient — 正确
@@ -321,11 +330,12 @@ read_skill_file → validate path → read file → String
 
 ### 6.1 覆盖良好的路径
 
-- ✅ MCP Constants 全覆盖（版本号、error codes、headers）
+- ✅ MCP Constants 全覆盖（版本号、headers、defaults）
 - ✅ SseParser 正常解析、多行 data、comments、retry、buffer limits、data limits
 - ✅ Transport::Base abstract 方法 + callback accessors
 - ✅ Transport::Stdio start/send/close + process lifecycle + error handling
 - ✅ StreamableHttp 构造验证 + send/close/cancel + session management
+- ✅ StreamableHttp 本地集成测试（httpx + WEBrick，本地 SSE/JSON server，全链路覆盖 JSON/SSE/GET 重连）
 - ✅ JsonRpcClient request/notify/close + timeout + correlation + transport close
 - ✅ Client initialize/list_tools/call_tool + protocol negotiation + reconnect
 - ✅ ServerConfig 构造 + coerce + validation + transport-specific checks
@@ -336,28 +346,26 @@ read_skill_file → validate path → read file → String
 - ✅ Store abstract methods
 - ✅ FileSystemStore list/load/read + path security + progressive disclosure
 
-### 6.2 未覆盖或薄弱的路径
+### 6.2 仍建议补强的路径
 
-- ✅ StreamableHttp 本地集成测试（httpx + WEBrick，本地 SSE/JSON server，全链路覆盖 JSON/SSE/GET 重连）
-- ✅ Client `call_tool` 的 `MCP_SESSION_NOT_FOUND` 重连路径（1 次 retry）已修复并测试覆盖
-- ✅ JsonRpcClient 并发请求基础覆盖（多线程 request + out-of-order response），仍建议补更强压力测试
+- ⚠️ JsonRpcClient 并发 request 的强压力测试（多线程 + 长时间运行 + 故障注入）尚未补齐
 - ⚠️ FileSystemStore 符号链接攻击测试 — 有 realpath 保护但测试中用了真实 fixture（非 symlink）
 - ⚠️ Stdio transport 进程崩溃时的 on_close callback 触发 — 有实现但难以在 CI 中稳定测试
 
 ### 6.3 测试数据统计
 
 ```
-Total: 585 runs, 1239 assertions, 0 failures, 0 errors
+Total: 589 runs, 1246 assertions, 0 failures, 0 errors
 ```
 
 Phase 2 新增测试覆盖：
 
 | 模块 | 测试文件数 | 说明 |
 |------|-----------|------|
-| MCP | 9 | 全部新建 |
+| MCP | 10 | 全部新建 |
 | Skills | 5 | 全部新建（Resources 命名空间） |
 | Phase 1 覆盖扩展 | 9 | 新建 + 扩展 |
-| 合计 | 23 | |
+| 合计 | 24 | |
 
 ## 7. Wire Protocol 审查
 

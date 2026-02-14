@@ -2,7 +2,7 @@
 
 > Date: 2026-02-14
 > Status: ✅ Complete
-> Tests: 585 runs, 1239 assertions, 0 failures, 0 errors
+> Tests: 589 runs, 1246 assertions, 0 failures, 0 errors
 
 ## What Was Delivered
 
@@ -13,14 +13,14 @@ comprehensive test coverage expansion across Phase 1 + 2.
 
 ```
 # MCP — Model Context Protocol (10 files)
-lib/agent_core/mcp.rb                                  # Namespace loader (requires all MCP modules)
-lib/agent_core/mcp/constants.rb                        # Protocol version, JSON-RPC error codes
+lib/agent_core/mcp.rb                                  # Namespace loader (StreamableHttp not auto-required)
+lib/agent_core/mcp/constants.rb                        # Protocol versions, headers, defaults
 lib/agent_core/mcp/json_rpc_client.rb                  # JSON-RPC 2.0 request/response/notification client
 lib/agent_core/mcp/client.rb                           # High-level MCP client (initialize, list_tools, call_tool)
 lib/agent_core/mcp/server_config.rb                    # ServerConfig Data.define (command, args, env, url, headers)
 lib/agent_core/mcp/sse_parser.rb                       # SSE (Server-Sent Events) incremental parser
 lib/agent_core/mcp/tool_adapter.rb                     # MCP tool name mapping helpers (local name builder)
-lib/agent_core/mcp/transport/base.rb                   # Abstract transport (send_message, receive, close)
+lib/agent_core/mcp/transport/base.rb                   # Abstract transport (start/send_message/close + callbacks)
 lib/agent_core/mcp/transport/stdio.rb                  # Stdio transport (stdin/stdout JSON-RPC)
 lib/agent_core/mcp/transport/streamable_http.rb        # Streamable HTTP transport (httpx, optional dep)
 
@@ -96,7 +96,7 @@ test/fixtures/skills/another-skill/assets/logo.txt
 
 | Plan Item | Status | Notes |
 |-----------|--------|-------|
-| MCP Constants (protocol version, error codes) | ✅ | |
+| MCP Constants (protocol versions, headers, defaults) | ✅ | |
 | MCP ServerConfig (Data.define) | ✅ | |
 | MCP Transport::Base (abstract) | ✅ | |
 | MCP Transport::Stdio | ✅ | |
@@ -111,7 +111,7 @@ test/fixtures/skills/another-skill/assets/logo.txt
 | Skills Store (abstract) | ✅ | |
 | Skills FileSystemStore | ✅ | Security: realpath, traversal checks |
 | Skills under Resources namespace | ✅ | Refactored from AgentCore::Skills to AgentCore::Resources::Skills |
-| Tests for all of the above | ✅ | 585 runs |
+| Tests for all of the above | ✅ | 589 runs |
 | Coverage expansion for Phase 1 gaps | ✅ | 12 new/expanded test files |
 
 ## Architecture Notes
@@ -120,7 +120,7 @@ test/fixtures/skills/another-skill/assets/logo.txt
 
 ```
 AgentCore::MCP
-  ├── Constants           # Protocol version, JSON-RPC codes
+  ├── Constants           # Protocol versions, headers, defaults
   ├── ServerConfig        # Immutable config (Data.define)
   ├── JsonRpcClient       # JSON-RPC 2.0 protocol layer
   ├── Client              # High-level: initialize → list_tools → call_tool

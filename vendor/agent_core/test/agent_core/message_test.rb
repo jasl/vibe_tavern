@@ -433,6 +433,36 @@ class AgentCore::ContentBlockTest < Minitest::Test
     assert_equal "Q4", restored.title
   end
 
+  def test_document_content_equality_includes_filename_and_title
+    a =
+      AgentCore::DocumentContent.new(
+        source_type: :base64,
+        media_type: "application/pdf",
+        data: "JVBERi",
+        filename: "a.pdf",
+        title: "A"
+      )
+    b =
+      AgentCore::DocumentContent.new(
+        source_type: :base64,
+        media_type: "application/pdf",
+        data: "JVBERi",
+        filename: "b.pdf",
+        title: "A"
+      )
+    c =
+      AgentCore::DocumentContent.new(
+        source_type: :base64,
+        media_type: "application/pdf",
+        data: "JVBERi",
+        filename: "a.pdf",
+        title: "C"
+      )
+
+    refute_equal a, b
+    refute_equal a, c
+  end
+
   # --- AudioContent ---
 
   def test_audio_content_base64
@@ -516,6 +546,12 @@ class AgentCore::ContentBlockTest < Minitest::Test
     refute_equal a, c
   end
 
+  def test_tool_use_content_equality_includes_input
+    a = AgentCore::ToolUseContent.new(id: "tc_1", name: "read", input: { path: "a" })
+    b = AgentCore::ToolUseContent.new(id: "tc_1", name: "read", input: { path: "b" })
+    refute_equal a, b
+  end
+
   # --- ToolResultContent ---
 
   def test_tool_result_content
@@ -553,6 +589,15 @@ class AgentCore::ContentBlockTest < Minitest::Test
     b = AgentCore::ToolResultContent.new(tool_use_id: "tc_1", content: "x")
     c = AgentCore::ToolResultContent.new(tool_use_id: "tc_2", content: "x")
     assert_equal a, b
+    refute_equal a, c
+  end
+
+  def test_tool_result_content_equality_includes_content_and_error
+    a = AgentCore::ToolResultContent.new(tool_use_id: "tc_1", content: "a", error: false)
+    b = AgentCore::ToolResultContent.new(tool_use_id: "tc_1", content: "b", error: false)
+    c = AgentCore::ToolResultContent.new(tool_use_id: "tc_1", content: "a", error: true)
+
+    refute_equal a, b
     refute_equal a, c
   end
 
@@ -636,5 +681,14 @@ class AgentCore::ContentBlockTest < Minitest::Test
     assert_instance_of AgentCore::TextContent, restored.content[0]
     assert_instance_of AgentCore::ImageContent, restored.content[1]
     assert_instance_of AgentCore::DocumentContent, restored.content[2]
+  end
+
+  def test_message_equality_includes_name_and_metadata
+    a = AgentCore::Message.new(role: :tool_result, content: "ok", tool_call_id: "tc_1", name: "read", metadata: { error: false })
+    b = AgentCore::Message.new(role: :tool_result, content: "ok", tool_call_id: "tc_1", name: "write", metadata: { error: false })
+    c = AgentCore::Message.new(role: :tool_result, content: "ok", tool_call_id: "tc_1", name: "read", metadata: { error: true })
+
+    refute_equal a, b
+    refute_equal a, c
   end
 end

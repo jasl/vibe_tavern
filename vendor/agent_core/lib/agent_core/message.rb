@@ -67,7 +67,9 @@ module AgentCore
         role == other.role &&
         content == other.content &&
         tool_calls == other.tool_calls &&
-        tool_call_id == other.tool_call_id
+        tool_call_id == other.tool_call_id &&
+        name == other.name &&
+        metadata == other.metadata
     end
 
     # Build a Message from a serialized Hash.
@@ -345,7 +347,9 @@ module AgentCore
         source_type == other.source_type &&
         data == other.data &&
         url == other.url &&
-        media_type == other.media_type
+        media_type == other.media_type &&
+        filename == other.filename &&
+        title == other.title
     end
 
     def self.from_h(hash)
@@ -440,7 +444,7 @@ module AgentCore
     end
 
     def ==(other)
-      other.is_a?(ToolUseContent) && id == other.id && name == other.name
+      other.is_a?(ToolUseContent) && id == other.id && name == other.name && input == other.input
     end
   end
 
@@ -462,7 +466,10 @@ module AgentCore
     end
 
     def ==(other)
-      other.is_a?(ToolResultContent) && tool_use_id == other.tool_use_id
+      other.is_a?(ToolResultContent) &&
+        tool_use_id == other.tool_use_id &&
+        content == other.content &&
+        error == other.error
     end
   end
 end

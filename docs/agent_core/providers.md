@@ -58,4 +58,3 @@ client = SimpleInference::Client.new(
   adapter: SimpleInference::HTTPAdapters::HTTPX.new(timeout: 60),
 )
 ```
-
