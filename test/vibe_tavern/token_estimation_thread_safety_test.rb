@@ -4,7 +4,7 @@ require "test_helper"
 
 class VibeTavernTokenEstimationThreadSafetyTest < ActiveSupport::TestCase
   test "estimator cache is thread-safe" do
-    mod = TavernKit::VibeTavern::TokenEstimation
+    mod = AgentCore::Contrib::TokenEstimation
     mod.instance_variable_set(:@estimators, {})
 
     start_barrier = Queue.new

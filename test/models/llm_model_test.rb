@@ -25,7 +25,7 @@ class LLMModelTest < ActiveSupport::TestCase
     assert_nil llm_model.reload.key
   end
 
-  test "build_runner_config uses capability columns as overrides" do
+  test "capabilities_overrides reflects capability columns" do
     provider =
       LLMProvider.create!(
         name: "X",
@@ -47,19 +47,13 @@ class LLMModelTest < ActiveSupport::TestCase
         supports_parallel_tool_calls: true,
       )
 
-    preset = LLMPreset.create!(llm_model: llm_model, key: "default", name: "Default", llm_options_overrides: { temperature: 0.7 })
+    caps = llm_model.capabilities_overrides
 
-    runner_config = llm_model.build_runner_config(preset: preset, context: {})
-    assert_equal :openai, runner_config.provider
-    caps = runner_config.capabilities
-
-    assert_equal false, caps.supports_tool_calling
-    assert_equal false, caps.supports_response_format_json_object
-    assert_equal true, caps.supports_response_format_json_schema
-    assert_equal true, caps.supports_streaming
-    assert_equal true, caps.supports_parallel_tool_calls
-
-    assert_equal 0.7, runner_config.llm_options_defaults.fetch(:temperature)
+    assert_equal false, caps.fetch(:supports_tool_calling)
+    assert_equal false, caps.fetch(:supports_response_format_json_object)
+    assert_equal true, caps.fetch(:supports_response_format_json_schema)
+    assert_equal true, caps.fetch(:supports_streaming)
+    assert_equal true, caps.fetch(:supports_parallel_tool_calls)
   end
 
   test "validates non-negative context_window_tokens" do

@@ -137,9 +137,10 @@ class LLMRunChatTest < ActiveSupport::TestCase
       )
 
     assert result.success?
-    runner_config = result.value.fetch(:runner_config)
-    assert_kind_of TavernKit::PromptBuilder::Context, runner_config.context
-    assert runner_config.context.key?(:language_policy)
+    ctx = result.value.fetch(:context)
+    assert ctx.key?(:language_policy)
+    assert_equal true, ctx.dig(:language_policy, :enabled)
+    assert_equal "zh-CN", ctx.dig(:language_policy, :target_lang)
   end
 
   test "normalizes history and appends user_text as last message" do
@@ -169,8 +170,8 @@ class LLMRunChatTest < ActiveSupport::TestCase
     messages = request.fetch(:messages)
 
     assert_equal 2, messages.size
-    assert_equal "user", messages.last.fetch(:role)
-    assert_equal "hi", messages.last.fetch(:content)
+    assert_equal "user", messages.last.fetch("role")
+    assert_equal "hi", messages.last.fetch("content")
   end
 
   test "returns PROMPT_TOO_LONG when prompt exceeds context_window_tokens (and does not call client)" do

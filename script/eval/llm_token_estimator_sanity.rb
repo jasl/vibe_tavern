@@ -67,7 +67,7 @@ messages = [
   { role: "user", content: user_text },
 ]
 
-estimator = TavernKit::VibeTavern::TokenEstimation.estimator
+estimator = AgentCore::Contrib::TokenEstimation.estimator
 
 def safe_float(v)
   Float(v)
@@ -105,11 +105,11 @@ rows =
 
     estimated_content_tokens =
       messages.sum do |m|
-        model_hint = TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(model)
+        model_hint = AgentCore::Contrib::TokenEstimation.canonical_model_hint(model)
         estimator.estimate(m[:content].to_s, model_hint: model_hint)
       end
 
-    info = estimator.describe(model_hint: TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(model))
+    info = estimator.describe(model_hint: AgentCore::Contrib::TokenEstimation.canonical_model_hint(model))
 
     prompt_tokens = usage ? safe_int(usage["prompt_tokens"]) : nil
     completion_tokens = usage ? safe_int(usage["completion_tokens"]) : nil

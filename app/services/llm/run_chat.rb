@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "agent_core"
+require "agent_core/resources/provider/simple_inference_provider"
+
 module LLM
   class RunChat
     def self.call(**kwargs)
@@ -17,9 +20,7 @@ module LLM
       llm_options: nil,
       strict: nil,
       allow_disabled: false,
-      client: nil,
-      pipeline: TavernKit::VibeTavern::Pipeline,
-      step_options: nil
+      client: nil
     )
       @llm_model = llm_model
       @user_text = user_text
@@ -32,8 +33,6 @@ module LLM
       @strict = strict
       @allow_disabled = allow_disabled == true
       @client = client
-      @pipeline = pipeline
-      @step_options = step_options
     end
 
     def call
@@ -48,78 +47,82 @@ module LLM
 
       selected_preset = selected_preset_result
       normalized_context = normalize_context(context)
-      normalized_history = normalize_history(history, user_text: user_text)
-      return Result.failure(errors: ["prompt is empty"], code: "EMPTY_PROMPT", value: { llm_model: llm_model }) if normalized_history.empty?
+      messages = normalize_history(history, user_text: user_text)
+      return Result.failure(errors: ["prompt is empty"], code: "EMPTY_PROMPT", value: { llm_model: llm_model }) if messages.empty?
 
-      runner_config =
-        llm_model.build_runner_config(
-          context: normalized_context,
-          preset: selected_preset,
-          pipeline: pipeline,
-          step_options: step_options,
+      user_llm_options = normalize_llm_options(llm_options)
+      provider_defaults = llm_model.llm_provider.llm_options_defaults_symbolized
+      preset_overrides = selected_preset.is_a?(LLMPreset) ? selected_preset.llm_options_overrides_symbolized : {}
+
+      effective_llm_options =
+        AgentCore::Contrib::Utils.deep_merge_hashes(
+          provider_defaults,
+          preset_overrides,
+          user_llm_options,
         )
 
-      generation =
-        TavernKit::VibeTavern::Generation.chat(
-          client: effective_client,
-          runner_config: runner_config,
-          history: normalized_history,
-          system: system,
-          strict: strict?,
-          llm_options: normalize_llm_options(llm_options),
-          dialect: :openai,
-        )
+      reserved_output_tokens = Integer(effective_llm_options.fetch(:max_tokens, 0), exception: false) || 0
+      reserved_output_tokens = 0 if reserved_output_tokens.negative?
 
-      generation_result = generation.run
-      if generation_result.failure?
-        case generation_result.code
-        when "PROMPT_TOO_LONG"
-          details = generation_result.value.is_a?(Hash) ? generation_result.value : {}
-          return Result.failure(
-            errors: generation_result.errors,
-            code: "PROMPT_TOO_LONG",
-            value: {
-              llm_model: llm_model,
-              estimated_tokens: details.fetch(:estimated_tokens, nil),
-              max_tokens: details.fetch(:max_tokens, nil),
-              reserve_tokens: details.fetch(:reserve_tokens, nil),
-              limit_tokens: details.fetch(:limit_tokens, nil),
-            },
-          )
-        when "LLM_REQUEST_FAILED"
-          return Result.failure(errors: generation_result.errors, code: "LLM_REQUEST_FAILED", value: { llm_model: llm_model })
-        when "INVALID_INPUT"
-          return Result.failure(errors: generation_result.errors, code: "INVALID_INPUT", value: { llm_model: llm_model })
-        else
-          return Result.failure(errors: generation_result.errors, code: "LLM_REQUEST_FAILED", value: { llm_model: llm_model })
+      context_window =
+        if llm_model.context_window_tokens.to_i.positive?
+          llm_model.context_window_tokens.to_i
         end
-      end
 
-      prompt_result = generation_result.value.prompt_result
+      token_counter =
+        build_token_counter(
+          normalized_context,
+          default_model_hint: llm_model.model,
+          per_message_overhead: llm_model.effective_message_overhead_tokens.to_i,
+        )
+
+      prompt_options = effective_llm_options.merge(model: llm_model.model)
+      prompt =
+        AgentCore::PromptBuilder::BuiltPrompt.new(
+          system_prompt: system.to_s,
+          messages: messages,
+          tools: [],
+          options: prompt_options,
+        )
+
+      provider =
+        AgentCore::Resources::Provider::SimpleInferenceProvider.new(
+          client: effective_client,
+        )
+
+      run_result =
+        AgentCore::PromptRunner::Runner.new.run(
+          prompt: prompt,
+          provider: provider,
+          token_counter: token_counter,
+          context_window: context_window,
+          reserved_output_tokens: reserved_output_tokens,
+        )
 
       Result.success(
         value: {
           llm_model: llm_model,
           preset: selected_preset,
-          runner_config: runner_config,
-          prompt_result: prompt_result,
+          context: normalized_context,
+          prompt: prompt,
+          run_result: run_result,
         },
       )
-    rescue TavernKit::MaxTokensExceededError => e
+    rescue AgentCore::ContextWindowExceededError => e
       Result.failure(
         errors: [e.message],
         code: "PROMPT_TOO_LONG",
         value: {
           llm_model: llm_model,
           estimated_tokens: e.estimated_tokens,
-          max_tokens: e.max_tokens,
-          reserve_tokens: e.reserve_tokens,
-          limit_tokens: e.limit_tokens,
+          max_tokens: e.context_window,
+          reserve_tokens: e.reserved_output,
+          limit_tokens: e.limit,
         },
       )
-    rescue SimpleInference::Errors::Error => e
+    rescue AgentCore::Resources::Provider::ProviderError, SimpleInference::Errors::Error => e
       Result.failure(errors: [e.message], code: "LLM_REQUEST_FAILED", value: { llm_model: llm_model })
-    rescue TavernKit::PipelineError, TavernKit::StrictModeError, ActiveRecord::RecordInvalid, ArgumentError => e
+    rescue ActiveRecord::RecordInvalid, ArgumentError => e
       Result.failure(errors: [e.message], code: "INVALID_INPUT", value: { llm_model: llm_model })
     end
 
@@ -135,9 +138,7 @@ module LLM
                 :llm_options,
                 :strict,
                 :allow_disabled,
-                :client,
-                :pipeline,
-                :step_options
+                :client
 
     def validate_llm_model!
       raise ArgumentError, "llm_model must be a LLMModel" unless llm_model.is_a?(LLMModel)
@@ -151,7 +152,7 @@ module LLM
       end
 
       key = preset_key.to_s.strip.downcase
-      if key.present?
+      unless key.empty?
         found = llm_model.llm_presets.find_by(key: key)
         return Result.failure(errors: ["preset not found: #{key}"], code: "PRESET_NOT_FOUND") unless found
 
@@ -164,22 +165,20 @@ module LLM
     def normalize_context(value)
       case value
       when nil
-        nil
-      when TavernKit::PromptBuilder::Context
-        value
+        {}
       when Hash
-        normalized = TavernKit::Utils.deep_symbolize_keys(value)
-        TavernKit::PromptBuilder::Context.build(normalized, type: :app)
+        AgentCore::Utils.deep_symbolize_keys(value)
       else
-        raise ArgumentError, "context must be a Hash or TavernKit::PromptBuilder::Context"
+        raise ArgumentError, "context must be a Hash"
       end
     end
 
     def normalize_history(value, user_text:)
-      messages = Array(value).map { |m| TavernKit::ChatHistory.coerce_message(m) }
+      messages = AgentCore::Contrib::OpenAIHistory.coerce_messages(value)
 
-      if user_text.present?
-        messages << TavernKit::PromptBuilder::Message.new(role: :user, content: user_text.to_s)
+      text = user_text.to_s
+      if !text.strip.empty?
+        messages << AgentCore::Message.new(role: :user, content: text)
       end
 
       messages
@@ -189,15 +188,62 @@ module LLM
       h = value.nil? ? {} : value
       raise ArgumentError, "llm_options must be a Hash" unless h.is_a?(Hash)
 
-      normalized = TavernKit::Utils.deep_symbolize_keys(h)
-      TavernKit::Utils.assert_symbol_keys!(normalized, path: "llm_options")
+      normalized = AgentCore::Utils.deep_symbolize_keys(h)
+      AgentCore::Utils.assert_symbol_keys!(normalized, path: "llm_options")
+
+      reserved = normalized.keys & AgentCore::Contrib::OpenAI::RESERVED_CHAT_COMPLETIONS_KEYS
+      if reserved.any?
+        raise ArgumentError, "llm_options contains reserved keys: #{reserved.map(&:to_s).sort.inspect}"
+      end
+
       normalized
     end
 
-    def strict?
-      return strict == true unless strict.nil?
+    def build_token_counter(context_hash, default_model_hint:, per_message_overhead:)
+      token_estimation = context_hash.fetch(:token_estimation, nil)
+      token_estimation = {} unless token_estimation.is_a?(Hash)
 
-      Rails.env.test?
+      token_estimator = token_estimation.fetch(:token_estimator, nil)
+      if token_estimator && !token_estimator.respond_to?(:estimate)
+        raise ArgumentError, "token_estimation.token_estimator must respond to #estimate"
+      end
+
+      model_hint = token_estimation.fetch(:model_hint, nil)
+      model_hint = default_model_hint if model_hint.to_s.strip.empty?
+
+      if token_estimator
+        return AgentCore::Contrib::TokenCounter::Estimator.new(
+          token_estimator: token_estimator,
+          model_hint: model_hint,
+          per_message_overhead: per_message_overhead,
+        )
+      end
+
+      registry = token_estimation.fetch(:registry, nil)
+      if registry
+        raise ArgumentError, "token_estimation.registry must be a Hash" unless registry.is_a?(Hash)
+
+        token_estimator = AgentCore::Contrib::TokenEstimator.new(registry: registry)
+        return AgentCore::Contrib::TokenCounter::Estimator.new(
+          token_estimator: token_estimator,
+          model_hint: AgentCore::Contrib::TokenEstimation.canonical_model_hint(model_hint),
+          per_message_overhead: per_message_overhead,
+        )
+      end
+
+      begin
+        token_estimator = AgentCore::Contrib::TokenEstimation.estimator
+        return AgentCore::Contrib::TokenCounter::Estimator.new(
+          token_estimator: token_estimator,
+          model_hint: AgentCore::Contrib::TokenEstimation.canonical_model_hint(model_hint),
+          per_message_overhead: per_message_overhead,
+        )
+      rescue AgentCore::Contrib::TokenEstimation::ConfigurationError
+      end
+
+      AgentCore::Contrib::TokenCounter::HeuristicWithOverhead.new(
+        per_message_overhead: per_message_overhead,
+      )
     end
 
     def effective_client

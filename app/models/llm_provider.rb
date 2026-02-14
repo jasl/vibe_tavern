@@ -47,7 +47,7 @@ class LLMProvider < ApplicationRecord
   end
 
   def llm_options_defaults_symbolized
-    TavernKit::Utils.deep_symbolize_keys((llm_options_defaults || {}).to_h)
+    AgentCore::Utils.deep_symbolize_keys((llm_options_defaults || {}).to_h)
   end
 
   private
@@ -75,8 +75,6 @@ class LLMProvider < ApplicationRecord
   end
 
   def reserved_llm_options_keys
-    TavernKit::VibeTavern::RunnerConfig::RESERVED_LLM_OPTIONS_KEYS
-  rescue NameError
-    %i[model messages tools tool_choice response_format stream stream_options]
+    AgentCore::Contrib::OpenAI::RESERVED_CHAT_COMPLETIONS_KEYS
   end
 end

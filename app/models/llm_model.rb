@@ -39,37 +39,4 @@ class LLMModel < ApplicationRecord
   def context_window_tokens_limit?
     context_window_tokens.to_i.positive?
   end
-
-  def build_runner_config(context: nil, preset: nil, step_options: nil, pipeline: TavernKit::VibeTavern::Pipeline)
-    effective_llm_defaults =
-      TavernKit::Utils.deep_merge_hashes(
-        llm_provider.llm_options_defaults_symbolized,
-        preset.is_a?(LLMPreset) ? preset.llm_options_overrides_symbolized : {},
-      )
-
-    base_step_options_from_db = {
-      max_tokens: {
-        max_tokens: context_window_tokens,
-        reserve_tokens: ->(state) { Integer((state.llm_options || {})[:max_tokens] || 0) },
-        mode: :error,
-        message_overhead_tokens: effective_message_overhead_tokens,
-      },
-    }
-
-    effective_step_options =
-      TavernKit::Utils.deep_merge_hashes(
-        base_step_options_from_db,
-        step_options.is_a?(Hash) ? step_options : {},
-      )
-
-    TavernKit::VibeTavern::RunnerConfig.build(
-      provider: llm_provider.api_format,
-      model: model,
-      context: context,
-      pipeline: pipeline,
-      step_options: effective_step_options,
-      llm_options_defaults: effective_llm_defaults,
-      capabilities_overrides: capabilities_overrides,
-    )
-  end
 end

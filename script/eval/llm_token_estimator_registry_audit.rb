@@ -23,7 +23,7 @@ module LlmTokenEstimatorRegistryAudit
       return 2
     end
 
-    registry = TavernKit::VibeTavern::TokenEstimation.registry(root: Rails.root)
+    registry = AgentCore::Contrib::TokenEstimation.registry(root: Rails.root)
     rows = models.to_a.sort.map { |model| build_row(model: model, registry: registry) }
 
     print_rows(rows: rows, format: options.fetch(:format), models_source: options.fetch(:models_source))
@@ -78,7 +78,7 @@ module LlmTokenEstimatorRegistryAudit
   end
 
   def build_row(model:, registry:)
-    hint = TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(model)
+    hint = AgentCore::Contrib::TokenEstimation.canonical_model_hint(model)
     entry = registry[hint]
 
     return { model: model, hint: hint, status: "miss" } unless entry.is_a?(Hash)

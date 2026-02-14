@@ -6,13 +6,13 @@ Token estimation is used for:
 - observability (budget stats in traces)
 - debug inspection (why did we overflow?)
 
-This repo keeps the **Core** token counting logic in the embedded `tavern_kit`
-gem (`vendor/tavern_kit/`) and keeps **provider/model mapping** in the Rails
-app (`lib/tavern_kit/vibe_tavern/`).
+This repo keeps the token estimator implementation in app-side
+`AgentCore::Contrib` (`lib/agent_core/contrib/`) and keeps provider/model
+mapping in `AgentCore::Contrib::TokenEstimation`.
 
-## Core building blocks (TavernKit)
+## Core building blocks (AgentCore::Contrib)
 
-Core API: `TavernKit::TokenEstimator`
+Core API: `AgentCore::Contrib::TokenEstimator`
 
 - hot path: `estimate(text, model_hint:) -> Integer`
   - deterministic, fast, and **never raises** on external input
@@ -25,8 +25,9 @@ Core API: `TavernKit::TokenEstimator`
   - `hf_tokenizers`: ids + tokens + offsets
 
 See:
-- `vendor/tavern_kit/docs/core-interface-design.md`
-- `vendor/tavern_kit/docs/prompt-inspector.md`
+- `lib/agent_core/contrib/token_estimator.rb`
+- legacy design notes: `vendor/tavern_kit/docs/core-interface-design.md`
+- legacy inspector notes: `vendor/tavern_kit/docs/prompt-inspector.md`
 
 ### HF tokenizer.json backend
 
@@ -42,26 +43,25 @@ This uses the `tokenizers` gem (Rust HF tokenizers bindings) to load a local
 
 VibeTavern provides an app-owned registry + canonicalization layer:
 
-- `TavernKit::VibeTavern::TokenEstimation.canonical_model_hint(model_id)`
+- `AgentCore::Contrib::TokenEstimation.canonical_model_hint(model_id)`
   - maps provider model ids/variants into a small canonical set
   - example: `deepseek/deepseek-chat-v3-0324:nitro` → `deepseek-v3`
-- `TavernKit::VibeTavern::TokenEstimation.registry`
+- `AgentCore::Contrib::TokenEstimation.registry`
   - maps canonical hints to backend entries (HF tokenizer.json or `tiktoken`)
   - carries source metadata (`source_hint`, `source_repo`) for inspector/debug
-- `TavernKit::VibeTavern::TokenEstimation.estimator`
-  - memoized `TavernKit::TokenEstimator` configured with the registry
+- `AgentCore::Contrib::TokenEstimation.estimator`
+  - memoized `AgentCore::Contrib::TokenEstimator` configured with the registry
 
-The VibeTavern pipeline injects these defaults in `PromptBuilder::Steps::Prepare`:
+`LLM::RunChat` (AgentCore runner integration) applies these defaults:
 
-- when `ctx[:model_hint]` is not explicitly set, it is derived from
-  `ctx[:default_model_hint]` (often the provider model id used for the request)
-  and canonicalized.
-- when `ctx.token_estimator` is not explicitly set, it defaults to
-  `TokenEstimation.estimator`.
+- when `context[:token_estimation][:model_hint]` is blank/missing, it uses the
+  request model id (`llm_model.model`) and canonicalizes it.
+- when `context[:token_estimation][:token_estimator]` is not explicitly set, it
+  defaults to `TokenEstimation.estimator`.
 
 ### Injection points (Context + Step behavior)
 
-Primary injection point for PromptRunner runs:
+Primary injection point for `LLM::RunChat`:
 
 - `context[:token_estimation]` (Hash; programmer-owned)
 
@@ -80,26 +80,24 @@ context = {
 }
 ```
 
-Precedence rules applied by `:prepare`:
+Model hint selection precedence:
 
-1) `ctx[:model_hint]` when present and non-blank
-2) `context[:token_estimation][:model_hint]`
-3) `ctx[:default_model_hint]` (set by `PromptRunner` as `meta(:default_model_hint, model_id)`)
+1) `context[:token_estimation][:model_hint]` when present and non-blank
+2) request model id (`llm_model.model`)
 
 Estimator selection precedence:
 
-1) `ctx.token_estimator` when already set (manual builds)
-2) `context[:token_estimation][:token_estimator]`
-3) `context[:token_estimation][:registry]` (build `TavernKit::TokenEstimator.new(registry: ...)`)
-4) default `TavernKit::VibeTavern::TokenEstimation.estimator`
+1) `context[:token_estimation][:token_estimator]`
+2) `context[:token_estimation][:registry]` (build `AgentCore::Contrib::TokenEstimator.new(registry: ...)`)
+3) default `AgentCore::Contrib::TokenEstimation.estimator`
 
 ### Caching strategy
 
 There are two layers of caching:
 
 - App-level estimator instance cache:
-  - `TavernKit::VibeTavern::TokenEstimation.estimator` memoizes a configured
-    `TavernKit::TokenEstimator` per tokenizer root path.
+  - `AgentCore::Contrib::TokenEstimation.estimator` memoizes a configured
+    `AgentCore::Contrib::TokenEstimator` per tokenizer root path.
 - Core adapter caches:
   - `TokenEstimator` caches HF tokenizers in an LRU cache (by `tokenizer_path`).
   - `tiktoken` adapter caches encoding selection per `model_hint`.
@@ -110,6 +108,8 @@ There are two layers of caching:
 
 - `TokenEstimation.configure(root: Rails.root, tokenizer_root: Rails.app.creds.option(:token_estimation, :tokenizer_root))`
 - `TokenEstimation.estimator.preload!(strict: Rails.env.production?)`
+ 
+(`TokenEstimation` is `AgentCore::Contrib::TokenEstimation`.)
 
 In production, this fails fast if a tokenizer asset is missing/invalid.
 
@@ -123,8 +123,8 @@ Rails:
 
 Non-Rails:
 
-- You must provide a root via `TokenEstimation.configure(root: ...)` or `ENV["VIBE_TAVERN_ROOT"]`.
-- Optional: provide `tokenizer_root` via `TokenEstimation.configure(tokenizer_root: ...)` or `ENV["TOKEN_ESTIMATION__TOKENIZER_ROOT"]`.
+- You must provide a root via `AgentCore::Contrib::TokenEstimation.configure(root: ...)` or `ENV["VIBE_TAVERN_ROOT"]`.
+- Optional: provide `tokenizer_root` via `AgentCore::Contrib::TokenEstimation.configure(tokenizer_root: ...)` or `ENV["TOKEN_ESTIMATION__TOKENIZER_ROOT"]`.
 - If `tokenizer_root` is relative, it is resolved against the configured root.
 - There is no `__dir__` fallback; missing root raises at use time.
 
@@ -158,7 +158,7 @@ are blank/missing, `ENV["TOKEN_ESTIMATION__TOKENIZER_ROOT"]` is used as a fallba
 Download/update them with:
 
 ```sh
-script/eval/download_tokenizers.rb
+script/download_tokenizers.rb
 ```
 
 Options:

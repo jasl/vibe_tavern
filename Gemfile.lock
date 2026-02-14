@@ -100,6 +100,12 @@ GIT
       zeitwerk (~> 2.6)
 
 PATH
+  remote: vendor/agent_core
+  specs:
+    agent_core (0.1.0)
+      marcel (~> 1.1)
+
+PATH
   remote: vendor/easy_talk
   specs:
     easy_talk (3.3.1)
@@ -480,6 +486,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  agent_core!
   bcrypt (~> 3.1.7)
   bootsnap
   brakeman
@@ -515,6 +522,7 @@ DEPENDENCIES
   stimulus-rails
   tavern_kit!
   thruster
+  tiktoken_ruby
   tokenizers
   turbo-rails
   tzinfo-data
@@ -535,6 +543,7 @@ CHECKSUMS
   activestorage (8.2.0.alpha)
   activesupport (8.2.0.alpha)
   addressable (2.8.8) sha256=7c13b8f9536cf6364c03b9d417c19986019e28f7c00ac8132da4eb0fe393b057
+  agent_core (0.1.0)
   ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bcrypt (3.1.21) sha256=5964613d750a42c7ee5dc61f7b9336fb6caca429ba4ac9f2011609946e4a2dcf

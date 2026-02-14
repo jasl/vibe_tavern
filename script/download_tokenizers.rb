@@ -21,7 +21,7 @@ module DownloadTokenizers
   def run(argv)
     options = parse_options(argv)
 
-    sources = TavernKit::VibeTavern::TokenEstimation.sources
+    sources = AgentCore::Contrib::TokenEstimation.sources
     if options[:only].any?
       allowed = options[:only]
       sources = sources.select { |s| allowed.include?(s.fetch(:hint)) }
@@ -43,7 +43,7 @@ module DownloadTokenizers
         next
       end
 
-      dest = Pathname.new(TavernKit::VibeTavern::TokenEstimation.tokenizer_path(root: Rails.root, hint: hint))
+      dest = Pathname.new(AgentCore::Contrib::TokenEstimation.tokenizer_path(root: Rails.root, hint: hint))
       dest_dir = dest.dirname
 
       if options[:check]
