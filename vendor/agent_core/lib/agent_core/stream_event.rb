@@ -71,7 +71,8 @@ module AgentCore
       def initialize(id:, name:, arguments:)
         @id = id
         @name = name
-        @arguments = arguments
+        args_hash = arguments.is_a?(Hash) ? arguments : {}
+        @arguments = Utils.deep_stringify_keys(args_hash).freeze
       end
 
       def type = :tool_call_end
@@ -84,7 +85,8 @@ module AgentCore
       def initialize(tool_call_id:, name:, arguments:)
         @tool_call_id = tool_call_id
         @name = name
-        @arguments = arguments
+        args_hash = arguments.is_a?(Hash) ? arguments : {}
+        @arguments = Utils.deep_stringify_keys(args_hash).freeze
       end
 
       def type = :tool_execution_start

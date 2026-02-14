@@ -30,10 +30,10 @@ class AgentCore::StreamEventTest < Minitest::Test
   end
 
   def test_tool_call_end
-    event = AgentCore::StreamEvent::ToolCallEnd.new(id: "tc_1", name: "read", arguments: { path: "f.txt" })
+    event = AgentCore::StreamEvent::ToolCallEnd.new(id: "tc_1", name: "read", arguments: { "path" => "f.txt" })
     assert_equal "tc_1", event.id
     assert_equal "read", event.name
-    assert_equal({ path: "f.txt" }, event.arguments)
+    assert_equal({ "path" => "f.txt" }, event.arguments)
     assert_equal :tool_call_end, event.type
   end
 

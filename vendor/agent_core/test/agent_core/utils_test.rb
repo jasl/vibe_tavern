@@ -64,26 +64,26 @@ class AgentCore::UtilsTest < Minitest::Test
 
   def test_parse_tool_arguments_json_string
     args, err = AgentCore::Utils.parse_tool_arguments("{\"a\":1}")
-    assert_equal({ a: 1 }, args)
+    assert_equal({ "a" => 1 }, args)
     assert_nil err
   end
 
   def test_parse_tool_arguments_fenced_json_string
     args, err = AgentCore::Utils.parse_tool_arguments("```json\n{\"a\":1}\n```")
-    assert_equal({ a: 1 }, args)
+    assert_equal({ "a" => 1 }, args)
     assert_nil err
   end
 
   def test_parse_tool_arguments_double_encoded_json_string
     raw = "\"{\\\"a\\\":1}\""
     args, err = AgentCore::Utils.parse_tool_arguments(raw)
-    assert_equal({ a: 1 }, args)
+    assert_equal({ "a" => 1 }, args)
     assert_nil err
   end
 
   def test_parse_tool_arguments_hash
     args, err = AgentCore::Utils.parse_tool_arguments({ "a" => 1, "b" => { "c" => 2 } })
-    assert_equal({ a: 1, b: { c: 2 } }, args)
+    assert_equal({ "a" => 1, "b" => { "c" => 2 } }, args)
     assert_nil err
   end
 

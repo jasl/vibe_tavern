@@ -13,7 +13,7 @@ class AgentCore::MessageTest < Minitest::Test
   end
 
   def test_assistant_message_with_tool_calls
-    tc = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { path: "foo.txt" })
+    tc = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { "path" => "foo.txt" })
     msg = AgentCore::Message.new(
       role: :assistant,
       content: "Let me read that.",
@@ -84,7 +84,7 @@ class AgentCore::MessageTest < Minitest::Test
   end
 
   def test_serialization_roundtrip
-    tc = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { path: "x" })
+    tc = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { "path" => "x" })
     msg = AgentCore::Message.new(
       role: :assistant,
       content: "Let me check.",
@@ -182,10 +182,15 @@ end
 
 class AgentCore::ToolCallTest < Minitest::Test
   def test_basic_tool_call
-    tc = AgentCore::ToolCall.new(id: "tc_1", name: "bash", arguments: { command: "ls" })
+    tc = AgentCore::ToolCall.new(id: "tc_1", name: "bash", arguments: { "command" => "ls" })
     assert_equal "tc_1", tc.id
     assert_equal "bash", tc.name
-    assert_equal({ command: "ls" }, tc.arguments)
+    assert_equal({ "command" => "ls" }, tc.arguments)
+  end
+
+  def test_arguments_are_deep_stringified
+    tc = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: { nested: 1 }, "keep" => 2 })
+    assert_equal({ "text" => { "nested" => 1 }, "keep" => 2 }, tc.arguments)
   end
 
   def test_arguments_default_to_empty_hash
@@ -194,12 +199,12 @@ class AgentCore::ToolCallTest < Minitest::Test
   end
 
   def test_arguments_frozen
-    tc = AgentCore::ToolCall.new(id: "tc_1", name: "bash", arguments: { cmd: "ls" })
+    tc = AgentCore::ToolCall.new(id: "tc_1", name: "bash", arguments: { "cmd" => "ls" })
     assert tc.arguments.frozen?
   end
 
   def test_serialization_roundtrip
-    tc = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { path: "a.txt" })
+    tc = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { "path" => "a.txt" })
     restored = AgentCore::ToolCall.from_h(tc.to_h)
     assert_equal tc, restored
   end
@@ -211,9 +216,9 @@ class AgentCore::ToolCallTest < Minitest::Test
   end
 
   def test_equality
-    a = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { path: "a" })
-    b = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { path: "a" })
-    c = AgentCore::ToolCall.new(id: "tc_2", name: "read", arguments: { path: "a" })
+    a = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { "path" => "a" })
+    b = AgentCore::ToolCall.new(id: "tc_1", name: "read", arguments: { "path" => "a" })
+    c = AgentCore::ToolCall.new(id: "tc_2", name: "read", arguments: { "path" => "a" })
     assert_equal a, b
     refute_equal a, c
     refute_equal a, "not a tool call"

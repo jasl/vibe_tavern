@@ -97,7 +97,7 @@ class AgentCore::Resources::Provider::SimpleInferenceProviderTest < Minitest::Te
     assert_equal 1, response.tool_calls.size
     assert_equal "call_1", response.tool_calls.first.id
     assert_equal "echo", response.tool_calls.first.name
-    assert_equal({ text: "hello" }, response.tool_calls.first.arguments)
+    assert_equal({ "text" => "hello" }, response.tool_calls.first.arguments)
     assert_nil response.tool_calls.first.arguments_parse_error
   end
 
@@ -139,7 +139,7 @@ class AgentCore::Resources::Provider::SimpleInferenceProviderTest < Minitest::Te
     assert_equal 1, response.tool_calls.size
     assert_equal "call_1", response.tool_calls.first.id
     assert_equal "echo", response.tool_calls.first.name
-    assert_equal({ text: "hello" }, response.tool_calls.first.arguments)
+    assert_equal({ "text" => "hello" }, response.tool_calls.first.arguments)
   end
 
   def test_chat_non_streaming_parses_tool_call_arguments_when_arguments_is_a_hash
@@ -178,7 +178,7 @@ class AgentCore::Resources::Provider::SimpleInferenceProviderTest < Minitest::Te
         stream: false,
       )
 
-    assert_equal({ text: "hello" }, response.tool_calls.first.arguments)
+    assert_equal({ "text" => "hello" }, response.tool_calls.first.arguments)
     assert_nil response.tool_calls.first.arguments_parse_error
   end
 
@@ -473,7 +473,7 @@ class AgentCore::Resources::Provider::SimpleInferenceProviderTest < Minitest::Te
     assert_equal 1, msg.tool_calls.size
     assert_equal "call_1", msg.tool_calls.first.id
     assert_equal "echo", msg.tool_calls.first.name
-    assert_equal({ text: "hello" }, msg.tool_calls.first.arguments)
+    assert_equal({ "text" => "hello" }, msg.tool_calls.first.arguments)
 
     done = events.find { |e| e.is_a?(AgentCore::StreamEvent::Done) }
     refute_nil done

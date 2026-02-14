@@ -32,9 +32,9 @@ class AgentCore::Resources::Tools::ToolTest < Minitest::Test
     tool = AgentCore::Resources::Tools::Tool.new(
       name: "echo",
       description: "Echo text",
-    ) { |args, context:| AgentCore::Resources::Tools::ToolResult.success(text: args[:text]) }
+    ) { |args, **| AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text")) }
 
-    result = tool.call({ text: "hello" })
+    result = tool.call({ "text" => "hello" })
     assert_equal "hello", result.text
   end
 

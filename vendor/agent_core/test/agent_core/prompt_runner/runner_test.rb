@@ -40,7 +40,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
 
   def test_run_with_tool_calling
     # First response: assistant wants to call a tool
-    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hello" })
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
     assistant_with_tool = AgentCore::Message.new(
       role: :assistant,
       content: "Let me echo that.",
@@ -66,7 +66,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
       AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
-        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text", ""))
       end
     )
 
@@ -257,7 +257,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
   end
 
   def test_fix_empty_final_retries_without_tools
-    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
     assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
     tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
 
@@ -272,7 +272,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
       AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
-        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text", ""))
       end
     )
 
@@ -336,7 +336,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
 
   def test_max_turns_limit
     # Provider always returns tool calls — will hit max turns
-    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "loop" })
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "loop" })
     looping_msg = AgentCore::Message.new(role: :assistant, content: "calling...", tool_calls: [tool_call])
     looping_response = AgentCore::Resources::Provider::Response.new(
       message: looping_msg,
@@ -454,7 +454,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
   end
 
   def test_streaming_run_with_tool_calling_emits_single_done
-    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
     assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
     tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
 
@@ -466,7 +466,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
       AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
-        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text", ""))
       end
     )
 
@@ -495,7 +495,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
   end
 
   def test_streaming_fix_empty_final_retries_without_tools
-    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
     assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
     tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
 
@@ -510,7 +510,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
       AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
-        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text", ""))
       end
     )
 
@@ -774,7 +774,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
   end
 
   def test_tool_result_text_only_stays_as_string
-    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
     assistant_with_tool = AgentCore::Message.new(
       role: :assistant, content: "Echoing.",
       tool_calls: [tool_call]
@@ -797,7 +797,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     registry = AgentCore::Resources::Tools::Registry.new
     registry.register(
       AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
-        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text", ""))
       end
     )
 

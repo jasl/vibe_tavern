@@ -13,7 +13,7 @@ module AgentCore
   #   Message.new(
   #     role: :assistant,
   #     content: [TextContent.new(text: "Let me check that.")],
-  #     tool_calls: [ToolCall.new(id: "tc_1", name: "read", arguments: { path: "config.json" })]
+  #     tool_calls: [ToolCall.new(id: "tc_1", name: "read", arguments: { "path" => "config.json" })]
   #   )
   class Message
     ROLES = %i[system user assistant tool_result].freeze
@@ -130,7 +130,7 @@ module AgentCore
     def initialize(id:, name:, arguments:, arguments_parse_error: nil)
       @id = id
       @name = name
-      @arguments = (arguments || {}).freeze
+      @arguments = Utils.deep_stringify_keys(arguments || {}).freeze
       @arguments_parse_error = arguments_parse_error
     end
 

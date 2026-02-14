@@ -55,10 +55,10 @@ class AgentCore::AgentTest < Minitest::Test
       name: "echo",
       description: "Echo",
       parameters: { type: "object", properties: { text: { type: "string" } } }
-    ) { |args, context:| AgentCore::Resources::Tools::ToolResult.success(text: args[:text] || "") }
+    ) { |args, **| AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text", "")) }
 
     # First response triggers tool call
-    tc = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    tc = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
     tool_msg = AgentCore::Message.new(role: :assistant, content: "Echoing...", tool_calls: [tc])
     tool_resp = AgentCore::Resources::Provider::Response.new(
       message: tool_msg, stop_reason: :tool_use,

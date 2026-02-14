@@ -23,7 +23,7 @@ module AgentCore
       #   registry.definitions  # => Array of tool definitions
       #
       #   # Execute a tool
-      #   result = registry.execute(name: "read", arguments: { path: "config.json" })
+      #   result = registry.execute(name: "read", arguments: { "path" => "config.json" })
       class Registry
         def initialize
           @native_tools = {}

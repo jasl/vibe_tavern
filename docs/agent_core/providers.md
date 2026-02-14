@@ -42,7 +42,7 @@ provider = AgentCore::Resources::Provider::SimpleInferenceProvider.new(client: c
 ### Notes
 
 - Tools: accepts AgentCore “generic” tool definitions (`{ name:, description:, parameters: }`) and converts them to OpenAI `tools: [{ type: "function", function: ... }]`.
-- Tool calling: parses OpenAI `tool_calls` / `function_call` into `AgentCore::ToolCall` (arguments are deep-symbolized).
+- Tool calling: parses OpenAI `tool_calls` / `function_call` into `AgentCore::ToolCall` (arguments are deep-stringified; keys are Strings).
 - Streaming: consumes OpenAI-style SSE chunks, emits `StreamEvent::TextDelta`, `ToolCall*` events, then `MessageComplete` + `Done`.
 - Multimodal: images are mapped to OpenAI `image_url` parts; documents/audio are stringified placeholders (provider-neutral fallback).
 
@@ -67,8 +67,11 @@ the tool loop stable across imperfect model/tool outputs:
 - Default `parallel_tool_calls: false` when tools are present (unless explicitly set).
 - Accepts OpenAI `tool_calls` as Array or Hash, and supports legacy `function_call`.
 - Tool call arguments are parsed defensively (JSON object only; supports fenced
-  JSON blocks; guards size). Invalid/too-large arguments are recorded as
-  `ToolCall#arguments_parse_error` and will **not** be executed.
+  JSON blocks; size-capped via `AgentCore::Utils::DEFAULT_MAX_TOOL_ARGS_BYTES`
+  (default 200KB) in the provider adapter). Invalid/too-large arguments are
+  recorded as `ToolCall#arguments_parse_error` and will **not** be executed.
+  Custom providers should enforce a similar cap when parsing `tool_calls[].arguments`
+  (or reuse `Utils.parse_tool_arguments`).
 - Tool call IDs are normalized (blank/duplicate IDs rewritten as `tc_#` and
   de-duped with `__2`, `__3`, … suffixes) to keep tool results consistent.
 - Tool schema is normalized for compatibility (omits `required: []` in JSON schema).

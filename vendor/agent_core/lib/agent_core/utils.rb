@@ -59,6 +59,34 @@ module AgentCore
       end
     end
 
+    # Deep-convert keys to strings.
+    #
+    # String keys take precedence over their non-String equivalents.
+    def deep_stringify_keys(value)
+      case value
+      when Array
+        value.map { |v| deep_stringify_keys(v) }
+      when Hash
+        out = {}
+
+        # Prefer string keys when both exist (e.g., "text" and :text).
+        value.each do |k, v|
+          out[k] = deep_stringify_keys(v) if k.is_a?(String)
+        end
+
+        value.each do |k, v|
+          next if k.is_a?(String)
+
+          key = k.to_s
+          out[key] = deep_stringify_keys(v) unless out.key?(key)
+        end
+
+        out
+      else
+        value
+      end
+    end
+
     def truncate_utf8_bytes(value, max_bytes:)
       max_bytes = Integer(max_bytes)
       return "" if max_bytes <= 0
@@ -236,7 +264,7 @@ module AgentCore
       require "json"
 
       if value.is_a?(Hash) || value.is_a?(Array)
-        normalized = deep_symbolize_keys(value)
+        normalized = deep_stringify_keys(value)
 
         begin
           json = JSON.generate(normalized)
@@ -268,7 +296,7 @@ module AgentCore
         end
       end
 
-      return [deep_symbolize_keys(parsed), nil] if parsed.is_a?(Hash)
+      return [deep_stringify_keys(parsed), nil] if parsed.is_a?(Hash)
 
       [{}, :invalid_json]
     rescue JSON::ParserError

@@ -36,7 +36,7 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
         properties: { text: { type: "string" } },
         required: ["text"],
       }
-    ) { |args, context:| AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, "")) }
+    ) { |args, **| AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text", "")) }
   end
 
   def test_register_and_find
@@ -53,7 +53,7 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
 
   def test_execute_native_tool
     @registry.register(@echo_tool)
-    result = @registry.execute(name: "echo", arguments: { text: "hello" })
+    result = @registry.execute(name: "echo", arguments: { "text" => "hello" })
     assert_equal "hello", result.text
     refute result.error?
   end

@@ -21,7 +21,7 @@ module AgentCore
       #       required: ["path"]
       #     }
       #   ) do |arguments, context:|
-      #     content = File.read(arguments[:path])
+      #     content = File.read(arguments.fetch("path"))
       #     AgentCore::Resources::Tools::ToolResult.success(text: content)
       #   end
       class Tool
