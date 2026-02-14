@@ -80,7 +80,17 @@ class AgentCore::StreamEventTest < Minitest::Test
     event = AgentCore::StreamEvent::TurnEnd.new(turn_number: 3, message: msg)
     assert_equal 3, event.turn_number
     assert_same msg, event.message
+    assert_nil event.stop_reason
+    assert_nil event.usage
     assert_equal :turn_end, event.type
+  end
+
+  def test_turn_end_with_stop_reason_and_usage
+    msg = AgentCore::Message.new(role: :assistant, content: "done")
+    usage = AgentCore::Resources::Provider::Usage.new(input_tokens: 1, output_tokens: 2)
+    event = AgentCore::StreamEvent::TurnEnd.new(turn_number: 1, message: msg, stop_reason: :end_turn, usage: usage)
+    assert_equal :end_turn, event.stop_reason
+    assert_same usage, event.usage
   end
 
   def test_message_complete

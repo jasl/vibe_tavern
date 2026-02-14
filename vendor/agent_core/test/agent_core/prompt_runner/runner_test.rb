@@ -453,6 +453,82 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_includes event_types, :done
   end
 
+  def test_streaming_run_with_tool_calling_emits_single_done
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Final answer")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    events_received = []
+    result = @runner.run_stream(prompt: prompt, provider: provider, tools_registry: registry) do |event|
+      events_received << event
+    end
+
+    assert_equal "Final answer", result.text
+
+    event_types = events_received.map(&:type)
+    assert_includes event_types, :tool_execution_start
+    assert_includes event_types, :tool_execution_end
+    assert_includes event_types, :turn_end
+
+    done_events = events_received.select { |e| e.type == :done }
+    assert_equal 1, done_events.size
+    assert_equal :end_turn, done_events.first.stop_reason
+  end
+
+  def test_streaming_fix_empty_final_retries_without_tools
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { text: "hi" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    empty_final_msg = AgentCore::Message.new(role: :assistant, content: "")
+    empty_final_response = AgentCore::Resources::Provider::Response.new(message: empty_final_msg, stop_reason: :end_turn)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Final answer")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, empty_final_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch(:text, ""))
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run_stream(prompt: prompt, provider: provider, tools_registry: registry) { }
+
+    assert_equal "Final answer", result.text
+    assert_equal 3, provider.calls.size
+    assert_nil provider.calls[2][:tools]
+    assert_equal "Please provide your final answer.", provider.calls[2][:messages].last.text
+  end
+
   def test_max_turns_zero_raises
     prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
       system_prompt: "test",

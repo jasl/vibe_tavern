@@ -215,8 +215,12 @@ AgentCore::PromptRunner::Events
 ```
 
 **Streaming architecture**: The runner calls `provider.chat(stream: true)`,
-iterates the enumerator, yields stream events to the caller, and upon
-receiving tool calls, executes them and loops.
+iterates the enumerator, forwards incremental deltas (text/tool calls), and
+captures `MessageComplete` + the provider `Done` internally to build the turn
+result. If the assistant requests tool calls, it executes tools, appends tool
+results, and loops. Each LLM call yields a `TurnEnd` (including stop_reason +
+usage for that turn), and the runner emits a single `Done` event when the whole
+run completes.
 
 **Concurrency considerations**:
 - Tool execution is sequential by default (one at a time, like pi-mono)

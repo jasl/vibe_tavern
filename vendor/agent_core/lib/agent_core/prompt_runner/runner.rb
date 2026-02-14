@@ -324,17 +324,19 @@ module AgentCore
           response_usage = nil
 
           stream_enum.each do |event|
-            # Forward stream events to caller
-            yield event if block
             events.emit(:stream_delta, event)
 
             case event
             when StreamEvent::Done
               response_stop_reason = event.stop_reason
               response_usage = event.usage
+              next
             when StreamEvent::MessageComplete
               assistant_msg = event.message
             end
+
+            # Forward stream events to caller (excluding per-call Done; Runner emits Done once per run).
+            yield event if block
           end
 
           # Track usage
@@ -439,7 +441,7 @@ module AgentCore
               all_new_messages << result_msg
             end
 
-            yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg) if block
+            yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
             events.emit(:turn_end, turn, all_new_messages)
           else
             if fix_empty_final &&
@@ -450,7 +452,7 @@ module AgentCore
                 assistant_msg.text.to_s.strip.empty?
               empty_final_fixup_attempted = true
               tools_enabled = false if fix_empty_final_disable_tools
-              yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg) if block
+              yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
               events.emit(:turn_end, turn, all_new_messages)
               user_msg = Message.new(role: :user, content: fix_empty_final_user_text)
               messages << user_msg
@@ -458,7 +460,7 @@ module AgentCore
               next
             end
 
-            yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg) if block
+            yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
             events.emit(:turn_end, turn, all_new_messages)
 
             yield StreamEvent::Done.new(stop_reason: response_stop_reason, usage: aggregated_usage) if block

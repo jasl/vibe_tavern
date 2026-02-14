@@ -129,18 +129,23 @@ module AgentCore
     end
 
     # A turn has ended.
+    #
+    # `stop_reason` / `usage` (when present) reflect the LLM call that produced
+    # `message` for this turn.
     class TurnEnd
-      attr_reader :turn_number, :message
+      attr_reader :turn_number, :message, :stop_reason, :usage
 
-      def initialize(turn_number:, message:)
+      def initialize(turn_number:, message:, stop_reason: nil, usage: nil)
         @turn_number = turn_number
         @message = message
+        @stop_reason = stop_reason
+        @usage = usage
       end
 
       def type = :turn_end
     end
 
-    # The complete message has been received.
+    # The complete message has been received (end of an LLM stream).
     class MessageComplete
       attr_reader :message
 
@@ -151,7 +156,12 @@ module AgentCore
       def type = :message_complete
     end
 
-    # The stream/run has completed.
+    # The run has completed.
+    #
+    # When emitted by providers directly, this marks the end of the provider's
+    # streaming response. When using PromptRunner#run_stream, Runner emits this
+    # once for the entire tool loop (providers' per-call Done events are not
+    # forwarded).
     class Done
       attr_reader :stop_reason, :usage
 
