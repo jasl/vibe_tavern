@@ -100,13 +100,26 @@ module AgentCore
 
           @client = nil
           @stream_client = nil
+          @sse_stream_client = nil
+
+          @sse_thread = nil
+          @sse_stop = false
+          @sse_response = nil
+          @sse_session_id = nil
         end
 
         def protocol_version=(value)
           s = value.to_s.strip
           s = nil if s.empty?
 
-          @mutex.synchronize { @protocol_version = s }
+          should_start = false
+
+          @mutex.synchronize do
+            @protocol_version = s
+            should_start = should_start_sse_stream_unsafe?
+          end
+
+          maybe_start_sse_stream! if should_start
         end
 
         def start
@@ -119,6 +132,8 @@ module AgentCore
             @worker = Thread.new { worker_loop }
             @started = true
           end
+
+          maybe_start_sse_stream!
 
           self
         end
@@ -192,18 +207,29 @@ module AgentCore
           raise ArgumentError, "timeout_s must be positive" if timeout_s <= 0
 
           worker = nil
+          sse_thread = nil
+          sse_response = nil
           protocol_version = nil
           session_id = nil
           client = nil
           stream_client = nil
+          sse_stream_client = nil
 
           @mutex.synchronize do
             return nil if @closed
 
             @closed = true
+            @sse_stop = true
 
             worker = @worker
             @worker = nil
+
+            sse_thread = @sse_thread
+            @sse_thread = nil
+
+            sse_response = @sse_response
+            @sse_response = nil
+            @sse_session_id = nil
 
             @queue.clear
             @inflight.clear
@@ -213,8 +239,19 @@ module AgentCore
 
             client = @client
             stream_client = @stream_client
+            sse_stream_client = @sse_stream_client
 
             @cv.broadcast
+          end
+
+          safe_close_response(sse_response)
+          sse_thread&.join(0.2)
+          if sse_thread&.alive?
+            safe_close_client(sse_stream_client)
+            sse_stream_client = nil
+
+            sse_thread.kill
+            sse_thread.join(0.1)
           end
 
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_s
@@ -251,6 +288,7 @@ module AgentCore
 
           safe_close_client(stream_client)
           safe_close_client(client)
+          safe_close_client(sse_stream_client)
 
           nil
         rescue ArgumentError, TypeError
@@ -287,6 +325,15 @@ module AgentCore
 
           @client = session
           @stream_client = session.plugin(:stream).with(timeout: timeout_opts)
+
+          sse_base_session =
+            if base == ::HTTPX
+              ::HTTPX.with(timeout: timeout_opts)
+            else
+              base.with(timeout: timeout_opts)
+            end
+
+          @sse_stream_client = sse_base_session.plugin(:stream).with(timeout: timeout_opts)
         end
 
         def require_httpx!
@@ -320,12 +367,15 @@ module AgentCore
           @mutex.synchronize do
             notify = !@closed
             @closed = true
+            @sse_stop = true
             on_close = @on_close
             @queue.clear
             @inflight.clear
             @cv.broadcast
           end
 
+          stop_sse_stream!
+          safe_close_client(@sse_stream_client)
           safe_close_client(@stream_client)
           safe_close_client(@client)
 
@@ -359,8 +409,6 @@ module AgentCore
             emit_error_response(id, code: "TRANSPORT_ERROR", message: "#{e.class}: #{e.message}")
             safe_call(@on_stderr_line, "mcp http error method=#{method_name} id=#{id.inspect} err=#{e.class}: #{e.message}")
           end
-        ensure
-          cleanup_inflight(id) if id
         end
 
         def handle_post(job, include_protocol_headers:, include_session_id:, extra_headers:)
@@ -395,13 +443,13 @@ module AgentCore
           response_headers = normalize_http_headers(stream_response)
           content_type = downcase_header_map(response_headers).fetch("content-type", "").to_s
 
-          if status == 404 && include_session_id && current_session_id
-            emit_error_response(id, code: "MCP_SESSION_NOT_FOUND", message: "MCP session not found")
-            return
-          end
-
           unless status >= 200 && status < 300
             body = read_full_body_safe(stream_response, token: token)
+            if include_session_id && current_session_id && session_not_found_http?(status, body)
+              emit_error_response(id, code: "MCP_SESSION_NOT_FOUND", message: "MCP session not found")
+              return
+            end
+
             emit_error_response(id, code: "HTTP_ERROR", message: "HTTP status #{status}", data: { "status" => status, "body" => truncate_bytes(body) })
             return
           end
@@ -420,7 +468,9 @@ module AgentCore
             return
           end
 
-          emit_message(parsed)
+          return if accepted_ack?(parsed)
+
+          emit_message(parsed) if json_rpc_like_message?(parsed)
         rescue ::HTTPX::HTTPError => e
           status = e.response.status.to_i
           emit_error_response(id, code: "HTTP_ERROR", message: "HTTP status #{status}", data: { "status" => status })
@@ -509,7 +559,7 @@ module AgentCore
               return
             rescue ::HTTPX::HTTPError => e
               status = e.response.status.to_i
-              if status == 404 && current_session_id
+              if current_session_id && (status == 404 || status == 400)
                 emit_error_response(id, code: "MCP_SESSION_NOT_FOUND", message: "MCP session not found")
                 return
               end
@@ -548,7 +598,7 @@ module AgentCore
             end
 
             status = response.status.to_i
-            if status == 404 && current_session_id
+            if current_session_id && (status == 404 || status == 400)
               emit_error_response(id, code: "MCP_SESSION_NOT_FOUND", message: "MCP session not found")
               safe_close_response(response)
               return
@@ -721,8 +771,8 @@ module AgentCore
           end
 
           status = response.status.to_i
-          if status == 404 && include_session_id && current_session_id
-            safe_call(@on_stderr_line, "mcp http notification got 404 (session not found)")
+          if include_session_id && current_session_id && (status == 404 || status == 400)
+            safe_call(@on_stderr_line, "mcp http notification got #{status} (session not found)")
           end
 
           unless status >= 200 && status < 300
@@ -748,7 +798,20 @@ module AgentCore
           value = downcase_header_map(headers).fetch(AgentCore::MCP::MCP_SESSION_ID_HEADER.downcase, nil).to_s.strip
           value = nil if value.empty?
 
-          @mutex.synchronize { @session_id = value }
+          should_restart = false
+
+          @mutex.synchronize do
+            old = @session_id
+            @session_id = value
+            should_restart = @started && !@closed && old.to_s != value.to_s
+          end
+
+          if should_restart
+            stop_sse_stream!
+            maybe_start_sse_stream!
+          else
+            maybe_start_sse_stream!
+          end
         end
 
         def normalize_event_id(value)
@@ -779,6 +842,7 @@ module AgentCore
         end
 
         def emit_message(msg)
+          cleanup_inflight_for_response(msg)
           safe_call(@on_stdout_line, JSON.generate(msg))
         rescue StandardError
           nil
@@ -879,6 +943,235 @@ module AgentCore
           client&.close if client&.respond_to?(:close)
         rescue StandardError
           nil
+        end
+
+        def should_start_sse_stream_unsafe?
+          return false unless @started
+          return false if @closed
+
+          session_id = @session_id.to_s.strip
+          return false if session_id.empty?
+
+          protocol_version = @protocol_version.to_s.strip
+          return false if protocol_version.empty?
+
+          @sse_thread.nil? || !@sse_thread.alive? || @sse_session_id.to_s != session_id
+        end
+
+        def maybe_start_sse_stream!
+          session_id = nil
+          protocol_version = nil
+          sse_thread = nil
+          sse_session_id = nil
+
+          @mutex.synchronize do
+            return nil unless should_start_sse_stream_unsafe?
+
+            session_id = @session_id.to_s.strip
+            protocol_version = @protocol_version.to_s.strip
+
+            @sse_stop = false
+            @sse_session_id = session_id
+
+            sse_thread = Thread.new { sse_loop(session_id: session_id, protocol_version: protocol_version) }
+            @sse_thread = sse_thread
+            sse_session_id = @sse_session_id
+          end
+
+          safe_call(@on_stderr_line, "mcp sse started session_id=#{sse_session_id}")
+          nil
+        rescue StandardError => e
+          safe_call(@on_stderr_line, "mcp sse start failed: #{e.class}: #{e.message}")
+          nil
+        end
+
+        def stop_sse_stream!
+          sse_thread = nil
+          sse_response = nil
+
+          @mutex.synchronize do
+            sse_thread = @sse_thread
+            @sse_thread = nil
+
+            @sse_stop = true
+
+            sse_response = @sse_response
+            @sse_response = nil
+            @sse_session_id = nil
+          end
+
+          safe_close_response(sse_response)
+          sse_thread&.join(0.2)
+          if sse_thread&.alive?
+            sse_thread.kill
+            sse_thread.join(0.1)
+          end
+
+          nil
+        rescue StandardError
+          nil
+        end
+
+        def sse_loop(session_id:, protocol_version:)
+          reconnects = 0
+          last_event_id = nil
+          retry_ms = nil
+
+          loop do
+            break if sse_should_stop?(session_id: session_id)
+
+            response =
+              sse_stream_session.request(
+                :get,
+                @url,
+                headers: build_sse_get_headers(session_id: session_id, protocol_version: protocol_version, last_event_id: last_event_id),
+                stream: true,
+              )
+
+            if response.is_a?(::HTTPX::ErrorResponse)
+              raise AgentCore::MCP::TransportError, (response.error&.message || "HTTPX request failed")
+            end
+
+            status = response.status.to_i
+            response_headers = normalize_http_headers(response)
+            content_type = downcase_header_map(response_headers).fetch("content-type", "").to_s
+
+            if status == 404 || status == 400 || status == 405
+              safe_call(@on_stderr_line, "mcp sse connect status=#{status}")
+              safe_close_response(response)
+              return
+            end
+
+            unless status >= 200 && status < 300
+              safe_call(@on_stderr_line, "mcp sse connect http_error status=#{status}")
+              safe_close_response(response)
+              return
+            end
+
+            unless content_type.include?("text/event-stream")
+              safe_call(@on_stderr_line, "mcp sse connect bad content-type=#{content_type.inspect}")
+              safe_close_response(response)
+              return
+            end
+
+            @mutex.synchronize { @sse_response = response }
+
+            parser =
+              AgentCore::MCP::SseParser.new(
+                max_buffer_bytes: DEFAULT_SSE_MAX_BUFFER_BYTES,
+                max_event_data_bytes: @max_response_bytes,
+              )
+
+            begin
+              response.each do |chunk|
+                break if sse_should_stop?(session_id: session_id)
+
+                parser.feed(chunk) do |event|
+                  last_event_id = normalize_event_id(event[:id]) || last_event_id
+                  retry_ms = event[:retry_ms] || retry_ms
+
+                  data = event[:data].to_s
+                  next if data.empty?
+
+                  msg = safe_parse_json(data)
+                  unless msg.is_a?(Hash)
+                    safe_call(@on_stderr_line, "mcp sse event invalid json")
+                    next
+                  end
+
+                  emit_message(msg)
+                end
+              end
+            rescue StopIteration
+              nil
+            rescue AgentCore::MCP::SseParser::EventDataTooLargeError
+              safe_call(@on_stderr_line, "mcp sse event data too large")
+              return
+            ensure
+              @mutex.synchronize { @sse_response = nil }
+              safe_close_response(response)
+            end
+
+            break if sse_should_stop?(session_id: session_id)
+
+            reconnects += 1
+            if reconnects > @sse_max_reconnects
+              safe_call(@on_stderr_line, "mcp sse reconnects exceeded reconnects=#{reconnects}")
+              return
+            end
+
+            wait_before_reconnect(retry_ms, reconnects: reconnects)
+          end
+        rescue ::HTTPX::HTTPError => e
+          status = e.response.status.to_i
+          safe_call(@on_stderr_line, "mcp sse http_error status=#{status}")
+        rescue StandardError => e
+          safe_call(@on_stderr_line, "mcp sse error: #{e.class}: #{e.message}")
+        ensure
+          @mutex.synchronize do
+            @sse_response = nil
+            @sse_thread = nil
+            @sse_session_id = nil
+          end
+        end
+
+        def sse_should_stop?(session_id:)
+          @mutex.synchronize do
+            return true if @closed
+            return true if @sse_stop
+            return true if @session_id.to_s.strip != session_id.to_s.strip
+
+            false
+          end
+        rescue StandardError
+          true
+        end
+
+        def build_sse_get_headers(session_id:, protocol_version:, last_event_id:)
+          out = base_headers_for_get(extra_headers: resolve_headers_provider!)
+          out[AgentCore::MCP::MCP_PROTOCOL_VERSION_HEADER] = protocol_version.to_s
+          out[AgentCore::MCP::MCP_SESSION_ID_HEADER] = session_id.to_s
+          out[AgentCore::MCP::LAST_EVENT_ID_HEADER] = last_event_id if last_event_id
+          out
+        end
+
+        def sse_stream_session = @sse_stream_client
+
+        def cleanup_inflight_for_response(msg)
+          return unless msg.is_a?(Hash)
+
+          id = msg.fetch("id", nil)
+          return if id.nil?
+          return unless msg.key?("result") || msg.key?("error")
+
+          @mutex.synchronize do
+            @inflight.delete(id)
+            @inflight.delete(id.to_s) if id.is_a?(Integer)
+            if id.is_a?(String) && id.match?(/\A\d+\z/)
+              @inflight.delete(id.to_i)
+            end
+          end
+
+          nil
+        rescue StandardError
+          nil
+        end
+
+        def session_not_found_http?(status, body)
+          return true if status.to_i == 404
+          return false unless status.to_i == 400
+
+          parsed = safe_parse_json(body)
+          err = parsed.is_a?(Hash) ? parsed.fetch("error", nil) : nil
+          err.to_s.downcase.include?("session")
+        end
+
+        def accepted_ack?(parsed)
+          parsed.is_a?(Hash) && parsed.fetch("accepted", false) == true
+        end
+
+        def json_rpc_like_message?(parsed)
+          parsed.is_a?(Hash) && (parsed.key?("jsonrpc") || parsed.key?("id") || parsed.key?("method"))
         end
       end
     end

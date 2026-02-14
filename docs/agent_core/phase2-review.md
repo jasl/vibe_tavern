@@ -171,7 +171,9 @@ timeout 使用 `CLOCK_MONOTONIC` 避免系统时间跳变。
 ### 3.3 ✅ Transport::StreamableHttp — 正确
 
 `@mutex + @cv` 保护 `@queue, @inflight, @closed, @started, @session_id, @protocol_version`。
-单 worker 线程顺序处理 queue（避免并发 HTTP 请求）。
+单 worker 线程顺序处理 queue（顺序发出 HTTP POST）。
+另有一个后台 SSE reader 线程在 session 建立后通过 HTTP GET 建立 `text/event-stream` 流，
+用于接收 ruby-sdk 风格的异步响应（POST 返回 `{"accepted": true}`，真实 JSON-RPC response 从 SSE 到达）。
 `cancel_request` 在新线程中发取消通知（不阻塞调用方）。
 Token struct 的 `cancelled` 字段在 mutex 内读写。
 
@@ -191,7 +193,7 @@ end
 ```
 
 `resolve_headers_provider!` 调用用户提供的 callback（在锁外），然后再进入锁内 enqueue。
-如果两个线程同时 `send_message`，headers_provider 会并发调用。
+如果两个线程同时 `send_message`，headers_provider 会并发调用；并且 SSE reader 线程也会调用它来生成 GET headers。
 这是合理设计（provider 应该是线程安全的），但值得文档化。
 
 ### 3.5 ⚠️ Skills 模块 — 非线程安全 by design
@@ -355,7 +357,7 @@ read_skill_file → validate path → read file → String
 ### 6.3 测试数据统计
 
 ```
-Total: 595 runs, 1261 assertions, 0 failures, 0 errors
+Total: 596 runs, 1270 assertions, 0 failures, 0 errors
 ```
 
 Phase 2 新增测试覆盖：
@@ -381,9 +383,10 @@ Phase 2 新增测试覆盖：
 
 - ✅ `initialize` 握手交换 protocolVersion + clientInfo + capabilities
 - ✅ `notifications/initialized` 在 initialize 成功后发送
-- ✅ `Mcp-Protocol-Version` header 在初始化后的请求中
-- ✅ `Mcp-Session-Id` header 在 session 建立后的请求中
-- ✅ 404 → MCP_SESSION_NOT_FOUND 映射
+- ✅ `MCP-Protocol-Version` header 在初始化后的请求中
+- ✅ `MCP-Session-Id` header 在 session 建立后的请求中
+- ✅ Streamable HTTP：支持 ruby-sdk 风格的 “GET SSE + POST accepted” 响应路径
+- ✅ 400/404（Invalid session / Session not found）→ MCP_SESSION_NOT_FOUND 映射
 - ✅ session DELETE on close
 
 ### 7.3 camelCase 使用审查

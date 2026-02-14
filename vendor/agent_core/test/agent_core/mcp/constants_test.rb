@@ -10,7 +10,9 @@ class AgentCore::MCP::ConstantsTest < Minitest::Test
   def test_supported_protocol_versions
     versions = AgentCore::MCP::SUPPORTED_PROTOCOL_VERSIONS
     assert_includes versions, "2025-11-25"
+    assert_includes versions, "2025-06-18"
     assert_includes versions, "2025-03-26"
+    assert_includes versions, "2024-11-05"
     assert versions.frozen?
   end
 

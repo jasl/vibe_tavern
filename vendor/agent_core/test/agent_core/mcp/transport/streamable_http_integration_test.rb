@@ -24,8 +24,9 @@ class AgentCore::MCP::Transport::StreamableHttpIntegrationTest < Minitest::Test
       def do_DELETE(req, res) = @handler.call(req, res)
     end
 
-    def initialize(responders)
+    def initialize(responders, get_handler: nil)
       @responders = responders.dup
+      @get_handler = get_handler
       @mutex = Mutex.new
       @requests = []
 
@@ -67,6 +68,13 @@ class AgentCore::MCP::Transport::StreamableHttpIntegrationTest < Minitest::Test
         body: req.body.to_s,
       }
 
+      if req.request_method == "GET"
+        @mutex.synchronize { @requests << info }
+        handler = @get_handler || method(:handle_get_default)
+        handler.call(req, res, self)
+        return
+      end
+
       responder = nil
       @mutex.synchronize do
         @requests << info
@@ -91,6 +99,210 @@ class AgentCore::MCP::Transport::StreamableHttpIntegrationTest < Minitest::Test
       req.header.each_with_object({}) do |(k, v), out|
         out[k.to_s.downcase] = Array(v).join(", ")
       end
+    end
+
+    def handle_get_default(_req, res, _server)
+      res.status = 405
+      res["Content-Type"] = "text/plain"
+      res.body = ""
+    end
+  end
+
+  class RubySdkStyleServer
+    class AnyMethodServlet < WEBrick::HTTPServlet::AbstractServlet
+      def initialize(server, handler)
+        super(server)
+        @handler = handler
+      end
+
+      def do_GET(req, res) = @handler.call(req, res)
+      def do_POST(req, res) = @handler.call(req, res)
+      def do_DELETE(req, res) = @handler.call(req, res)
+    end
+
+    def initialize
+      @mutex = Mutex.new
+      @requests = []
+
+      @session_id = "sess_test"
+      @sse_queue = Queue.new
+      @sse_connected = false
+
+      @server =
+        WEBrick::HTTPServer.new(
+          Port: 0,
+          BindAddress: "127.0.0.1",
+          Logger: WEBrick::Log.new(File::NULL, WEBrick::Log::FATAL),
+          AccessLog: [],
+        )
+
+      handler = ->(req, res) { handle(req, res) }
+      @server.mount "/mcp", AnyMethodServlet, handler
+
+      @thread = Thread.new { @server.start }
+    end
+
+    attr_reader :requests, :session_id
+
+    def url
+      "http://127.0.0.1:#{@server.config[:Port]}/mcp"
+    end
+
+    def shutdown
+      @sse_queue << :__close
+      @server.shutdown
+      @thread.join(1.0)
+    end
+
+    private
+
+    def handle(req, res) # rubocop:disable Metrics/MethodLength
+      info = {
+        method: req.request_method,
+        headers: normalize_headers(req),
+        body: req.body.to_s,
+      }
+      @mutex.synchronize { @requests << info }
+
+      case req.request_method
+      when "POST"
+        handle_post(req, res)
+      when "GET"
+        handle_get(req, res)
+      when "DELETE"
+        handle_delete(req, res)
+      else
+        res.status = 405
+        res["Content-Type"] = "text/plain"
+        res.body = ""
+      end
+    rescue StandardError => e
+      res.status = 500
+      res["Content-Type"] = "text/plain"
+      res.body = "Server error: #{e.class}: #{e.message}"
+    end
+
+    def normalize_headers(req)
+      req.header.each_with_object({}) do |(k, v), out|
+        out[k.to_s.downcase] = Array(v).join(", ")
+      end
+    end
+
+    def handle_post(req, res) # rubocop:disable Metrics/MethodLength
+      accept = req.header["accept"]&.first.to_s
+      unless accept.include?("application/json") && accept.include?("text/event-stream")
+        res.status = 406
+        res["Content-Type"] = "application/json"
+        res.body = JSON.generate({ error: "Not Acceptable" })
+        return
+      end
+
+      msg = JSON.parse(req.body.to_s)
+      method_name = msg.fetch("method")
+
+      case method_name
+      when "initialize"
+        response =
+          {
+            "jsonrpc" => "2.0",
+            "id" => msg.fetch("id"),
+            "result" => {
+              "protocolVersion" => AgentCore::MCP::DEFAULT_PROTOCOL_VERSION,
+              "serverInfo" => { "name" => "test-server", "version" => "1.0" },
+              "capabilities" => { "tools" => {} },
+            },
+          }
+
+        res.status = 200
+        res["Content-Type"] = "application/json"
+        res["Mcp-Session-Id"] = @session_id
+        res.body = JSON.generate(response)
+      when "notifications/initialized"
+        res.status = 202
+        res["Content-Type"] = "application/json"
+        res.body = ""
+      when "tools/list"
+        response =
+          {
+            "jsonrpc" => "2.0",
+            "id" => msg.fetch("id"),
+            "result" => {
+              "tools" => [
+                { "name" => "tool_a", "description" => "A", "inputSchema" => {} },
+              ],
+            },
+          }
+
+        if @mutex.synchronize { @sse_connected }
+          @sse_queue << "data: #{JSON.generate(response)}\n\n"
+          res.status = 200
+          res["Content-Type"] = "application/json"
+          res.body = JSON.generate({ accepted: true })
+        else
+          res.status = 200
+          res["Content-Type"] = "application/json"
+          res.body = JSON.generate(response)
+        end
+      else
+        res.status = 404
+        res["Content-Type"] = "application/json"
+        res.body = JSON.generate({ error: "Unknown method" })
+      end
+    end
+
+    def handle_get(req, res)
+      accept = req.header["accept"]&.first.to_s
+      unless accept.include?("text/event-stream")
+        res.status = 406
+        res["Content-Type"] = "application/json"
+        res.body = JSON.generate({ error: "Not Acceptable" })
+        return
+      end
+
+      session_id = req.header["mcp-session-id"]&.first.to_s
+      if session_id.strip.empty?
+        res.status = 400
+        res["Content-Type"] = "application/json"
+        res.body = JSON.generate({ error: "Missing session ID" })
+        return
+      end
+
+      unless session_id == @session_id
+        res.status = 404
+        res["Content-Type"] = "application/json"
+        res.body = JSON.generate({ error: "Session not found" })
+        return
+      end
+
+      @mutex.synchronize { @sse_connected = true }
+
+      res.status = 200
+      res["Content-Type"] = "text/event-stream"
+      res["Cache-Control"] = "no-cache"
+      res["Connection"] = "keep-alive"
+      res.chunked = true
+
+      queue = @sse_queue
+      res.body =
+        proc do |out|
+          loop do
+            msg = queue.pop
+            break if msg == :__close
+
+            begin
+              out.write(msg.to_s)
+            rescue IOError, Errno::EPIPE
+              break
+            end
+          end
+        end
+    end
+
+    def handle_delete(req, res)
+      @sse_queue << :__close
+      res.status = 200
+      res["Content-Type"] = "application/json"
+      res.body = JSON.generate({ ok: true })
     end
   end
 
@@ -170,9 +382,9 @@ class AgentCore::MCP::Transport::StreamableHttpIntegrationTest < Minitest::Test
           method(:handle_initialize_json),
           method(:handle_initialized_notification),
           method(:handle_tools_list_sse_incomplete),
-          method(:handle_tools_list_get_reconnect),
           method(:handle_delete_session),
         ],
+        get_handler: method(:handle_tools_list_get_reconnect_or_405),
       )
 
     transport =
@@ -190,9 +402,37 @@ class AgentCore::MCP::Transport::StreamableHttpIntegrationTest < Minitest::Test
     result = client.list_tools
     assert_equal ["tool_b"], result.fetch("tools").map { |t| t.fetch("name") }
 
-    get_req = server.requests.find { |r| r[:method] == "GET" }
+    get_req = server.requests.find { |r| r[:method] == "GET" && r[:headers].key?("last-event-id") }
     refute_nil get_req
     assert_equal "evt_1", get_req[:headers]["last-event-id"]
+  ensure
+    client&.close
+    server&.shutdown
+  end
+
+  def test_ruby_sdk_style_async_sse_via_get_stream
+    server = RubySdkStyleServer.new
+
+    transport =
+      AgentCore::MCP::Transport::StreamableHttp.new(
+        url: server.url,
+        timeout_s: 1.0,
+        open_timeout_s: 1.0,
+        read_timeout_s: 1.0,
+        sleep_fn: ->(_seconds) { nil },
+      )
+
+    client = AgentCore::MCP::Client.new(transport: transport)
+    client.start
+
+    result = client.list_tools
+    assert_equal ["tool_a"], result.fetch("tools").map { |t| t.fetch("name") }
+
+    get_req = server.requests.find { |r| r[:method] == "GET" }
+    refute_nil get_req
+    assert_equal AgentCore::MCP::HTTP_ACCEPT_GET, get_req[:headers].fetch("accept")
+    assert_equal "sess_test", get_req[:headers].fetch("mcp-session-id")
+    assert_equal AgentCore::MCP::DEFAULT_PROTOCOL_VERSION, get_req[:headers].fetch("mcp-protocol-version")
   ensure
     client&.close
     server&.shutdown
@@ -297,9 +537,16 @@ class AgentCore::MCP::Transport::StreamableHttpIntegrationTest < Minitest::Test
     res.body = sse_event(data: notification, id: "evt_1")
   end
 
-  def handle_tools_list_get_reconnect(req, res, server)
+  def handle_tools_list_get_reconnect_or_405(req, res, server)
     assert_equal "GET", req.request_method
-    assert_equal "evt_1", req.header["last-event-id"]&.first.to_s
+    last_event_id = req.header["last-event-id"]&.first.to_s
+
+    if last_event_id != "evt_1"
+      res.status = 405
+      res["Content-Type"] = "text/plain"
+      res.body = ""
+      return
+    end
 
     response =
       {

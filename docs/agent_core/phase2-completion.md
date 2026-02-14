@@ -2,7 +2,7 @@
 
 > Date: 2026-02-14
 > Status: ✅ Complete
-> Tests: 595 runs, 1261 assertions, 0 failures, 0 errors
+> Tests: 596 runs, 1270 assertions, 0 failures, 0 errors
 
 ## What Was Delivered
 
@@ -100,7 +100,7 @@ test/fixtures/skills/another-skill/assets/logo.txt
 | MCP ServerConfig (Data.define) | ✅ | |
 | MCP Transport::Base (abstract) | ✅ | |
 | MCP Transport::Stdio | ✅ | |
-| MCP Transport::StreamableHttp | ✅ | Optional dep (httpx), not auto-required |
+| MCP Transport::StreamableHttp | ✅ | Optional dep (httpx), not auto-required; supports GET SSE + POST accepted |
 | MCP SseParser | ✅ | |
 | MCP JsonRpcClient (request/notify) | ✅ | |
 | MCP Client (initialize/list_tools/call_tool) | ✅ | |
@@ -111,7 +111,7 @@ test/fixtures/skills/another-skill/assets/logo.txt
 | Skills Store (abstract) | ✅ | |
 | Skills FileSystemStore | ✅ | Security: realpath, traversal checks |
 | Skills under Resources namespace | ✅ | Refactored from AgentCore::Skills to AgentCore::Resources::Skills |
-| Tests for all of the above | ✅ | 595 runs |
+| Tests for all of the above | ✅ | 596 runs |
 | Coverage expansion for Phase 1 gaps | ✅ | 12 new/expanded test files |
 
 ## Architecture Notes
