@@ -14,3 +14,13 @@ gem "simplecov", require: false
 
 gem "rubocop", "~> 1.21"
 gem "rubocop-rails-omakase", require: false
+
+# Optional integration/provider adapters.
+#
+# In this monorepo, SimpleInference lives under vendor/ and is used as a soft dependency.
+simple_inference_path = File.expand_path("../simple_inference", __dir__)
+if File.directory?(simple_inference_path)
+  gem "simple_inference", path: simple_inference_path
+else
+  gem "simple_inference"
+end

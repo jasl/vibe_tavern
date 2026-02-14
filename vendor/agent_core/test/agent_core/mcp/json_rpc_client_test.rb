@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "timeout"
 
 class AgentCore::MCP::JsonRpcClientTest < Minitest::Test
   # A mock transport for testing JSON-RPC interactions.
@@ -33,6 +34,42 @@ class AgentCore::MCP::JsonRpcClientTest < Minitest::Test
     # Simulate receiving a JSON-RPC response (called from test code).
     def simulate_response(json_string)
       on_stdout_line&.call(json_string)
+    end
+  end
+
+  class QueueTransport < AgentCore::MCP::Transport::Base
+    def initialize
+      @queue = Queue.new
+      @started = false
+    end
+
+    def start
+      @started = true
+      self
+    end
+
+    def send_message(hash)
+      raise AgentCore::MCP::TransportError, "transport is not started" unless @started
+
+      @queue << hash
+      true
+    end
+
+    def close(timeout_s: 2.0)
+      nil
+    end
+
+    def pop_message(timeout_s: 1.0)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_s.to_f
+
+      loop do
+        return @queue.pop(true)
+      rescue ThreadError
+        now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        raise Timeout::Error, "Timed out waiting for message" if now >= deadline
+
+        sleep(0.001)
+      end
     end
   end
 
@@ -364,5 +401,44 @@ class AgentCore::MCP::JsonRpcClientTest < Minitest::Test
     @transport.on_stdout_line.call("test line")
 
     assert_equal ["test line"], original_calls
+  end
+
+  def test_request_is_thread_safe_under_concurrent_load
+    transport = QueueTransport.new
+    client = AgentCore::MCP::JsonRpcClient.new(transport: transport, timeout_s: 1.0)
+    client.start
+
+    n = 50
+    results = Array.new(n)
+
+    threads =
+      n.times.map do |i|
+        Thread.new do
+          results[i] = client.request("test/method", { "i" => i }, timeout_s: 1.0)
+        end
+      end
+
+    responder =
+      Thread.new do
+        n.times do
+          msg = transport.pop_message(timeout_s: 1.0)
+          id = msg.fetch("id")
+          i = msg.dig("params", "i")
+
+          sleep(0.001) # encourage out-of-order completion
+
+          transport.on_stdout_line&.call(JSON.generate({ "jsonrpc" => "2.0", "id" => id, "result" => { "i" => i } }))
+        end
+      end
+
+    threads.each { |t| t.join(2.0) }
+    responder.join(2.0)
+
+    assert_equal n, results.size
+    results.each_with_index do |result, i|
+      assert_equal({ "i" => i }, result)
+    end
+  ensure
+    client&.close
   end
 end

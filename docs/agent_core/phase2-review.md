@@ -340,7 +340,7 @@ read_skill_file → validate path → read file → String
 
 - ❌ StreamableHttp 集成测试（需要 httpx，排除在 SimpleCov 之外）
 - ✅ Client `call_tool` 的 `MCP_SESSION_NOT_FOUND` 重连路径（1 次 retry）已修复并测试覆盖
-- ⚠️ JsonRpcClient 并发测试（多线程同时 request）— 有 Mutex 保护但无并发测试
+- ✅ JsonRpcClient 并发请求基础覆盖（多线程 request + out-of-order response），仍建议补更强压力测试
 - ⚠️ FileSystemStore 符号链接攻击测试 — 有 realpath 保护但测试中用了真实 fixture（非 symlink）
 - ⚠️ Stdio transport 进程崩溃时的 on_close callback 触发 — 有实现但难以在 CI 中稳定测试
 

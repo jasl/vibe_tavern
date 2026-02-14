@@ -16,6 +16,19 @@ class AgentCore::UtilsTest < Minitest::Test
     assert_equal({ model: "a" }, AgentCore::Utils.symbolize_keys(input))
   end
 
+  def test_deep_symbolize_keys
+    input = {
+      "a" => 1,
+      "b" => [{ "c" => 2 }],
+      d: { "e" => 3 },
+    }
+
+    assert_equal(
+      { a: 1, b: [{ c: 2 }], d: { e: 3 } },
+      AgentCore::Utils.deep_symbolize_keys(input),
+    )
+  end
+
   def test_normalize_mcp_tool_definition
     raw = { "name" => "read_file", "description" => "Read a file", "inputSchema" => { "type" => "object" } }
     normalized = AgentCore::Utils.normalize_mcp_tool_definition(raw)
