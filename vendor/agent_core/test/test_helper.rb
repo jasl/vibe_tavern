@@ -8,10 +8,6 @@ begin
     primary_coverage :line
     add_filter "/test/"
     add_filter "/tmp/"
-    # StreamableHttp requires httpx (optional dependency) — exclude from coverage.
-    # It has its own unit tests for validation/struct behavior; HTTP execution
-    # is not testable without the real dependency.
-    add_filter "mcp/transport/streamable_http.rb"
   end
 rescue LoadError
   # SimpleCov not available — skip coverage

@@ -2,7 +2,7 @@
 
 > Date: 2026-02-14
 > Status: ✅ Complete
-> Tests: 575 runs, 1112 assertions, 0 failures, 0 errors
+> Tests: 585 runs, 1239 assertions, 0 failures, 0 errors
 
 ## What Was Delivered
 
@@ -40,10 +40,10 @@ lib/agent_core/errors.rb       # Added MCP::ClosedError, ProtocolVersionNotSuppo
 lib/agent_core/utils.rb        # Added assert_symbol_keys! for API boundary enforcement
 ```
 
-### New Test Files (23 test files)
+### New Test Files (24 test files)
 
 ```
-# MCP tests (9 files)
+# MCP tests (10 files)
 test/agent_core/mcp/constants_test.rb
 test/agent_core/mcp/server_config_test.rb
 test/agent_core/mcp/json_rpc_client_test.rb
@@ -53,6 +53,7 @@ test/agent_core/mcp/tool_adapter_test.rb
 test/agent_core/mcp/transport/base_test.rb
 test/agent_core/mcp/transport/stdio_test.rb
 test/agent_core/mcp/transport/streamable_http_test.rb
+test/agent_core/mcp/transport/streamable_http_integration_test.rb
 
 # Skills tests (5 files)
 test/agent_core/resources/skills/store_test.rb
@@ -76,7 +77,7 @@ test/agent_core/resources/tools/tool_result_test.rb
 ### Modified Test Files (3 files)
 
 ```
-test/test_helper.rb                            # SimpleCov config: primary_coverage :line, exclude streamable_http
+test/test_helper.rb                            # SimpleCov config: primary_coverage :line
 test/agent_core/message_test.rb                # Expanded ~97 → ~640 lines (ContentBlock, media types, roundtrips)
 test/agent_core/resources/tools/registry_test.rb  # Removed duplicate ToolTest/ToolResultTest classes
 ```
@@ -110,7 +111,7 @@ test/fixtures/skills/another-skill/assets/logo.txt
 | Skills Store (abstract) | ✅ | |
 | Skills FileSystemStore | ✅ | Security: realpath, traversal checks |
 | Skills under Resources namespace | ✅ | Refactored from AgentCore::Skills to AgentCore::Resources::Skills |
-| Tests for all of the above | ✅ | 578 tests |
+| Tests for all of the above | ✅ | 585 runs |
 | Coverage expansion for Phase 1 gaps | ✅ | 12 new/expanded test files |
 
 ## Architecture Notes
@@ -124,7 +125,7 @@ AgentCore::MCP
   ├── JsonRpcClient       # JSON-RPC 2.0 protocol layer
   ├── Client              # High-level: initialize → list_tools → call_tool
   ├── SseParser           # SSE stream parsing
-  ├── ToolAdapter         # MCP tool → AgentCore Tool conversion
+  ├── ToolAdapter         # MCP tool name mapping helpers
   └── Transport
       ├── Base            # Abstract (send_message, receive, close)
       ├── Stdio           # stdin/stdout (subprocess)
@@ -160,4 +161,3 @@ MCP is an independent leaf module (pure JSON-RPC + transports). Skills lives und
 - `Registry#register_skill` — connecting Skills to the tool registry
 - File system watcher for live skill reload
 - Full MCP session reconnection/backoff strategy (beyond one-shot reinitialize on session-not-found)
-- StreamableHttp integration tests (requires httpx)

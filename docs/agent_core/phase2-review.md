@@ -338,7 +338,7 @@ read_skill_file → validate path → read file → String
 
 ### 6.2 未覆盖或薄弱的路径
 
-- ❌ StreamableHttp 集成测试（需要 httpx，排除在 SimpleCov 之外）
+- ✅ StreamableHttp 本地集成测试（httpx + WEBrick，本地 SSE/JSON server，全链路覆盖 JSON/SSE/GET 重连）
 - ✅ Client `call_tool` 的 `MCP_SESSION_NOT_FOUND` 重连路径（1 次 retry）已修复并测试覆盖
 - ✅ JsonRpcClient 并发请求基础覆盖（多线程 request + out-of-order response），仍建议补更强压力测试
 - ⚠️ FileSystemStore 符号链接攻击测试 — 有 realpath 保护但测试中用了真实 fixture（非 symlink）
@@ -347,7 +347,7 @@ read_skill_file → validate path → read file → String
 ### 6.3 测试数据统计
 
 ```
-Total: 575 runs, 1112 assertions, 0 failures, 0 errors
+Total: 585 runs, 1239 assertions, 0 failures, 0 errors
 ```
 
 Phase 2 新增测试覆盖：

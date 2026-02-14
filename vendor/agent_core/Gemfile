@@ -18,6 +18,9 @@ gem "rubocop-rails-omakase", require: false
 # Optional integration/provider adapters.
 #
 # In this monorepo, SimpleInference lives under vendor/ and is used as a soft dependency.
+gem "httpx"
+gem "webrick"
+
 simple_inference_path = File.expand_path("../simple_inference", __dir__)
 if File.directory?(simple_inference_path)
   gem "simple_inference", path: simple_inference_path
