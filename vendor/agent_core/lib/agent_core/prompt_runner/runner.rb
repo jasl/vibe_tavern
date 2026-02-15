@@ -912,6 +912,11 @@ module AgentCore
                 args_summaries: {},
               )
 
+            tool_result_messages.each do |msg|
+              messages << msg
+              all_new_messages << msg
+            end
+
             apply_resume_tool_traces!(
               turn_traces: turn_traces,
               paused_turn_number: turn,
@@ -925,11 +930,6 @@ module AgentCore
               run_payload[:stop_reason] = stop_reason
               completed_turns = turn
               next
-            end
-
-            tool_result_messages.each do |msg|
-              messages << msg
-              all_new_messages << msg
             end
 
           if turn >= max_turns

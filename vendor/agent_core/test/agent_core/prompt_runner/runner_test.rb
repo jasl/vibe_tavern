@@ -671,6 +671,65 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_equal "allow", confirm_events.first.fetch(:payload).fetch("outcome")
   end
 
+  def test_resume_after_confirm_with_defer_includes_denied_tool_result_and_pauses
+    tool_call_1 = AgentCore::ToolCall.new(id: "tc_1", name: "dangerous", arguments: { "x" => 1 })
+    tool_call_2 = AgentCore::ToolCall.new(id: "tc_2", name: "echo", arguments: { "text" => "hi" })
+    assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tools", tool_calls: [tool_call_1, tool_call_2])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, stop_reason: :tool_use)
+
+    provider = MockProvider.new(responses: [tool_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "dangerous", description: "bad", parameters: {}) do |_args, **|
+        raise "should not execute"
+      end
+    )
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        raise "should not execute"
+      end
+    )
+
+    confirm_policy = Class.new(AgentCore::Resources::Tools::Policy::Base) do
+      def authorize(name:, arguments: {}, context: {})
+        AgentCore::Resources::Tools::Policy::Decision.confirm(reason: "need approval")
+      end
+    end.new
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "do something")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    paused = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: confirm_policy)
+
+    assert paused.awaiting_tool_confirmation?
+    assert_equal 1, provider.calls.size
+
+    resumed =
+      @runner.resume(
+        continuation: paused.continuation,
+        tool_confirmations: { "tc_1" => :deny, "tc_2" => :allow },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: confirm_policy,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+      )
+
+    assert resumed.awaiting_tool_results?
+    assert_equal 1, resumed.pending_tool_executions.size
+    assert_equal "tc_2", resumed.pending_tool_executions.first.tool_call_id
+    assert_equal 1, provider.calls.size
+
+    tool_result_msgs = resumed.messages.select(&:tool_result?)
+    assert_equal 1, tool_result_msgs.size
+    assert_equal "tc_1", tool_result_msgs.first.tool_call_id
+    assert_includes tool_result_msgs.first.text, "denied"
+  end
+
   def test_streaming_confirm_emits_authorization_required_and_stops
     tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "dangerous", arguments: {})
     assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])
