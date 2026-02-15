@@ -56,6 +56,8 @@ require_relative "agent_core/prompt_runner/events"
 require_relative "agent_core/prompt_runner/run_result"
 require_relative "agent_core/prompt_runner/tool_execution_utils"
 require_relative "agent_core/prompt_runner/tool_executor"
+require_relative "agent_core/prompt_runner/continuation_codec"
+require_relative "agent_core/prompt_runner/tool_task_codec"
 require_relative "agent_core/prompt_runner/runner"
 
 # Agent (top-level)

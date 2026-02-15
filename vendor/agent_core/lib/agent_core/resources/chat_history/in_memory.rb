@@ -18,6 +18,28 @@ module AgentCore
           self
         end
 
+        # Replace a message in the history by object identity.
+        #
+        # This is a convenience for in-memory sessions where callers may want
+        # to rewrite/normalize a previously appended message (e.g., language
+        # policy rewrite of the final assistant message).
+        #
+        # @param target [Message] The exact message object to replace
+        # @param replacement [Message] The new message object
+        # @return [Boolean] true if replaced, false if not found
+        def replace_message(target, replacement)
+          raise ArgumentError, "target is required" if target.nil?
+          raise ArgumentError, "replacement is required" if replacement.nil?
+
+          @mutex.synchronize do
+            idx = @messages.rindex { |m| m.equal?(target) }
+            return false unless idx
+
+            @messages[idx] = replacement
+            true
+          end
+        end
+
         def each(&block)
           return enum_for(:each) unless block
 

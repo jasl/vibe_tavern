@@ -101,6 +101,55 @@ if result.awaiting_tool_confirmation?
 end
 ```
 
+## Using Agent / AgentSession (recommended entrypoints)
+
+### Agent (gem)
+
+`AgentCore::Agent` exposes top-level pause/resume helpers so app code does not
+need to call `PromptRunner::Runner#resume` directly:
+
+```ruby
+agent = AgentCore::Agent.build do |b|
+  b.provider = provider
+  b.model = "m1"
+  b.system_prompt = "You can use tools."
+  b.tools_registry = registry
+  b.tool_policy = policy
+end
+
+paused = agent.chat("do something")
+
+if paused.awaiting_tool_confirmation?
+  final = agent.resume(continuation: paused, tool_confirmations: { "tc_1" => :allow })
+end
+```
+
+`continuation:` accepts either a `PromptRunner::Continuation` or a `RunResult`
+(Agent will use `run_result.continuation`).
+
+### AgentSession (app contrib)
+
+In this repo, prefer `AgentCore::Contrib::AgentSession` as the UI/session-level
+entrypoint:
+
+```ruby
+session =
+  AgentCore::Contrib::AgentSession.new(
+    provider: provider,
+    model: "m1",
+    system_prompt: "",
+    history: [],
+    tools_registry: registry,
+    tool_policy: policy,
+  )
+
+paused = session.chat("do something")
+
+if paused.awaiting_tool_confirmation?
+  final = session.resume(continuation: paused, tool_confirmations: { "tc_1" => :allow })
+end
+```
+
 ## Suggested app pattern
 
 In an app/UI, treat `pending_tool_confirmations` as an **authorization request**
@@ -111,8 +160,9 @@ record:
 - call `resume`/`resume_stream` with those decisions
 
 If you need persistence across process restarts, explicitly serialize the
-continuation state in your app (AgentCore does not guarantee JSON compatibility
-for arbitrary embedded values by default).
+continuation state in your app. Recommended: use
+`AgentCore::PromptRunner::ContinuationCodec` (versioned, JSON-safe) and only
+persist explicitly allowlisted context attributes (`context_keys:`).
 
 ## Auditing confirmation decisions
 

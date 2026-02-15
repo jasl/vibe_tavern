@@ -80,6 +80,22 @@ class AgentCore::Resources::ChatHistory::InMemoryTest < Minitest::Test
     history = AgentCore::Resources::ChatHistory::InMemory.new(msgs)
     assert_equal 1, history.size
   end
+
+  def test_replace_message_by_identity
+    msg1 = AgentCore::Message.new(role: :user, content: "Hello")
+    msg2 = AgentCore::Message.new(role: :assistant, content: "Hi!")
+
+    @history.append(msg1)
+    @history.append(msg2)
+
+    replacement = AgentCore::Message.new(role: :assistant, content: "Rewritten")
+
+    assert @history.replace_message(msg2, replacement)
+    assert_same replacement, @history.last.first
+
+    missing = AgentCore::Message.new(role: :assistant, content: "missing")
+    assert_equal false, @history.replace_message(missing, replacement)
+  end
 end
 
 class AgentCore::Resources::ChatHistory::WrapTest < Minitest::Test

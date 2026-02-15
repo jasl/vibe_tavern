@@ -24,7 +24,15 @@ The primary app-side entrypoint is:
 Execution happens through:
 
 - `AgentCore::Resources::Provider::SimpleInferenceProvider` (OpenAI-compatible)
-- `AgentCore::Contrib::AgentSession` (wraps `AgentCore::Agent`; tools are not wired in yet)
+- `AgentCore::Contrib::AgentSession` (wraps `AgentCore::Agent`)
+
+Notes:
+
+- `AgentSession` supports injecting `tools_registry`, `tool_policy`, and
+  `tool_executor` (for confirm/defer pause-resume flows).
+- `LLM::RunChat` currently runs with `tools: []` and does not pass tool wiring by
+  default (intentional: directives mode forbids tool calls; chat mode can be
+  enabled incrementally).
 
 For debugging, `LLM::RunChat` still returns an `AgentCore::PromptBuilder::BuiltPrompt`
 representing the effective prompt, but the run itself is executed through
@@ -122,3 +130,28 @@ rewritten =
 Guardrail:
 
 - if `text` is larger than 200KB, the rewriter returns the input unchanged (to avoid accidental truncation).
+
+## Pause/resume entrypoint (recommended)
+
+For app/UI code, prefer pausing and resuming via `AgentCore::Contrib::AgentSession`
+instead of calling `PromptRunner::Runner#resume*` directly:
+
+- confirmation pause: `#resume` / `#resume_stream`
+- deferred execution pause: `#resume_with_tool_results` / `#resume_stream_with_tool_results`
+
+This keeps the app-level session history consistent and centralizes policy glue.
+
+## Persisting continuations (production)
+
+If you need to pause and resume across processes (web ↔ jobs, deploys, etc.),
+persist `RunResult#continuation` using a JSON-safe, versioned payload:
+
+- `AgentCore::PromptRunner::ContinuationCodec.dump(continuation, context_keys: [...])`
+- `AgentCore::PromptRunner::ContinuationCodec.load(payload)`
+
+Guidelines:
+
+- Only persist explicitly allowlisted `context_keys` (tenant/user/workspace ids).
+- Never persist secrets (tokens/headers/env).
+- Prefer passing a **fresh** context on resume (current tenant/user/workspace),
+  and treat stored `context_attributes` as an optional hint.

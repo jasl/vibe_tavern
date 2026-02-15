@@ -67,6 +67,8 @@ Runner currently emits these events:
 - `agent_core.run`
 - `agent_core.turn`
 - `agent_core.llm.call`
+- `agent_core.tool.task.created`
+- `agent_core.tool.task.deferred`
 - `agent_core.tool.authorize`
 - `agent_core.tool.execute`
 
@@ -83,6 +85,10 @@ Typical payload fields:
   `options_summary`, `stop_reason`, `usage`
 - `agent_core.tool.authorize`: `tool_call_id`, `name`, `arguments_summary`,
   `outcome` (`allow|deny|confirm`), `reason`, `stage` (`policy|confirmation`, optional)
+- `agent_core.tool.task.created`: `tool_call_id`, `name`, `arguments_summary`,
+  `arguments_valid`, `arguments_parse_error`, `turn_number`
+- `agent_core.tool.task.deferred`: `tool_call_id`, `name`, `executed_name`,
+  `source`, `arguments_summary`, `executor`, `turn_number`
 - `agent_core.tool.execute`: `tool_call_id`, `name`, `executed_name`, `source`
   (`native|mcp|skills|policy|runner|unknown`), `arguments_summary`,
   `result_error`, `result_summary`, `stage` (`external`, optional)

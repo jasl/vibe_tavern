@@ -67,6 +67,96 @@ result =
   )
 ```
 
+### Partial resume (optional)
+
+By default, `resume_with_tool_results` requires results for all pending tool
+calls. If you receive results incrementally, pass `allow_partial: true` to
+buffer results and keep the run paused until all tool results are available:
+
+```ruby
+result =
+  runner.resume_with_tool_results(
+    continuation: result.continuation,
+    tool_results: { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") },
+    provider: provider,
+    tools_registry: registry,
+    tool_policy: policy,
+    allow_partial: true,
+  )
+```
+
+## Task payloads (ToolTaskCodec)
+
+For app-side schedulers (ActiveJob/MQ/worker processes), you can derive a
+stable JSON-safe task payload from a continuation:
+
+```ruby
+payload =
+  AgentCore::PromptRunner::ToolTaskCodec.dump(
+    result.continuation,
+    context_keys: %i[tenant_id user_id workspace_id session_id],
+  )
+
+payload.fetch("tasks").each do |t|
+  ExecuteToolCallJob.perform_later(
+    run_id: payload.fetch("run_id"),
+    tool_call_id: t.fetch("tool_call_id"),
+    name: t.fetch("executed_name"),
+    arguments: t.fetch("arguments"),
+  )
+end
+```
+
+Notes:
+
+- Tool task payloads include **raw tool arguments**. Treat them as sensitive:
+  avoid untrusted logs and use appropriate at-rest protections.
+- `context_keys:` is an explicit allowlist. Keep it minimal (IDs only).
+
+## Using Agent / AgentSession (recommended entrypoints)
+
+### Agent (gem)
+
+```ruby
+agent = AgentCore::Agent.build do |b|
+  b.provider = provider
+  b.model = "m1"
+  b.system_prompt = "You can use tools."
+  b.tools_registry = registry
+  b.tool_policy = policy
+  b.tool_executor = AgentCore::PromptRunner::ToolExecutor::DeferAll.new
+end
+
+paused = agent.chat("hi")
+
+if paused.awaiting_tool_results?
+  tool_results = { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") }
+  final = agent.resume_with_tool_results(continuation: paused, tool_results: tool_results)
+end
+```
+
+### AgentSession (app contrib)
+
+```ruby
+session =
+  AgentCore::Contrib::AgentSession.new(
+    provider: provider,
+    model: "m1",
+    system_prompt: "",
+    history: [],
+    tools_registry: registry,
+    tool_policy: policy,
+    tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+  )
+
+paused = session.chat("hi")
+
+if paused.awaiting_tool_results?
+  tool_results = { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") }
+  final = session.resume_with_tool_results(continuation: paused, tool_results: tool_results)
+end
+```
+
 ### Rails ActiveJob example (offload tool execution)
 
 AgentCore does not prescribe persistence; one workable Rails pattern is:
@@ -99,7 +189,17 @@ end
 
 # Somewhere in your controller/service when you get awaiting_tool_results:
 run_id = result.run_id
-ContinuationRecord.create!(run_id: run_id, payload: Marshal.dump(result.continuation))
+
+payload =
+  AgentCore::PromptRunner::ContinuationCodec.dump(
+    result.continuation,
+    # Only persist explicitly allowlisted context attributes.
+    # Keep this minimal (avoid secrets) — it may be stored long-term.
+    context_keys: %i[tenant_id user_id workspace_id session_id],
+    include_traces: true,
+  )
+
+ContinuationRecord.create!(run_id: run_id, payload: payload) # payload: jsonb
 
 result.pending_tool_executions.each do |p|
   ExecuteToolCallJob.perform_later(
@@ -111,7 +211,8 @@ result.pending_tool_executions.each do |p|
 end
 
 # Later, when all results are ready (polling or callback):
-continuation = Marshal.load(ContinuationRecord.find_by!(run_id: run_id).payload)
+continuation_payload = ContinuationRecord.find_by!(run_id: run_id).payload
+continuation = AgentCore::PromptRunner::ContinuationCodec.load(continuation_payload)
 
 tool_results =
   ToolResultRecord.where(run_id: run_id).to_h do |r|
@@ -128,6 +229,7 @@ tool_results =
 
 runner = AgentCore::PromptRunner::Runner.new
 runner.resume_with_tool_results(
+  # Runner also accepts the JSON payload Hash/String directly.
   continuation: continuation,
   tool_results: tool_results,
   provider: provider,
@@ -138,8 +240,10 @@ runner.resume_with_tool_results(
 
 Notes:
 
-- `continuation` is intended to be treated as **opaque**. If you persist it, you
-  own the serialization format and upgrade path.
+- `continuation` is intended to be treated as **opaque**. For stable
+  persistence, use `ContinuationCodec` (versioned, JSON-safe).
+- If `ContinuationCodec` rejects an old/new payload (`schema_version` mismatch),
+  you must decide on an app-level migration or fail the resume attempt.
 - `resume_with_tool_results` only accepts `ToolResult` values (no Hash/String
   coercion).
 

@@ -196,6 +196,248 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_equal true, record.fetch(:external)
   end
 
+  def test_resume_with_tool_results_accepts_json_continuation_payload
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        raise "should not execute inline"
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    paused =
+      @runner.run(
+        prompt: prompt,
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+      )
+
+    payload = AgentCore::PromptRunner::ContinuationCodec.dump(paused.continuation, include_traces: false)
+    json = JSON.generate(payload)
+
+    resumed =
+      @runner.resume_with_tool_results(
+        continuation: json,
+        tool_results: { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+      )
+
+    assert_equal "Done", resumed.text
+  end
+
+  def test_partial_resume_with_tool_results_waits_until_all_results_are_available
+    tool_call_1 = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
+    tool_call_2 = AgentCore::ToolCall.new(id: "tc_2", name: "echo", arguments: { "text" => "world" })
+    assistant_with_tool =
+      AgentCore::Message.new(
+        role: :assistant,
+        content: "Calling tool",
+        tool_calls: [tool_call_1, tool_call_2],
+      )
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        raise "should not execute inline"
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    paused =
+      @runner.run(
+        prompt: prompt,
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+      )
+
+    assert paused.awaiting_tool_results?
+    assert_equal 1, provider.calls.size
+
+    partial =
+      @runner.resume_with_tool_results(
+        continuation: paused.continuation,
+        tool_results: { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "r1") },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        allow_partial: true,
+      )
+
+    assert partial.awaiting_tool_results?
+    assert_equal 1, provider.calls.size
+    assert_empty partial.messages
+
+    assert_equal 1, partial.pending_tool_executions.size
+    assert_equal "tc_2", partial.pending_tool_executions.first.tool_call_id
+    assert partial.continuation.buffered_tool_results.key?("tc_1")
+
+    payload = AgentCore::PromptRunner::ContinuationCodec.dump(partial.continuation, include_traces: false)
+    loaded = AgentCore::PromptRunner::ContinuationCodec.load(JSON.generate(payload))
+
+    final =
+      @runner.resume_with_tool_results(
+        continuation: loaded,
+        tool_results: { "tc_2" => AgentCore::Resources::Tools::ToolResult.success(text: "r2") },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        allow_partial: true,
+      )
+
+    assert_equal "Done", final.text
+    assert_equal 2, provider.calls.size
+
+    tool_msgs = final.messages.select(&:tool_result?)
+    assert_equal %w[tc_1 tc_2], tool_msgs.map(&:tool_call_id)
+    assert_equal %w[r1 r2], tool_msgs.map(&:content)
+  end
+
+  def test_tool_task_created_and_deferred_events_do_not_include_raw_arguments
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    provider = MockProvider.new(responses: [tool_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        raise "should not execute inline"
+      end
+    )
+
+    instrumenter = AgentCore::Observability::TraceRecorder.new(capture: :full)
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    paused =
+      @runner.run(
+        prompt: prompt,
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+        instrumenter: instrumenter,
+      )
+
+    assert paused.awaiting_tool_results?
+
+    created = instrumenter.trace.find { |e| e.fetch(:name) == "agent_core.tool.task.created" }
+    assert created
+    payload = created.fetch(:payload)
+    assert_equal paused.run_id, payload.fetch("run_id")
+    assert_equal 1, payload.fetch("turn_number")
+    assert_equal "tc_1", payload.fetch("tool_call_id")
+    assert_equal "echo", payload.fetch("name")
+    refute payload.key?("arguments")
+
+    deferred = instrumenter.trace.find { |e| e.fetch(:name) == "agent_core.tool.task.deferred" }
+    assert deferred
+    refute deferred.fetch(:payload).key?("arguments")
+  end
+
+  def test_pause_and_resume_events_are_published
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        raise "should not execute inline"
+      end
+    )
+
+    instrumenter = AgentCore::Observability::TraceRecorder.new(capture: :full)
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    paused =
+      @runner.run(
+        prompt: prompt,
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+        instrumenter: instrumenter,
+      )
+
+    pause_event = instrumenter.trace.find { |e| e.fetch(:name) == "agent_core.pause" }
+    assert pause_event
+    assert_equal paused.run_id, pause_event.fetch(:payload).fetch("run_id")
+    assert_equal 1, pause_event.fetch(:payload).fetch("turn_number")
+    assert_equal "awaiting_tool_results", pause_event.fetch(:payload).fetch("pause_reason")
+    assert_equal 0, pause_event.fetch(:payload).fetch("pending_confirmations_count")
+    assert_equal 1, pause_event.fetch(:payload).fetch("pending_executions_count")
+
+    resumed =
+      @runner.resume_with_tool_results(
+        continuation: paused.continuation,
+        tool_results: { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        instrumenter: instrumenter,
+      )
+
+    assert_equal "Done", resumed.text
+
+    resume_event = instrumenter.trace.find { |e| e.fetch(:name) == "agent_core.resume" }
+    assert resume_event
+    assert_equal paused.run_id, resume_event.fetch(:payload).fetch("run_id")
+    assert_equal 1, resume_event.fetch(:payload).fetch("paused_turn_number")
+    assert_equal "awaiting_tool_results", resume_event.fetch(:payload).fetch("pause_reason")
+    assert_equal true, resume_event.fetch(:payload).fetch("resumed")
+  end
+
   def test_tool_call_with_invalid_arguments_is_not_executed
     executed = false
 

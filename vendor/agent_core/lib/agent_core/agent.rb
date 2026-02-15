@@ -168,6 +168,116 @@ module AgentCore
       result
     end
 
+    # Resume a paused run after providing tool confirmations.
+    #
+    # @param continuation [PromptRunner::Continuation, PromptRunner::RunResult] RunResult or continuation token
+    # @param tool_confirmations [Hash{String=>Symbol,Boolean}] tool_call_id => :allow/:deny (or true/false)
+    # @return [PromptRunner::RunResult]
+    def resume(continuation:, tool_confirmations:, context: nil, instrumenter: nil, events: nil)
+      events = build_events(events)
+      execution_context = ExecutionContext.from(context, instrumenter: instrumenter)
+
+      cont = normalize_continuation!(continuation)
+
+      result =
+        @runner.resume(
+          continuation: cont,
+          tool_confirmations: tool_confirmations,
+          provider: provider,
+          tools_registry: tools_registry,
+          tool_policy: tool_policy,
+          tool_executor: @tool_executor,
+          token_counter: token_counter,
+          context_window: context_window,
+          reserved_output_tokens: reserved_output_tokens,
+          context: execution_context,
+          events: events,
+        )
+
+      result.messages.each { |msg| chat_history.append(msg) }
+      result
+    end
+
+    # Resume a paused run with streaming events.
+    def resume_stream(continuation:, tool_confirmations:, context: nil, instrumenter: nil, events: nil, &block)
+      events = build_events(events)
+      execution_context = ExecutionContext.from(context, instrumenter: instrumenter)
+
+      cont = normalize_continuation!(continuation)
+
+      result =
+        @runner.resume_stream(
+          continuation: cont,
+          tool_confirmations: tool_confirmations,
+          provider: provider,
+          tools_registry: tools_registry,
+          tool_policy: tool_policy,
+          tool_executor: @tool_executor,
+          token_counter: token_counter,
+          context_window: context_window,
+          reserved_output_tokens: reserved_output_tokens,
+          context: execution_context,
+          events: events,
+          &block
+        )
+
+      result.messages.each { |msg| chat_history.append(msg) }
+      result
+    end
+
+    # Resume a paused run after receiving external tool execution results.
+    def resume_with_tool_results(continuation:, tool_results:, context: nil, instrumenter: nil, events: nil)
+      events = build_events(events)
+      execution_context = ExecutionContext.from(context, instrumenter: instrumenter)
+
+      cont = normalize_continuation!(continuation)
+
+      result =
+        @runner.resume_with_tool_results(
+          continuation: cont,
+          tool_results: tool_results,
+          provider: provider,
+          tools_registry: tools_registry,
+          tool_policy: tool_policy,
+          tool_executor: @tool_executor,
+          token_counter: token_counter,
+          context_window: context_window,
+          reserved_output_tokens: reserved_output_tokens,
+          context: execution_context,
+          events: events,
+        )
+
+      result.messages.each { |msg| chat_history.append(msg) }
+      result
+    end
+
+    # Streaming variant of {#resume_with_tool_results}.
+    def resume_stream_with_tool_results(continuation:, tool_results:, context: nil, instrumenter: nil, events: nil, &block)
+      events = build_events(events)
+      execution_context = ExecutionContext.from(context, instrumenter: instrumenter)
+
+      cont = normalize_continuation!(continuation)
+
+      result =
+        @runner.resume_stream_with_tool_results(
+          continuation: cont,
+          tool_results: tool_results,
+          provider: provider,
+          tools_registry: tools_registry,
+          tool_policy: tool_policy,
+          tool_executor: @tool_executor,
+          token_counter: token_counter,
+          context_window: context_window,
+          reserved_output_tokens: reserved_output_tokens,
+          context: execution_context,
+          events: events,
+          &block
+        )
+
+      result.messages.each { |msg| chat_history.append(msg) }
+      result
+    end
+
     # Export the agent's serializable config.
     # Uses the same flat format as Builder#to_config so that
     # Agent.from_config(agent.to_config, ...) round-trips correctly.
@@ -234,6 +344,19 @@ module AgentCore
       end
 
       events
+    end
+
+    def normalize_continuation!(value)
+      case value
+      when PromptRunner::Continuation
+        value
+      when PromptRunner::RunResult
+        cont = value.continuation
+        raise ArgumentError, "run_result has no continuation" unless cont
+        cont
+      else
+        raise ArgumentError, "continuation must be a PromptRunner::Continuation or PromptRunner::RunResult (got #{value.class})"
+      end
     end
   end
 end

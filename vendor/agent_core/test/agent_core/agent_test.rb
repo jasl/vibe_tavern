@@ -89,6 +89,52 @@ class AgentCore::AgentTest < Minitest::Test
     assert result.used_tools?
   end
 
+  def test_resume_after_tool_confirmation_appends_messages_to_history
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "dangerous", arguments: { "x" => 1 })
+    assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done.")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    executed = []
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "dangerous", description: "bad", parameters: {}) do |_args, **|
+        executed << true
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    confirm_policy = Class.new(AgentCore::Resources::Tools::Policy::Base) do
+      def authorize(name:, arguments: {}, context: {})
+        AgentCore::Resources::Tools::Policy::Decision.confirm(reason: "need approval")
+      end
+    end.new
+
+    agent = AgentCore::Agent.build do |b|
+      b.name = "ConfirmBot"
+      b.system_prompt = "You have tools."
+      b.provider = provider
+      b.tools_registry = registry
+      b.tool_policy = confirm_policy
+    end
+
+    paused = agent.chat("do something dangerous")
+    assert paused.awaiting_tool_confirmation?
+    assert_equal 2, agent.chat_history.size
+    assert_equal 0, executed.size
+
+    resumed = agent.resume(continuation: paused, tool_confirmations: { "tc_1" => :allow })
+
+    assert_equal "Done.", resumed.text
+    assert_equal paused.run_id, resumed.run_id
+    assert_equal 4, agent.chat_history.size
+    assert_equal 1, executed.size
+  end
+
   def test_chat_stream
     agent = AgentCore::Agent.build do |b|
       b.name = "StreamBot"

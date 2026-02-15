@@ -91,7 +91,8 @@ module AgentCore
     # This object is intended to be treated as an implementation detail by
     # downstream apps. It is safe to persist only if the app explicitly
     # serializes it (AgentCore does not guarantee JSON-compatibility for all
-    # embedded values by default).
+    # embedded values by default). For a versioned JSON-safe payload, use
+    # PromptRunner::ContinuationCodec.
     Continuation =
       Data.define(
         :run_id,
@@ -113,6 +114,7 @@ module AgentCore
         :pause_reason,
         :pending_tool_calls,
         :pending_tool_executions,
+        :buffered_tool_results,
         :pending_decisions,
         :context_attributes,
         :max_tool_output_bytes,

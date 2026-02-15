@@ -53,19 +53,52 @@ module AgentCore
           self
         end
 
+        # Register a Skills::Store as native tools.
+        #
+        # @param store [Resources::Skills::Store] Skills store
+        # @param max_body_bytes [Integer] Max bytes for skills.list / skills.load responses
+        # @param max_file_bytes [Integer] Max bytes for skills.read_file responses
+        # @param tool_name_prefix [String] Tool name prefix (default: "skills.")
+        # @return [self]
+        def register_skills_store(store,
+                                  max_body_bytes: Resources::Skills::Tools::DEFAULT_MAX_BODY_BYTES,
+                                  max_file_bytes: Resources::Skills::Tools::DEFAULT_MAX_FILE_BYTES,
+                                  tool_name_prefix: Resources::Skills::Tools::DEFAULT_TOOL_NAME_PREFIX)
+          tools =
+            Resources::Skills::Tools.build(
+              store: store,
+              max_body_bytes: max_body_bytes,
+              max_file_bytes: max_file_bytes,
+              tool_name_prefix: tool_name_prefix,
+            )
+
+          register_many(tools)
+        end
+
         # Register an MCP client (its tools become available).
         #
         # @param client [MCP::Client] An initialized MCP client
         # @param prefix [String, nil] Optional prefix for tool names (e.g., "mcp_server1_")
+        # @param server_id [String, nil] MCP server identifier for safe tool name mapping
         # @return [self]
-        def register_mcp_client(client, prefix: nil)
+        def register_mcp_client(client, prefix: nil, server_id: nil)
           tools = list_all_mcp_tool_definitions(client)
+          if server_id && prefix
+            warn "[AgentCore::Registry] register_mcp_client(server_id:) ignores prefix=#{prefix.inspect}"
+          end
 
           @mutex.synchronize do
             @mcp_clients[client.object_id] = client
 
             tools.each do |tool_def|
-              tool_name = prefix ? "#{prefix}#{tool_def[:name]}" : tool_def[:name]
+              tool_name =
+                if server_id
+                  MCP::ToolAdapter.local_tool_name(server_id: server_id, remote_tool_name: tool_def[:name])
+                elsif prefix
+                  "#{prefix}#{tool_def[:name]}"
+                else
+                  tool_def[:name]
+                end
               if @native_tools.key?(tool_name)
                 warn "[AgentCore::Registry] MCP tool '#{tool_name}' conflicts with existing native tool (native takes priority)"
               elsif @mcp_tools.key?(tool_name)

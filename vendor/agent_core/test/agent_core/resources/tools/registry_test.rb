@@ -3,6 +3,8 @@
 require "test_helper"
 
 class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
+  FIXTURES_DIR = File.expand_path("../../../fixtures/skills", __dir__)
+
   class FakeMcpClient
     def initialize(pages:, call_result:)
       @pages = pages
@@ -83,6 +85,64 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
     assert @registry.include?("mcp_tool_a")
     assert @registry.include?("mcp_tool_b")
     assert_equal [nil, "page2"], client.list_calls
+  end
+
+  def test_register_mcp_client_with_server_id_uses_safe_names_and_forwards_execute
+    client = FakeMcpClient.new(
+      pages: {
+        nil => { "tools" => [{ "name" => "tool.a", "description" => "A", "inputSchema" => {} }] },
+      },
+      call_result: { "content" => [{ "type" => "text", "text" => "ok" }], "isError" => false },
+    )
+
+    server_id = "my.server"
+    local_name = AgentCore::MCP::ToolAdapter.local_tool_name(server_id: server_id, remote_tool_name: "tool.a")
+
+    @registry.register_mcp_client(client, server_id: server_id)
+
+    assert @registry.include?(local_name)
+
+    result = @registry.execute(name: local_name, arguments: { "x" => 1 })
+    assert_equal "ok", result.text
+    refute result.error?
+
+    assert_equal [{ name: "tool.a", arguments: { "x" => 1 } }], client.call_calls
+  end
+
+  def test_register_mcp_client_server_id_ignores_prefix_and_warns_once
+    client = FakeMcpClient.new(
+      pages: {
+        nil => { "tools" => [{ "name" => "tool_a", "description" => "A", "inputSchema" => {} }] },
+      },
+      call_result: { "content" => [{ "type" => "text", "text" => "ok" }], "isError" => false },
+    )
+
+    local_name = AgentCore::MCP::ToolAdapter.local_tool_name(server_id: "srv", remote_tool_name: "tool_a")
+
+    assert_output(nil, /ignores prefix/) do
+      @registry.register_mcp_client(client, prefix: "legacy_", server_id: "srv")
+    end
+
+    assert @registry.include?(local_name)
+    refute @registry.include?("legacy_tool_a")
+  end
+
+  def test_register_skills_store_registers_skills_tools
+    store = AgentCore::Resources::Skills::FileSystemStore.new(dirs: [FIXTURES_DIR])
+    @registry.register_skills_store(store)
+
+    assert @registry.include?("skills.list")
+    assert @registry.include?("skills.load")
+    assert @registry.include?("skills.read_file")
+
+    result = @registry.execute(name: "skills.list", arguments: {})
+    refute result.error?
+
+    require "json"
+    json = JSON.parse(result.text)
+    names = json.fetch("skills").map { |s| s.fetch("name") }
+    assert_includes names, "example-skill"
+    assert_includes names, "another-skill"
   end
 
   def test_execute_mcp_tool_normalizes_is_error

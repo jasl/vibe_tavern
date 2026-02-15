@@ -21,6 +21,7 @@ module AgentCore
         max_turns: 10,
         tools_registry: nil,
         tool_policy: nil,
+        tool_executor: nil,
         directives_config: {},
         capabilities: {}
       )
@@ -44,6 +45,7 @@ module AgentCore
 
         @tools_registry = tools_registry
         @tool_policy = tool_policy
+        @tool_executor = tool_executor
         @directives_config = directives_config.is_a?(Hash) ? AgentCore::Utils.deep_symbolize_keys(directives_config) : {}
         @capabilities = capabilities.is_a?(Hash) ? AgentCore::Utils.deep_symbolize_keys(capabilities) : {}
 
@@ -89,6 +91,40 @@ module AgentCore
         end
 
         @agent.chat_stream(text, &block)
+      end
+
+      def resume(continuation:, tool_confirmations:, language_policy: nil)
+        run_result = @agent.resume(continuation: continuation, tool_confirmations: tool_confirmations)
+        apply_language_policy_to_run_result(run_result, language_policy: language_policy)
+      end
+
+      def resume_stream(continuation:, tool_confirmations:, language_policy: nil, &block)
+        policy = normalize_language_policy(language_policy)
+
+        if policy.fetch(:enabled) && policy.fetch(:target_lang, nil)
+          result = resume(continuation: continuation, tool_confirmations: tool_confirmations, language_policy: policy)
+          emit_final_only_stream_events(result, &block)
+          return result
+        end
+
+        @agent.resume_stream(continuation: continuation, tool_confirmations: tool_confirmations, &block)
+      end
+
+      def resume_with_tool_results(continuation:, tool_results:, language_policy: nil)
+        run_result = @agent.resume_with_tool_results(continuation: continuation, tool_results: tool_results)
+        apply_language_policy_to_run_result(run_result, language_policy: language_policy)
+      end
+
+      def resume_stream_with_tool_results(continuation:, tool_results:, language_policy: nil, &block)
+        policy = normalize_language_policy(language_policy)
+
+        if policy.fetch(:enabled) && policy.fetch(:target_lang, nil)
+          result = resume_with_tool_results(continuation: continuation, tool_results: tool_results, language_policy: policy)
+          emit_final_only_stream_events(result, &block)
+          return result
+        end
+
+        @agent.resume_stream_with_tool_results(continuation: continuation, tool_results: tool_results, &block)
       end
 
       def directives(language_policy: nil, structured_output_options: nil, result_validator: nil)
@@ -146,6 +182,7 @@ module AgentCore
           b.chat_history = @chat_history
           b.tools_registry = @tools_registry if @tools_registry
           b.tool_policy = @tool_policy if @tool_policy
+          b.tool_executor = @tool_executor if @tool_executor
           b.max_turns = @max_turns
 
           b.token_counter = @token_counter if @token_counter
@@ -188,12 +225,33 @@ module AgentCore
         policy = normalize_language_policy(language_policy)
         return run_result unless policy.fetch(:enabled) && policy.fetch(:target_lang, nil)
 
+        # Only rewrite when the tool loop has fully completed.
+        return run_result if run_result.respond_to?(:awaiting_tool_confirmation?) && run_result.awaiting_tool_confirmation?
+        return run_result if run_result.respond_to?(:awaiting_tool_results?) && run_result.awaiting_tool_results?
+
         final_message = run_result.final_message
         return run_result unless final_message
 
         original = final_message.text.to_s
         rewritten = rewrite_text(original, policy)
         return run_result if rewritten.to_s.strip.empty? || rewritten == original
+
+        new_metadata =
+          if final_message.metadata.is_a?(Hash)
+            final_message.metadata.merge(
+              language_policy: {
+                target_lang: policy.fetch(:target_lang),
+                original_text: original,
+              },
+            )
+          else
+            {
+              language_policy: {
+                target_lang: policy.fetch(:target_lang),
+                original_text: original,
+              },
+            }
+          end
 
         new_final_message =
           AgentCore::Message.new(
@@ -202,12 +260,21 @@ module AgentCore
             tool_calls: final_message.tool_calls,
             tool_call_id: final_message.tool_call_id,
             name: final_message.name,
-            metadata: final_message.metadata,
+            metadata: new_metadata,
           )
 
         new_messages = replace_message_identity(run_result.messages, final_message, new_final_message)
 
+        # Keep session history consistent with the returned run_result when possible.
+        if @chat_history.respond_to?(:replace_message)
+          @chat_history.replace_message(final_message, new_final_message)
+        end
+
         AgentCore::PromptRunner::RunResult.new(
+          run_id: run_result.run_id,
+          started_at: run_result.started_at,
+          ended_at: run_result.ended_at,
+          duration_ms: run_result.duration_ms,
           messages: new_messages,
           final_message: new_final_message,
           turns: run_result.turns,
@@ -215,6 +282,10 @@ module AgentCore
           per_turn_usage: run_result.per_turn_usage,
           tool_calls_made: run_result.tool_calls_made,
           stop_reason: run_result.stop_reason,
+          trace: run_result.trace,
+          pending_tool_confirmations: run_result.pending_tool_confirmations,
+          pending_tool_executions: run_result.pending_tool_executions,
+          continuation: run_result.continuation,
         )
       end
 
