@@ -391,10 +391,12 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
   def test_instrumentation_emits_run_turn_llm_and_tool_events
     tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
     assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
-    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+    tool_usage = AgentCore::Resources::Provider::Usage.new(input_tokens: 10, output_tokens: 2)
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, usage: tool_usage, stop_reason: :tool_use)
 
     final_msg = AgentCore::Message.new(role: :assistant, content: "Final answer")
-    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+    final_usage = AgentCore::Resources::Provider::Usage.new(input_tokens: 6, output_tokens: 4)
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, usage: final_usage, stop_reason: :end_turn)
 
     provider = MockProvider.new(responses: [tool_response, final_response])
 
@@ -424,11 +426,23 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_includes names, "agent_core.tool.authorize"
     assert_includes names, "agent_core.tool.execute"
 
-    recorder.trace.each do |evt|
-      payload = evt.fetch(:payload)
-      assert payload.key?("run_id")
-      assert payload.key?("duration_ms")
-    end
+    run_evt = recorder.trace.find { |e| e.fetch(:name) == "agent_core.run" }
+    assert run_evt
+
+    run_payload = run_evt.fetch(:payload)
+    assert run_payload.key?("run_id")
+    assert run_payload.key?("duration_ms")
+    assert_equal 2, run_payload.fetch("turns")
+    assert_equal "end_turn", run_payload.fetch("stop_reason")
+    assert run_payload.fetch("usage").is_a?(Hash)
+    assert_equal 22, run_payload.fetch("usage").fetch("total_tokens")
+
+    turn_evt = recorder.trace.find { |e| e.fetch(:name) == "agent_core.turn" }
+    assert turn_evt
+
+    turn_payload = turn_evt.fetch(:payload)
+    assert turn_payload.key?("stop_reason")
+    assert turn_payload.key?("turn_number")
   end
 
   def test_tool_policy_deny
@@ -576,6 +590,72 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     done_events = events_received.select { |e| e.type == :done }
     assert_equal 1, done_events.size
     assert_equal :awaiting_tool_confirmation, done_events.first.stop_reason
+  end
+
+  def test_resume_stream_after_confirm_executes_tool_and_streams_final
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "dangerous", arguments: { "x" => 1 })
+    assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])
+    tool_usage = AgentCore::Resources::Provider::Usage.new(input_tokens: 5, output_tokens: 1)
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, usage: tool_usage, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done.")
+    final_usage = AgentCore::Resources::Provider::Usage.new(input_tokens: 3, output_tokens: 2)
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, usage: final_usage, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    executed = []
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "dangerous", description: "bad", parameters: {}) do |_args, **|
+        executed << true
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    confirm_policy = Class.new(AgentCore::Resources::Tools::Policy::Base) do
+      def authorize(name:, arguments: {}, context: {})
+        AgentCore::Resources::Tools::Policy::Decision.confirm(reason: "need approval")
+      end
+    end.new
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "do something dangerous")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    run_events = []
+    paused = @runner.run_stream(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: confirm_policy) do |event|
+      run_events << event
+    end
+
+    assert paused.awaiting_tool_confirmation?
+    assert_equal 0, executed.size
+
+    resume_events = []
+    resumed =
+      @runner.resume_stream(
+        continuation: paused.continuation,
+        tool_confirmations: { "tc_1" => :allow },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: confirm_policy
+      ) do |event|
+        resume_events << event
+      end
+
+    assert_equal "Done.", resumed.text
+    assert_equal paused.run_id, resumed.run_id
+    assert_equal 1, executed.size
+    assert_equal 2, provider.calls.size
+
+    types = resume_events.map(&:type)
+    assert_includes types, :tool_execution_start
+    assert_includes types, :tool_execution_end
+    assert_includes types, :text_delta
+    assert_includes types, :done
   end
 
   def test_streaming_run

@@ -75,4 +75,3 @@ File media types are inferred via `Marcel` (filename-based inference).
   tools.
 - Treat skill contents as potentially sensitive: log/trace with redaction
   (`Observability::TraceRecorder` `redactor:`).
-

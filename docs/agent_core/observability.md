@@ -74,6 +74,7 @@ All payloads include:
 
 Typical payload fields:
 
+- `agent_core.run`: `resumed` (when resuming), `stop_reason`, `turns`, `usage`
 - `agent_core.turn`: `turn_number`, `stop_reason`, `usage`
 - `agent_core.llm.call`: `model`, `stream`, `messages_count`, `tools_count`,
   `options_summary`, `stop_reason`, `usage`
