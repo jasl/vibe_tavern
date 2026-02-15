@@ -754,6 +754,69 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_equal :awaiting_tool_results, done_events.first.stop_reason
   end
 
+  def test_resume_stream_with_tool_results_continues_and_streams_final
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
+    assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Final answer")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        raise "should not execute inline"
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    paused_events = []
+    paused =
+      @runner.run_stream(
+        prompt: prompt,
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+      ) do |event|
+        paused_events << event
+      end
+
+    assert paused.awaiting_tool_results?
+    assert_includes paused_events.map(&:type), :tool_execution_required
+    assert_equal 1, provider.calls.size
+
+    resumed_events = []
+    resumed =
+      @runner.resume_stream_with_tool_results(
+        continuation: paused.continuation,
+        tool_results: { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+      ) do |event|
+        resumed_events << event
+      end
+
+    assert_equal "Final answer", resumed.text
+    assert_equal paused.run_id, resumed.run_id
+    assert_equal 2, provider.calls.size
+
+    types = resumed_events.map(&:type)
+    assert_includes types, :tool_execution_start
+    assert_includes types, :tool_execution_end
+    assert_includes types, :text_delta
+    assert_includes types, :done
+  end
+
   def test_resume_stream_after_confirm_executes_tool_and_streams_final
     tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "dangerous", arguments: { "x" => 1 })
     assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])

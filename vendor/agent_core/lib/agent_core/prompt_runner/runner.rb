@@ -1375,946 +1375,6 @@ module AgentCore
               next
             end
 
-        # Resume a paused run after receiving external tool execution results.
-        #
-        # This is used when the run stopped with `stop_reason=:awaiting_tool_results`
-        # (typically via a `ToolExecutor::DeferAll` strategy), and the app executes
-        # tools out-of-band (ActiveJob, MQ, etc.).
-        #
-        # @param continuation [Continuation] RunResult#continuation
-        # @param tool_results [Hash{String=>Resources::Tools::ToolResult}] tool_call_id => ToolResult
-        # @return [RunResult]
-        def resume_with_tool_results(continuation:, tool_results:, provider:, tools_registry:, tool_policy: nil, events: nil,
-                                     token_counter: nil, context_window: nil, reserved_output_tokens: 0,
-                                     context: nil, instrumenter: nil, tool_executor: ToolExecutor::Inline.new)
-          unless continuation.is_a?(Continuation)
-            raise ArgumentError, "continuation must be a PromptRunner::Continuation (got #{continuation.class})"
-          end
-
-          if continuation.pause_reason != :awaiting_tool_results
-            raise ArgumentError, "continuation pause_reason is #{continuation.pause_reason.inspect} (expected :awaiting_tool_results)"
-          end
-
-          pending_tool_executions = Array(continuation.pending_tool_executions)
-          if pending_tool_executions.empty?
-            raise ArgumentError, "continuation has no pending tool executions"
-          end
-
-          raise ArgumentError, "tool_results must be a Hash" unless tool_results.is_a?(Hash)
-
-          raise ArgumentError, "provider is required" unless provider
-          raise ArgumentError, "tools_registry is required" unless tools_registry
-
-          events ||= Events.new
-
-          base_context = context || continuation.context_attributes
-          execution_context = ExecutionContext.from(base_context, instrumenter: instrumenter).with(run_id: continuation.run_id)
-          instrumenter = execution_context.instrumenter
-          clock = execution_context.clock
-          run_id = execution_context.run_id
-
-          messages = continuation.messages.dup
-          tool_calls_record = continuation.tool_calls_record.dup
-          aggregated_usage = continuation.aggregated_usage
-          per_turn_usage = continuation.per_turn_usage.dup
-          turn_traces = continuation.turn_traces.dup
-
-          prompt_tools = continuation.tools
-          options = continuation.options.dup
-          model = continuation.model
-
-          turn = continuation.turn
-          max_turns = continuation.max_turns
-          tools_enabled = continuation.tools_enabled
-          empty_final_fixup_attempted = continuation.empty_final_fixup_attempted
-          any_tool_calls_seen = continuation.any_tool_calls_seen
-
-          fix_empty_final = continuation.fix_empty_final
-          fix_empty_final_user_text = continuation.fix_empty_final_user_text.to_s
-          fix_empty_final_disable_tools = continuation.fix_empty_final_disable_tools
-          max_tool_output_bytes = continuation.max_tool_output_bytes
-          max_tool_calls_per_turn = continuation.max_tool_calls_per_turn
-
-          run_started_at = continuation.started_at
-          prior_duration_ms = continuation.duration_ms.to_f
-          run_started_mono = clock.monotonic
-
-          all_new_messages = []
-          pending_tool_confirmations = []
-          next_continuation = nil
-          pause_state = nil
-
-          stop_reason = :end_turn
-          completed_turns = turn
-
-          run_payload = { run_id: run_id, resumed: true, stage: "tool_results" }
-
-          instrumenter.instrument("agent_core.run", run_payload) do
-            begin
-              external_exec_traces = []
-
-              pending_tool_executions.each do |pending|
-                tool_call_id = pending.tool_call_id.to_s
-                result =
-                  tool_results.fetch(tool_call_id) do
-                    raise ArgumentError, "Missing tool result for tool_call_id=#{tool_call_id}"
-                  end
-
-                unless result.is_a?(Resources::Tools::ToolResult)
-                  raise ArgumentError, "tool_results[#{tool_call_id.inspect}] must be a ToolResult (got #{result.class})"
-                end
-
-                result = ToolExecutionUtils.limit_tool_result(result, max_bytes: max_tool_output_bytes, tool_name: pending.executed_name)
-
-                instrumenter.publish(
-                  "agent_core.tool.execute",
-                  {
-                    run_id: run_id,
-                    tool_call_id: tool_call_id,
-                    name: pending.name.to_s,
-                    executed_name: pending.executed_name.to_s,
-                    source: pending.source.to_s,
-                    stage: "external",
-                    arguments_summary: pending.arguments_summary,
-                    result_error: result.error?,
-                    result_summary: ToolExecutionUtils.summarize_tool_result(result),
-                    duration_ms: result.metadata.is_a?(Hash) ? result.metadata.fetch(:duration_ms, 0.0).to_f : 0.0,
-                    turn_number: turn,
-                  }.compact
-                )
-
-                external_exec_traces <<
-                  ToolExecutionTrace.new(
-                    tool_call_id: tool_call_id,
-                    name: pending.name.to_s,
-                    executed_name: pending.executed_name.to_s,
-                    source: pending.source.to_s,
-                    arguments_summary: pending.arguments_summary,
-                    result_summary: ToolExecutionUtils.summarize_tool_result(result),
-                    error: result.error? == true,
-                    duration_ms: result.metadata.is_a?(Hash) ? result.metadata.fetch(:duration_ms, 0.0).to_f : 0.0,
-                  )
-
-                tool_calls_record.each do |r|
-                  next unless r.is_a?(Hash) && r[:tool_call_id].to_s == tool_call_id
-
-                  r[:pending] = false
-                  r[:deferred] = false
-                  r[:external] = true
-                  r[:error] = result.error? ? result.text : nil
-                  break
-                end
-
-                tool_result_message =
-                  tool_result_to_message(
-                    result,
-                    tool_call_id: tool_call_id,
-                    name: pending.name.to_s,
-                    max_tool_output_bytes: max_tool_output_bytes,
-                  )
-
-                messages << tool_result_message
-                all_new_messages << tool_result_message
-                events.emit(:tool_result, pending.name.to_s, result, tool_call_id)
-              end
-
-              apply_resume_tool_traces!(
-                turn_traces: turn_traces,
-                paused_turn_number: turn,
-                confirmation_traces: [],
-                execution_traces: external_exec_traces,
-              )
-
-              if turn >= max_turns
-                completed_turns = turn
-                stop_reason = :max_turns
-                run_payload[:stop_reason] = stop_reason
-                next
-              end
-
-              loop do
-                turn += 1
-
-                if turn > max_turns
-                  completed_turns = turn - 1
-                  stop_reason = :max_turns
-                  run_payload[:stop_reason] = stop_reason
-                  events.emit(:error, MaxTurnsExceededError.new(turns: max_turns), false)
-                  break
-                end
-
-                turn_started_at = clock.now
-                turn_payload = { run_id: run_id, turn_number: turn }
-
-                tool_authorization_traces = []
-                tool_execution_traces = []
-                llm_trace = nil
-                turn_stop_reason = :end_turn
-                turn_usage_obj = nil
-
-                turn_outcome =
-                  instrumenter.instrument("agent_core.turn", turn_payload) do
-                    begin
-                      events.emit(:turn_start, turn)
-
-                      tools = tools_enabled && prompt_tools && !prompt_tools.empty? ? prompt_tools : nil
-                      request_messages = messages.dup.freeze
-
-                      begin
-                        preflight_token_check!(
-                          messages: request_messages, tools: tools,
-                          token_counter: token_counter, context_window: context_window,
-                          reserved_output_tokens: reserved_output_tokens
-                        )
-                      rescue ContextWindowExceededError => e
-                        events.emit(:error, e, false)
-                        raise
-                      end
-
-                      events.emit(:llm_request, request_messages, tools)
-
-                      llm_payload = {
-                        run_id: run_id,
-                        turn_number: turn,
-                        model: model,
-                        stream: false,
-                        messages_count: request_messages.size,
-                        tools_count: tools ? tools.size : 0,
-                        options_summary: summarize_llm_options(options),
-                      }
-
-                      response =
-                        instrumenter.instrument("agent_core.llm.call", llm_payload) do
-                          resp =
-                            provider.chat(
-                              messages: request_messages,
-                              model: model,
-                              tools: tools,
-                              stream: false,
-                              **options
-                            )
-                          llm_payload[:stop_reason] = resp.stop_reason
-                          llm_payload[:usage] = resp.usage&.to_h
-                          resp
-                        end
-
-                      llm_trace =
-                        LlmCallTrace.new(
-                          model: model.to_s,
-                          messages_count: request_messages.size,
-                          tools_count: tools ? tools.size : 0,
-                          options_summary: llm_payload.fetch(:options_summary),
-                          stop_reason: llm_payload.fetch(:stop_reason, nil),
-                          usage: llm_payload.fetch(:usage, nil),
-                          duration_ms: llm_payload.fetch(:duration_ms, nil),
-                        )
-
-                      assistant_msg = response.message
-                      turn_stop_reason = response.stop_reason
-                      turn_usage_obj = response.usage
-
-                      if response.usage
-                        per_turn_usage << response.usage
-                        aggregated_usage = aggregated_usage ? aggregated_usage + response.usage : response.usage
-                      end
-
-                      messages << assistant_msg
-                      all_new_messages << assistant_msg
-                      events.emit(:llm_response, response)
-
-                      effective_max_tool_calls_per_turn =
-                        if max_tool_calls_per_turn
-                          limit = Integer(max_tool_calls_per_turn)
-                          raise ArgumentError, "max_tool_calls_per_turn must be positive" if limit <= 0
-                          limit
-                        elsif options.fetch(:parallel_tool_calls, nil) == false
-                          1
-                        end
-
-                      tool_calls = assistant_msg.tool_calls || []
-
-                      if tools_registry && tools && effective_max_tool_calls_per_turn && tool_calls.size > effective_max_tool_calls_per_turn
-                        ignored = tool_calls.drop(effective_max_tool_calls_per_turn)
-
-                        ignored.each do |tc|
-                          tool_calls_record << {
-                            tool_call_id: tc.id,
-                            name: tc.name,
-                            arguments: tc.arguments,
-                            error: "ignored: max_tool_calls_per_turn=#{effective_max_tool_calls_per_turn}",
-                          }
-                        end
-
-                        tool_calls = tool_calls.first(effective_max_tool_calls_per_turn)
-
-                        assistant_msg =
-                          Message.new(
-                            role: assistant_msg.role,
-                            content: assistant_msg.content,
-                            tool_calls: tool_calls.empty? ? nil : tool_calls,
-                            tool_call_id: assistant_msg.tool_call_id,
-                            name: assistant_msg.name,
-                            metadata: assistant_msg.metadata,
-                          )
-                        messages[-1] = assistant_msg
-                        all_new_messages[-1] = assistant_msg
-                      elsif tools.nil? && assistant_msg.has_tool_calls?
-                        assistant_msg =
-                          Message.new(
-                            role: assistant_msg.role,
-                            content: assistant_msg.content,
-                            tool_calls: nil,
-                            tool_call_id: assistant_msg.tool_call_id,
-                            name: assistant_msg.name,
-                            metadata: assistant_msg.metadata,
-                          )
-                        tool_calls = []
-                        messages[-1] = assistant_msg
-                        all_new_messages[-1] = assistant_msg
-                      end
-
-                      any_tool_calls_seen ||= tool_calls.any? if tools_registry && tools
-
-                      if tool_calls.any? && tools_registry && tools
-                        tool_processing =
-                          process_tool_calls_for_turn(
-                            tool_calls: tool_calls,
-                            tools_registry: tools_registry,
-                            tool_policy: tool_policy,
-                            tool_executor: tool_executor,
-                            events: events,
-                            tool_calls_record: tool_calls_record,
-                            max_tool_output_bytes: max_tool_output_bytes,
-                            execution_context: execution_context,
-                            stream_block: nil
-                          )
-
-                        tool_authorization_traces.concat(tool_processing.fetch(:authorization_traces))
-                        tool_execution_traces.concat(tool_processing.fetch(:execution_traces))
-
-                        Array(tool_processing[:result_messages]).each do |result_msg|
-                          messages << result_msg
-                          all_new_messages << result_msg
-                        end
-
-                        if tool_processing[:pause_state]
-                          pause_state = tool_processing.fetch(:pause_state)
-                          stop_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
-                          turn_stop_reason = stop_reason
-                          completed_turns = turn
-                          run_payload[:stop_reason] = stop_reason
-                          events.emit(:turn_end, turn, all_new_messages)
-                          next :stop
-                        end
-
-                        events.emit(:turn_end, turn, all_new_messages)
-                        next :continue
-                      end
-
-                      if fix_empty_final &&
-                          !empty_final_fixup_attempted &&
-                          tools_registry &&
-                          any_tool_calls_seen &&
-                          assistant_msg.assistant? &&
-                          assistant_msg.text.to_s.strip.empty?
-                        empty_final_fixup_attempted = true
-                        tools_enabled = false if fix_empty_final_disable_tools
-                        events.emit(:turn_end, turn, all_new_messages)
-                        user_msg = Message.new(role: :user, content: fix_empty_final_user_text)
-                        messages << user_msg
-                        all_new_messages << user_msg
-                        next :continue
-                      end
-
-                      events.emit(:turn_end, turn, all_new_messages)
-                      stop_reason = turn_stop_reason
-                      completed_turns = turn
-                      run_payload[:stop_reason] = stop_reason
-                      :stop
-                    ensure
-                      turn_payload[:stop_reason] ||= turn_stop_reason
-                      turn_payload[:usage] ||= turn_usage_obj&.to_h if turn_usage_obj
-                    end
-                  end
-
-              turn_ended_at = clock.now
-
-              turn_traces <<
-                TurnTrace.new(
-                  turn_number: turn,
-                  started_at: turn_started_at,
-                  ended_at: turn_ended_at,
-                  duration_ms: turn_payload.fetch(:duration_ms, nil),
-                  llm: llm_trace,
-                  tool_authorizations: tool_authorization_traces,
-                  tool_executions: tool_execution_traces,
-                  stop_reason: turn_stop_reason,
-                  usage: turn_usage_obj&.to_h,
-                )
-
-              break if turn_outcome == :stop
-              end
-            ensure
-              run_payload[:turns] ||= completed_turns
-              run_payload[:usage] ||= aggregated_usage&.to_h if aggregated_usage
-            end
-          end
-
-          run_ended_at = clock.now
-          segment_duration_ms = (clock.monotonic - run_started_mono) * 1000.0
-          run_duration_ms = prior_duration_ms + segment_duration_ms
-
-          run_trace =
-            RunTrace.new(
-              run_id: run_id,
-              started_at: run_started_at,
-              ended_at: run_ended_at,
-              duration_ms: run_duration_ms,
-              turns: turn_traces,
-              stop_reason: stop_reason,
-              usage: aggregated_usage&.to_h,
-            )
-
-          if pause_state
-            pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
-            pending_tool_confirmations =
-              pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
-            pending_tool_executions =
-              pause_reason == :awaiting_tool_results ? pause_state.fetch(:pending_tool_executions) : []
-
-            next_continuation =
-              Continuation.new(
-                run_id: run_id,
-                started_at: run_started_at,
-                duration_ms: run_duration_ms,
-                turn: completed_turns,
-                max_turns: max_turns,
-                messages: messages.dup.freeze,
-                model: model,
-                options: options.dup.freeze,
-                tools: prompt_tools,
-                tools_enabled: tools_enabled,
-                empty_final_fixup_attempted: empty_final_fixup_attempted,
-                any_tool_calls_seen: any_tool_calls_seen,
-                tool_calls_record: tool_calls_record.dup.freeze,
-                aggregated_usage: aggregated_usage,
-                per_turn_usage: per_turn_usage.dup.freeze,
-                turn_traces: turn_traces.dup.freeze,
-                pause_reason: pause_reason,
-                pending_tool_calls: pause_state.fetch(:pending_tool_calls),
-                pending_tool_executions: pending_tool_executions,
-                pending_decisions: pause_state.fetch(:pending_decisions),
-                context_attributes: execution_context.attributes,
-                max_tool_output_bytes: max_tool_output_bytes,
-                max_tool_calls_per_turn: max_tool_calls_per_turn,
-                fix_empty_final: fix_empty_final,
-                fix_empty_final_user_text: fix_empty_final_user_text,
-                fix_empty_final_disable_tools: fix_empty_final_disable_tools,
-              )
-          end
-
-          build_result(
-            run_id: run_id,
-            started_at: run_started_at,
-            ended_at: run_ended_at,
-            duration_ms: run_duration_ms,
-            trace: run_trace,
-            all_new_messages: all_new_messages,
-            turns: completed_turns,
-            usage: aggregated_usage,
-            tool_calls_record: tool_calls_record,
-            stop_reason: stop_reason,
-            per_turn_usage: per_turn_usage,
-            pending_tool_confirmations: pending_tool_confirmations,
-            pending_tool_executions: pending_tool_executions,
-            continuation: next_continuation,
-          )
-        end
-
-        # Streaming variant of {#resume_with_tool_results}.
-        def resume_stream_with_tool_results(continuation:, tool_results:, provider:, tools_registry:, tool_policy: nil, events: nil,
-                                            token_counter: nil, context_window: nil, reserved_output_tokens: 0,
-                                            context: nil, instrumenter: nil, tool_executor: ToolExecutor::Inline.new, &block)
-          unless continuation.is_a?(Continuation)
-            raise ArgumentError, "continuation must be a PromptRunner::Continuation (got #{continuation.class})"
-          end
-
-          if continuation.pause_reason != :awaiting_tool_results
-            raise ArgumentError, "continuation pause_reason is #{continuation.pause_reason.inspect} (expected :awaiting_tool_results)"
-          end
-
-          pending_tool_executions = Array(continuation.pending_tool_executions)
-          if pending_tool_executions.empty?
-            raise ArgumentError, "continuation has no pending tool executions"
-          end
-
-          raise ArgumentError, "tool_results must be a Hash" unless tool_results.is_a?(Hash)
-
-          raise ArgumentError, "provider is required" unless provider
-          raise ArgumentError, "tools_registry is required" unless tools_registry
-
-          events ||= Events.new
-
-          base_context = context || continuation.context_attributes
-          execution_context = ExecutionContext.from(base_context, instrumenter: instrumenter).with(run_id: continuation.run_id)
-          instrumenter = execution_context.instrumenter
-          clock = execution_context.clock
-          run_id = execution_context.run_id
-
-          messages = continuation.messages.dup
-          tool_calls_record = continuation.tool_calls_record.dup
-          aggregated_usage = continuation.aggregated_usage
-          per_turn_usage = continuation.per_turn_usage.dup
-          turn_traces = continuation.turn_traces.dup
-
-          prompt_tools = continuation.tools
-          options = continuation.options.dup
-          model = continuation.model
-
-          turn = continuation.turn
-          max_turns = continuation.max_turns
-          tools_enabled = continuation.tools_enabled
-          empty_final_fixup_attempted = continuation.empty_final_fixup_attempted
-          any_tool_calls_seen = continuation.any_tool_calls_seen
-
-          fix_empty_final = continuation.fix_empty_final
-          fix_empty_final_user_text = continuation.fix_empty_final_user_text.to_s
-          fix_empty_final_disable_tools = continuation.fix_empty_final_disable_tools
-          max_tool_output_bytes = continuation.max_tool_output_bytes
-          max_tool_calls_per_turn = continuation.max_tool_calls_per_turn
-
-          run_started_at = continuation.started_at
-          prior_duration_ms = continuation.duration_ms.to_f
-          run_started_mono = clock.monotonic
-
-          all_new_messages = []
-          pending_tool_confirmations = []
-          next_continuation = nil
-          pause_state = nil
-
-          stop_reason = :end_turn
-          completed_turns = turn
-
-          run_payload = { run_id: run_id, resumed: true, stage: "tool_results", stream: true }
-
-          instrumenter.instrument("agent_core.run", run_payload) do
-            begin
-              external_exec_traces = []
-
-              pending_tool_executions.each do |pending|
-                tool_call_id = pending.tool_call_id.to_s
-                result =
-                  tool_results.fetch(tool_call_id) do
-                    raise ArgumentError, "Missing tool result for tool_call_id=#{tool_call_id}"
-                  end
-
-                unless result.is_a?(Resources::Tools::ToolResult)
-                  raise ArgumentError, "tool_results[#{tool_call_id.inspect}] must be a ToolResult (got #{result.class})"
-                end
-
-                result = ToolExecutionUtils.limit_tool_result(result, max_bytes: max_tool_output_bytes, tool_name: pending.executed_name)
-
-                stream_block = block
-                stream_block&.call(StreamEvent::ToolExecutionStart.new(
-                  tool_call_id: tool_call_id,
-                  name: pending.name.to_s,
-                  arguments: pending.arguments,
-                ))
-                stream_block&.call(StreamEvent::ToolExecutionEnd.new(
-                  tool_call_id: tool_call_id,
-                  name: pending.name.to_s,
-                  result: result,
-                  error: result.error? == true,
-                ))
-
-                instrumenter.publish(
-                  "agent_core.tool.execute",
-                  {
-                    run_id: run_id,
-                    tool_call_id: tool_call_id,
-                    name: pending.name.to_s,
-                    executed_name: pending.executed_name.to_s,
-                    source: pending.source.to_s,
-                    stage: "external",
-                    arguments_summary: pending.arguments_summary,
-                    result_error: result.error?,
-                    result_summary: ToolExecutionUtils.summarize_tool_result(result),
-                    duration_ms: result.metadata.is_a?(Hash) ? result.metadata.fetch(:duration_ms, 0.0).to_f : 0.0,
-                    turn_number: turn,
-                  }.compact
-                )
-
-                external_exec_traces <<
-                  ToolExecutionTrace.new(
-                    tool_call_id: tool_call_id,
-                    name: pending.name.to_s,
-                    executed_name: pending.executed_name.to_s,
-                    source: pending.source.to_s,
-                    arguments_summary: pending.arguments_summary,
-                    result_summary: ToolExecutionUtils.summarize_tool_result(result),
-                    error: result.error? == true,
-                    duration_ms: result.metadata.is_a?(Hash) ? result.metadata.fetch(:duration_ms, 0.0).to_f : 0.0,
-                  )
-
-                tool_calls_record.each do |r|
-                  next unless r.is_a?(Hash) && r[:tool_call_id].to_s == tool_call_id
-
-                  r[:pending] = false
-                  r[:deferred] = false
-                  r[:external] = true
-                  r[:error] = result.error? ? result.text : nil
-                  break
-                end
-
-                tool_result_message =
-                  tool_result_to_message(
-                    result,
-                    tool_call_id: tool_call_id,
-                    name: pending.name.to_s,
-                    max_tool_output_bytes: max_tool_output_bytes,
-                  )
-
-                messages << tool_result_message
-                all_new_messages << tool_result_message
-                events.emit(:tool_result, pending.name.to_s, result, tool_call_id)
-              end
-
-              apply_resume_tool_traces!(
-                turn_traces: turn_traces,
-                paused_turn_number: turn,
-                confirmation_traces: [],
-                execution_traces: external_exec_traces,
-              )
-
-              if turn >= max_turns
-                completed_turns = turn
-                stop_reason = :max_turns
-                run_payload[:stop_reason] = stop_reason
-                next
-              end
-
-              loop do
-                turn += 1
-
-                if turn > max_turns
-                  completed_turns = turn - 1
-                  stop_reason = :max_turns
-                  run_payload[:stop_reason] = stop_reason
-                  yield StreamEvent::ErrorEvent.new(error: "Max turns exceeded", recoverable: false) if block
-                  break
-                end
-
-                yield StreamEvent::TurnStart.new(turn_number: turn) if block
-                events.emit(:turn_start, turn)
-
-                turn_started_at = clock.now
-                turn_payload = { run_id: run_id, turn_number: turn }
-
-                tool_authorization_traces = []
-                tool_execution_traces = []
-                llm_trace = nil
-                turn_stop_reason = :end_turn
-                turn_usage_obj = nil
-
-                turn_outcome =
-                  instrumenter.instrument("agent_core.turn", turn_payload) do
-                    begin
-                      tools = tools_enabled && prompt_tools && !prompt_tools.empty? ? prompt_tools : nil
-                      request_messages = messages.dup.freeze
-
-                      begin
-                        preflight_token_check!(
-                          messages: request_messages, tools: tools,
-                          token_counter: token_counter, context_window: context_window,
-                          reserved_output_tokens: reserved_output_tokens
-                        )
-                      rescue ContextWindowExceededError => e
-                        events.emit(:error, e, false)
-                        raise
-                      end
-
-                      events.emit(:llm_request, request_messages, tools)
-
-                      llm_payload = {
-                        run_id: run_id,
-                        turn_number: turn,
-                        model: model,
-                        stream: true,
-                        messages_count: request_messages.size,
-                        tools_count: tools ? tools.size : 0,
-                        options_summary: summarize_llm_options(options),
-                      }
-
-                      response =
-                        instrumenter.instrument("agent_core.llm.call", llm_payload) do
-                          resp =
-                            provider.chat(
-                              messages: request_messages,
-                              model: model,
-                              tools: tools,
-                              stream: true,
-                              **options
-                            ) do |event|
-                              yield event if block
-                            end
-                          llm_payload[:stop_reason] = resp.stop_reason
-                          llm_payload[:usage] = resp.usage&.to_h
-                          resp
-                        end
-
-                      llm_trace =
-                        LlmCallTrace.new(
-                          model: model.to_s,
-                          messages_count: request_messages.size,
-                          tools_count: tools ? tools.size : 0,
-                          options_summary: llm_payload.fetch(:options_summary),
-                          stop_reason: llm_payload.fetch(:stop_reason, nil),
-                          usage: llm_payload.fetch(:usage, nil),
-                          duration_ms: llm_payload.fetch(:duration_ms, nil),
-                        )
-
-                      assistant_msg = response.message
-                      response_stop_reason = response.stop_reason
-                      response_usage = response.usage
-                      turn_stop_reason = response_stop_reason
-                      turn_usage_obj = response_usage
-
-                      if response_usage
-                        per_turn_usage << response_usage
-                        aggregated_usage = aggregated_usage ? aggregated_usage + response_usage : response_usage
-                      end
-
-                      messages << assistant_msg
-                      all_new_messages << assistant_msg
-                      events.emit(:llm_response, response)
-
-                      effective_max_tool_calls_per_turn =
-                        if max_tool_calls_per_turn
-                          limit = Integer(max_tool_calls_per_turn)
-                          raise ArgumentError, "max_tool_calls_per_turn must be positive" if limit <= 0
-                          limit
-                        elsif options.fetch(:parallel_tool_calls, nil) == false
-                          1
-                        end
-
-                      tool_calls = assistant_msg.tool_calls || []
-
-                      if tools_registry && tools && effective_max_tool_calls_per_turn && tool_calls.size > effective_max_tool_calls_per_turn
-                        ignored = tool_calls.drop(effective_max_tool_calls_per_turn)
-
-                        ignored.each do |tc|
-                          tool_calls_record << {
-                            tool_call_id: tc.id,
-                            name: tc.name,
-                            arguments: tc.arguments,
-                            error: "ignored: max_tool_calls_per_turn=#{effective_max_tool_calls_per_turn}",
-                          }
-                        end
-
-                        tool_calls = tool_calls.first(effective_max_tool_calls_per_turn)
-
-                        assistant_msg =
-                          Message.new(
-                            role: assistant_msg.role,
-                            content: assistant_msg.content,
-                            tool_calls: tool_calls.empty? ? nil : tool_calls,
-                            tool_call_id: assistant_msg.tool_call_id,
-                            name: assistant_msg.name,
-                            metadata: assistant_msg.metadata,
-                          )
-                        messages[-1] = assistant_msg
-                        all_new_messages[-1] = assistant_msg
-                      elsif tools.nil? && assistant_msg.has_tool_calls?
-                        assistant_msg =
-                          Message.new(
-                            role: assistant_msg.role,
-                            content: assistant_msg.content,
-                            tool_calls: nil,
-                            tool_call_id: assistant_msg.tool_call_id,
-                            name: assistant_msg.name,
-                            metadata: assistant_msg.metadata,
-                          )
-                        tool_calls = []
-                        messages[-1] = assistant_msg
-                        all_new_messages[-1] = assistant_msg
-                      end
-
-                      any_tool_calls_seen ||= tool_calls.any? if tools_registry && tools
-
-                      if tool_calls.any? && tools_registry && tools
-                        tool_processing =
-                          process_tool_calls_for_turn(
-                            tool_calls: tool_calls,
-                            tools_registry: tools_registry,
-                            tool_policy: tool_policy,
-                            tool_executor: tool_executor,
-                            events: events,
-                            tool_calls_record: tool_calls_record,
-                            max_tool_output_bytes: max_tool_output_bytes,
-                            execution_context: execution_context,
-                            stream_block: block
-                          )
-
-                        tool_authorization_traces.concat(tool_processing.fetch(:authorization_traces))
-                        tool_execution_traces.concat(tool_processing.fetch(:execution_traces))
-
-                        Array(tool_processing[:result_messages]).each do |result_msg|
-                          messages << result_msg
-                          all_new_messages << result_msg
-                        end
-
-                        yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
-                        events.emit(:turn_end, turn, all_new_messages)
-
-                        if tool_processing[:pause_state]
-                          pause_state = tool_processing.fetch(:pause_state)
-                          stop_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
-                          turn_stop_reason = stop_reason
-                          completed_turns = turn
-                          run_payload[:stop_reason] = stop_reason
-
-                          case stop_reason
-                          when :awaiting_tool_confirmation
-                            yield StreamEvent::AuthorizationRequired.new(
-                              run_id: run_id,
-                              pending_tool_confirmations: pause_state.fetch(:pending_tool_confirmations),
-                            ) if block
-                          when :awaiting_tool_results
-                            yield StreamEvent::ToolExecutionRequired.new(
-                              run_id: run_id,
-                              pending_tool_executions: pause_state.fetch(:pending_tool_executions),
-                            ) if block
-                          end
-                          next :stop
-                        end
-
-                        next :continue
-                      end
-
-                      if fix_empty_final &&
-                          !empty_final_fixup_attempted &&
-                          tools_registry &&
-                          any_tool_calls_seen &&
-                          assistant_msg.assistant? &&
-                          assistant_msg.text.to_s.strip.empty?
-                        empty_final_fixup_attempted = true
-                        tools_enabled = false if fix_empty_final_disable_tools
-                        yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
-                        events.emit(:turn_end, turn, all_new_messages)
-                        user_msg = Message.new(role: :user, content: fix_empty_final_user_text)
-                        messages << user_msg
-                        all_new_messages << user_msg
-                        next :continue
-                      end
-
-                      yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
-                      events.emit(:turn_end, turn, all_new_messages)
-
-                      stop_reason = response_stop_reason
-                      completed_turns = turn
-                      run_payload[:stop_reason] = stop_reason
-                      :stop
-                    ensure
-                      turn_payload[:stop_reason] ||= turn_stop_reason
-                      turn_payload[:usage] ||= turn_usage_obj&.to_h if turn_usage_obj
-                    end
-                  end
-
-                turn_ended_at = clock.now
-                turn_traces <<
-                  TurnTrace.new(
-                    turn_number: turn,
-                    started_at: turn_started_at,
-                    ended_at: turn_ended_at,
-                    duration_ms: turn_payload.fetch(:duration_ms, nil),
-                    llm: llm_trace,
-                    tool_authorizations: tool_authorization_traces,
-                    tool_executions: tool_execution_traces,
-                    stop_reason: turn_stop_reason,
-                    usage: turn_usage_obj&.to_h,
-                  )
-
-                break if turn_outcome == :stop
-              end
-            ensure
-              run_payload[:turns] ||= completed_turns
-              run_payload[:usage] ||= aggregated_usage&.to_h if aggregated_usage
-            end
-          end
-
-          run_ended_at = clock.now
-          segment_duration_ms = (clock.monotonic - run_started_mono) * 1000.0
-          run_duration_ms = prior_duration_ms + segment_duration_ms
-
-          run_trace =
-            RunTrace.new(
-              run_id: run_id,
-              started_at: run_started_at,
-              ended_at: run_ended_at,
-              duration_ms: run_duration_ms,
-              turns: turn_traces,
-              stop_reason: stop_reason,
-              usage: aggregated_usage&.to_h,
-            )
-
-          yield StreamEvent::Done.new(stop_reason: stop_reason, usage: aggregated_usage) if block
-
-          if pause_state
-            pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
-            pending_tool_confirmations =
-              pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
-            pending_tool_executions =
-              pause_reason == :awaiting_tool_results ? pause_state.fetch(:pending_tool_executions) : []
-
-            next_continuation =
-              Continuation.new(
-                run_id: run_id,
-                started_at: run_started_at,
-                duration_ms: run_duration_ms,
-                turn: completed_turns,
-                max_turns: max_turns,
-                messages: messages.dup.freeze,
-                model: model,
-                options: options.dup.freeze,
-                tools: prompt_tools,
-                tools_enabled: tools_enabled,
-                empty_final_fixup_attempted: empty_final_fixup_attempted,
-                any_tool_calls_seen: any_tool_calls_seen,
-                tool_calls_record: tool_calls_record.dup.freeze,
-                aggregated_usage: aggregated_usage,
-                per_turn_usage: per_turn_usage.dup.freeze,
-                turn_traces: turn_traces.dup.freeze,
-                pause_reason: pause_reason,
-                pending_tool_calls: pause_state.fetch(:pending_tool_calls),
-                pending_tool_executions: pending_tool_executions,
-                pending_decisions: pause_state.fetch(:pending_decisions),
-                context_attributes: execution_context.attributes,
-                max_tool_output_bytes: max_tool_output_bytes,
-                max_tool_calls_per_turn: max_tool_calls_per_turn,
-                fix_empty_final: fix_empty_final,
-                fix_empty_final_user_text: fix_empty_final_user_text,
-                fix_empty_final_disable_tools: fix_empty_final_disable_tools,
-              )
-          end
-
-          build_result(
-            run_id: run_id,
-            started_at: run_started_at,
-            ended_at: run_ended_at,
-            duration_ms: run_duration_ms,
-            trace: run_trace,
-            all_new_messages: all_new_messages,
-            turns: completed_turns,
-            usage: aggregated_usage,
-            tool_calls_record: tool_calls_record,
-            stop_reason: stop_reason,
-            per_turn_usage: per_turn_usage,
-            pending_tool_confirmations: pending_tool_confirmations,
-            pending_tool_executions: pending_tool_executions,
-            continuation: next_continuation,
-          )
-        end
-
           loop do
             turn += 1
 
@@ -2593,6 +1653,981 @@ module AgentCore
 
             break if turn_outcome == :stop
           end
+          ensure
+            run_payload[:turns] ||= completed_turns
+            run_payload[:usage] ||= aggregated_usage&.to_h if aggregated_usage
+          end
+        end
+
+        run_ended_at = clock.now
+        segment_duration_ms = (clock.monotonic - run_started_mono) * 1000.0
+        run_duration_ms = prior_duration_ms + segment_duration_ms
+
+        run_trace =
+          RunTrace.new(
+            run_id: run_id,
+            started_at: run_started_at,
+            ended_at: run_ended_at,
+            duration_ms: run_duration_ms,
+            turns: turn_traces,
+            stop_reason: stop_reason,
+            usage: aggregated_usage&.to_h,
+          )
+
+        yield StreamEvent::Done.new(stop_reason: stop_reason, usage: aggregated_usage) if block
+
+        if pause_state
+          pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
+          pending_tool_confirmations =
+            pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
+          pending_tool_executions =
+            pause_reason == :awaiting_tool_results ? pause_state.fetch(:pending_tool_executions) : []
+
+          next_continuation =
+            Continuation.new(
+              run_id: run_id,
+              started_at: run_started_at,
+              duration_ms: run_duration_ms,
+              turn: completed_turns,
+              max_turns: max_turns,
+              messages: messages.dup.freeze,
+              model: model,
+              options: options.dup.freeze,
+              tools: prompt_tools,
+              tools_enabled: tools_enabled,
+              empty_final_fixup_attempted: empty_final_fixup_attempted,
+              any_tool_calls_seen: any_tool_calls_seen,
+              tool_calls_record: tool_calls_record.dup.freeze,
+              aggregated_usage: aggregated_usage,
+              per_turn_usage: per_turn_usage.dup.freeze,
+              turn_traces: turn_traces.dup.freeze,
+              pause_reason: pause_reason,
+              pending_tool_calls: pause_state.fetch(:pending_tool_calls),
+              pending_tool_executions: pending_tool_executions,
+              pending_decisions: pause_state.fetch(:pending_decisions),
+              context_attributes: execution_context.attributes,
+              max_tool_output_bytes: max_tool_output_bytes,
+              max_tool_calls_per_turn: max_tool_calls_per_turn,
+              fix_empty_final: fix_empty_final,
+              fix_empty_final_user_text: fix_empty_final_user_text,
+              fix_empty_final_disable_tools: fix_empty_final_disable_tools,
+            )
+        end
+
+        build_result(
+          run_id: run_id,
+          started_at: run_started_at,
+          ended_at: run_ended_at,
+          duration_ms: run_duration_ms,
+          trace: run_trace,
+          all_new_messages: all_new_messages,
+          turns: completed_turns,
+          usage: aggregated_usage,
+          tool_calls_record: tool_calls_record,
+          stop_reason: stop_reason,
+          per_turn_usage: per_turn_usage,
+          pending_tool_confirmations: pending_tool_confirmations,
+          pending_tool_executions: pending_tool_executions,
+          continuation: next_continuation,
+        )
+      end
+
+      # Resume a paused run after receiving external tool execution results.
+      #
+      # This is used when the run stopped with `stop_reason=:awaiting_tool_results`
+      # (typically via a `ToolExecutor::DeferAll` strategy), and the app executes
+      # tools out-of-band (ActiveJob, MQ, etc.).
+      #
+      # @param continuation [Continuation] RunResult#continuation
+      # @param tool_results [Hash{String=>Resources::Tools::ToolResult}] tool_call_id => ToolResult
+      # @return [RunResult]
+      def resume_with_tool_results(continuation:, tool_results:, provider:, tools_registry:, tool_policy: nil, events: nil,
+                                   token_counter: nil, context_window: nil, reserved_output_tokens: 0,
+                                   context: nil, instrumenter: nil, tool_executor: ToolExecutor::Inline.new)
+        unless continuation.is_a?(Continuation)
+          raise ArgumentError, "continuation must be a PromptRunner::Continuation (got #{continuation.class})"
+        end
+
+        if continuation.pause_reason != :awaiting_tool_results
+          raise ArgumentError, "continuation pause_reason is #{continuation.pause_reason.inspect} (expected :awaiting_tool_results)"
+        end
+
+        pending_tool_executions = Array(continuation.pending_tool_executions)
+        if pending_tool_executions.empty?
+          raise ArgumentError, "continuation has no pending tool executions"
+        end
+
+        raise ArgumentError, "tool_results must be a Hash" unless tool_results.is_a?(Hash)
+
+        raise ArgumentError, "provider is required" unless provider
+        raise ArgumentError, "tools_registry is required" unless tools_registry
+
+        events ||= Events.new
+
+        base_context = context || continuation.context_attributes
+        execution_context = ExecutionContext.from(base_context, instrumenter: instrumenter).with(run_id: continuation.run_id)
+        instrumenter = execution_context.instrumenter
+        clock = execution_context.clock
+        run_id = execution_context.run_id
+
+        messages = continuation.messages.dup
+        tool_calls_record = continuation.tool_calls_record.dup
+        aggregated_usage = continuation.aggregated_usage
+        per_turn_usage = continuation.per_turn_usage.dup
+        turn_traces = continuation.turn_traces.dup
+
+        prompt_tools = continuation.tools
+        options = continuation.options.dup
+        model = continuation.model
+
+        turn = continuation.turn
+        max_turns = continuation.max_turns
+        tools_enabled = continuation.tools_enabled
+        empty_final_fixup_attempted = continuation.empty_final_fixup_attempted
+        any_tool_calls_seen = continuation.any_tool_calls_seen
+
+        fix_empty_final = continuation.fix_empty_final
+        fix_empty_final_user_text = continuation.fix_empty_final_user_text.to_s
+        fix_empty_final_disable_tools = continuation.fix_empty_final_disable_tools
+        max_tool_output_bytes = continuation.max_tool_output_bytes
+        max_tool_calls_per_turn = continuation.max_tool_calls_per_turn
+
+        run_started_at = continuation.started_at
+        prior_duration_ms = continuation.duration_ms.to_f
+        run_started_mono = clock.monotonic
+
+        all_new_messages = []
+        pending_tool_confirmations = []
+        next_continuation = nil
+        pause_state = nil
+
+        stop_reason = :end_turn
+        completed_turns = turn
+
+        run_payload = { run_id: run_id, resumed: true, stage: "tool_results" }
+
+        instrumenter.instrument("agent_core.run", run_payload) do
+          begin
+            external_exec_traces = []
+
+            pending_tool_executions.each do |pending|
+              tool_call_id = pending.tool_call_id.to_s
+              result =
+                tool_results.fetch(tool_call_id) do
+                  raise ArgumentError, "Missing tool result for tool_call_id=#{tool_call_id}"
+                end
+
+              unless result.is_a?(Resources::Tools::ToolResult)
+                raise ArgumentError, "tool_results[#{tool_call_id.inspect}] must be a ToolResult (got #{result.class})"
+              end
+
+              result = ToolExecutionUtils.limit_tool_result(result, max_bytes: max_tool_output_bytes, tool_name: pending.executed_name)
+
+              instrumenter.publish(
+                "agent_core.tool.execute",
+                {
+                  run_id: run_id,
+                  tool_call_id: tool_call_id,
+                  name: pending.name.to_s,
+                  executed_name: pending.executed_name.to_s,
+                  source: pending.source.to_s,
+                  stage: "external",
+                  arguments_summary: pending.arguments_summary,
+                  result_error: result.error?,
+                  result_summary: ToolExecutionUtils.summarize_tool_result(result),
+                  duration_ms: result.metadata.is_a?(Hash) ? result.metadata.fetch(:duration_ms, 0.0).to_f : 0.0,
+                  turn_number: turn,
+                }.compact
+              )
+
+              external_exec_traces <<
+                ToolExecutionTrace.new(
+                  tool_call_id: tool_call_id,
+                  name: pending.name.to_s,
+                  executed_name: pending.executed_name.to_s,
+                  source: pending.source.to_s,
+                  arguments_summary: pending.arguments_summary,
+                  result_summary: ToolExecutionUtils.summarize_tool_result(result),
+                  error: result.error? == true,
+                  duration_ms: result.metadata.is_a?(Hash) ? result.metadata.fetch(:duration_ms, 0.0).to_f : 0.0,
+                )
+
+              tool_calls_record.each do |r|
+                next unless r.is_a?(Hash) && r[:tool_call_id].to_s == tool_call_id
+
+                r[:pending] = false
+                r[:deferred] = false
+                r[:external] = true
+                r[:error] = result.error? ? result.text : nil
+                break
+              end
+
+              tool_result_message =
+                tool_result_to_message(
+                  result,
+                  tool_call_id: tool_call_id,
+                  name: pending.name.to_s,
+                  max_tool_output_bytes: max_tool_output_bytes,
+                )
+
+              messages << tool_result_message
+              all_new_messages << tool_result_message
+              events.emit(:tool_result, pending.name.to_s, result, tool_call_id)
+            end
+
+            apply_resume_tool_traces!(
+              turn_traces: turn_traces,
+              paused_turn_number: turn,
+              confirmation_traces: [],
+              execution_traces: external_exec_traces,
+            )
+
+            if turn >= max_turns
+              completed_turns = turn
+              stop_reason = :max_turns
+              run_payload[:stop_reason] = stop_reason
+              next
+            end
+
+            loop do
+              turn += 1
+
+              if turn > max_turns
+                completed_turns = turn - 1
+                stop_reason = :max_turns
+                run_payload[:stop_reason] = stop_reason
+                events.emit(:error, MaxTurnsExceededError.new(turns: max_turns), false)
+                break
+              end
+
+              turn_started_at = clock.now
+              turn_payload = { run_id: run_id, turn_number: turn }
+
+              tool_authorization_traces = []
+              tool_execution_traces = []
+              llm_trace = nil
+              turn_stop_reason = :end_turn
+              turn_usage_obj = nil
+
+              turn_outcome =
+                instrumenter.instrument("agent_core.turn", turn_payload) do
+                  begin
+                    events.emit(:turn_start, turn)
+
+                    tools = tools_enabled && prompt_tools && !prompt_tools.empty? ? prompt_tools : nil
+                    request_messages = messages.dup.freeze
+
+                    begin
+                      preflight_token_check!(
+                        messages: request_messages, tools: tools,
+                        token_counter: token_counter, context_window: context_window,
+                        reserved_output_tokens: reserved_output_tokens
+                      )
+                    rescue ContextWindowExceededError => e
+                      events.emit(:error, e, false)
+                      raise
+                    end
+
+                    events.emit(:llm_request, request_messages, tools)
+
+                    llm_payload = {
+                      run_id: run_id,
+                      turn_number: turn,
+                      model: model,
+                      stream: false,
+                      messages_count: request_messages.size,
+                      tools_count: tools ? tools.size : 0,
+                      options_summary: summarize_llm_options(options),
+                    }
+
+                    response =
+                      instrumenter.instrument("agent_core.llm.call", llm_payload) do
+                        resp =
+                          provider.chat(
+                            messages: request_messages,
+                            model: model,
+                            tools: tools,
+                            stream: false,
+                            **options
+                          )
+                        llm_payload[:stop_reason] = resp.stop_reason
+                        llm_payload[:usage] = resp.usage&.to_h
+                        resp
+                      end
+
+                    llm_trace =
+                      LlmCallTrace.new(
+                        model: model.to_s,
+                        messages_count: request_messages.size,
+                        tools_count: tools ? tools.size : 0,
+                        options_summary: llm_payload.fetch(:options_summary),
+                        stop_reason: llm_payload.fetch(:stop_reason, nil),
+                        usage: llm_payload.fetch(:usage, nil),
+                        duration_ms: llm_payload.fetch(:duration_ms, nil),
+                      )
+
+                    assistant_msg = response.message
+                    turn_stop_reason = response.stop_reason
+                    turn_usage_obj = response.usage
+
+                    if response.usage
+                      per_turn_usage << response.usage
+                      aggregated_usage = aggregated_usage ? aggregated_usage + response.usage : response.usage
+                    end
+
+                    messages << assistant_msg
+                    all_new_messages << assistant_msg
+                    events.emit(:llm_response, response)
+
+                    effective_max_tool_calls_per_turn =
+                      if max_tool_calls_per_turn
+                        limit = Integer(max_tool_calls_per_turn)
+                        raise ArgumentError, "max_tool_calls_per_turn must be positive" if limit <= 0
+                        limit
+                      elsif options.fetch(:parallel_tool_calls, nil) == false
+                        1
+                      end
+
+                    tool_calls = assistant_msg.tool_calls || []
+
+                    if tools_registry && tools && effective_max_tool_calls_per_turn && tool_calls.size > effective_max_tool_calls_per_turn
+                      ignored = tool_calls.drop(effective_max_tool_calls_per_turn)
+
+                      ignored.each do |tc|
+                        tool_calls_record << {
+                          tool_call_id: tc.id,
+                          name: tc.name,
+                          arguments: tc.arguments,
+                          error: "ignored: max_tool_calls_per_turn=#{effective_max_tool_calls_per_turn}",
+                        }
+                      end
+
+                      tool_calls = tool_calls.first(effective_max_tool_calls_per_turn)
+
+                      assistant_msg =
+                        Message.new(
+                          role: assistant_msg.role,
+                          content: assistant_msg.content,
+                          tool_calls: tool_calls.empty? ? nil : tool_calls,
+                          tool_call_id: assistant_msg.tool_call_id,
+                          name: assistant_msg.name,
+                          metadata: assistant_msg.metadata,
+                        )
+                      messages[-1] = assistant_msg
+                      all_new_messages[-1] = assistant_msg
+                    elsif tools.nil? && assistant_msg.has_tool_calls?
+                      assistant_msg =
+                        Message.new(
+                          role: assistant_msg.role,
+                          content: assistant_msg.content,
+                          tool_calls: nil,
+                          tool_call_id: assistant_msg.tool_call_id,
+                          name: assistant_msg.name,
+                          metadata: assistant_msg.metadata,
+                        )
+                      tool_calls = []
+                      messages[-1] = assistant_msg
+                      all_new_messages[-1] = assistant_msg
+                    end
+
+                    any_tool_calls_seen ||= tool_calls.any? if tools_registry && tools
+
+                    if tool_calls.any? && tools_registry && tools
+                      tool_processing =
+                        process_tool_calls_for_turn(
+                          tool_calls: tool_calls,
+                          tools_registry: tools_registry,
+                          tool_policy: tool_policy,
+                          tool_executor: tool_executor,
+                          events: events,
+                          tool_calls_record: tool_calls_record,
+                          max_tool_output_bytes: max_tool_output_bytes,
+                          execution_context: execution_context,
+                          stream_block: nil
+                        )
+
+                      tool_authorization_traces.concat(tool_processing.fetch(:authorization_traces))
+                      tool_execution_traces.concat(tool_processing.fetch(:execution_traces))
+
+                      Array(tool_processing[:result_messages]).each do |result_msg|
+                        messages << result_msg
+                        all_new_messages << result_msg
+                      end
+
+                      if tool_processing[:pause_state]
+                        pause_state = tool_processing.fetch(:pause_state)
+                        stop_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
+                        turn_stop_reason = stop_reason
+                        completed_turns = turn
+                        run_payload[:stop_reason] = stop_reason
+                        events.emit(:turn_end, turn, all_new_messages)
+                        next :stop
+                      end
+
+                      events.emit(:turn_end, turn, all_new_messages)
+                      next :continue
+                    end
+
+                    if fix_empty_final &&
+                        !empty_final_fixup_attempted &&
+                        tools_registry &&
+                        any_tool_calls_seen &&
+                        assistant_msg.assistant? &&
+                        assistant_msg.text.to_s.strip.empty?
+                      empty_final_fixup_attempted = true
+                      tools_enabled = false if fix_empty_final_disable_tools
+                      events.emit(:turn_end, turn, all_new_messages)
+                      user_msg = Message.new(role: :user, content: fix_empty_final_user_text)
+                      messages << user_msg
+                      all_new_messages << user_msg
+                      next :continue
+                    end
+
+                    events.emit(:turn_end, turn, all_new_messages)
+                    stop_reason = turn_stop_reason
+                    completed_turns = turn
+                    run_payload[:stop_reason] = stop_reason
+                    :stop
+                  ensure
+                    turn_payload[:stop_reason] ||= turn_stop_reason
+                    turn_payload[:usage] ||= turn_usage_obj&.to_h if turn_usage_obj
+                  end
+                end
+
+            turn_ended_at = clock.now
+
+            turn_traces <<
+              TurnTrace.new(
+                turn_number: turn,
+                started_at: turn_started_at,
+                ended_at: turn_ended_at,
+                duration_ms: turn_payload.fetch(:duration_ms, nil),
+                llm: llm_trace,
+                tool_authorizations: tool_authorization_traces,
+                tool_executions: tool_execution_traces,
+                stop_reason: turn_stop_reason,
+                usage: turn_usage_obj&.to_h,
+              )
+
+            break if turn_outcome == :stop
+            end
+          ensure
+            run_payload[:turns] ||= completed_turns
+            run_payload[:usage] ||= aggregated_usage&.to_h if aggregated_usage
+          end
+        end
+
+        run_ended_at = clock.now
+        segment_duration_ms = (clock.monotonic - run_started_mono) * 1000.0
+        run_duration_ms = prior_duration_ms + segment_duration_ms
+
+        run_trace =
+          RunTrace.new(
+            run_id: run_id,
+            started_at: run_started_at,
+            ended_at: run_ended_at,
+            duration_ms: run_duration_ms,
+            turns: turn_traces,
+            stop_reason: stop_reason,
+            usage: aggregated_usage&.to_h,
+          )
+
+        if pause_state
+          pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
+          pending_tool_confirmations =
+            pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
+          pending_tool_executions =
+            pause_reason == :awaiting_tool_results ? pause_state.fetch(:pending_tool_executions) : []
+
+          next_continuation =
+            Continuation.new(
+              run_id: run_id,
+              started_at: run_started_at,
+              duration_ms: run_duration_ms,
+              turn: completed_turns,
+              max_turns: max_turns,
+              messages: messages.dup.freeze,
+              model: model,
+              options: options.dup.freeze,
+              tools: prompt_tools,
+              tools_enabled: tools_enabled,
+              empty_final_fixup_attempted: empty_final_fixup_attempted,
+              any_tool_calls_seen: any_tool_calls_seen,
+              tool_calls_record: tool_calls_record.dup.freeze,
+              aggregated_usage: aggregated_usage,
+              per_turn_usage: per_turn_usage.dup.freeze,
+              turn_traces: turn_traces.dup.freeze,
+              pause_reason: pause_reason,
+              pending_tool_calls: pause_state.fetch(:pending_tool_calls),
+              pending_tool_executions: pending_tool_executions,
+              pending_decisions: pause_state.fetch(:pending_decisions),
+              context_attributes: execution_context.attributes,
+              max_tool_output_bytes: max_tool_output_bytes,
+              max_tool_calls_per_turn: max_tool_calls_per_turn,
+              fix_empty_final: fix_empty_final,
+              fix_empty_final_user_text: fix_empty_final_user_text,
+              fix_empty_final_disable_tools: fix_empty_final_disable_tools,
+            )
+        end
+
+        build_result(
+          run_id: run_id,
+          started_at: run_started_at,
+          ended_at: run_ended_at,
+          duration_ms: run_duration_ms,
+          trace: run_trace,
+          all_new_messages: all_new_messages,
+          turns: completed_turns,
+          usage: aggregated_usage,
+          tool_calls_record: tool_calls_record,
+          stop_reason: stop_reason,
+          per_turn_usage: per_turn_usage,
+          pending_tool_confirmations: pending_tool_confirmations,
+          pending_tool_executions: pending_tool_executions,
+          continuation: next_continuation,
+        )
+      end
+
+      # Streaming variant of {#resume_with_tool_results}.
+      def resume_stream_with_tool_results(continuation:, tool_results:, provider:, tools_registry:, tool_policy: nil, events: nil,
+                                          token_counter: nil, context_window: nil, reserved_output_tokens: 0,
+                                          context: nil, instrumenter: nil, tool_executor: ToolExecutor::Inline.new, &block)
+        unless continuation.is_a?(Continuation)
+          raise ArgumentError, "continuation must be a PromptRunner::Continuation (got #{continuation.class})"
+        end
+
+        if continuation.pause_reason != :awaiting_tool_results
+          raise ArgumentError, "continuation pause_reason is #{continuation.pause_reason.inspect} (expected :awaiting_tool_results)"
+        end
+
+        pending_tool_executions = Array(continuation.pending_tool_executions)
+        if pending_tool_executions.empty?
+          raise ArgumentError, "continuation has no pending tool executions"
+        end
+
+        raise ArgumentError, "tool_results must be a Hash" unless tool_results.is_a?(Hash)
+
+        raise ArgumentError, "provider is required" unless provider
+        raise ArgumentError, "tools_registry is required" unless tools_registry
+
+        events ||= Events.new
+
+        base_context = context || continuation.context_attributes
+        execution_context = ExecutionContext.from(base_context, instrumenter: instrumenter).with(run_id: continuation.run_id)
+        instrumenter = execution_context.instrumenter
+        clock = execution_context.clock
+        run_id = execution_context.run_id
+
+        messages = continuation.messages.dup
+        tool_calls_record = continuation.tool_calls_record.dup
+        aggregated_usage = continuation.aggregated_usage
+        per_turn_usage = continuation.per_turn_usage.dup
+        turn_traces = continuation.turn_traces.dup
+
+        prompt_tools = continuation.tools
+        options = continuation.options.dup
+        model = continuation.model
+
+        turn = continuation.turn
+        max_turns = continuation.max_turns
+        tools_enabled = continuation.tools_enabled
+        empty_final_fixup_attempted = continuation.empty_final_fixup_attempted
+        any_tool_calls_seen = continuation.any_tool_calls_seen
+
+        fix_empty_final = continuation.fix_empty_final
+        fix_empty_final_user_text = continuation.fix_empty_final_user_text.to_s
+        fix_empty_final_disable_tools = continuation.fix_empty_final_disable_tools
+        max_tool_output_bytes = continuation.max_tool_output_bytes
+        max_tool_calls_per_turn = continuation.max_tool_calls_per_turn
+
+        run_started_at = continuation.started_at
+        prior_duration_ms = continuation.duration_ms.to_f
+        run_started_mono = clock.monotonic
+
+        all_new_messages = []
+        pending_tool_confirmations = []
+        next_continuation = nil
+        pause_state = nil
+
+        stop_reason = :end_turn
+        completed_turns = turn
+
+        run_payload = { run_id: run_id, resumed: true, stage: "tool_results", stream: true }
+
+        instrumenter.instrument("agent_core.run", run_payload) do
+          begin
+            external_exec_traces = []
+
+            pending_tool_executions.each do |pending|
+              tool_call_id = pending.tool_call_id.to_s
+              result =
+                tool_results.fetch(tool_call_id) do
+                  raise ArgumentError, "Missing tool result for tool_call_id=#{tool_call_id}"
+                end
+
+              unless result.is_a?(Resources::Tools::ToolResult)
+                raise ArgumentError, "tool_results[#{tool_call_id.inspect}] must be a ToolResult (got #{result.class})"
+              end
+
+              result = ToolExecutionUtils.limit_tool_result(result, max_bytes: max_tool_output_bytes, tool_name: pending.executed_name)
+
+              stream_block = block
+              stream_block&.call(StreamEvent::ToolExecutionStart.new(
+                tool_call_id: tool_call_id,
+                name: pending.name.to_s,
+                arguments: pending.arguments,
+              ))
+              stream_block&.call(StreamEvent::ToolExecutionEnd.new(
+                tool_call_id: tool_call_id,
+                name: pending.name.to_s,
+                result: result,
+                error: result.error? == true,
+              ))
+
+              instrumenter.publish(
+                "agent_core.tool.execute",
+                {
+                  run_id: run_id,
+                  tool_call_id: tool_call_id,
+                  name: pending.name.to_s,
+                  executed_name: pending.executed_name.to_s,
+                  source: pending.source.to_s,
+                  stage: "external",
+                  arguments_summary: pending.arguments_summary,
+                  result_error: result.error?,
+                  result_summary: ToolExecutionUtils.summarize_tool_result(result),
+                  duration_ms: result.metadata.is_a?(Hash) ? result.metadata.fetch(:duration_ms, 0.0).to_f : 0.0,
+                  turn_number: turn,
+                }.compact
+              )
+
+              external_exec_traces <<
+                ToolExecutionTrace.new(
+                  tool_call_id: tool_call_id,
+                  name: pending.name.to_s,
+                  executed_name: pending.executed_name.to_s,
+                  source: pending.source.to_s,
+                  arguments_summary: pending.arguments_summary,
+                  result_summary: ToolExecutionUtils.summarize_tool_result(result),
+                  error: result.error? == true,
+                  duration_ms: result.metadata.is_a?(Hash) ? result.metadata.fetch(:duration_ms, 0.0).to_f : 0.0,
+                )
+
+              tool_calls_record.each do |r|
+                next unless r.is_a?(Hash) && r[:tool_call_id].to_s == tool_call_id
+
+                r[:pending] = false
+                r[:deferred] = false
+                r[:external] = true
+                r[:error] = result.error? ? result.text : nil
+                break
+              end
+
+              tool_result_message =
+                tool_result_to_message(
+                  result,
+                  tool_call_id: tool_call_id,
+                  name: pending.name.to_s,
+                  max_tool_output_bytes: max_tool_output_bytes,
+                )
+
+              messages << tool_result_message
+              all_new_messages << tool_result_message
+              events.emit(:tool_result, pending.name.to_s, result, tool_call_id)
+            end
+
+            apply_resume_tool_traces!(
+              turn_traces: turn_traces,
+              paused_turn_number: turn,
+              confirmation_traces: [],
+              execution_traces: external_exec_traces,
+            )
+
+            if turn >= max_turns
+              completed_turns = turn
+              stop_reason = :max_turns
+              run_payload[:stop_reason] = stop_reason
+              next
+            end
+
+            loop do
+              turn += 1
+
+              if turn > max_turns
+                completed_turns = turn - 1
+                stop_reason = :max_turns
+                run_payload[:stop_reason] = stop_reason
+                yield StreamEvent::ErrorEvent.new(error: "Max turns exceeded", recoverable: false) if block
+                break
+              end
+
+              yield StreamEvent::TurnStart.new(turn_number: turn) if block
+              events.emit(:turn_start, turn)
+
+              turn_started_at = clock.now
+              turn_payload = { run_id: run_id, turn_number: turn }
+
+              tool_authorization_traces = []
+              tool_execution_traces = []
+              llm_trace = nil
+              turn_stop_reason = :end_turn
+              turn_usage_obj = nil
+
+              turn_outcome =
+                instrumenter.instrument("agent_core.turn", turn_payload) do
+                  begin
+                    tools = tools_enabled && prompt_tools && !prompt_tools.empty? ? prompt_tools : nil
+                    request_messages = messages.dup.freeze
+
+                    begin
+                      preflight_token_check!(
+                        messages: request_messages, tools: tools,
+                        token_counter: token_counter, context_window: context_window,
+                        reserved_output_tokens: reserved_output_tokens
+                      )
+                    rescue ContextWindowExceededError => e
+                      yield StreamEvent::ErrorEvent.new(error: e.message, recoverable: false) if block
+                      events.emit(:error, e, false)
+                      raise
+                    end
+
+                    events.emit(:llm_request, request_messages, tools)
+
+                    assistant_msg = nil
+                    response_stop_reason = :end_turn
+                    response_usage = nil
+
+                    llm_payload = {
+                      run_id: run_id,
+                      turn_number: turn,
+                      model: model,
+                      stream: true,
+                      messages_count: request_messages.size,
+                      tools_count: tools ? tools.size : 0,
+                      options_summary: summarize_llm_options(options),
+                    }
+
+                    instrumenter.instrument("agent_core.llm.call", llm_payload) do
+                      stream_enum =
+                        provider.chat(
+                          messages: request_messages,
+                          model: model,
+                          tools: tools,
+                          stream: true,
+                          **options
+                        )
+
+                      stream_enum.each do |event|
+                        events.emit(:stream_delta, event)
+
+                        case event
+                        when StreamEvent::Done
+                          response_stop_reason = event.stop_reason
+                          response_usage = event.usage
+                          next
+                        when StreamEvent::MessageComplete
+                          assistant_msg = event.message
+                        end
+
+                        yield event if block
+                      end
+
+                      llm_payload[:stop_reason] = response_stop_reason
+                      llm_payload[:usage] = response_usage&.to_h
+
+                      nil
+                    end
+
+                    llm_trace =
+                      LlmCallTrace.new(
+                        model: model.to_s,
+                        messages_count: request_messages.size,
+                        tools_count: tools ? tools.size : 0,
+                        options_summary: llm_payload.fetch(:options_summary),
+                        stop_reason: llm_payload.fetch(:stop_reason, nil),
+                        usage: llm_payload.fetch(:usage, nil),
+                        duration_ms: llm_payload.fetch(:duration_ms, nil),
+                      )
+
+                    turn_stop_reason = response_stop_reason
+                    turn_usage_obj = response_usage
+
+                    if response_usage
+                      per_turn_usage << response_usage
+                      aggregated_usage = aggregated_usage ? aggregated_usage + response_usage : response_usage
+                    end
+
+                    unless assistant_msg
+                      yield StreamEvent::ErrorEvent.new(
+                        error: "Provider stream ended without producing a MessageComplete event",
+                        recoverable: false
+                      ) if block
+                      stop_reason = :error
+                      completed_turns = turn
+                      run_payload[:stop_reason] = stop_reason
+                      events.emit(:turn_end, turn, all_new_messages)
+                      next :stop
+                    end
+
+                    messages << assistant_msg
+                    all_new_messages << assistant_msg
+                    events.emit(
+                      :llm_response,
+                      Resources::Provider::Response.new(
+                        message: assistant_msg,
+                        usage: response_usage,
+                        stop_reason: response_stop_reason
+                      )
+                    )
+
+                    effective_max_tool_calls_per_turn =
+                      if max_tool_calls_per_turn
+                        limit = Integer(max_tool_calls_per_turn)
+                        raise ArgumentError, "max_tool_calls_per_turn must be positive" if limit <= 0
+                        limit
+                      elsif options.fetch(:parallel_tool_calls, nil) == false
+                        1
+                      end
+
+                    tool_calls = assistant_msg.tool_calls || []
+
+                    if tools_registry && tools && effective_max_tool_calls_per_turn && tool_calls.size > effective_max_tool_calls_per_turn
+                      ignored = tool_calls.drop(effective_max_tool_calls_per_turn)
+
+                      ignored.each do |tc|
+                        tool_calls_record << {
+                          tool_call_id: tc.id,
+                          name: tc.name,
+                          arguments: tc.arguments,
+                          error: "ignored: max_tool_calls_per_turn=#{effective_max_tool_calls_per_turn}",
+                        }
+                      end
+
+                      tool_calls = tool_calls.first(effective_max_tool_calls_per_turn)
+
+                      assistant_msg =
+                        Message.new(
+                          role: assistant_msg.role,
+                          content: assistant_msg.content,
+                          tool_calls: tool_calls.empty? ? nil : tool_calls,
+                          tool_call_id: assistant_msg.tool_call_id,
+                          name: assistant_msg.name,
+                          metadata: assistant_msg.metadata,
+                        )
+                      messages[-1] = assistant_msg
+                      all_new_messages[-1] = assistant_msg
+                    elsif tools.nil? && assistant_msg.has_tool_calls?
+                      assistant_msg =
+                        Message.new(
+                          role: assistant_msg.role,
+                          content: assistant_msg.content,
+                          tool_calls: nil,
+                          tool_call_id: assistant_msg.tool_call_id,
+                          name: assistant_msg.name,
+                          metadata: assistant_msg.metadata,
+                        )
+                      tool_calls = []
+                      messages[-1] = assistant_msg
+                      all_new_messages[-1] = assistant_msg
+                    end
+
+                    any_tool_calls_seen ||= tool_calls.any? if tools_registry && tools
+
+                    if tool_calls.any? && tools_registry && tools
+                      tool_processing =
+                        process_tool_calls_for_turn(
+                          tool_calls: tool_calls,
+                          tools_registry: tools_registry,
+                          tool_policy: tool_policy,
+                          tool_executor: tool_executor,
+                          events: events,
+                          tool_calls_record: tool_calls_record,
+                          max_tool_output_bytes: max_tool_output_bytes,
+                          execution_context: execution_context,
+                          stream_block: block
+                        )
+
+                      tool_authorization_traces.concat(tool_processing.fetch(:authorization_traces))
+                      tool_execution_traces.concat(tool_processing.fetch(:execution_traces))
+
+                      Array(tool_processing[:result_messages]).each do |result_msg|
+                        messages << result_msg
+                        all_new_messages << result_msg
+                      end
+
+                      yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
+                      events.emit(:turn_end, turn, all_new_messages)
+
+                      if tool_processing[:pause_state]
+                        pause_state = tool_processing.fetch(:pause_state)
+                        stop_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
+                        turn_stop_reason = stop_reason
+                        completed_turns = turn
+                        run_payload[:stop_reason] = stop_reason
+
+                        case stop_reason
+                        when :awaiting_tool_confirmation
+                          yield StreamEvent::AuthorizationRequired.new(
+                            run_id: run_id,
+                            pending_tool_confirmations: pause_state.fetch(:pending_tool_confirmations),
+                          ) if block
+                        when :awaiting_tool_results
+                          yield StreamEvent::ToolExecutionRequired.new(
+                            run_id: run_id,
+                            pending_tool_executions: pause_state.fetch(:pending_tool_executions),
+                          ) if block
+                        end
+                        next :stop
+                      end
+
+                      next :continue
+                    end
+
+                    if fix_empty_final &&
+                        !empty_final_fixup_attempted &&
+                        tools_registry &&
+                        any_tool_calls_seen &&
+                        assistant_msg.assistant? &&
+                        assistant_msg.text.to_s.strip.empty?
+                      empty_final_fixup_attempted = true
+                      tools_enabled = false if fix_empty_final_disable_tools
+                      yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
+                      events.emit(:turn_end, turn, all_new_messages)
+                      user_msg = Message.new(role: :user, content: fix_empty_final_user_text)
+                      messages << user_msg
+                      all_new_messages << user_msg
+                      next :continue
+                    end
+
+                    yield StreamEvent::TurnEnd.new(turn_number: turn, message: assistant_msg, stop_reason: response_stop_reason, usage: response_usage) if block
+                    events.emit(:turn_end, turn, all_new_messages)
+
+                    stop_reason = response_stop_reason
+                    completed_turns = turn
+                    run_payload[:stop_reason] = stop_reason
+                    :stop
+                  ensure
+                    turn_payload[:stop_reason] ||= turn_stop_reason
+                    turn_payload[:usage] ||= turn_usage_obj&.to_h if turn_usage_obj
+                  end
+                end
+
+              turn_ended_at = clock.now
+              turn_traces <<
+                TurnTrace.new(
+                  turn_number: turn,
+                  started_at: turn_started_at,
+                  ended_at: turn_ended_at,
+                  duration_ms: turn_payload.fetch(:duration_ms, nil),
+                  llm: llm_trace,
+                  tool_authorizations: tool_authorization_traces,
+                  tool_executions: tool_execution_traces,
+                  stop_reason: turn_stop_reason,
+                  usage: turn_usage_obj&.to_h,
+                )
+
+              break if turn_outcome == :stop
+            end
           ensure
             run_payload[:turns] ||= completed_turns
             run_payload[:usage] ||= aggregated_usage&.to_h if aggregated_usage
