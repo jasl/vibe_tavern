@@ -96,3 +96,43 @@ Capture levels:
 - `:full` — record full payload (still size-limited)
 
 Use `redactor:` for app-specific PII/secret masking.
+
+### Recommended production redaction pattern
+
+`TraceRecorder(capture: :safe)` only applies a **shallow** key-based redaction
+on the top-level payload. If you want stronger guarantees, provide a `redactor:`
+that:
+
+- uses an allowlist (keep only known-safe keys per event), and/or
+- scrubs values (tool args/results can contain secrets)
+
+Example (allowlist + drop summaries for tool events):
+
+```ruby
+redactor =
+  lambda do |name, payload|
+    allowed =
+      case name
+      when "agent_core.run"
+        %w[run_id resumed stop_reason turns usage duration_ms]
+      when "agent_core.turn"
+        %w[run_id turn_number stop_reason usage duration_ms]
+      when "agent_core.llm.call"
+        %w[run_id turn_number model stream messages_count tools_count options_summary stop_reason usage duration_ms]
+      when "agent_core.tool.authorize"
+        %w[run_id tool_call_id name outcome reason duration_ms]
+      when "agent_core.tool.execute"
+        %w[run_id tool_call_id name executed_name source result_error duration_ms]
+      else
+        payload.keys
+      end
+
+    payload.select { |k, _v| allowed.include?(k.to_s) }
+  end
+
+recorder = AgentCore::Observability::TraceRecorder.new(capture: :safe, redactor: redactor)
+```
+
+Also consider keeping `ExecutionContext.attributes` small and non-sensitive
+(IDs, request IDs), and avoid putting raw prompt/messages into observation
+payloads unless you have strong redaction.

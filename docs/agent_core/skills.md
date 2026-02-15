@@ -16,16 +16,17 @@ AgentCore does **not** execute skill scripts. Execution remains an app concern.
 
 ### FileSystemStore
 
-`Resources::Skills::FileSystemStore` loads skills from a directory:
+`Resources::Skills::FileSystemStore` loads skills from one or more directories:
 
 ```ruby
 store =
-  AgentCore::Resources::Skills::FileSystemStore.new(root_dir: "/path/to/skills")
+  AgentCore::Resources::Skills::FileSystemStore.new(dirs: "/path/to/skills", strict: true)
 ```
 
 The store enforces:
 
 - relative-path safety (no `..` traversal)
+- realpath validation (prevents symlink escapes)
 - size caps (via `max_bytes:` parameters)
 
 ## `<available_skills>` prompt fragment
@@ -44,6 +45,19 @@ end
 
 `include_skill_locations` is **false by default** to avoid leaking filesystem
 paths in prompts.
+
+### Size note (no built-in limits)
+
+`<available_skills>` currently has **no built-in `max_skills` / `max_bytes`**
+limit. If you have many skills (or very long descriptions), the injected
+fragment can become large and may push prompts over the context window.
+
+Recommended mitigations:
+
+- Prefer exposing skills via tools (`skills.list` / `skills.load`) and keep
+  `<available_skills>` minimal (or disable it entirely).
+- If you still want the fragment, wrap your store so `list_skills` returns a
+  curated subset (or add caching + trimming in your app).
 
 ## Skills as tools (auditable + authorization-aware)
 

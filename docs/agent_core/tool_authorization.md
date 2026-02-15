@@ -110,3 +110,29 @@ record:
 If you need persistence across process restarts, explicitly serialize the
 continuation state in your app (AgentCore does not guarantee JSON compatibility
 for arbitrary embedded values by default).
+
+## Auditing confirmation decisions
+
+`Decision.confirm(...)` intentionally moves the final authorization decision
+into your app/UI. Recommended place to record audits is the moment the user (or
+admin) approves/denies:
+
+- `run_id` (from `RunResult.run_id` / `RunResult.continuation.run_id`)
+- `tool_call_id`
+- decision (`allow` / `deny`)
+- actor (`user_id`, admin ID), timestamp, and any justification
+
+If you want everything in a single observability backend, you can publish an
+app-side event at approval time (example schema; you own it):
+
+```ruby
+instrumenter.publish(
+  "agent_core.tool.confirmation",
+  {
+    run_id: run_id,
+    tool_call_id: tool_call_id,
+    outcome: "allow",
+    actor_id: current_user.id,
+  }
+)
+```
