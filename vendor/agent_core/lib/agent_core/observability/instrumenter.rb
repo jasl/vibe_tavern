@@ -41,12 +41,30 @@ module AgentCore
         end
       end
 
-      # Publish an event to the backend.
+      # Publish an event to the backend (best-effort).
       #
-      # @param _name [String]
-      # @param _payload [Hash]
-      def publish(_name, _payload)
-        raise AgentCore::NotImplementedError, "#{self.class}#publish must be implemented"
+      # This method must never raise (observability should not interfere with
+      # the main execution flow). Implementations should override #_publish.
+      #
+      # @param name [String]
+      # @param payload [Hash]
+      # @return [nil]
+      def publish(name, payload)
+        event_name = name.to_s
+        return nil if event_name.strip.empty?
+
+        data = payload.is_a?(Hash) ? payload : {}
+        _publish(event_name, data)
+        nil
+      rescue StandardError
+        nil
+      end
+
+      # Implementation hook for subclasses.
+      #
+      # @api private
+      def _publish(_name, _payload)
+        raise AgentCore::NotImplementedError, "#{self.class}#_publish must be implemented"
       end
     end
   end

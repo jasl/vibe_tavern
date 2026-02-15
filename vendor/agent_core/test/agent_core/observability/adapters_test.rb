@@ -23,6 +23,27 @@ module AgentCore
         end
       end
 
+      class ExplodingNotificationsBeforeYield < FakeNotifications
+        def instrument(_name, _payload)
+          raise "notifier boom"
+        end
+      end
+
+      class ExplodingNotificationsAfterYield < FakeNotifications
+        def instrument(name, payload)
+          super
+          raise "notifier boom"
+        end
+      end
+
+      class ExplodingNotificationsInEnsure < FakeNotifications
+        def instrument(name, payload)
+          super
+        ensure
+          raise "notifier boom"
+        end
+      end
+
       class FakeSpan
         attr_reader :attributes, :exceptions
 
@@ -40,6 +61,13 @@ module AgentCore
         end
       end
 
+      class ExplodingSpan < FakeSpan
+        def set_attribute(key, value)
+          super
+          raise "set_attribute boom"
+        end
+      end
+
       class FakeTracer
         attr_reader :spans
 
@@ -49,6 +77,27 @@ module AgentCore
 
         def in_span(name, attributes: {})
           span = FakeSpan.new
+          @spans << { name: name.to_s, attributes: attributes.dup, span: span }.freeze
+          yield span
+        end
+      end
+
+      class ExplodingTracerBeforeYield < FakeTracer
+        def in_span(_name, attributes: {})
+          raise "tracer boom"
+        end
+      end
+
+      class ExplodingTracerAfterYield < FakeTracer
+        def in_span(name, attributes: {})
+          super
+          raise "tracer boom"
+        end
+      end
+
+      class TracerWithExplodingSpan < FakeTracer
+        def in_span(name, attributes: {})
+          span = ExplodingSpan.new
           @spans << { name: name.to_s, attributes: attributes.dup, span: span }.freeze
           yield span
         end
@@ -72,6 +121,59 @@ module AgentCore
         assert_equal "agent_core.test", notifier.events.first.fetch(:name)
         assert_equal "r1", notifier.events.first.fetch(:payload).fetch(:run_id)
         assert notifier.events.first.fetch(:payload).key?(:duration_ms)
+      end
+
+      def test_active_support_notifications_instrumenter_falls_back_when_notifier_raises_before_yield
+        require "agent_core/observability/adapters/active_support_notifications_instrumenter"
+
+        notifier = ExplodingNotificationsBeforeYield.new
+        inst = Adapters::ActiveSupportNotificationsInstrumenter.new(notifier: notifier)
+
+        calls = 0
+        result =
+          inst.instrument("agent_core.test", {}) do
+            calls += 1
+            "ok"
+          end
+
+        assert_equal "ok", result
+        assert_equal 1, calls
+      end
+
+      def test_active_support_notifications_instrumenter_does_not_double_yield_when_notifier_raises_after_block
+        require "agent_core/observability/adapters/active_support_notifications_instrumenter"
+
+        notifier = ExplodingNotificationsAfterYield.new
+        inst = Adapters::ActiveSupportNotificationsInstrumenter.new(notifier: notifier)
+
+        calls = 0
+        result =
+          inst.instrument("agent_core.test", {}) do
+            calls += 1
+            "ok"
+          end
+
+        assert_equal "ok", result
+        assert_equal 1, calls
+      end
+
+      def test_active_support_notifications_instrumenter_does_not_mask_block_error_when_notifier_raises_in_ensure
+        require "agent_core/observability/adapters/active_support_notifications_instrumenter"
+
+        notifier = ExplodingNotificationsInEnsure.new
+        inst = Adapters::ActiveSupportNotificationsInstrumenter.new(notifier: notifier)
+
+        calls = 0
+        err =
+          assert_raises(RuntimeError) do
+            inst.instrument("agent_core.test", {}) do
+              calls += 1
+              raise "boom"
+            end
+          end
+
+        assert_equal "boom", err.message
+        assert_equal 1, calls
       end
 
       def test_active_support_notifications_instrumenter_records_error_and_reraises
@@ -114,6 +216,57 @@ module AgentCore
         assert_equal "r1", span.fetch(:attributes).fetch("run_id")
         assert span.fetch(:attributes).fetch("nested").is_a?(String)
         assert span.fetch(:span).attributes.key?("duration_ms")
+      end
+
+      def test_open_telemetry_instrumenter_falls_back_when_tracer_raises_before_yield
+        require "agent_core/observability/adapters/open_telemetry_instrumenter"
+
+        tracer = ExplodingTracerBeforeYield.new
+        inst = Adapters::OpenTelemetryInstrumenter.new(tracer: tracer)
+
+        calls = 0
+        result =
+          inst.instrument("agent_core.test", {}) do
+            calls += 1
+            "ok"
+          end
+
+        assert_equal "ok", result
+        assert_equal 1, calls
+      end
+
+      def test_open_telemetry_instrumenter_does_not_double_yield_when_tracer_raises_after_block
+        require "agent_core/observability/adapters/open_telemetry_instrumenter"
+
+        tracer = ExplodingTracerAfterYield.new
+        inst = Adapters::OpenTelemetryInstrumenter.new(tracer: tracer)
+
+        calls = 0
+        result =
+          inst.instrument("agent_core.test", {}) do
+            calls += 1
+            "ok"
+          end
+
+        assert_equal "ok", result
+        assert_equal 1, calls
+      end
+
+      def test_open_telemetry_instrumenter_does_not_fail_when_span_set_attribute_raises
+        require "agent_core/observability/adapters/open_telemetry_instrumenter"
+
+        tracer = TracerWithExplodingSpan.new
+        inst = Adapters::OpenTelemetryInstrumenter.new(tracer: tracer)
+
+        calls = 0
+        result =
+          inst.instrument("agent_core.test", {}) do
+            calls += 1
+            "ok"
+          end
+
+        assert_equal "ok", result
+        assert_equal 1, calls
       end
 
       def test_open_telemetry_instrumenter_records_exception_and_reraises

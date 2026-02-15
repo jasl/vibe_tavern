@@ -51,7 +51,7 @@ module AgentCore
         @mutex = Mutex.new
       end
 
-      def publish(name, payload)
+      def _publish(name, payload)
         event_name = name.to_s
         data = payload.is_a?(Hash) ? payload.dup : {}
         recorded = record_payload(event_name, data)

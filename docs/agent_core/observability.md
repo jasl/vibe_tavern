@@ -12,6 +12,9 @@ events to any sink (logs, ActiveSupport::Notifications, OpenTelemetry, etc.).
   - calls `publish(name, payload)`
 - Default: `AgentCore::Observability::NullInstrumenter` (no-op)
 
+`publish` is **best-effort**: errors in the observability backend are swallowed
+so they do not interfere with the main execution flow.
+
 AgentCore calls the instrumenter for:
 
 - run lifecycle
@@ -79,7 +82,7 @@ Typical payload fields:
 - `agent_core.llm.call`: `model`, `stream`, `messages_count`, `tools_count`,
   `options_summary`, `stop_reason`, `usage`
 - `agent_core.tool.authorize`: `tool_call_id`, `name`, `arguments_summary`,
-  `outcome` (`allow|deny|confirm`), `reason`
+  `outcome` (`allow|deny|confirm`), `reason`, `stage` (`policy|confirmation`, optional)
 - `agent_core.tool.execute`: `tool_call_id`, `name`, `executed_name`, `source`
   (`native|mcp|skills|policy|runner|unknown`), `arguments_summary`,
   `result_error`, `result_summary`

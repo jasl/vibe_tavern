@@ -4,7 +4,7 @@ module AgentCore
   module Observability
     # No-op instrumenter used by default.
     class NullInstrumenter < Instrumenter
-      def publish(_name, _payload)
+      def _publish(_name, _payload)
         nil
       end
     end

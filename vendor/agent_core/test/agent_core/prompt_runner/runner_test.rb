@@ -524,7 +524,9 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: confirm_policy)
+    recorder = AgentCore::Observability::TraceRecorder.new(capture: :full)
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: confirm_policy, instrumenter: recorder)
 
     assert result.awaiting_tool_confirmation?
     assert_instance_of AgentCore::PromptRunner::Continuation, result.continuation
@@ -542,13 +544,22 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
         tool_confirmations: { "tc_1" => :allow },
         provider: provider,
         tools_registry: registry,
-        tool_policy: confirm_policy
+        tool_policy: confirm_policy,
+        instrumenter: recorder
       )
 
     assert_equal "Done.", resumed.text
     assert_equal result.run_id, resumed.run_id
     assert_equal 2, provider.calls.size
     assert_equal 1, executed.size
+
+    confirm_events =
+      recorder.trace.select { |e|
+        e.fetch(:name) == "agent_core.tool.authorize" &&
+          e.fetch(:payload).fetch("stage", nil) == "confirmation"
+      }
+    assert_equal 1, confirm_events.size
+    assert_equal "allow", confirm_events.first.fetch(:payload).fetch("outcome")
   end
 
   def test_streaming_confirm_emits_authorization_required_and_stops

@@ -136,3 +136,82 @@ instrumenter.publish(
   }
 )
 ```
+
+AgentCore also publishes `agent_core.tool.authorize` with `stage: "confirmation"`
+when you call `resume`/`resume_stream`, but this happens at resume time (not at
+the exact moment the user clicked approve/deny).
+
+## Example: app-side authorization flow (in-memory)
+
+This example shows a complete, app-controlled pause/resume loop with:
+
+- a simple tool policy that returns `confirm` for risky tools
+- an in-memory continuation store keyed by `run_id`
+- a separate audit record published at approval time
+
+```ruby
+class AppToolPolicy < AgentCore::Resources::Tools::Policy::Base
+  RISKY_TOOLS = %w[skills.read_file filesystem.write mcp.shell].freeze
+
+  def filter(tools:, context:)
+    # Tool visibility and tool execution are separate checks.
+    # In production you likely want an allowlist here.
+    tools
+  end
+
+  def authorize(name:, arguments:, context:)
+    user_id = context.attributes[:user_id]
+    return Decision.deny(reason: "unauthenticated") unless user_id
+
+    if RISKY_TOOLS.include?(name.to_s)
+      Decision.confirm(reason: "requires user approval")
+    else
+      Decision.allow
+    end
+  end
+end
+
+class ContinuationStore
+  def initialize
+    @mutex = Mutex.new
+    @by_run_id = {}
+  end
+
+  def write(run_id, continuation)
+    @mutex.synchronize { @by_run_id[run_id.to_s] = continuation }
+  end
+
+  def read(run_id)
+    @mutex.synchronize { @by_run_id.fetch(run_id.to_s) }
+  end
+end
+
+store = ContinuationStore.new
+policy = AppToolPolicy.new
+
+result = runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: policy, context: { user_id: 123 })
+
+if result.awaiting_tool_confirmation?
+  store.write(result.run_id, result.continuation)
+  # Show result.pending_tool_confirmations in your UI and collect allow/deny decisions.
+end
+
+# Later, after user approves/denies in the UI:
+continuation = store.read(run_id)
+confirmations = { "tc_1" => :allow, "tc_2" => :deny } # tool_call_id => :allow/:deny
+
+instrumenter.publish(
+  "agent_core.tool.confirmation",
+  { run_id: run_id, decisions: confirmations, actor_id: 123 }
+)
+
+result =
+  runner.resume(
+    continuation: continuation,
+    tool_confirmations: confirmations,
+    provider: provider,
+    tools_registry: registry,
+    tool_policy: policy,
+    context: { user_id: 123 }
+  )
+```

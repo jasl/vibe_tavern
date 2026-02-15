@@ -26,30 +26,58 @@ module AgentCore
 
           data = payload.is_a?(Hash) ? payload : {}
           start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          ran = false
+          result = nil
+          block_error = nil
 
           attributes = otel_attributes(data)
 
-          @tracer.in_span(event_name, attributes: attributes) do |span|
-            begin
-              yield if block_given?
-            rescue StandardError => e
-              data[:error] ||= { class: e.class.name, message: e.message.to_s }
-              record_exception(span, e)
-              raise
-            ensure
-              duration_ms = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000.0
-              data[:duration_ms] ||= duration_ms
-              span.set_attribute("duration_ms", data[:duration_ms]) if span.respond_to?(:set_attribute)
-              if (err = data[:error]).is_a?(Hash)
-                span.set_attribute("error.class", err[:class].to_s) if span.respond_to?(:set_attribute) && err[:class]
-                span.set_attribute("error.message", err[:message].to_s) if span.respond_to?(:set_attribute) && err[:message]
+          begin
+            @tracer.in_span(event_name, attributes: attributes) do |span|
+              begin
+                ran = true
+                result = yield if block_given?
+              rescue StandardError => e
+                block_error = e
+                data[:error] ||= { class: e.class.name, message: e.message.to_s }
+                record_exception(span, e)
+                raise
+              ensure
+                duration_ms = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000.0
+                data[:duration_ms] ||= duration_ms
+                safe_set_attribute(span, "duration_ms", data[:duration_ms])
+                if (err = data[:error]).is_a?(Hash)
+                  safe_set_attribute(span, "error.class", err[:class].to_s) if err[:class]
+                  safe_set_attribute(span, "error.message", err[:message].to_s) if err[:message]
+                end
               end
+              result
             end
+          rescue StandardError
+            raise block_error if block_error
+            return result if ran
+
+            return super(event_name, data) { yield if block_given? }
           end
+
+          result
         end
 
-        def publish(name, payload)
-          instrument(name, payload) { }
+        def _publish(name, payload)
+          event_name = name.to_s
+          return nil if event_name.strip.empty?
+
+          data = payload.is_a?(Hash) ? payload : {}
+          attrs = otel_attributes(data)
+
+          @tracer.in_span(event_name, attributes: attrs) do |span|
+            span.set_attribute("duration_ms", data.fetch(:duration_ms, 0.0)) if span.respond_to?(:set_attribute)
+            if (err = data[:error]).is_a?(Hash)
+              span.set_attribute("error.class", err[:class].to_s) if span.respond_to?(:set_attribute) && err[:class]
+              span.set_attribute("error.message", err[:message].to_s) if span.respond_to?(:set_attribute) && err[:message]
+            end
+          end
+
           nil
         end
 
@@ -115,6 +143,15 @@ module AgentCore
           AgentCore::Utils.truncate_utf8_bytes(str, max_bytes: @max_attribute_bytes)
         rescue StandardError
           ""
+        end
+
+        def safe_set_attribute(span, key, value)
+          return nil unless span&.respond_to?(:set_attribute)
+
+          span.set_attribute(key, value)
+          nil
+        rescue StandardError
+          nil
         end
       end
     end

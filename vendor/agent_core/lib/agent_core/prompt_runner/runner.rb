@@ -855,11 +855,20 @@ module AgentCore
                 tool_confirmations: tool_confirmations,
               )
 
-          tool_result_messages, exec_traces =
-            execute_tool_calls_with_decisions(
-              tool_calls: pending_tool_calls,
-              decisions: resolved_decisions,
-              tools_registry: tools_registry,
+            publish_confirmation_authorizations!(
+              instrumenter: instrumenter,
+              run_id: run_id,
+              paused_turn_number: turn,
+              pending_tool_calls: pending_tool_calls,
+              confirmation_traces: confirmation_traces,
+              resumed: true,
+            )
+
+            tool_result_messages, exec_traces =
+              execute_tool_calls_with_decisions(
+                tool_calls: pending_tool_calls,
+                decisions: resolved_decisions,
+                tools_registry: tools_registry,
               events: events,
               tool_calls_record: tool_calls_record,
               max_tool_output_bytes: max_tool_output_bytes,
@@ -1245,11 +1254,20 @@ module AgentCore
                 tool_confirmations: tool_confirmations,
               )
 
-          tool_result_messages, exec_traces =
-            execute_tool_calls_with_decisions(
-              tool_calls: pending_tool_calls,
-              decisions: resolved_decisions,
-              tools_registry: tools_registry,
+            publish_confirmation_authorizations!(
+              instrumenter: instrumenter,
+              run_id: run_id,
+              paused_turn_number: turn,
+              pending_tool_calls: pending_tool_calls,
+              confirmation_traces: confirmation_traces,
+              resumed: true,
+            )
+
+            tool_result_messages, exec_traces =
+              execute_tool_calls_with_decisions(
+                tool_calls: pending_tool_calls,
+                decisions: resolved_decisions,
+                tools_registry: tools_registry,
               events: events,
               tool_calls_record: tool_calls_record,
               max_tool_output_bytes: max_tool_output_bytes,
@@ -2013,6 +2031,42 @@ module AgentCore
         else
           raise ArgumentError, "Invalid tool confirmation: #{value.inspect} (expected :allow/:deny or true/false)"
         end
+      end
+
+      def publish_confirmation_authorizations!(instrumenter:, run_id:, paused_turn_number:, pending_tool_calls:, confirmation_traces:, resumed:)
+        return nil if confirmation_traces.nil? || confirmation_traces.empty?
+        return nil unless instrumenter&.respond_to?(:publish)
+
+        tool_by_id = {}
+        Array(pending_tool_calls).each do |tc|
+          tool_by_id[tc.id] = tc if tc.respond_to?(:id)
+        end
+
+        Array(confirmation_traces).each do |trace|
+          next unless trace.respond_to?(:tool_call_id) && trace.respond_to?(:name)
+
+          tc = tool_by_id[trace.tool_call_id]
+          args_summary = tc ? summarize_tool_arguments(tc.arguments) : nil
+
+          payload = {
+            run_id: run_id,
+            tool_call_id: trace.tool_call_id,
+            name: trace.name.to_s,
+            arguments_summary: args_summary,
+            outcome: trace.outcome,
+            reason: trace.reason,
+            stage: "confirmation",
+            resumed: resumed == true,
+            turn_number: paused_turn_number,
+            duration_ms: 0.0,
+          }.compact
+
+          instrumenter.publish("agent_core.tool.authorize", payload)
+        end
+
+        nil
+      rescue StandardError
+        nil
       end
 
       def apply_resume_tool_traces!(turn_traces:, paused_turn_number:, confirmation_traces:, execution_traces:)
