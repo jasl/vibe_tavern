@@ -17,9 +17,9 @@ require_relative "support/openrouter_sampling_profiles"
 require_relative "support/openrouter_models"
 require_relative "support/capabilities_registry"
 require_relative "support/paths"
-require_relative "support/language_policy_prompt"
 require_relative "support/agent_core_openai_provider"
-require_relative "support/directives"
+require_relative "../../lib/agent_core/contrib/directives"
+require_relative "../../lib/agent_core/contrib/language_policy_prompt"
 
 module DirectivesEval
   class ModelCatalog
@@ -843,8 +843,8 @@ run_task =
     directives_config =
       DirectivesEval::Util.deep_merge_hashes(
         {
-          modes: VibeTavernEval::Directives::DEFAULT_MODES,
-          repair_retry_count: VibeTavernEval::Directives::DEFAULT_REPAIR_RETRY_COUNT,
+          modes: AgentCore::Contrib::Directives::DEFAULT_MODES,
+          repair_retry_count: AgentCore::Contrib::Directives::DEFAULT_REPAIR_RETRY_COUNT,
         },
         (apply_provider_defaults ? provider_directives_preset : {}),
         { request_overrides: directives_request_overrides },
@@ -870,7 +870,7 @@ run_task =
     provider = VibeTavernEval::AgentCoreOpenAIProvider.new(client: client)
 
       directives_runner =
-        VibeTavernEval::Directives::Runner.new(
+        AgentCore::Contrib::Directives::Runner.new(
           provider: provider,
           model: model,
           llm_options_defaults: llm_options_defaults,
@@ -879,7 +879,7 @@ run_task =
         )
 
       directives_registry =
-        VibeTavernEval::Directives::Registry.new(
+        AgentCore::Contrib::Directives::Registry.new(
           definitions: [
             {
               type: "ui.show_form",
@@ -917,7 +917,7 @@ run_task =
             # - { "ops": [...] } (preferred)
             # - { "op": "...", "path": "...", "value": ... } (single op at root)
             ops = payload.key?("ops") ? payload.fetch("ops", nil) : payload
-            normalized = VibeTavernEval::Directives::Validator.normalize_patch_ops(ops)
+            normalized = AgentCore::Contrib::Directives::Validator.normalize_patch_ops(ops)
             unless normalized[:ok]
               err = { code: normalized[:code] }
               err[:details] = normalized[:details] if normalized[:details].is_a?(Hash)
@@ -972,7 +972,7 @@ run_task =
             begin
               system_text = scenario[:system].to_s
               if language_policy_enabled && language_policy_target_lang
-                policy = VibeTavernEval::LanguagePolicyPrompt.build(language_policy_target_lang)
+                policy = AgentCore::Contrib::LanguagePolicyPrompt.build(language_policy_target_lang)
                 system_text = [system_text, policy].map(&:to_s).map(&:strip).reject(&:empty?).join("\n\n")
               end
 

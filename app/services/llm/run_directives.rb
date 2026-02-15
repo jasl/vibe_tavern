@@ -4,33 +4,35 @@ require "agent_core"
 require "agent_core/resources/provider/simple_inference_provider"
 
 module LLM
-  class RunChat
+  class RunDirectives
     def self.call(**kwargs)
       new(**kwargs).call
     end
 
     def initialize(
       llm_model:,
-      user_text: nil,
       history: nil,
       system: nil,
       context: nil,
       preset: nil,
       preset_key: nil,
       llm_options: nil,
-      strict: nil,
+      directives_config: nil,
+      structured_output_options: nil,
+      result_validator: nil,
       allow_disabled: false,
       client: nil
     )
       @llm_model = llm_model
-      @user_text = user_text
       @history = history
       @system = system
       @context = context
       @preset = preset
       @preset_key = preset_key
       @llm_options = llm_options
-      @strict = strict
+      @directives_config = directives_config
+      @structured_output_options = structured_output_options
+      @result_validator = result_validator
       @allow_disabled = allow_disabled == true
       @client = client
     end
@@ -47,7 +49,7 @@ module LLM
 
       selected_preset = selected_preset_result
       normalized_context = normalize_context(context)
-      messages = normalize_history(history, user_text: user_text)
+      messages = normalize_history(history)
       return Result.failure(errors: ["prompt is empty"], code: "EMPTY_PROMPT", value: { llm_model: llm_model }) if messages.empty?
 
       user_llm_options = normalize_llm_options(llm_options)
@@ -76,24 +78,26 @@ module LLM
           per_message_overhead: llm_model.effective_message_overhead_tokens.to_i,
         )
 
-      prompt_options = effective_llm_options.merge(model: llm_model.model)
-      prompt =
-        AgentCore::PromptBuilder::BuiltPrompt.new(
-          system_prompt: system.to_s,
-          messages: messages,
-          tools: [],
-          options: prompt_options,
-        )
-
       provider =
         AgentCore::Resources::Provider::SimpleInferenceProvider.new(
           client: effective_client,
         )
 
-      run_result =
-        AgentCore::PromptRunner::Runner.new.run(
-          prompt: prompt,
+      directives_runner =
+        AgentCore::Contrib::Directives::Runner.new(
           provider: provider,
+          model: llm_model.model,
+          llm_options_defaults: effective_llm_options,
+          directives_config: normalize_directives_config(directives_config),
+          capabilities: llm_model.capabilities_overrides,
+        )
+
+      directives_result =
+        directives_runner.run(
+          history: messages,
+          system: system.to_s,
+          structured_output_options: normalize_structured_output_options(structured_output_options),
+          result_validator: result_validator,
           token_counter: token_counter,
           context_window: context_window,
           reserved_output_tokens: reserved_output_tokens,
@@ -104,8 +108,7 @@ module LLM
           llm_model: llm_model,
           preset: selected_preset,
           context: normalized_context,
-          prompt: prompt,
-          run_result: run_result,
+          directives_result: directives_result,
         },
       )
     rescue AgentCore::ContextWindowExceededError => e
@@ -129,14 +132,15 @@ module LLM
     private
 
     attr_reader :llm_model,
-                :user_text,
                 :history,
                 :system,
                 :context,
                 :preset,
                 :preset_key,
                 :llm_options,
-                :strict,
+                :directives_config,
+                :structured_output_options,
+                :result_validator,
                 :allow_disabled,
                 :client
 
@@ -173,15 +177,8 @@ module LLM
       end
     end
 
-    def normalize_history(value, user_text:)
-      messages = AgentCore::Contrib::OpenAIHistory.coerce_messages(value)
-
-      text = user_text.to_s
-      if !text.strip.empty?
-        messages << AgentCore::Message.new(role: :user, content: text)
-      end
-
-      messages
+    def normalize_history(value)
+      AgentCore::Contrib::OpenAIHistory.coerce_messages(value)
     end
 
     def normalize_llm_options(value)
@@ -197,6 +194,28 @@ module LLM
       end
 
       normalized
+    end
+
+    def normalize_directives_config(value)
+      case value
+      when nil
+        {}
+      when Hash
+        AgentCore::Utils.deep_symbolize_keys(value)
+      else
+        raise ArgumentError, "directives_config must be a Hash"
+      end
+    end
+
+    def normalize_structured_output_options(value)
+      case value
+      when nil
+        nil
+      when Hash
+        AgentCore::Utils.deep_symbolize_keys(value)
+      else
+        raise ArgumentError, "structured_output_options must be a Hash"
+      end
     end
 
     def build_token_counter(context_hash, default_model_hint:, per_message_overhead:)

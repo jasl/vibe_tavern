@@ -16,8 +16,8 @@ require "simple_inference"
 require_relative "support/openrouter_sampling_profiles"
 require_relative "support/openrouter_models"
 require_relative "support/paths"
-require_relative "support/language_policy_prompt"
 require_relative "support/agent_core_openai_provider"
+require_relative "../../lib/agent_core/contrib/language_policy_prompt"
 
 module LanguagePolicyEval
   class ModelCatalog
@@ -701,7 +701,7 @@ process_task =
       system_text = ""
       if language_policy_enabled && target_lang_raw
         tags = scenario[:uses_lang_spans] == true ? ["lang"] : []
-        system_text = VibeTavernEval::LanguagePolicyPrompt.build(target_lang_raw, special_tags: tags)
+        system_text = AgentCore::Contrib::LanguagePolicyPrompt.build(target_lang_raw, special_tags: tags)
       end
 
       injected_target_lang = system_text[/Respond in:\s*([A-Za-z0-9-]+)/, 1]

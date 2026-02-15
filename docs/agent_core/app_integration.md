@@ -51,3 +51,57 @@ App-side wrappers:
 
 - `AgentCore::Contrib::TokenCounter::Estimator` wraps `token_estimator#estimate`
 - `AgentCore::Contrib::TokenCounter::HeuristicWithOverhead` is the fallback
+
+## Directives (structured envelope)
+
+This app can request a **single JSON object** response shaped like:
+
+- `assistant_text: String`
+- `directives: Array<{ type: String, payload: Object }>`
+
+Implementation:
+
+- `AgentCore::Contrib::Directives` (parser/validator + fallback runner)
+- `LLM::RunDirectives` (app service, similar to `LLM::RunChat`)
+
+Runner strategy:
+
+- tries `json_schema` → `json_object` → `prompt_only` (configurable)
+- each mode can do a small “repair” retry if the model returns invalid JSON
+
+Security / safety boundaries:
+
+- output size guard: `AgentCore::Contrib::Directives::Parser::DEFAULT_MAX_BYTES` (200KB)
+- patch ops helper: `AgentCore::Contrib::Directives::Validator.normalize_patch_ops`
+  - only allows `op: set|delete|append|insert` (with common aliases)
+  - only allows paths under `/draft/` or `/ui_state/` by default
+
+Important: **Directives mode forbids tool calls.** If the assistant emits tool calls, it is treated as an invalid response and will not be executed.
+
+## Language policy: final-only rewrite
+
+Injecting “respond in X language” constraints into the main tool-calling loop can reduce tool-calling reliability. Recommended approach:
+
+1) run the tool loop without language constraints
+2) when you have the final assistant text, rewrite it into the target language with a second request **without tools**
+
+Helper:
+
+- `AgentCore::Contrib::LanguagePolicy::FinalRewriter`
+
+Example (pure Ruby; no Rails model dependency):
+
+```ruby
+rewritten =
+  AgentCore::Contrib::LanguagePolicy::FinalRewriter.rewrite(
+    provider: provider,
+    model: "m1",
+    text: final_text,
+    target_lang: "zh-CN",
+    llm_options: { max_tokens: 2000, temperature: 0 },
+  )
+```
+
+Guardrail:
+
+- if `text` is larger than 200KB, the rewriter returns the input unchanged (to avoid accidental truncation).
