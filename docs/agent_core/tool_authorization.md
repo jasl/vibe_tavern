@@ -71,6 +71,9 @@ Notes:
 - When paused, AgentCore does **not** execute any tool calls.
 - `run_id` is stable across `run` and `resume` (useful for correlating audits).
 - The `continuation` object is intended to be treated as **opaque**.
+- Tool authorization pause/resume is independent from tool execution pause/resume
+  (defer execution to the app). They can be composed (confirm first, then defer).
+  See `docs/agent_core/tool_execution.md`.
 
 ### Streaming
 

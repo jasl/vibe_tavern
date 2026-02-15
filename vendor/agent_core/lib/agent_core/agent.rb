@@ -89,6 +89,7 @@ module AgentCore
       @token_counter = builder.token_counter
       @context_window = builder.context_window
       @reserved_output_tokens = builder.reserved_output_tokens || 0
+      @tool_executor = builder.tool_executor
 
       # Internal
       @runner = PromptRunner::Runner.new
@@ -115,6 +116,7 @@ module AgentCore
         provider: provider,
         tools_registry: tools_registry,
         tool_policy: tool_policy,
+        tool_executor: @tool_executor,
         max_turns: max_turns,
         events: events,
         token_counter: token_counter,
@@ -150,6 +152,7 @@ module AgentCore
         provider: provider,
         tools_registry: tools_registry,
         tool_policy: tool_policy,
+        tool_executor: @tool_executor,
         max_turns: max_turns,
         events: events,
         token_counter: token_counter,

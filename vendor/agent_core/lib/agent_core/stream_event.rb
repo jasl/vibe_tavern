@@ -134,6 +134,21 @@ module AgentCore
       def type = :authorization_required
     end
 
+    # The runner requires external tool execution before continuing.
+    #
+    # Emitted by PromptRunner#run_stream when the ToolExecutor defers tool calls
+    # (pause/resume with external results).
+    class ToolExecutionRequired
+      attr_reader :run_id, :pending_tool_executions
+
+      def initialize(run_id:, pending_tool_executions:)
+        @run_id = run_id.to_s
+        @pending_tool_executions = Array(pending_tool_executions).freeze
+      end
+
+      def type = :tool_execution_required
+    end
+
     # A new turn (LLM call) has started.
     class TurnStart
       attr_reader :turn_number

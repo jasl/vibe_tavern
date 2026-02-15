@@ -87,6 +87,115 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_equal "echo", result.tool_calls_made.first[:name]
   end
 
+  def test_deferred_tool_execution_pauses_without_executing_tool
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    provider = MockProvider.new(responses: [tool_response])
+
+    executed = false
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        executed = true
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result =
+      @runner.run(
+        prompt: prompt,
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+      )
+
+    assert result.awaiting_tool_results?
+    refute executed
+    assert_equal 1, provider.calls.size
+
+    assert_equal 1, result.pending_tool_executions.size
+    pending = result.pending_tool_executions.first
+    assert_equal "tc_1", pending.tool_call_id
+    assert_equal "echo", pending.name
+    assert_equal "echo", pending.executed_name
+
+    assert_equal 1, result.tool_calls_made.size
+    record = result.tool_calls_made.first
+    assert_equal "tc_1", record.fetch(:tool_call_id)
+    assert_equal true, record.fetch(:pending)
+    assert_equal true, record.fetch(:deferred)
+  end
+
+  def test_resume_with_tool_results_continues_to_final
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        raise "should not execute inline"
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    paused =
+      @runner.run(
+        prompt: prompt,
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+      )
+
+    assert paused.awaiting_tool_results?
+    assert_equal 1, provider.calls.size
+
+    resumed =
+      @runner.resume_with_tool_results(
+        continuation: paused.continuation,
+        tool_results: { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+      )
+
+    assert_equal "Done", resumed.text
+    assert_equal paused.run_id, resumed.run_id
+    assert_equal 2, provider.calls.size
+
+    tool_msg = resumed.messages.find(&:tool_result?)
+    assert tool_msg
+    assert_equal "ok", tool_msg.content
+
+    assert_equal 1, resumed.tool_calls_made.size
+    record = resumed.tool_calls_made.first
+    assert_equal false, record.fetch(:pending)
+    assert_equal false, record.fetch(:deferred)
+    assert_equal true, record.fetch(:external)
+  end
+
   def test_tool_call_with_invalid_arguments_is_not_executed
     executed = false
 
@@ -601,6 +710,48 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     done_events = events_received.select { |e| e.type == :done }
     assert_equal 1, done_events.size
     assert_equal :awaiting_tool_confirmation, done_events.first.stop_reason
+  end
+
+  def test_streaming_deferred_tool_execution_emits_tool_execution_required_and_stops
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
+    assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, stop_reason: :tool_use)
+
+    provider = MockProvider.new(responses: [tool_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    events_received = []
+    result =
+      @runner.run_stream(
+        prompt: prompt,
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: @allow_all,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+      ) do |event|
+        events_received << event
+      end
+
+    assert result.awaiting_tool_results?
+    event_types = events_received.map(&:type)
+    assert_includes event_types, :tool_execution_required
+    refute_includes event_types, :tool_execution_start
+    done_events = events_received.select { |e| e.type == :done }
+    assert_equal 1, done_events.size
+    assert_equal :awaiting_tool_results, done_events.first.stop_reason
   end
 
   def test_resume_stream_after_confirm_executes_tool_and_streams_final

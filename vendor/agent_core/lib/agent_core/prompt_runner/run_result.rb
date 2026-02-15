@@ -75,6 +75,17 @@ module AgentCore
         :arguments_summary,
       )
 
+    # A tool call awaiting external execution (pause/resume).
+    PendingToolExecution =
+      Data.define(
+        :tool_call_id,
+        :name,
+        :executed_name,
+        :arguments,
+        :arguments_summary,
+        :source,
+      )
+
     # Opaque continuation state for resuming a paused run.
     #
     # This object is intended to be treated as an implementation detail by
@@ -99,7 +110,9 @@ module AgentCore
         :aggregated_usage,
         :per_turn_usage,
         :turn_traces,
+        :pause_reason,
         :pending_tool_calls,
+        :pending_tool_executions,
         :pending_decisions,
         :context_attributes,
         :max_tool_output_bytes,
@@ -114,7 +127,7 @@ module AgentCore
       attr_reader :run_id, :started_at, :ended_at, :duration_ms,
                   :messages, :final_message, :turns, :usage, :per_turn_usage,
                   :tool_calls_made, :stop_reason, :trace,
-                  :pending_tool_confirmations, :continuation
+                  :pending_tool_confirmations, :pending_tool_executions, :continuation
 
       # @param messages [Array<Message>] All messages from this run
       # @param final_message [Message] The last assistant message
@@ -125,6 +138,7 @@ module AgentCore
       # @param stop_reason [Symbol] Why the run ended
       # @param trace [RunTrace, nil] Structured trace summary (safe for audits)
       # @param pending_tool_confirmations [Array<PendingToolConfirmation, Hash>] Pending tool calls requiring confirmation (when paused)
+      # @param pending_tool_executions [Array<PendingToolExecution, Hash>] Pending tool calls requiring external execution (when paused)
       # @param continuation [Object, nil] Resume token/state (when paused)
       def initialize(
         run_id:,
@@ -140,6 +154,7 @@ module AgentCore
         stop_reason: :end_turn,
         trace: nil,
         pending_tool_confirmations: [],
+        pending_tool_executions: [],
         continuation: nil
       )
         @run_id = run_id.to_s.freeze
@@ -155,6 +170,7 @@ module AgentCore
         @stop_reason = stop_reason
         @trace = trace
         @pending_tool_confirmations = Array(pending_tool_confirmations).freeze
+        @pending_tool_executions = Array(pending_tool_executions).freeze
         @continuation = continuation
       end
 
@@ -175,6 +191,10 @@ module AgentCore
 
       def awaiting_tool_confirmation?
         stop_reason == :awaiting_tool_confirmation
+      end
+
+      def awaiting_tool_results?
+        stop_reason == :awaiting_tool_results
       end
     end
   end

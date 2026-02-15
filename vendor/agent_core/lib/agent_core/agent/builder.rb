@@ -17,7 +17,7 @@ module AgentCore
                     :tools_registry, :tool_policy,
                     :skills_store, :include_skill_locations,
                     :prompt_pipeline, :on_event,
-                    :token_counter
+                    :token_counter, :tool_executor
 
       # Token budget (serializable)
       attr_accessor :context_window, :reserved_output_tokens
@@ -49,6 +49,7 @@ module AgentCore
         @prompt_pipeline = nil
         @on_event = nil
         @token_counter = nil
+        @tool_executor = PromptRunner::ToolExecutor::Inline.new
       end
 
       # Build the Agent instance.
