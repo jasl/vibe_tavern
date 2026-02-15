@@ -41,6 +41,19 @@ module AgentCore
           prompt = prompt.gsub("{{#{key}}}", value.to_s)
         end
 
+        if context.skills_store
+          begin
+            fragment =
+              Resources::Skills::PromptFragment.available_skills_xml(
+                store: context.skills_store,
+                include_location: context.include_skill_locations
+              )
+            prompt = "#{prompt}\n\n#{fragment}" unless fragment.to_s.empty?
+          rescue StandardError
+            # Skip skills fragment on any store/prompt rendering error.
+          end
+        end
+
         prompt
       end
 
@@ -65,10 +78,14 @@ module AgentCore
 
         tools = context.tools_registry.definitions
 
-        # Apply policy filtering if available
-        if context.tool_policy
-          tools = context.tool_policy.filter(tools: tools, context: context.variables)
-        end
+        policy = context.tool_policy || Resources::Tools::Policy::DenyAll.new
+
+        tools =
+          begin
+            policy.filter(tools: tools, context: context.execution_context)
+          rescue StandardError
+            []
+          end
 
         tools
       end

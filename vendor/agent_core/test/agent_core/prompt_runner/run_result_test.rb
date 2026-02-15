@@ -3,9 +3,24 @@
 require "test_helper"
 
 class AgentCore::PromptRunner::RunResultTest < Minitest::Test
+  def build_result(messages:, final_message:, turns:, **kwargs)
+    now = Time.now
+
+    AgentCore::PromptRunner::RunResult.new(
+      run_id: "run_1",
+      started_at: now,
+      ended_at: now,
+      duration_ms: 0.0,
+      messages: messages,
+      final_message: final_message,
+      turns: turns,
+      **kwargs
+    )
+  end
+
   def test_basic_attributes
     msg = AgentCore::Message.new(role: :assistant, content: "Hello")
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [msg],
       final_message: msg,
       turns: 1,
@@ -20,7 +35,7 @@ class AgentCore::PromptRunner::RunResultTest < Minitest::Test
 
   def test_text_delegates_to_final_message
     msg = AgentCore::Message.new(role: :assistant, content: "Reply text")
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [msg], final_message: msg, turns: 1,
     )
 
@@ -28,7 +43,7 @@ class AgentCore::PromptRunner::RunResultTest < Minitest::Test
   end
 
   def test_text_with_nil_final_message
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [], final_message: nil, turns: 0,
     )
 
@@ -37,7 +52,7 @@ class AgentCore::PromptRunner::RunResultTest < Minitest::Test
 
   def test_used_tools_true
     msg = AgentCore::Message.new(role: :assistant, content: "done")
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [msg], final_message: msg, turns: 2,
       tool_calls_made: [{ name: "read", arguments: {} }],
     )
@@ -47,7 +62,7 @@ class AgentCore::PromptRunner::RunResultTest < Minitest::Test
 
   def test_used_tools_false
     msg = AgentCore::Message.new(role: :assistant, content: "done")
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [msg], final_message: msg, turns: 1,
     )
 
@@ -56,7 +71,7 @@ class AgentCore::PromptRunner::RunResultTest < Minitest::Test
 
   def test_max_turns_reached
     msg = AgentCore::Message.new(role: :assistant, content: "done")
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [msg], final_message: msg, turns: 10,
       stop_reason: :max_turns,
     )
@@ -66,7 +81,7 @@ class AgentCore::PromptRunner::RunResultTest < Minitest::Test
 
   def test_max_turns_not_reached
     msg = AgentCore::Message.new(role: :assistant, content: "done")
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [msg], final_message: msg, turns: 1,
       stop_reason: :end_turn,
     )
@@ -79,7 +94,7 @@ class AgentCore::PromptRunner::RunResultTest < Minitest::Test
     per_turn = [usage]
     msg = AgentCore::Message.new(role: :assistant, content: "hi")
 
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [msg], final_message: msg, turns: 1,
       usage: usage, per_turn_usage: per_turn,
     )
@@ -90,7 +105,7 @@ class AgentCore::PromptRunner::RunResultTest < Minitest::Test
 
   def test_messages_frozen
     msg = AgentCore::Message.new(role: :assistant, content: "hi")
-    result = AgentCore::PromptRunner::RunResult.new(
+    result = build_result(
       messages: [msg], final_message: msg, turns: 1,
     )
 

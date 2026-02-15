@@ -119,6 +119,21 @@ module AgentCore
       def error? = error
     end
 
+    # The runner requires tool authorization/confirmation before continuing.
+    #
+    # Emitted by PromptRunner#run_stream when the tool policy returns
+    # Decision.confirm for one or more tool calls.
+    class AuthorizationRequired
+      attr_reader :run_id, :pending_tool_confirmations
+
+      def initialize(run_id:, pending_tool_confirmations:)
+        @run_id = run_id.to_s
+        @pending_tool_confirmations = Array(pending_tool_confirmations).freeze
+      end
+
+      def type = :authorization_required
+    end
+
     # A new turn (LLM call) has started.
     class TurnStart
       attr_reader :turn_number

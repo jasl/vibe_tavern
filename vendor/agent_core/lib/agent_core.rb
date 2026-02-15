@@ -5,6 +5,14 @@ require_relative "agent_core/errors"
 require_relative "agent_core/configuration"
 require_relative "agent_core/utils"
 
+# Observability (library-agnostic tracing/instrumentation)
+require_relative "agent_core/observability/instrumenter"
+require_relative "agent_core/observability/null_instrumenter"
+require_relative "agent_core/observability/trace_recorder"
+
+# Execution context (run_id, attributes, instrumenter)
+require_relative "agent_core/execution_context"
+
 # Core data types
 require_relative "agent_core/message"
 require_relative "agent_core/stream_event"
@@ -20,6 +28,8 @@ require_relative "agent_core/resources/tools/tool"
 require_relative "agent_core/resources/tools/tool_result"
 require_relative "agent_core/resources/tools/registry"
 require_relative "agent_core/resources/tools/policy/base"
+require_relative "agent_core/resources/tools/policy/deny_all"
+require_relative "agent_core/resources/tools/policy/allow_all"
 require_relative "agent_core/resources/token_counter/base"
 require_relative "agent_core/resources/token_counter/heuristic"
 
@@ -32,6 +42,8 @@ require_relative "agent_core/resources/skills/skill"
 require_relative "agent_core/resources/skills/frontmatter"
 require_relative "agent_core/resources/skills/store"
 require_relative "agent_core/resources/skills/file_system_store"
+require_relative "agent_core/resources/skills/prompt_fragment"
+require_relative "agent_core/resources/skills/tools"
 
 # Prompt Builder
 require_relative "agent_core/prompt_builder/context"

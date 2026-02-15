@@ -31,7 +31,8 @@ module AgentCore
   class Agent
     attr_reader :name, :description, :system_prompt, :model,
                 :provider, :chat_history, :memory, :tools_registry,
-                :tool_policy, :prompt_pipeline, :max_turns,
+                :tool_policy, :skills_store, :include_skill_locations,
+                :prompt_pipeline, :max_turns,
                 :token_counter, :context_window, :reserved_output_tokens
 
     # Build an agent using the Builder DSL.
@@ -81,6 +82,8 @@ module AgentCore
       @memory = builder.memory
       @tools_registry = builder.tools_registry || Resources::Tools::Registry.new
       @tool_policy = builder.tool_policy
+      @skills_store = builder.skills_store
+      @include_skill_locations = builder.include_skill_locations == true
       @prompt_pipeline = builder.prompt_pipeline || PromptBuilder::SimplePipeline.new
       @on_event = builder.on_event
       @token_counter = builder.token_counter
@@ -95,13 +98,16 @@ module AgentCore
     # Send a message and get a response (synchronous).
     #
     # @param message [String] User message
+    # @param context [ExecutionContext, Hash, nil] Execution context (user/session attributes, etc.)
+    # @param instrumenter [Observability::Instrumenter, nil] Optional instrumenter override
     # @param events [PromptRunner::Events, nil] Optional event callbacks
     # @return [PromptRunner::RunResult]
-    def chat(message, events: nil)
+    def chat(message, context: nil, instrumenter: nil, events: nil)
       events = build_events(events)
+      execution_context = ExecutionContext.from(context, instrumenter: instrumenter)
 
       # 1. Build prompt
-      prompt = build_prompt(user_message: message)
+      prompt = build_prompt(user_message: message, execution_context: execution_context)
 
       # 2. Run prompt (handles tool loop)
       result = @runner.run(
@@ -113,7 +119,8 @@ module AgentCore
         events: events,
         token_counter: token_counter,
         context_window: context_window,
-        reserved_output_tokens: reserved_output_tokens
+        reserved_output_tokens: reserved_output_tokens,
+        context: execution_context
       )
 
       # 3. Update chat history with new messages
@@ -127,13 +134,16 @@ module AgentCore
     # Send a message with streaming response.
     #
     # @param message [String] User message
+    # @param context [ExecutionContext, Hash, nil] Execution context (user/session attributes, etc.)
+    # @param instrumenter [Observability::Instrumenter, nil] Optional instrumenter override
     # @param events [PromptRunner::Events, nil] Optional event callbacks
     # @yield [StreamEvent] Stream events
     # @return [PromptRunner::RunResult]
-    def chat_stream(message, events: nil, &block)
+    def chat_stream(message, context: nil, instrumenter: nil, events: nil, &block)
       events = build_events(events)
+      execution_context = ExecutionContext.from(context, instrumenter: instrumenter)
 
-      prompt = build_prompt(user_message: message)
+      prompt = build_prompt(user_message: message, execution_context: execution_context)
 
       result = @runner.run_stream(
         prompt: prompt,
@@ -145,6 +155,7 @@ module AgentCore
         token_counter: token_counter,
         context_window: context_window,
         reserved_output_tokens: reserved_output_tokens,
+        context: execution_context,
         &block
       )
 
@@ -184,7 +195,7 @@ module AgentCore
 
     private
 
-    def build_prompt(user_message:)
+    def build_prompt(user_message:, execution_context:)
       # Query memory for relevant context
       memory_results = if memory && user_message
         memory.search(query: user_message)
@@ -200,7 +211,10 @@ module AgentCore
         user_message: user_message,
         variables: {},
         agent_config: { llm_options: @llm_options },
-        tool_policy: tool_policy
+        tool_policy: tool_policy,
+        execution_context: execution_context,
+        skills_store: skills_store,
+        include_skill_locations: include_skill_locations,
       )
 
       prompt_pipeline.build(context: context)

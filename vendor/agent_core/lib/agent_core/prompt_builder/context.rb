@@ -9,7 +9,8 @@ module AgentCore
     class Context
       attr_reader :system_prompt, :chat_history, :tools_registry,
                   :memory_results, :user_message, :variables,
-                  :agent_config, :tool_policy
+                  :agent_config, :tool_policy, :execution_context,
+                  :skills_store, :include_skill_locations
 
       # @param system_prompt [String] The system prompt template
       # @param chat_history [ChatHistory::Base] Conversation history
@@ -19,6 +20,9 @@ module AgentCore
       # @param variables [Hash] Template variables
       # @param agent_config [Hash] Agent configuration (for pipeline customization)
       # @param tool_policy [Tools::Policy::Base, nil] Tool access policy
+      # @param execution_context [ExecutionContext, Hash, nil] Execution context (run_id, auth attributes, etc.)
+      # @param skills_store [Resources::Skills::Store, nil] Optional skills store
+      # @param include_skill_locations [Boolean] Whether to include skill locations in prompt fragments
       def initialize(
         system_prompt: "",
         chat_history: nil,
@@ -27,7 +31,10 @@ module AgentCore
         user_message: nil,
         variables: {},
         agent_config: {},
-        tool_policy: nil
+        tool_policy: nil,
+        execution_context: nil,
+        skills_store: nil,
+        include_skill_locations: false
       )
         @system_prompt = system_prompt
         @chat_history = chat_history
@@ -37,6 +44,9 @@ module AgentCore
         @variables = (variables || {}).freeze
         @agent_config = (agent_config || {}).freeze
         @tool_policy = tool_policy
+        @execution_context = ExecutionContext.from(execution_context)
+        @skills_store = skills_store
+        @include_skill_locations = include_skill_locations == true
       end
     end
   end

@@ -5,6 +5,7 @@ require "test_helper"
 class AgentCore::PromptRunner::RunnerTest < Minitest::Test
   def setup
     @runner = AgentCore::PromptRunner::Runner.new
+    @allow_all = AgentCore::Resources::Tools::Policy::AllowAll.new
   end
 
   def test_simple_run
@@ -77,7 +78,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
 
     assert_equal "Echo result: hello", result.text
     assert_equal 2, result.turns
@@ -119,7 +120,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
 
     refute executed
     assert_equal 1, result.tool_calls_made.size
@@ -154,6 +155,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       @runner.run(
         prompt: prompt, provider: provider,
         tools_registry: registry,
+        tool_policy: @allow_all,
         max_tool_output_bytes: 100
       )
 
@@ -190,7 +192,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
 
     assert_equal [:foo_bar], executed
     assert_equal 1, result.tool_calls_made.size
@@ -243,6 +245,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       @runner.run(
         prompt: prompt, provider: provider,
         tools_registry: registry,
+        tool_policy: @allow_all,
         max_tool_calls_per_turn: 1
       )
 
@@ -283,7 +286,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
 
     assert_equal "Final answer", result.text
     assert_equal 3, provider.calls.size
@@ -327,7 +330,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
 
     assert_equal "Recovered", result.text
     assert_equal 1, result.tool_calls_made.size
@@ -385,6 +388,49 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_equal [1], turn_starts
   end
 
+  def test_instrumentation_emits_run_turn_llm_and_tool_events
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hi" })
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Final answer")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |args, **|
+        AgentCore::Resources::Tools::ToolResult.success(text: args.fetch("text", ""))
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    recorder = AgentCore::Observability::TraceRecorder.new(capture: :full)
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, instrumenter: recorder)
+    assert_equal "Final answer", result.text
+
+    names = recorder.trace.map { |e| e.fetch(:name) }
+    assert_includes names, "agent_core.run"
+    assert_includes names, "agent_core.turn"
+    assert_includes names, "agent_core.llm.call"
+    assert_includes names, "agent_core.tool.authorize"
+    assert_includes names, "agent_core.tool.execute"
+
+    recorder.trace.each do |evt|
+      payload = evt.fetch(:payload)
+      assert payload.key?("run_id")
+      assert payload.key?("duration_ms")
+    end
+  end
+
   def test_tool_policy_deny
     tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "dangerous", arguments: {})
     assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])
@@ -430,6 +476,106 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
 
     assert_equal 1, result.tool_calls_made.size
     assert_equal "too risky", result.tool_calls_made.first[:error]
+  end
+
+  def test_tool_policy_confirm_pauses_and_resume_executes_tool
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "dangerous", arguments: { "x" => 1 })
+    assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done.")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    executed = []
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "dangerous", description: "bad", parameters: {}) do |_args, **|
+        executed << true
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    confirm_policy = Class.new(AgentCore::Resources::Tools::Policy::Base) do
+      def authorize(name:, arguments: {}, context: {})
+        AgentCore::Resources::Tools::Policy::Decision.confirm(reason: "need approval")
+      end
+    end.new
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "do something dangerous")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: confirm_policy)
+
+    assert result.awaiting_tool_confirmation?
+    assert_instance_of AgentCore::PromptRunner::Continuation, result.continuation
+    assert_equal 1, provider.calls.size
+    assert_equal 0, executed.size
+
+    pending = result.pending_tool_confirmations
+    assert_equal 1, pending.size
+    assert_equal "tc_1", pending.first.tool_call_id
+    assert_equal "dangerous", pending.first.name
+
+    resumed =
+      @runner.resume(
+        continuation: result.continuation,
+        tool_confirmations: { "tc_1" => :allow },
+        provider: provider,
+        tools_registry: registry,
+        tool_policy: confirm_policy
+      )
+
+    assert_equal "Done.", resumed.text
+    assert_equal result.run_id, resumed.run_id
+    assert_equal 2, provider.calls.size
+    assert_equal 1, executed.size
+  end
+
+  def test_streaming_confirm_emits_authorization_required_and_stops
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "dangerous", arguments: {})
+    assistant_msg = AgentCore::Message.new(role: :assistant, content: "calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, stop_reason: :tool_use)
+
+    provider = MockProvider.new(responses: [tool_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "dangerous", description: "bad", parameters: {}) do |_args, **|
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    confirm_policy = Class.new(AgentCore::Resources::Tools::Policy::Base) do
+      def authorize(name:, arguments: {}, context: {})
+        AgentCore::Resources::Tools::Policy::Decision.confirm(reason: "need approval")
+      end
+    end.new
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "do something dangerous")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    events_received = []
+    result = @runner.run_stream(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: confirm_policy) do |event|
+      events_received << event
+    end
+
+    assert result.awaiting_tool_confirmation?
+    event_types = events_received.map(&:type)
+    assert_includes event_types, :authorization_required
+    refute_includes event_types, :tool_execution_start
+    done_events = events_received.select { |e| e.type == :done }
+    assert_equal 1, done_events.size
+    assert_equal :awaiting_tool_confirmation, done_events.first.stop_reason
   end
 
   def test_streaming_run
@@ -758,7 +904,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
 
     # Find the tool_result message in the conversation
     tool_result_msg = result.messages.find { |m| m.tool_result? }
@@ -808,7 +954,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
 
     tool_result_msg = result.messages.find { |m| m.tool_result? }
     assert tool_result_msg
@@ -856,7 +1002,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
-    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry)
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
 
     tool_result_msg = result.messages.find { |m| m.tool_result? }
     assert tool_result_msg

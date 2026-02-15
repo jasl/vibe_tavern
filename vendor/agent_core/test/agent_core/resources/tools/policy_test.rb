@@ -35,12 +35,14 @@ class AgentCore::Resources::Tools::Policy::BaseTest < Minitest::Test
   def test_default_filter_passes_through
     policy = AgentCore::Resources::Tools::Policy::Base.new
     tools = [{ name: "read" }, { name: "write" }]
-    assert_equal tools, policy.filter(tools: tools)
+    ctx = AgentCore::ExecutionContext.from(nil)
+    assert_equal tools, policy.filter(tools: tools, context: ctx)
   end
 
   def test_default_authorize_allows
     policy = AgentCore::Resources::Tools::Policy::Base.new
-    decision = policy.authorize(name: "read")
+    ctx = AgentCore::ExecutionContext.from(nil)
+    decision = policy.authorize(name: "read", context: ctx)
     assert decision.allowed?
   end
 end

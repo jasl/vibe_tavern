@@ -3,6 +3,8 @@
 require "test_helper"
 
 class AgentCore::PromptBuilder::SimplePipelineTest < Minitest::Test
+  FIXTURES_DIR = File.expand_path("../../fixtures/skills", __dir__)
+
   def setup
     @pipeline = AgentCore::PromptBuilder::SimplePipeline.new
   end
@@ -80,6 +82,7 @@ class AgentCore::PromptBuilder::SimplePipelineTest < Minitest::Test
     context = AgentCore::PromptBuilder::Context.new(
       system_prompt: "You are helpful.",
       tools_registry: registry,
+      tool_policy: AgentCore::Resources::Tools::Policy::AllowAll.new,
       user_message: "Hi"
     )
 
@@ -110,5 +113,35 @@ class AgentCore::PromptBuilder::SimplePipelineTest < Minitest::Test
     prompt = @pipeline.build(context: context)
     assert_equal 0.7, prompt.options[:temperature]
     assert_equal "test-model", prompt.options[:model]
+  end
+
+  def test_injects_available_skills_fragment
+    store = AgentCore::Resources::Skills::FileSystemStore.new(dirs: [FIXTURES_DIR])
+    context = AgentCore::PromptBuilder::Context.new(
+      system_prompt: "You are helpful.",
+      user_message: "Hi",
+      skills_store: store
+    )
+
+    prompt = @pipeline.build(context: context)
+
+    assert_includes prompt.system_prompt, "<available_skills>"
+    assert_includes prompt.system_prompt, "example-skill"
+    refute_includes prompt.system_prompt, "location="
+  end
+
+  def test_available_skills_fragment_can_include_location
+    store = AgentCore::Resources::Skills::FileSystemStore.new(dirs: [FIXTURES_DIR])
+    context = AgentCore::PromptBuilder::Context.new(
+      system_prompt: "You are helpful.",
+      user_message: "Hi",
+      skills_store: store,
+      include_skill_locations: true
+    )
+
+    prompt = @pipeline.build(context: context)
+
+    assert_includes prompt.system_prompt, "<available_skills>"
+    assert_includes prompt.system_prompt, "location="
   end
 end

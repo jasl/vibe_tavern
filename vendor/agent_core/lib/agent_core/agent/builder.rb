@@ -15,6 +15,7 @@ module AgentCore
       # Runtime dependencies (not serialized)
       attr_accessor :provider, :chat_history, :memory,
                     :tools_registry, :tool_policy,
+                    :skills_store, :include_skill_locations,
                     :prompt_pipeline, :on_event,
                     :token_counter
 
@@ -42,7 +43,9 @@ module AgentCore
         @chat_history = nil
         @memory = nil
         @tools_registry = nil
-        @tool_policy = nil
+        @tool_policy = Resources::Tools::Policy::DenyAll.new
+        @skills_store = nil
+        @include_skill_locations = false
         @prompt_pipeline = nil
         @on_event = nil
         @token_counter = nil

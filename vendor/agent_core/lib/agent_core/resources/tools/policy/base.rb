@@ -13,9 +13,9 @@ module AgentCore
           # Filter the list of tool definitions before sending to the LLM.
           #
           # @param tools [Array<Hash>] Tool definitions
-          # @param context [Hash] Execution context (user, session, etc.)
+          # @param context [AgentCore::ExecutionContext] Execution context
           # @return [Array<Hash>] Filtered tool definitions
-          def filter(tools:, context: {})
+          def filter(tools:, context:)
             tools # Default: no filtering
           end
 
@@ -23,9 +23,9 @@ module AgentCore
           #
           # @param name [String] Tool name
           # @param arguments [Hash] Tool arguments
-          # @param context [Hash] Execution context
+          # @param context [AgentCore::ExecutionContext] Execution context
           # @return [Decision]
-          def authorize(name:, arguments: {}, context: {})
+          def authorize(name:, arguments: {}, context:)
             Decision.allow # Default: allow all
           end
         end

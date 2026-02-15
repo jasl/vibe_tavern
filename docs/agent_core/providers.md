@@ -87,6 +87,65 @@ the tool loop stable across imperfect model/tool outputs:
 - Optional per-turn cap: `max_tool_calls_per_turn:` limits tool calls executed
   in a single turn; ignored tool calls are recorded and skipped.
 
+## Observability / audit hooks (vNext)
+
+AgentCore can emit **structured** trace/observation events for every run, turn,
+LLM call, and tool authorization/execution.
+
+- Core interface: `AgentCore::Observability::Instrumenter`
+- Default: `NullInstrumenter` (no-op)
+- In-memory recorder (useful for audits/tests): `TraceRecorder`
+
+Runner emits these event names (payload includes `run_id` and `duration_ms`):
+
+- `agent_core.run`
+- `agent_core.turn`
+- `agent_core.llm.call`
+- `agent_core.tool.authorize`
+- `agent_core.tool.execute`
+
+To enable:
+
+- pass `instrumenter:` to `PromptRunner::Runner#run/#run_stream`, or
+- pass `context:` as an `AgentCore::ExecutionContext` with a custom instrumenter
+
+See `docs/agent_core/observability.md` for payload fields and redaction guidance.
+
+## Tool policy (default deny) + pause/resume confirmation (vNext)
+
+AgentCore is **deny-by-default** for tools:
+
+- Tool visibility is filtered by `tool_policy.filter(...)` during prompt building.
+  If `tool_policy` is `nil`, AgentCore behaves like `DenyAll` (tools are hidden).
+- Tool execution is authorized per tool call via `tool_policy.authorize(...)`.
+  If `tool_policy` is `nil`, tool calls are denied (no execution).
+
+To enable tools explicitly, set a policy such as `AllowAll` (development/tests)
+or provide your own app policy.
+
+### Confirmation flow
+
+If `tool_policy.authorize` returns `Decision.confirm(...)`, the runner will:
+
+- **pause** (no tool execution happens)
+- return `RunResult.stop_reason = :awaiting_tool_confirmation`
+- include `RunResult.pending_tool_confirmations` + `RunResult.continuation`
+
+Resume with `PromptRunner::Runner#resume` / `#resume_stream` by providing
+`tool_confirmations` (tool_call_id => allow/deny).
+
+See `docs/agent_core/tool_authorization.md` for an app/UI-friendly pattern.
+
+## Multimodal security defaults (vNext)
+
+URL-based media sources are **disabled by default** to reduce SSRF/privacy risk:
+
+- `AgentCore.config.allow_url_media_sources == false` (default)
+- To enable, configure explicitly:
+  - `allow_url_media_sources = true`
+  - optionally set `allowed_media_url_schemes = %w[https]`
+  - optionally set `media_source_validator` for custom policy checks
+
 ## App-side provider/model workarounds (keep out of AgentCore core)
 
 Some reliability hacks and provider/model compatibility shims are **deliberately

@@ -134,6 +134,12 @@ module AgentCore
 
         # Read a specific file from within a skill directory.
         def read_skill_file(name:, rel_path:, max_bytes: DEFAULT_MAX_BYTES)
+          raw = read_skill_file_bytes(name: name, rel_path: rel_path, max_bytes: max_bytes)
+          normalize_utf8(raw)
+        end
+
+        # Read raw bytes for a file from within a skill directory.
+        def read_skill_file_bytes(name:, rel_path:, max_bytes: DEFAULT_MAX_BYTES)
           meta = find_skill_metadata!(name.to_s)
 
           normalized = normalize_rel_path(rel_path)
@@ -146,7 +152,7 @@ module AgentCore
           ensure_realpath_within_skill_dir!(skill_dir: meta.location, abs_path: abs_path, rel_path: normalized)
 
           content = read_file_limited(abs_path, max_bytes: max_bytes.to_i, label: normalized)
-          normalize_utf8(content)
+          content.to_s.dup.force_encoding(Encoding::BINARY)
         end
 
         private

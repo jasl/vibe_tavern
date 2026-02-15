@@ -101,17 +101,18 @@ module AgentCore
         #
         # @param name [String] Tool name
         # @param arguments [Hash] Tool arguments
-        # @param context [Hash] Execution context
+        # @param context [ExecutionContext, Hash, nil] Execution context
         # @return [ToolResult]
         # @raise [ToolNotFoundError] If tool is not registered
-        def execute(name:, arguments:, context: {})
+        def execute(name:, arguments:, context: nil)
+          execution_context = ExecutionContext.from(context)
           tool_info = @mutex.synchronize { @native_tools[name] || @mcp_tools[name] }
 
           raise ToolNotFoundError.new("Tool not found: #{name}", tool_name: name) unless tool_info
 
           case tool_info
           when Tool
-            tool_info.call(arguments, context: context)
+            tool_info.call(arguments, context: execution_context)
           when Hash
             # MCP tool — wrap in rescue to normalize errors to ToolResult
             client = tool_info[:client]

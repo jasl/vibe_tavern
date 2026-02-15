@@ -20,4 +20,10 @@ class AgentCore::Resources::Skills::StoreTest < Minitest::Test
       @store.read_skill_file(name: "test", rel_path: "scripts/a.sh", max_bytes: 1000)
     end
   end
+
+  def test_read_skill_file_bytes_raises_not_implemented
+    assert_raises(AgentCore::NotImplementedError) do
+      @store.read_skill_file_bytes(name: "test", rel_path: "scripts/a.sh", max_bytes: 1000)
+    end
+  end
 end

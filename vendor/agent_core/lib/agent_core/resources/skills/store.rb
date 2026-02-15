@@ -31,6 +31,19 @@ module AgentCore
         def read_skill_file(name:, rel_path:, max_bytes:)
           raise AgentCore::NotImplementedError, "#{self.class}#read_skill_file must be implemented"
         end
+
+        # Read raw bytes from within a skill directory.
+        #
+        # Unlike #read_skill_file, this does not attempt to normalize to UTF-8.
+        # Useful for binary assets (images, PDFs, etc.).
+        #
+        # @param name [String] Skill name
+        # @param rel_path [String] Relative path within the skill (e.g., "assets/logo.png")
+        # @param max_bytes [Integer] Max file size
+        # @return [String] Raw bytes (ASCII-8BIT)
+        def read_skill_file_bytes(name:, rel_path:, max_bytes:)
+          raise AgentCore::NotImplementedError, "#{self.class}#read_skill_file_bytes must be implemented"
+        end
       end
     end
   end

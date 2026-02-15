@@ -45,7 +45,8 @@ class AgentCore::Resources::Tools::ToolTest < Minitest::Test
     ) { |_args, context:| captured_context = context; AgentCore::Resources::Tools::ToolResult.success(text: "ok") }
 
     tool.call({}, context: { user: "alice" })
-    assert_equal({ user: "alice" }, captured_context)
+    assert_instance_of AgentCore::ExecutionContext, captured_context
+    assert_equal({ user: "alice" }, captured_context.attributes)
   end
 
   def test_call_without_handler_raises

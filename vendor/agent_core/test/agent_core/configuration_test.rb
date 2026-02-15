@@ -8,7 +8,7 @@ class AgentCore::ConfigurationTest < Minitest::Test
   end
 
   def test_default_allow_url_media_sources
-    assert_equal true, AgentCore.config.allow_url_media_sources
+    assert_equal false, AgentCore.config.allow_url_media_sources
   end
 
   def test_default_allowed_media_url_schemes
@@ -33,7 +33,7 @@ class AgentCore::ConfigurationTest < Minitest::Test
     AgentCore.configure { |c| c.allow_url_media_sources = false }
     AgentCore.reset_config!
 
-    assert_equal true, AgentCore.config.allow_url_media_sources
+    assert_equal false, AgentCore.config.allow_url_media_sources
   end
 
   def test_config_is_singleton

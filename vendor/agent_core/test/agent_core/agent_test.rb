@@ -80,6 +80,7 @@ class AgentCore::AgentTest < Minitest::Test
       b.system_prompt = "You have tools."
       b.provider = MockProvider.new(responses: [tool_resp, final_resp])
       b.tools_registry = registry
+      b.tool_policy = AgentCore::Resources::Tools::Policy::AllowAll.new
     end
 
     result = agent.chat("Echo hi")

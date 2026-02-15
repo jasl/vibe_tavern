@@ -43,11 +43,12 @@ module AgentCore
         # Execute the tool with the given arguments.
         #
         # @param arguments [Hash] Tool arguments (from LLM)
-        # @param context [Hash] Execution context (user info, session, etc.)
+        # @param context [ExecutionContext, Hash, nil] Execution context
         # @return [ToolResult]
-        def call(arguments, context: {})
+        def call(arguments, context: nil)
           raise AgentCore::Error, "No handler defined for tool '#{name}'" unless @handler
-          @handler.call(arguments, context: context)
+          execution_context = ExecutionContext.from(context)
+          @handler.call(arguments, context: execution_context)
         rescue AgentCore::Error
           raise
         rescue => e

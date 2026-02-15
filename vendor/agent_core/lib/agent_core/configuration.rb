@@ -22,7 +22,7 @@ module AgentCore
     attr_accessor :media_source_validator
 
     def initialize
-      @allow_url_media_sources = true
+      @allow_url_media_sources = false
       @allowed_media_url_schemes = nil
       @media_source_validator = nil
     end

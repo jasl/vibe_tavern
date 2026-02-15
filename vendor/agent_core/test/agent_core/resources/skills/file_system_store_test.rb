@@ -110,6 +110,17 @@ class AgentCore::Resources::Skills::FileSystemStoreTest < Minitest::Test
     assert_includes content, "# Guide"
   end
 
+  def test_read_skill_file_bytes
+    bytes = @store.read_skill_file_bytes(
+      name: "another-skill",
+      rel_path: "scripts/setup.sh",
+    )
+
+    assert_kind_of String, bytes
+    assert_equal Encoding::BINARY, bytes.encoding
+    assert_includes bytes, "echo"
+  end
+
   def test_read_skill_file_unknown_skill_raises
     assert_raises(ArgumentError) do
       @store.read_skill_file(name: "nonexistent", rel_path: "scripts/a.sh")

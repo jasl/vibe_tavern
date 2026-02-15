@@ -254,14 +254,20 @@ class AgentCore::ContentBlockTest < Minitest::Test
   end
 
   def test_image_content_url
+    AgentCore.configure { |c| c.allow_url_media_sources = true }
     ic = AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg")
     assert_equal :image, ic.type
     assert_equal :url, ic.source_type
     assert_equal "https://example.com/img.jpg", ic.url
     assert_nil ic.data
+  ensure
+    AgentCore.reset_config!
   end
 
   def test_image_content_url_can_be_disabled_by_config
+    AgentCore.configure { |c| c.allow_url_media_sources = true }
+    AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/img.jpg")
+
     AgentCore.configure { |c| c.allow_url_media_sources = false }
 
     assert_raises(ArgumentError) do
@@ -272,7 +278,10 @@ class AgentCore::ContentBlockTest < Minitest::Test
   end
 
   def test_image_content_url_scheme_restriction
-    AgentCore.configure { |c| c.allowed_media_url_schemes = %w[https] }
+    AgentCore.configure do |c|
+      c.allow_url_media_sources = true
+      c.allowed_media_url_schemes = %w[https]
+    end
 
     assert_raises(ArgumentError) do
       AgentCore::ImageContent.new(source_type: :url, url: "http://example.com/img.jpg")
@@ -285,7 +294,10 @@ class AgentCore::ContentBlockTest < Minitest::Test
   end
 
   def test_image_content_url_invalid_uri
-    AgentCore.configure { |c| c.allowed_media_url_schemes = %w[https] }
+    AgentCore.configure do |c|
+      c.allow_url_media_sources = true
+      c.allowed_media_url_schemes = %w[https]
+    end
 
     assert_raises(ArgumentError) do
       AgentCore::ImageContent.new(source_type: :url, url: "not a valid uri %%%")
@@ -316,8 +328,11 @@ class AgentCore::ContentBlockTest < Minitest::Test
   end
 
   def test_image_content_effective_media_type_infers_from_url
+    AgentCore.configure { |c| c.allow_url_media_sources = true }
     ic = AgentCore::ImageContent.new(source_type: :url, url: "https://example.com/photo.jpg")
     assert_equal "image/jpeg", ic.effective_media_type
+  ensure
+    AgentCore.reset_config!
   end
 
   def test_image_content_base64_requires_data
@@ -382,10 +397,13 @@ class AgentCore::ContentBlockTest < Minitest::Test
   end
 
   def test_document_content_url
+    AgentCore.configure { |c| c.allow_url_media_sources = true }
     dc = AgentCore::DocumentContent.new(
       source_type: :url, url: "https://example.com/doc.pdf", media_type: "application/pdf"
     )
     assert_equal :url, dc.source_type
+  ensure
+    AgentCore.reset_config!
   end
 
   def test_document_content_text_based
@@ -410,9 +428,12 @@ class AgentCore::ContentBlockTest < Minitest::Test
   end
 
   def test_document_content_text_nil_for_url_source
+    AgentCore.configure { |c| c.allow_url_media_sources = true }
     dc = AgentCore::DocumentContent.new(source_type: :url, url: "https://example.com/readme.txt", media_type: "text/plain")
     assert dc.text_based?
     assert_nil dc.text  # URL source, not base64
+  ensure
+    AgentCore.reset_config!
   end
 
   def test_document_content_effective_media_type_from_filename
@@ -489,15 +510,21 @@ class AgentCore::ContentBlockTest < Minitest::Test
   end
 
   def test_audio_content_url
+    AgentCore.configure { |c| c.allow_url_media_sources = true }
     ac = AgentCore::AudioContent.new(
       source_type: :url, url: "https://example.com/audio.mp3"
     )
     assert_equal :url, ac.source_type
+  ensure
+    AgentCore.reset_config!
   end
 
   def test_audio_content_effective_media_type
+    AgentCore.configure { |c| c.allow_url_media_sources = true }
     ac = AgentCore::AudioContent.new(source_type: :url, url: "https://example.com/audio.mp3")
     assert_equal "audio/mpeg", ac.effective_media_type
+  ensure
+    AgentCore.reset_config!
   end
 
   def test_audio_content_serialization_roundtrip
