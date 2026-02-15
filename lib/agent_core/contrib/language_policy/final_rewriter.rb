@@ -2,6 +2,7 @@
 
 require_relative "../language_policy_prompt"
 require_relative "../openai"
+require_relative "detector"
 
 module AgentCore
   module Contrib
@@ -23,11 +24,14 @@ module AgentCore
           context_window: nil,
           reserved_output_tokens: 0
         )
-          lang = target_lang.to_s.strip
+          lang = AgentCore::Contrib::LanguagePolicy::Detector.canonical_target_lang(target_lang)
           raise ArgumentError, "target_lang is required" if lang.empty?
 
           input = text.to_s
           return input if input.bytesize > DEFAULT_MAX_INPUT_BYTES
+          if AgentCore::Contrib::LanguagePolicy::Detector.language_shape(input, target_lang: lang) == :ok
+            return input
+          end
 
           system_text =
             [

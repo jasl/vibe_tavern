@@ -65,4 +65,19 @@ class AgentCoreContribLanguagePolicyFinalRewriterTest < ActiveSupport::TestCase
       )
     end
   end
+
+  test "rewrite skips when already in target language (conservative CJK detector)" do
+    provider = FakeProvider.new(reply_text: "should not be called")
+
+    out =
+      AgentCore::Contrib::LanguagePolicy::FinalRewriter.rewrite(
+        provider: provider,
+        model: "m1",
+        text: "你好",
+        target_lang: "zh-CN",
+      )
+
+    assert_equal "你好", out
+    assert_empty provider.requests
+  end
 end

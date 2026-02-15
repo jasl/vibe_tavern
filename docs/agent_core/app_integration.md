@@ -7,19 +7,28 @@ For now, we intentionally **do not** port TavernKit prompt pipeline steps (e.g.
 AgentCore core. App-specific glue lives in `lib/agent_core/contrib` so it can
 also be reused from `script/eval` without relying on Rails models.
 
+The primary app-side entrypoint is:
+
+- `AgentCore::Contrib::AgentSession` (wraps `AgentCore::Agent` and integrates
+  directives + final-only language policy rewrite).
+
 ## `LLM::RunChat`
 
-`LLM::RunChat` builds an `AgentCore::PromptBuilder::BuiltPrompt` from:
+`LLM::RunChat` normalizes inputs and merges LLM options, then runs via:
 
 - `system` (optional, sent as a system message)
 - `history` (OpenAI-ish messages)
 - `user_text` (appended as the last user message)
 - merged LLM options (provider defaults + preset overrides + per-call overrides)
 
-It then runs the prompt via:
+Execution happens through:
 
 - `AgentCore::Resources::Provider::SimpleInferenceProvider` (OpenAI-compatible)
-- `AgentCore::PromptRunner::Runner` (tool loop engine; tools are not wired in yet)
+- `AgentCore::Contrib::AgentSession` (wraps `AgentCore::Agent`; tools are not wired in yet)
+
+For debugging, `LLM::RunChat` still returns an `AgentCore::PromptBuilder::BuiltPrompt`
+representing the effective prompt, but the run itself is executed through
+`AgentSession`.
 
 ## Token budgeting (preflight)
 
@@ -88,6 +97,14 @@ Injecting “respond in X language” constraints into the main tool-calling loo
 Helper:
 
 - `AgentCore::Contrib::LanguagePolicy::FinalRewriter`
+
+Notes:
+
+- When the target language is a CJK language (`zh-*`/`ja-JP`/`ko-KR`/`yue-HK`),
+  the rewriter uses a conservative script-based detector and **skips the rewrite
+  call** when the text already looks like the target language.
+- When language policy is enabled and the caller requests streaming, the app
+  buffers the run and emits **final-only** events (the rewritten final text).
 
 Example (pure Ruby; no Rails model dependency):
 

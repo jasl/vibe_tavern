@@ -83,24 +83,25 @@ module LLM
           client: effective_client,
         )
 
-      directives_runner =
-        AgentCore::Contrib::Directives::Runner.new(
+      session =
+        AgentCore::Contrib::AgentSession.new(
           provider: provider,
           model: llm_model.model,
-          llm_options_defaults: effective_llm_options,
+          system_prompt: system.to_s,
+          history: messages,
+          llm_options: effective_llm_options,
+          token_counter: token_counter,
+          context_window: context_window,
+          reserved_output_tokens: reserved_output_tokens,
           directives_config: normalize_directives_config(directives_config),
           capabilities: llm_model.capabilities_overrides,
         )
 
       directives_result =
-        directives_runner.run(
-          history: messages,
-          system: system.to_s,
+        session.directives(
+          language_policy: normalized_context.fetch(:language_policy, nil),
           structured_output_options: normalize_structured_output_options(structured_output_options),
           result_validator: result_validator,
-          token_counter: token_counter,
-          context_window: context_window,
-          reserved_output_tokens: reserved_output_tokens,
         )
 
       Result.success(

@@ -47,8 +47,12 @@ module LLM
 
       selected_preset = selected_preset_result
       normalized_context = normalize_context(context)
-      messages = normalize_history(history, user_text: user_text)
-      return Result.failure(errors: ["prompt is empty"], code: "EMPTY_PROMPT", value: { llm_model: llm_model }) if messages.empty?
+      history_messages = normalize_history(history)
+      normalized_user_text = user_text.to_s
+      normalized_user_text = "" if normalized_user_text.strip.empty?
+      if history_messages.empty? && normalized_user_text.empty?
+        return Result.failure(errors: ["prompt is empty"], code: "EMPTY_PROMPT", value: { llm_model: llm_model })
+      end
 
       user_llm_options = normalize_llm_options(llm_options)
       provider_defaults = llm_model.llm_provider.llm_options_defaults_symbolized
@@ -77,10 +81,14 @@ module LLM
         )
 
       prompt_options = effective_llm_options.merge(model: llm_model.model)
+      prompt_messages = history_messages.dup
+      if !normalized_user_text.empty?
+        prompt_messages << AgentCore::Message.new(role: :user, content: normalized_user_text)
+      end
       prompt =
         AgentCore::PromptBuilder::BuiltPrompt.new(
           system_prompt: system.to_s,
-          messages: messages,
+          messages: prompt_messages,
           tools: [],
           options: prompt_options,
         )
@@ -90,14 +98,19 @@ module LLM
           client: effective_client,
         )
 
-      run_result =
-        AgentCore::PromptRunner::Runner.new.run(
-          prompt: prompt,
+      session =
+        AgentCore::Contrib::AgentSession.new(
           provider: provider,
+          model: llm_model.model,
+          system_prompt: system.to_s,
+          history: history_messages,
+          llm_options: effective_llm_options,
           token_counter: token_counter,
           context_window: context_window,
           reserved_output_tokens: reserved_output_tokens,
         )
+
+      run_result = session.chat(normalized_user_text, language_policy: normalized_context.fetch(:language_policy, nil))
 
       Result.success(
         value: {
@@ -173,15 +186,8 @@ module LLM
       end
     end
 
-    def normalize_history(value, user_text:)
-      messages = AgentCore::Contrib::OpenAIHistory.coerce_messages(value)
-
-      text = user_text.to_s
-      if !text.strip.empty?
-        messages << AgentCore::Message.new(role: :user, content: text)
-      end
-
-      messages
+    def normalize_history(value)
+      AgentCore::Contrib::OpenAIHistory.coerce_messages(value)
     end
 
     def normalize_llm_options(value)
