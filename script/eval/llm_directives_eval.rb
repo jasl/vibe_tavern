@@ -7,15 +7,19 @@ require "securerandom"
 require "thread"
 require "time"
 
+# Boot Bundler/Bootsnap without loading full Rails.
+require_relative "../../config/boot"
+
+require "agent_core"
+require "simple_inference"
+
 require_relative "support/openrouter_sampling_profiles"
 require_relative "support/openrouter_models"
 require_relative "support/capabilities_registry"
-
-# Default settings
-ENV["RAILS_ENV"] ||= "development"
-
-# Load Rails environment
-require_relative "../../config/environment"
+require_relative "support/paths"
+require_relative "support/language_policy_prompt"
+require_relative "support/agent_core_openai_provider"
+require_relative "support/directives"
 
 module DirectivesEval
   class ModelCatalog
@@ -115,20 +119,20 @@ module DirectivesEval
 
         preset_for(canonical)
       end
-    end
-
-    def preset_for(name)
-      case canonical_workaround_name(name)
-      when "prompt_only"
-        TavernKit::VibeTavern::Directives::Presets.directives(modes: [:prompt_only])
-      when "json_object_first", "no_json_schema"
-        TavernKit::VibeTavern::Directives::Presets.directives(modes: %i[json_object prompt_only])
-      when "no_prompt_only"
-        TavernKit::VibeTavern::Directives::Presets.directives(modes: %i[json_schema json_object])
-      else
-        {}
       end
-    end
+
+      def preset_for(name)
+        case canonical_workaround_name(name)
+        when "prompt_only"
+          { modes: [:prompt_only] }
+        when "json_object_first", "no_json_schema"
+          { modes: %i[json_object prompt_only] }
+        when "no_prompt_only"
+          { modes: %i[json_schema json_object] }
+        else
+          {}
+        end
+      end
 
     def canonical_workaround_name(name)
       name.to_s.strip.downcase.tr("-", "_")
@@ -156,20 +160,27 @@ module DirectivesEval
       end
     end
 
-    def deep_merge_hashes(left, right)
-      out = (left.is_a?(Hash) ? left : {}).dup
-      (right.is_a?(Hash) ? right : {}).each do |k, v|
-        if out[k].is_a?(Hash) && v.is_a?(Hash)
-          out[k] = deep_merge_hashes(out[k], v)
-        else
-          out[k] = v
+      def deep_merge_hashes(left, right)
+        out = (left.is_a?(Hash) ? left : {}).dup
+        (right.is_a?(Hash) ? right : {}).each do |k, v|
+          if out[k].is_a?(Hash) && v.is_a?(Hash)
+            out[k] = deep_merge_hashes(out[k], v)
+          else
+            out[k] = v
+          end
         end
+        out
       end
-      out
-    end
 
-    def percentile(sorted, p)
-      return 0 if sorted.empty?
+      def truncate(str, max_chars: 220)
+        s = str.to_s
+        return s if s.length <= max_chars
+
+        "#{s[0, max_chars]}…"
+      end
+
+      def percentile(sorted, p)
+        return 0 if sorted.empty?
 
       idx = (sorted.length * p).floor
       sorted[[idx, sorted.length - 1].min].to_i
@@ -605,10 +616,14 @@ directives_request_overrides[:max_tokens] =
 require_parameters_default = ENV.fetch("OPENROUTER_REQUIRE_PARAMETERS", "1") == "1"
 
 provider_directives_preset =
-  TavernKit::VibeTavern::Directives::Presets.provider_defaults(
-    "openrouter",
-    require_parameters: require_parameters_default,
-  )
+  if require_parameters_default
+    {
+      structured_request_overrides: { provider: { require_parameters: true } },
+      prompt_only_request_overrides: { provider: { require_parameters: false } },
+    }
+  else
+    {}
+  end
 
 MODEL_CATALOG =
   DirectivesEval::ModelCatalog.build do
@@ -785,7 +800,8 @@ if selected_language_policies.empty?
 end
 
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
-out_dir = Rails.root.join("tmp", "llm_directives_eval_reports", timestamp)
+root = VibeTavernEval::Paths.root
+out_dir = root.join("tmp", "llm_directives_eval_reports", timestamp)
 FileUtils.mkdir_p(out_dir)
 
 log_mutex = Mutex.new
@@ -824,14 +840,15 @@ run_task =
         []
       end
 
-    directives_preset =
-      TavernKit::VibeTavern::Directives::Presets.merge(
-        TavernKit::VibeTavern::Directives::Presets.default_directives,
+    directives_config =
+      DirectivesEval::Util.deep_merge_hashes(
+        {
+          modes: VibeTavernEval::Directives::DEFAULT_MODES,
+          repair_retry_count: VibeTavernEval::Directives::DEFAULT_REPAIR_RETRY_COUNT,
+        },
         (apply_provider_defaults ? provider_directives_preset : {}),
-        TavernKit::VibeTavern::Directives::Presets.directives(
-          request_overrides: directives_request_overrides,
-        ),
-        (repair_retry_count.nil? ? {} : TavernKit::VibeTavern::Directives::Presets.directives(repair_retry_count: repair_retry_count)),
+        { request_overrides: directives_request_overrides },
+        (repair_retry_count.nil? ? {} : { repair_retry_count: repair_retry_count }),
         *model_workaround_presets,
       )
 
@@ -850,35 +867,23 @@ run_task =
         timeout: client_timeout,
       )
 
-    context_inputs = { directives: directives_preset }
-    if language_policy_enabled && language_policy_target_lang
-      context_inputs[:language_policy] = {
-        enabled: true,
-        target_lang: language_policy_target_lang,
-      }
-    end
+    provider = VibeTavernEval::AgentCoreOpenAIProvider.new(client: client)
 
-    runner_config =
-      TavernKit::VibeTavern::RunnerConfig.build(
-        provider: "openrouter",
-        model: model,
-        context: context_inputs,
-        llm_options_defaults: llm_options_defaults,
-        capabilities_overrides: VibeTavernEval::CapabilitiesRegistry.lookup(provider_id: "openrouter", model: model),
-      )
+      directives_runner =
+        VibeTavernEval::Directives::Runner.new(
+          provider: provider,
+          model: model,
+          llm_options_defaults: llm_options_defaults,
+          directives_config: directives_config,
+          capabilities: VibeTavernEval::CapabilitiesRegistry.lookup(provider_id: "openrouter", model: model),
+        )
 
-    directives_runner =
-      TavernKit::VibeTavern::Directives::Runner.build(
-        client: client,
-        runner_config: runner_config,
-      )
-
-    directives_registry =
-      TavernKit::VibeTavern::Directives::Registry.new(
-        definitions: [
-          {
-            type: "ui.show_form",
-            description: "payload: {form_id:String}",
+      directives_registry =
+        VibeTavernEval::Directives::Registry.new(
+          definitions: [
+            {
+              type: "ui.show_form",
+              description: "payload: {form_id:String}",
             aliases: %w[show_form showform ui_show_form],
           },
           {
@@ -900,27 +905,31 @@ run_task =
         ],
       )
 
-    payload_validator =
-      lambda do |type, payload|
-        case type.to_s
-        when "ui.show_form"
-          { code: "MISSING_FORM_ID" } if payload.fetch("form_id", "").to_s.strip.empty?
-        when "ui.toast"
-          { code: "MISSING_MESSAGE" } if payload.fetch("message", "").to_s.strip.empty?
-        when "ui.patch"
-          # Tolerate both payload shapes:
-          # - { "ops": [...] } (preferred)
-          # - { "op": "...", "path": "...", "value": ... } (single op at root)
-          ops = payload.key?("ops") ? payload.fetch("ops", nil) : payload
-          normalized = TavernKit::VibeTavern::Directives::Validator.normalize_patch_ops(ops)
-          return normalized unless normalized[:ok]
+      payload_validator =
+        lambda do |type, payload|
+          case type.to_s
+          when "ui.show_form"
+            { code: "MISSING_FORM_ID" } if payload.fetch("form_id", "").to_s.strip.empty?
+          when "ui.toast"
+            { code: "MISSING_MESSAGE" } if payload.fetch("message", "").to_s.strip.empty?
+          when "ui.patch"
+            # Tolerate both payload shapes:
+            # - { "ops": [...] } (preferred)
+            # - { "op": "...", "path": "...", "value": ... } (single op at root)
+            ops = payload.key?("ops") ? payload.fetch("ops", nil) : payload
+            normalized = VibeTavernEval::Directives::Validator.normalize_patch_ops(ops)
+            unless normalized[:ok]
+              err = { code: normalized[:code] }
+              err[:details] = normalized[:details] if normalized[:details].is_a?(Hash)
+              return err
+            end
 
-          payload["ops"] = normalized[:ops]
-          nil
-        when "ui.request_upload"
-          { code: "MISSING_PURPOSE" } if payload.fetch("purpose", "").to_s.strip.empty?
+            payload["ops"] = normalized[:ops]
+            nil
+          when "ui.request_upload"
+            { code: "MISSING_PURPOSE" } if payload.fetch("purpose", "").to_s.strip.empty?
+          end
         end
-      end
 
     structured_output_options = {
       registry: directives_registry,
@@ -960,14 +969,20 @@ run_task =
           error = nil
           result = nil
 
-          begin
-            result =
-              directives_runner.run(
-                system: scenario[:system],
-                history: [TavernKit::PromptBuilder::Message.new(role: :user, content: scenario[:user])],
-                structured_output_options: structured_output_options,
-                result_validator: semantic_repair ? scenario[:assert] : nil,
-              )
+            begin
+              system_text = scenario[:system].to_s
+              if language_policy_enabled && language_policy_target_lang
+                policy = VibeTavernEval::LanguagePolicyPrompt.build(language_policy_target_lang)
+                system_text = [system_text, policy].map(&:to_s).map(&:strip).reject(&:empty?).join("\n\n")
+              end
+
+              result =
+                directives_runner.run(
+                  system: system_text,
+                  history: [AgentCore::Message.new(role: :user, content: scenario[:user])],
+                  structured_output_options: structured_output_options,
+                  result_validator: semantic_repair ? scenario[:assert] : nil,
+                )
 
             if result[:ok] == true
               reasons = Array(scenario[:assert].call(result))
@@ -1379,7 +1394,7 @@ puts "strategy_filter: #{raw_strategy_filter}" unless raw_strategy_filter.empty?
 puts "strategy_matrix: #{strategy_matrix}" if strategy_matrix
 puts "strategies: #{requested_strategies.map(&:id).join(",")}"
 puts "semantic_repair: #{summary[:semantic_repair]}" unless summary[:semantic_repair].nil?
-puts "full report: #{out_dir.relative_path_from(Rails.root)}"
+puts "full report: #{out_dir.relative_path_from(root)}"
 puts
 
 header = ["model", "profile", "strategy", "lang", "runs", "ok", "rate", "p50_ms", "p95_ms", "sample"]

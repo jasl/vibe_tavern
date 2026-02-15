@@ -7,15 +7,17 @@ require "securerandom"
 require "thread"
 require "time"
 
+# Boot Bundler/Bootsnap without loading full Rails.
+require_relative "../../config/boot"
+
+require "agent_core"
+require "simple_inference"
+
 require_relative "support/openrouter_sampling_profiles"
 require_relative "support/openrouter_models"
-require_relative "support/capabilities_registry"
-
-# Default settings
-ENV["RAILS_ENV"] ||= "development"
-
-# Load Rails environment
-require_relative "../../config/environment"
+require_relative "support/paths"
+require_relative "support/language_policy_prompt"
+require_relative "support/agent_core_openai_provider"
 
 module ToolCallEval
   class ModelCatalog
@@ -134,13 +136,13 @@ module ToolCallEval
     def preset_for(name)
       case canonical_workaround_name(name)
       when "deepseek_openrouter_compat", "deepseek_compat"
-        TavernKit::VibeTavern::ToolCalling::Presets.deepseek_openrouter_compat
+        { message_transforms: ["assistant_tool_calls_reasoning_content_empty_if_missing"] }
       when "gemini_openrouter_compat", "gemini_compat"
-        TavernKit::VibeTavern::ToolCalling::Presets.gemini_openrouter_compat
+        { message_transforms: ["assistant_tool_calls_signature_skip_validator_if_missing"] }
       when "content_tag_tool_call_fallback", "content_tag_fallback"
-        TavernKit::VibeTavern::ToolCalling::Presets.content_tag_tool_call_fallback
+        { response_transforms: ["assistant_content_tool_call_tags_to_tool_calls"] }
       when "tool_use_disabled", "disable_tool_use", "tools_disabled"
-        TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(tool_use_mode: :disabled)
+        { tool_use_mode: :disabled }
       else
         {}
       end
@@ -150,6 +152,16 @@ module ToolCallEval
       name.to_s.strip.downcase.tr("-", "_")
     end
   end
+
+  DEFAULT_TOOL_CALLING = {
+    tool_use_mode: :relaxed,
+    fix_empty_final: true,
+    fix_empty_final_disable_tools: true,
+    fallback_retry_count: 0,
+    message_transforms: [],
+    response_transforms: [],
+    request_overrides: {},
+  }.freeze
 
   module Strategies
     Entry =
@@ -704,14 +716,9 @@ end
 build_provider_tool_calling_preset =
   lambda do |apply_provider_defaults:, enable_tag_fallback:|
     return {} unless apply_provider_defaults == true
+    return {} unless enable_tag_fallback == true
 
-    preset = TavernKit::VibeTavern::ToolCalling::Presets.provider_defaults("openrouter")
-    return preset unless enable_tag_fallback == true
-
-    TavernKit::VibeTavern::ToolCalling::Presets.merge(
-      preset,
-      TavernKit::VibeTavern::ToolCalling::Presets.content_tag_tool_call_fallback,
-    )
+    { response_transforms: ["assistant_content_tool_call_tags_to_tool_calls"] }
   end
 
 fallback_profiles =
@@ -1013,9 +1020,155 @@ module ToolCallEval
     end
   end
 
-  def self.tool_definitions
+  class AllowlistPolicy < AgentCore::Resources::Tools::Policy::Base
+    def initialize(allowlist:)
+      @allowlist =
+        Array(allowlist)
+          .map { |v| v.to_s.strip }
+          .reject(&:empty?)
+          .to_h { |name| [name, true] }
+    end
+
+    def authorize(name:, arguments: {}, context: {})
+      _ = arguments
+      _ = context
+
+      return AgentCore::Resources::Tools::Policy::Decision.allow if @allowlist.empty?
+
+      if @allowlist.key?(name.to_s)
+        AgentCore::Resources::Tools::Policy::Decision.allow
+      else
+        AgentCore::Resources::Tools::Policy::Decision.deny(reason: "TOOL_NOT_ALLOWED")
+      end
+    end
+  end
+
+  class AgentCoreRunner < AgentCore::PromptRunner::Runner
+    private
+
+    def tool_error_envelope(tool_name, code:, message:)
+      {
+        ok: false,
+        tool_name: tool_name.to_s,
+        data: {},
+        warnings: [],
+        errors: [{ code: code.to_s, message: message.to_s }],
+      }
+    end
+
+    def tool_error_result(tool_name, code:, message:)
+      json = JSON.generate(tool_error_envelope(tool_name, code: code, message: message))
+      AgentCore::Resources::Tools::ToolResult.error(text: json)
+    rescue StandardError
+      AgentCore::Resources::Tools::ToolResult.error(text: "#{code}: #{message}")
+    end
+
+    def execute_tool_calls(tool_calls:, tools_registry:, tool_policy:, events:, tool_calls_record:, max_tool_output_bytes:, stream_block:)
+      tool_calls.map do |tc|
+        stream_block&.call(AgentCore::StreamEvent::ToolExecutionStart.new(
+          tool_call_id: tc.id, name: tc.name, arguments: tc.arguments
+        ))
+        events.emit(:tool_call, tc.name, tc.arguments, tc.id)
+
+        if tc.respond_to?(:arguments_valid?) && !tc.arguments_valid?
+          parse_error = tc.respond_to?(:arguments_parse_error) ? tc.arguments_parse_error : :invalid_json
+
+          code =
+            case parse_error
+            when :too_large then "ARGUMENTS_TOO_LARGE"
+            else "INVALID_JSON"
+            end
+
+          error_text =
+            case parse_error
+            when :too_large
+              "Tool call arguments are too large. Retry with smaller arguments."
+            else
+              "Invalid JSON in tool call arguments. Retry with arguments as a JSON object only."
+            end
+
+          error_result = tool_error_result(tc.name, code: code, message: error_text)
+
+          stream_block&.call(AgentCore::StreamEvent::ToolExecutionEnd.new(
+            tool_call_id: tc.id, name: tc.name, result: error_result, error: true
+          ))
+          events.emit(:tool_result, tc.name, error_result, tc.id)
+          tool_calls_record << { name: tc.name, arguments: tc.arguments, error: code }
+
+          next tool_result_to_message(
+            error_result,
+            tool_call_id: tc.id,
+            name: tc.name,
+            max_tool_output_bytes: max_tool_output_bytes,
+          )
+        end
+
+        if tool_policy
+          decision = tool_policy.authorize(name: tc.name, arguments: tc.arguments)
+          unless decision.allowed?
+            error_result = tool_error_result(tc.name, code: "TOOL_DENIED", message: "Tool call denied: #{decision.reason}")
+
+            stream_block&.call(AgentCore::StreamEvent::ToolExecutionEnd.new(
+              tool_call_id: tc.id, name: tc.name, result: error_result, error: true
+            ))
+            events.emit(:tool_result, tc.name, error_result, tc.id)
+            tool_calls_record << { name: tc.name, arguments: tc.arguments, error: decision.reason }
+
+            next tool_result_to_message(
+              error_result,
+              tool_call_id: tc.id,
+              name: tc.name,
+              max_tool_output_bytes: max_tool_output_bytes,
+            )
+          end
+        end
+
+        requested_name = tc.name.to_s
+        execute_name = requested_name
+        unless tools_registry.include?(execute_name)
+          if execute_name.include?(".")
+            underscored = execute_name.tr(".", "_")
+            execute_name = underscored if tools_registry.include?(underscored)
+          end
+        end
+
+        result = begin
+          tools_registry.execute(name: execute_name, arguments: tc.arguments)
+        rescue AgentCore::ToolNotFoundError => e
+          tool_error_result(requested_name, code: "TOOL_NOT_FOUND", message: e.message)
+        rescue StandardError => e
+          tool_error_result(requested_name, code: "TOOL_RAISED", message: e.message)
+        end
+
+        result = limit_tool_result(result, max_bytes: max_tool_output_bytes, tool_name: execute_name)
+
+        stream_block&.call(AgentCore::StreamEvent::ToolExecutionEnd.new(
+          tool_call_id: tc.id, name: tc.name, result: result, error: result.error?
+        ))
+        events.emit(:tool_result, tc.name, result, tc.id)
+
+        tool_calls_record << {
+          name: requested_name,
+          executed_name: execute_name,
+          arguments: tc.arguments,
+          error: result.error? ? result.text : nil,
+        }
+
+        tool_result_to_message(
+          result,
+          tool_call_id: tc.id,
+          name: requested_name,
+          max_tool_output_bytes: max_tool_output_bytes,
+        )
+      end
+    end
+  end
+
+  def self.build_tools(executor:, max_tool_output_bytes:)
+    max_tool_output_bytes = Integer(max_tool_output_bytes)
+
     [
-      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
+      AgentCore::Resources::Tools::Tool.new(
         name: "state_get",
         description:
           "Read workspace state (facts/draft/locks/ui_state/versions). " \
@@ -1033,8 +1186,32 @@ module ToolCallEval
           },
           required: [],
         },
-      ),
-      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
+        metadata: { exposed_to_model: true },
+      ) do |arguments, context:|
+        _ = context
+
+        envelope = executor.call(name: "state_get", args: arguments)
+        json = JSON.generate(envelope)
+
+        if json.bytesize > max_tool_output_bytes
+          err = {
+            ok: false,
+            tool_name: "state_get",
+            data: {},
+            warnings: [],
+            errors: [
+              {
+                code: "TOOL_OUTPUT_TOO_LARGE",
+                message: "Tool output exceeded max_bytes=#{max_tool_output_bytes}.",
+              },
+            ],
+          }
+          return AgentCore::Resources::Tools::ToolResult.error(text: JSON.generate(err))
+        end
+
+        AgentCore::Resources::Tools::ToolResult.success(text: json)
+      end,
+      AgentCore::Resources::Tools::Tool.new(
         name: "state_patch",
         description: "Apply patch operations to draft state (set/delete/append/insert).",
         parameters: {
@@ -1060,12 +1237,17 @@ module ToolCallEval
           },
           required: ["request_id", "ops"],
         },
-      ),
+        metadata: { exposed_to_model: true },
+      ) do |arguments, context:|
+        _ = context
+
+        envelope = executor.call(name: "state_patch", args: arguments)
+        AgentCore::Resources::Tools::ToolResult.success(text: JSON.generate(envelope))
+      end,
       # Include but hide (regression guard): model should never see it.
-      TavernKit::VibeTavern::ToolsBuilder::Definition.new(
+      AgentCore::Resources::Tools::Tool.new(
         name: "facts_commit",
         description: "Commit a facts proposal (must be triggered by UI/user confirmation).",
-        exposed_to_model: false,
         parameters: {
           type: "object",
           additionalProperties: false,
@@ -1077,7 +1259,19 @@ module ToolCallEval
           },
           required: ["workspace_id", "request_id", "proposal_id", "user_confirmed"],
         },
-      ),
+        metadata: { exposed_to_model: false },
+      ) do |_arguments, context:|
+        _ = context
+
+        err = {
+          ok: false,
+          tool_name: "facts_commit",
+          data: {},
+          warnings: [],
+          errors: [{ code: "TOOL_NOT_AVAILABLE", message: "facts_commit is not available." }],
+        }
+        AgentCore::Resources::Tools::ToolResult.error(text: JSON.generate(err))
+      end,
     ]
   end
 end
@@ -1106,6 +1300,56 @@ def deep_merge_hashes(left, right)
     end
   end
   out
+end
+
+def normalize_string_list(value)
+  list = Array(value).map { |v| v.to_s.strip }.reject(&:empty?)
+  list.empty? ? nil : list
+end
+
+def explicit_empty_string_list?(value)
+  case value
+  when String
+    value.split(",").map(&:strip).reject(&:empty?).empty?
+  when Array
+    value.map { |v| v.to_s.strip }.reject(&:empty?).empty?
+  else
+    false
+  end
+end
+
+def merge_string_list(left, right)
+  return nil if right.nil?
+
+  right_list = normalize_string_list(right)
+  return [] if explicit_empty_string_list?(right)
+
+  left_list = normalize_string_list(left)
+  return right_list if left_list.nil?
+
+  (left_list + right_list).uniq
+end
+
+def merge_tool_calling_configs(*configs)
+  Array(configs).compact.reduce({}) do |acc, raw_cfg|
+    cfg = raw_cfg.is_a?(Hash) ? deep_symbolize_keys(raw_cfg) : {}
+
+    cfg.each do |k, v|
+      key = k.to_sym
+
+      case key
+      when :request_overrides
+        acc[key] = deep_merge_hashes(acc[key], v)
+      when :tool_allowlist, :tool_denylist, :message_transforms, :response_transforms, :tool_call_transforms, :tool_result_transforms
+        merged = merge_string_list(acc[key], v)
+        acc[key] = merged unless merged.nil?
+      else
+        acc[key] = v
+      end
+    end
+
+    acc
+  end
 end
 
 def truncate(str, max_chars: 220)
@@ -1512,14 +1756,14 @@ SCENARIOS =
           end
           reasons << %(draft["foo"] != "bar") if tools_enabled && workspace.draft["foo"] != "bar"
 
-          saw_truncation =
-            Array(raw_history).any? do |m|
-              next false unless m.respond_to?(:role) && m.respond_to?(:content)
-              next false unless m.role.to_s == "tool"
+            saw_truncation =
+              Array(raw_history).any? do |m|
+                next false unless m.respond_to?(:role) && m.respond_to?(:content)
+                next false unless %w[tool tool_result].include?(m.role.to_s)
 
-              m.content.to_s.include?("TOOL_OUTPUT_TOO_LARGE")
-            end
-          reasons << "expected TOOL_OUTPUT_TOO_LARGE to be emitted at least once" unless saw_truncation
+                m.content.to_s.include?("TOOL_OUTPUT_TOO_LARGE")
+              end
+            reasons << "expected TOOL_OUTPUT_TOO_LARGE to be emitted at least once" unless saw_truncation
 
           reasons
         },
@@ -1643,8 +1887,9 @@ if selected_language_policies.empty?
   selected_language_policies = [ToolCallEval::LanguagePolicy::OFF]
 end
 
+root = VibeTavernEval::Paths.root
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
-out_dir = Rails.root.join("tmp", "llm_tool_call_eval_reports", timestamp)
+out_dir = root.join("tmp", "llm_tool_call_eval_reports", timestamp)
 FileUtils.mkdir_p(out_dir)
 
 reports = []
@@ -1811,17 +2056,17 @@ process_task =
         end
 
         tool_calling =
-          TavernKit::VibeTavern::ToolCalling::Presets.merge(
-            (apply_infra_defaults ? TavernKit::VibeTavern::ToolCalling::Presets.default_tool_calling : {}),
+          merge_tool_calling_configs(
+            (apply_infra_defaults ? ToolCallEval::DEFAULT_TOOL_CALLING : {}),
             provider_tool_calling_preset,
-            TavernKit::VibeTavern::ToolCalling::Presets.tool_calling(
-              tool_use_mode: tool_use_mode,
+            {
+              tool_use_mode: tool_use_mode.to_sym,
               tool_failure_policy: tool_failure_policy,
               fallback_retry_count: fallback_retry_count,
               fix_empty_final: fix_empty_final,
               tool_allowlist: tool_allowlist,
               request_overrides: effective_request_overrides,
-            ),
+            },
             *model_workaround_presets,
             scenario[:context_overrides] || {},
           )
@@ -1841,19 +2086,10 @@ process_task =
           system_text = system_text.gsub("Done.", done_override)
         end
 
-        context_inputs = { tool_calling: tool_calling }
         if language_policy_enabled && language_policy_target_lang
-          context_inputs[:language_policy] = {
-            enabled: true,
-            target_lang: language_policy_target_lang,
-          }
+          policy = VibeTavernEval::LanguagePolicyPrompt.build(language_policy_target_lang)
+          system_text = [system_text, policy].map(&:to_s).map(&:strip).reject(&:empty?).join("\n\n")
         end
-
-        context =
-          TavernKit::PromptBuilder::Context.build(
-            context_inputs,
-            type: :app,
-          )
 
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         retry_attempts_used = 0
@@ -1876,46 +2112,54 @@ process_task =
           scenario_prepare.call(workspace) if scenario_prepare
 
           tool_executor = ToolCallEval::Executor.new(workspace: workspace)
-          registry =
-            TavernKit::VibeTavern::Tools::Custom::Catalog.new(
-              definitions: ToolCallEval.tool_definitions,
-            )
+          effective_max_tool_args_bytes =
+            Integer(
+              tool_calling.fetch(:max_tool_args_bytes, AgentCore::Utils::DEFAULT_MAX_TOOL_ARGS_BYTES),
+              exception: false,
+            ) || AgentCore::Utils::DEFAULT_MAX_TOOL_ARGS_BYTES
 
-          runner_config =
-            TavernKit::VibeTavern::RunnerConfig.build(
-              provider: "openrouter",
-              model: model,
-              context: context,
-              llm_options_defaults: llm_options_defaults,
-              capabilities_overrides: VibeTavernEval::CapabilitiesRegistry.lookup(provider_id: "openrouter", model: model),
-            )
+          effective_max_tool_output_bytes =
+            Integer(
+              tool_calling.fetch(:max_tool_output_bytes, AgentCore::Utils::DEFAULT_MAX_TOOL_OUTPUT_BYTES),
+              exception: false,
+            ) || AgentCore::Utils::DEFAULT_MAX_TOOL_OUTPUT_BYTES
 
-          tool_surface =
-            if effective_tools_enabled
-              TavernKit::VibeTavern::ToolsBuilder.build(
-                runner_config: runner_config,
-                base_catalog: registry,
-              )
-            end
+          tools = ToolCallEval.build_tools(executor: tool_executor, max_tool_output_bytes: effective_max_tool_output_bytes)
 
-          effective_executor =
-            if effective_tools_enabled
-              TavernKit::VibeTavern::ToolCalling::ExecutorBuilder.build(
-                runner_config: runner_config,
-                registry: tool_surface,
-                default_executor: tool_executor,
-              )
-            end
+          tools_registry = AgentCore::Resources::Tools::Registry.new
+          tools_registry.register_many(tools)
 
-          runner =
-            TavernKit::VibeTavern::ToolCalling::ToolLoopRunner.build(
+          exposed_tools = tools.select { |t| t.metadata.fetch(:exposed_to_model, true) == true }
+
+          effective_tool_allowlist = tool_calling.fetch(:tool_allowlist, nil)
+          effective_tool_allowlist ||= tool_allowlist
+          allowlist_values = normalize_string_list(effective_tool_allowlist)
+          if allowlist_values
+            exposed_tools = exposed_tools.select { |t| allowlist_values.include?(t.name) }
+          end
+
+          prompt_tools = exposed_tools.map(&:to_openai)
+
+          provider =
+            VibeTavernEval::AgentCoreOpenAIProvider.new(
               client: client,
-              runner_config: runner_config,
-              tool_executor: effective_executor,
-              registry: effective_tools_enabled ? tool_surface : registry,
-              system: system_text,
-              strict: false,
+              message_transforms: tool_calling.fetch(:message_transforms, nil),
+              enable_tool_call_tag_fallback: effective_tag_fallback,
+              max_tool_args_bytes: effective_max_tool_args_bytes,
             )
+
+          tool_policy =
+            if effective_tools_enabled && allowlist_values
+              ToolCallEval::AllowlistPolicy.new(allowlist: allowlist_values)
+            end
+
+          runner = ToolCallEval::AgentCoreRunner.new
+
+          request_overrides = tool_calling.fetch(:request_overrides, {})
+          run_options = deep_merge_hashes(llm_options_defaults, request_overrides)
+          run_options.delete(:model)
+          run_options.delete(:messages)
+          run_options[:model] = model
 
           ok = true
           error = nil
@@ -1933,81 +2177,188 @@ process_task =
               user_text = user_text.gsub("Done.", done_override)
             end
 
-            result =
-              if verbose_level <= 0
-                runner.run(user_text: user_text)
-              else
-                runner.run user_text: user_text do |raw_event|
-                  event = raw_event.is_a?(Hash) ? raw_event : {}
-                  type = event.fetch(:type, "").to_s
-                  turn = event.fetch(:turn, nil)
+            prompt_messages = [AgentCore::Message.new(role: :user, content: user_text)]
+            prompt =
+              AgentCore::PromptBuilder::BuiltPrompt.new(
+                system_prompt: system_text,
+                messages: prompt_messages,
+                tools: effective_tools_enabled ? prompt_tools : [],
+                options: run_options,
+              )
 
-                  case type
-                  when "llm_request_start"
-                    tools_on = event[:tools_enabled] == true
-                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] -> llm (tools=#{tools_on ? "on" : "off"})"
-                    if verbose_level >= 2
-                      msg << " msgs=#{event[:messages_count]}"
-                      msg << " tools=#{event[:tools_count]}"
-                      msg << " choice=#{event[:tool_choice] || "auto"}"
-                      if event[:request_attempts_left].to_i.positive?
-                        msg << " retries_left=#{event[:request_attempts_left]}"
-                      end
-                    end
-                    log_line.call(msg)
-                  when "llm_request_error"
-                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] !! llm error"
-                    msg << " status=#{event[:status]}" if event[:status]
-                    msg << " #{event[:elapsed_ms]}ms" if verbose_level >= 2 && event[:elapsed_ms]
-                    msg << " #{truncate(event[:message].to_s, max_chars: 220)}" unless event[:message].to_s.strip.empty?
-                    log_line.call(msg)
-                  when "llm_request_retry"
-                    log_line.call(
-                      "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] .. retry (tools=off, attempts_left=#{event[:request_attempts_left]})",
-                    )
-                  when "llm_request_end"
-                    ms = event[:elapsed_ms]
-                    finish = event[:finish_reason]
-                    tool_calls = Array(event[:tool_calls]).select { |v| v.is_a?(Hash) }
-                    names = tool_calls.map { |tc| tc.fetch(:name, nil) }.map(&:to_s).map(&:strip).reject(&:empty?).uniq
+            trace = []
+            current_trace = nil
+            current_turn = nil
+            last_tool_ok_by_name = {}
+            any_tool_success_seen = false
 
-                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- llm"
-                    msg << " #{ms}ms" if ms
-                    msg << " finish=#{finish}" if finish
-                    msg << " tool_calls=#{names.join(",")}" if names.any?
-                    log_line.call(msg)
-                  when "tool_call_start"
-                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] -> tool #{event[:name]}"
-                    msg << " args=#{event[:arguments_bytes]}B" if verbose_level >= 2
-                    if (parse = event[:parse_status]) && parse.to_s != "ok"
-                      msg << " parse=#{parse}"
-                    end
-                    log_line.call(msg)
-                  when "tool_call_end"
-                    msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- tool #{event[:name]} ok=#{event[:ok]}"
-                    msg << " #{event[:elapsed_ms]}ms" if event[:elapsed_ms]
-                    errors = Array(event[:error_codes]).map(&:to_s).map(&:strip).reject(&:empty?)
-                    msg << " errors=#{errors.join(",")}" if errors.any?
-                    if verbose_level >= 2
-                      msg << " out=#{event[:output_bytes]}B"
-                      msg << " replaced" if event[:output_replaced] == true
-                    end
-                    log_line.call(msg)
-                  when "fix_empty_final"
-                    log_line.call(
-                      "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] .. empty final; retry finalization (disable_tools=#{event[:disable_tools]})",
-                    )
-                  when "final"
-                    log_line.call("  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{turn}] <- final")
+            parse_tool_result =
+              lambda do |tool_result|
+                text = tool_result.respond_to?(:text) ? tool_result.text.to_s : tool_result.to_s
+                envelope =
+                  begin
+                    JSON.parse(text)
+                  rescue JSON::ParserError, TypeError
+                    nil
                   end
-                rescue StandardError
-                  nil
+
+                ok_value = nil
+                codes = []
+
+                if envelope.is_a?(Hash)
+                  ok_value = envelope.fetch("ok", nil)
+                  codes =
+                    Array(envelope.fetch("errors", nil)).filter_map do |err|
+                      err.is_a?(Hash) ? err.fetch("code", nil) : nil
+                    end
+                elsif tool_result.respond_to?(:error?)
+                  ok_value = !tool_result.error?
                 end
+
+                [ok_value, codes, text.bytesize]
               end
 
-            assistant_text = result[:assistant_text]
-            trace = result[:trace]
-            raw_history = Array(result[:history])
+            events = AgentCore::PromptRunner::Events.new
+
+            events.on_turn_start do |turn_num|
+              current_turn = turn_num
+              current_trace = {
+                turn: turn_num,
+                request: {
+                  model: model,
+                  tool_use_mode: effective_tool_use_mode,
+                  tool_failure_policy: tool_calling.fetch(:tool_failure_policy, tool_failure_policy).to_s,
+                  message_transforms: tool_calling.fetch(:message_transforms, []),
+                  response_transforms: tool_calling.fetch(:response_transforms, []),
+                },
+                response_summary: {},
+                tool_calls: [],
+                tool_results: [],
+              }
+              trace << current_trace
+            end
+
+            events.on_llm_request do |request_messages, tools|
+              next unless current_trace
+
+              current_trace[:request][:messages_count] = request_messages.size
+              current_trace[:request][:tools_count] = Array(tools).size
+
+              next if verbose_level <= 0
+
+              tools_on = tools.is_a?(Array) && tools.any?
+              msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{current_turn}] -> llm (tools=#{tools_on ? "on" : "off"})"
+              if verbose_level >= 2
+                msg << " msgs=#{request_messages.size}"
+                msg << " tools=#{Array(tools).size}"
+              end
+              log_line.call(msg)
+            end
+
+            events.on_llm_response do |response|
+              next unless current_trace
+
+              tool_calls = response.respond_to?(:tool_calls) ? response.tool_calls : []
+              names =
+                Array(tool_calls)
+                  .filter_map { |tc| tc.respond_to?(:name) ? tc.name : nil }
+                  .map { |n| n.to_s.strip }
+                  .reject(&:empty?)
+                  .uniq
+
+              summary = {
+                has_tool_calls: names.any?,
+                tool_calls_count: Array(tool_calls).size,
+                ignored_tool_calls_count: 0,
+                usage: response.respond_to?(:usage) && response.usage ? response.usage.to_h : nil,
+                finish_reason: response.respond_to?(:stop_reason) ? response.stop_reason.to_s : nil,
+              }
+
+              assistant_text_raw = response.respond_to?(:message) ? response.message&.text.to_s : ""
+              if names.any? && !assistant_text_raw.strip.empty?
+                summary[:assistant_content_stripped] = true
+                summary[:assistant_content_sample] = assistant_text_raw[0, 200]
+              end
+
+              current_trace[:response_summary] = summary
+
+              next if verbose_level <= 0
+
+              msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{current_turn}] <- llm"
+              msg << " finish=#{summary[:finish_reason]}" if summary[:finish_reason]
+              msg << " tool_calls=#{names.join(",")}" if names.any?
+              log_line.call(msg)
+            end
+
+            events.on_tool_call do |name, arguments, tool_call_id|
+              next unless current_trace
+
+              bytes =
+                begin
+                  JSON.generate(arguments).bytesize
+                rescue StandardError
+                  arguments.to_s.bytesize
+                end
+
+              current_trace[:tool_calls] << {
+                id: tool_call_id.to_s,
+                name: name.to_s,
+                arguments_bytes: bytes,
+              }
+
+              next if verbose_level <= 0
+
+              msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{current_turn}] -> tool #{name}"
+              msg << " args=#{bytes}B" if verbose_level >= 2
+              log_line.call(msg)
+            end
+
+            events.on_tool_result do |name, result, tool_call_id|
+              next unless current_trace
+
+              ok_value, codes, out_bytes = parse_tool_result.call(result)
+              ok_value = ok_value == true
+
+              current_trace[:tool_results] << {
+                id: tool_call_id.to_s,
+                name: name.to_s,
+                ok: ok_value,
+                error_codes: codes,
+              }
+
+              last_tool_ok_by_name[name.to_s] = ok_value
+              any_tool_success_seen ||= ok_value
+
+              next if verbose_level <= 0
+
+              msg = "  [#{task_idx}/#{task_total}] [#{model_idx}/#{model_total}] [t#{current_turn}] <- tool #{name} ok=#{ok_value}"
+              errors = Array(codes).map(&:to_s).map(&:strip).reject(&:empty?)
+              msg << " errors=#{errors.join(",")}" if errors.any?
+              msg << " out=#{out_bytes}B" if verbose_level >= 2
+              log_line.call(msg)
+            end
+
+            tools_registry_for_run = effective_tools_enabled ? tools_registry : nil
+            tool_policy_for_run = effective_tools_enabled ? tool_policy : nil
+
+            fix_empty_final = tool_calling.fetch(:fix_empty_final, true) == true
+            fix_empty_final_disable_tools = tool_calling.fetch(:fix_empty_final_disable_tools, true) == true
+
+            run_result =
+              runner.run(
+                prompt: prompt,
+                provider: provider,
+                tools_registry: tools_registry_for_run,
+                tool_policy: tool_policy_for_run,
+                max_turns: 12,
+                events: events,
+                fix_empty_final: fix_empty_final,
+                fix_empty_final_disable_tools: fix_empty_final_disable_tools,
+                max_tool_output_bytes: effective_max_tool_output_bytes,
+              )
+
+            assistant_text = run_result.text
+            raw_history = prompt_messages + Array(run_result.messages)
 
             fail_reasons =
               Array(
@@ -2034,11 +2385,6 @@ process_task =
               end
               ok = false
             end
-          rescue TavernKit::VibeTavern::ToolCalling::ToolLoopRunner::ToolUseError => e
-            ok = false
-            error = "#{e.code}: #{e.message}"
-            trace = e.details.is_a?(Hash) ? e.details.fetch(:trace, nil) : nil
-            raw_history = e.details.is_a?(Hash) ? Array(e.details.fetch(:history, nil)) : nil
           rescue SimpleInference::Errors::HTTPError => e
             ok = false
             error_status = e.status
@@ -2162,10 +2508,10 @@ process_task =
         report_path = out_dir.join(file_name)
         File.write(report_path, JSON.pretty_generate(report))
 
-        run_meta = {
-          model: model_label,
-          model_base: model,
-          strategy: strategy_id,
+          run_meta = {
+            model: model_label,
+            model_base: model,
+            strategy: strategy_id,
           fallback_profile: fallback_profile_id,
           sampling_profile: sampling_profile_id,
           empty_response_retry_attempts: retry_attempts_used,
@@ -2177,12 +2523,12 @@ process_task =
           trial: trial_idx + 1,
           ok: ok,
           elapsed_ms: elapsed_ms,
-          error: error,
-          error_hint: error_hint,
-          error_status: error_status,
-          error_category: report[:error_category],
-          report_path: report_path.relative_path_from(Rails.root).to_s,
-        }
+            error: error,
+            error_hint: error_hint,
+            error_status: error_status,
+            error_category: report[:error_category],
+            report_path: report_path.relative_path_from(root).to_s,
+          }
 
         runs << run_meta
         failures << run_meta unless ok
@@ -2467,7 +2813,7 @@ puts "scenarios: #{scenarios.map { |s| s[:id] }.join(",")}"
 puts "model_profiles: #{reports.size} (runs=#{total_runs}, ok=#{successes}, fail=#{failures})"
 puts "tool_scenarios_only: #{tool_ok}/#{tool_runs.size}" if tool_runs.any?
 puts "control_chat_only: #{control_ok}/#{control_runs.size}" if control_runs.any?
-puts "full report: #{out_dir.relative_path_from(Rails.root)}"
+puts "full report: #{out_dir.relative_path_from(root)}"
 puts
 
 header = [

@@ -5,9 +5,14 @@ require "json"
 require "optparse"
 require "set"
 
-ENV["RAILS_ENV"] ||= "development"
-require_relative "../../config/environment"
+# Boot Bundler/Bootsnap without loading full Rails.
+require_relative "../../config/boot"
+
+require "agent_core"
+
 require_relative "support/openrouter_models"
+require_relative "support/paths"
+require_relative "../../lib/agent_core/contrib/token_estimation"
 
 module LlmTokenEstimatorRegistryAudit
   module_function
@@ -23,7 +28,8 @@ module LlmTokenEstimatorRegistryAudit
       return 2
     end
 
-    registry = AgentCore::Contrib::TokenEstimation.registry(root: Rails.root)
+    root = VibeTavernEval::Paths.root
+    registry = AgentCore::Contrib::TokenEstimation.registry(root: root)
     rows = models.to_a.sort.map { |model| build_row(model: model, registry: registry) }
 
     print_rows(rows: rows, format: options.fetch(:format), models_source: options.fetch(:models_source))

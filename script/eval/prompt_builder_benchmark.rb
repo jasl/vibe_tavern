@@ -4,15 +4,12 @@
 require "json"
 require "time"
 
-ENV["RAILS_ENV"] ||= "development"
-
 # Boot Bundler/Bootsnap without loading full Rails.
 require_relative "../../config/boot"
 
-require "tavern_kit"
+require "agent_core"
 
-# App-owned pipeline (not loaded by the gem).
-require_relative "../../lib/tavern_kit/vibe_tavern/pipeline"
+require_relative "../../lib/agent_core/contrib/openai_history"
 
 module PromptBuilderBenchmark
   module_function
@@ -34,41 +31,64 @@ module PromptBuilderBenchmark
     default
   end
 
-  CheapTokenEstimator =
-    Class.new do
-      def estimate(text, model_hint: nil)
-        _ = model_hint
-        ((text.to_s.bytesize / 4.0).ceil).clamp(1, 1_000_000)
-      end
-
-      def describe(model_hint: nil)
-        _ = model_hint
-        { backend: "cheap", encoding: "bytes/4" }
-      end
-    end
-
-  def cheap_estimator
-    @cheap_estimator ||= CheapTokenEstimator.new
-  end
-
   def build_history(length, kind:)
     messages =
       Array.new(length) do |i|
         role = i.even? ? :user : :assistant
-        TavernKit::PromptBuilder::Message.new(role: role, content: "hello #{i}")
+        AgentCore::Message.new(role: role, content: "hello #{i}")
       end
 
     case kind
-    when "in_memory"
-      TavernKit::ChatHistory::InMemory.new(messages)
     when "array_messages"
       messages
-    when "array_hashes"
+    when "array_hashes_symbol_keys"
       messages.map { |m| { role: m.role, content: m.content } }
+    when "array_hashes_string_keys"
+      messages.map { |m| { "role" => m.role.to_s, "content" => m.content } }
     else
       raise ArgumentError, "unknown HISTORY_KIND: #{kind.inspect}"
     end
   end
+
+  DEFAULT_TOOLS = [
+    {
+      "type" => "function",
+      "function" => {
+        "name" => "state_get",
+        "description" => "Read workspace state.",
+        "parameters" => {
+          "type" => "object",
+          "additionalProperties" => false,
+          "properties" => {
+            "workspace_id" => { "type" => "string" },
+          },
+          "required" => [],
+        },
+      },
+    },
+    {
+      "type" => "function",
+      "function" => {
+        "name" => "state_patch",
+        "description" => "Apply patch operations to draft state.",
+        "parameters" => {
+          "type" => "object",
+          "additionalProperties" => false,
+          "properties" => {
+            "request_id" => { "type" => "string" },
+            "ops" => { "type" => "array" },
+          },
+          "required" => ["request_id", "ops"],
+        },
+      },
+    },
+  ].freeze
+
+  DEFAULT_OPTIONS = {
+    model: "openai/gpt-5.2-chat",
+    temperature: 0.7,
+    max_tokens: 256,
+  }.freeze
 
   def measure(warmup:, iterations:)
     warmup.times { yield }
@@ -132,116 +152,82 @@ module PromptBuilderBenchmark
     iterations = env_int("ITER", 300)
     history_len = env_int("HISTORY", 8)
 
-    cases = env_list("CASES", "vibe_tavern,silly_tavern")
-    mode = env_choice("MODE", "build", allowed: %w[build to_messages both])
+    cases = env_list("CASES", "coerce_messages,built_prompt,built_prompt_with_coerce,estimate_tokens")
     format = env_choice("FORMAT", "table", allowed: %w[table jsonl])
-    history_kind = env_choice("HISTORY_KIND", "in_memory", allowed: %w[in_memory array_messages array_hashes])
+    history_kind =
+      env_choice(
+        "HISTORY_KIND",
+        "array_hashes_string_keys",
+        allowed: %w[array_messages array_hashes_symbol_keys array_hashes_string_keys],
+      )
+    tools_mode = env_choice("TOOLS", "on", allowed: %w[on off])
+    tools = tools_mode == "on" ? DEFAULT_TOOLS : []
+    system_prompt = ENV.fetch("SYSTEM", "You are a helpful assistant.").to_s
+    options = DEFAULT_OPTIONS
+    token_counter = AgentCore::Resources::TokenCounter::Heuristic.new
 
     gc_mode = env_choice("GC_MODE", "enable", allowed: %w[enable disable])
     gc_was_enabled = nil
     gc_was_enabled = GC.disable if gc_mode == "disable"
 
-    history = build_history(history_len, kind: history_kind)
-
-    character = TavernKit::Character.create(name: "Alice", description: "A test character.")
-    user = TavernKit::User.new(name: "Bob", persona: "A test persona.")
-
-    vibe_configs_on = {
-      language_policy: {
-        enabled: true,
-        target_lang: "zh-CN",
-        special_tags: ["lang"],
-      },
-    }
+    history_input = build_history(history_len, kind: history_kind)
 
     results = []
 
-    if cases.include?("vibe_tavern")
-      pipeline = TavernKit::VibeTavern::Pipeline
-      base_inputs = {
-        pipeline: pipeline,
-        character: character,
-        user: user,
-        history: history,
-        message: "Hello, world.",
-        token_estimator: cheap_estimator,
-      }
-
-      if mode == "build" || mode == "both"
-        results << run_case("vibe_tavern:build", warmup: warmup, iterations: iterations) do
-          measure(warmup: warmup, iterations: iterations) do
-            TavernKit::PromptBuilder.build(**base_inputs)
-          end
-        end
-
-        results << run_case("vibe_tavern:build+language_policy", warmup: warmup, iterations: iterations) do
-          measure(warmup: warmup, iterations: iterations) do
-            TavernKit::PromptBuilder.build(**base_inputs, configs: vibe_configs_on)
-          end
-        end
-      end
-
-      if mode == "to_messages" || mode == "both"
-        results << run_case("vibe_tavern:to_messages", warmup: warmup, iterations: iterations) do
-          measure(warmup: warmup, iterations: iterations) do
-            TavernKit::PromptBuilder.to_messages(dialect: :openai, **base_inputs)
-          end
+    if cases.include?("coerce_messages")
+      results << run_case("#{history_kind}:coerce_messages", warmup: warmup, iterations: iterations) do
+        measure(warmup: warmup, iterations: iterations) do
+          AgentCore::Contrib::OpenAIHistory.coerce_messages(history_input)
         end
       end
     end
 
-    if cases.include?("silly_tavern")
-      pipeline = TavernKit::SillyTavern::Pipeline
-      base_inputs = {
-        pipeline: pipeline,
-        character: character,
-        user: user,
-        history: history,
-        message: "Hello, world.",
-        token_estimator: cheap_estimator,
-      }
-
-      if mode == "build" || mode == "both"
-        results << run_case("silly_tavern:build", warmup: warmup, iterations: iterations) do
-          measure(warmup: warmup, iterations: iterations) do
-            TavernKit::PromptBuilder.build(**base_inputs)
-          end
-        end
+    base_messages =
+      if history_input.is_a?(Array) && history_input.all? { |m| m.is_a?(AgentCore::Message) }
+        history_input
+      else
+        AgentCore::Contrib::OpenAIHistory.coerce_messages(history_input)
       end
 
-      if mode == "to_messages" || mode == "both"
-        results << run_case("silly_tavern:to_messages", warmup: warmup, iterations: iterations) do
-          measure(warmup: warmup, iterations: iterations) do
-            TavernKit::PromptBuilder.to_messages(dialect: :openai, **base_inputs)
-          end
+    if cases.include?("built_prompt")
+      results << run_case("#{history_kind}:built_prompt", warmup: warmup, iterations: iterations) do
+        measure(warmup: warmup, iterations: iterations) do
+          AgentCore::PromptBuilder::BuiltPrompt.new(
+            system_prompt: system_prompt,
+            messages: base_messages.dup,
+            tools: tools,
+            options: options,
+          )
         end
       end
     end
 
-    if cases.include?("risu_ai")
-      pipeline = TavernKit::RisuAI::Pipeline
-      base_inputs = {
-        pipeline: pipeline,
-        character: character,
-        user: user,
-        history: history,
-        message: "Hello, world.",
-        token_estimator: cheap_estimator,
-      }
-
-      if mode == "build" || mode == "both"
-        results << run_case("risu_ai:build", warmup: warmup, iterations: iterations) do
-          measure(warmup: warmup, iterations: iterations) do
-            TavernKit::PromptBuilder.build(**base_inputs)
-          end
+    if cases.include?("built_prompt_with_coerce")
+      results << run_case("#{history_kind}:built_prompt_with_coerce", warmup: warmup, iterations: iterations) do
+        measure(warmup: warmup, iterations: iterations) do
+          messages = AgentCore::Contrib::OpenAIHistory.coerce_messages(history_input)
+          AgentCore::PromptBuilder::BuiltPrompt.new(
+            system_prompt: system_prompt,
+            messages: messages,
+            tools: tools,
+            options: options,
+          )
         end
       end
+    end
 
-      if mode == "to_messages" || mode == "both"
-        results << run_case("risu_ai:to_messages", warmup: warmup, iterations: iterations) do
-          measure(warmup: warmup, iterations: iterations) do
-            TavernKit::PromptBuilder.to_messages(dialect: :openai, **base_inputs)
-          end
+    if cases.include?("estimate_tokens")
+      results << run_case("#{history_kind}:estimate_tokens", warmup: warmup, iterations: iterations) do
+        measure(warmup: warmup, iterations: iterations) do
+          messages = AgentCore::Contrib::OpenAIHistory.coerce_messages(history_input)
+          prompt =
+            AgentCore::PromptBuilder::BuiltPrompt.new(
+              system_prompt: system_prompt,
+              messages: messages,
+              tools: tools,
+              options: options,
+            )
+          prompt.estimate_tokens(token_counter: token_counter)
         end
       end
     end
@@ -253,8 +239,9 @@ module PromptBuilderBenchmark
       print_table(results)
       puts
       puts "Notes:"
-      puts "- This measures only local prompt-building (no LLM/network)."
-      puts "- HISTORY_KIND=in_memory avoids per-run history normalization overhead."
+      puts "- This measures only local prompt assembly (no LLM/network)."
+      puts "- CASES controls which steps are included in the measurement."
+      puts "- TOOLS=off removes tool-schema serialization overhead from estimate_tokens."
       puts "- GC_MODE=disable can reduce noise but may increase memory usage."
     end
   ensure

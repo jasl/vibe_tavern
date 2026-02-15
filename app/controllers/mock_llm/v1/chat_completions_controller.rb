@@ -74,7 +74,7 @@ module MockLLM
         end
 
         if prompt.blank?
-          "Hello! I'm a mock LLM running inside TavernKit Playground. #{random_id}"
+          "Hello! I'm a mock LLM running inside VibeTavern. #{random_id}"
         elsif prompt.match?(/brief greeting/i)
           "Hello! (mock) Nice to meet you. #{random_id}"
         else

@@ -4,11 +4,14 @@
 require "json"
 require "time"
 
-# Default settings
-ENV["RAILS_ENV"] ||= "development"
+# Boot Bundler/Bootsnap without loading full Rails.
+require_relative "../../config/boot"
 
-# Load Rails environment (for SimpleInference + app dependencies)
-require_relative "../../config/environment"
+require "agent_core"
+require "simple_inference"
+
+require_relative "support/paths"
+require_relative "../../lib/agent_core/contrib/token_estimation"
 
 api_key = ENV.fetch("OPENROUTER_API_KEY", "").to_s.strip
 if api_key.empty?
@@ -66,6 +69,9 @@ messages = [
   { role: "system", content: "You are a helpful assistant." },
   { role: "user", content: user_text },
 ]
+
+root = VibeTavernEval::Paths.root
+AgentCore::Contrib::TokenEstimation.configure(root: root)
 
 estimator = AgentCore::Contrib::TokenEstimation.estimator
 

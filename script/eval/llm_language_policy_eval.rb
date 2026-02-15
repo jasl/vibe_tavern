@@ -7,15 +7,17 @@ require "securerandom"
 require "thread"
 require "time"
 
+# Boot Bundler/Bootsnap without loading full Rails.
+require_relative "../../config/boot"
+
+require "agent_core"
+require "simple_inference"
+
 require_relative "support/openrouter_sampling_profiles"
 require_relative "support/openrouter_models"
-require_relative "support/capabilities_registry"
-
-# Default settings
-ENV["RAILS_ENV"] ||= "development"
-
-# Load Rails environment (for SimpleInference + VibeTavern pipeline)
-require_relative "../../config/environment"
+require_relative "support/paths"
+require_relative "support/language_policy_prompt"
+require_relative "support/agent_core_openai_provider"
 
 module LanguagePolicyEval
   class ModelCatalog
@@ -613,8 +615,9 @@ if scenarios.empty?
   exit 2
 end
 
+root = VibeTavernEval::Paths.root
 timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
-out_dir = Rails.root.join("tmp", "llm_language_policy_eval_reports", timestamp)
+out_dir = root.join("tmp", "llm_language_policy_eval_reports", timestamp)
 FileUtils.mkdir_p(out_dir)
 
 task_list =
@@ -692,29 +695,20 @@ process_task =
           read_timeout: client_read_timeout,
         )
 
-      context = nil
-      if language_policy_enabled && target_lang_raw
-        lp_cfg = {
-          enabled: true,
-          target_lang: target_lang_raw,
-        }
-        lp_cfg[:special_tags] = ["lang"] if scenario[:uses_lang_spans] == true
-        context = { language_policy: lp_cfg }
-      end
-
-      runner_config =
-        TavernKit::VibeTavern::RunnerConfig.build(
-          provider: "openrouter",
-          model: model,
-          context: context,
-          llm_options_defaults: llm_options_defaults,
-          capabilities_overrides: VibeTavernEval::CapabilitiesRegistry.lookup(provider_id: "openrouter", model: model),
-        )
-
-      prompt_runner = TavernKit::VibeTavern::PromptRunner.new(client: client)
+      provider = VibeTavernEval::AgentCoreOpenAIProvider.new(client: client)
 
       user_text = scenario.fetch(:user_text).call(language_policy_target_lang || "")
-      history = [TavernKit::PromptBuilder::Message.new(role: :user, content: user_text)]
+      system_text = ""
+      if language_policy_enabled && target_lang_raw
+        tags = scenario[:uses_lang_spans] == true ? ["lang"] : []
+        system_text = VibeTavernEval::LanguagePolicyPrompt.build(target_lang_raw, special_tags: tags)
+      end
+
+      injected_target_lang = system_text[/Respond in:\s*([A-Za-z0-9-]+)/, 1]
+
+      prompt_messages = []
+      prompt_messages << AgentCore::Message.new(role: :system, content: system_text) unless system_text.strip.empty?
+      prompt_messages << AgentCore::Message.new(role: :user, content: user_text)
 
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       retry_attempts_used = 0
@@ -724,26 +718,27 @@ process_task =
       assistant_text = nil
       assistant_message = nil
       finish_reason = nil
-      injected_target_lang = nil
 
       begin
-        prompt_request =
-          prompt_runner.build_request(
-            runner_config: runner_config,
-            history: history,
-            strict: false,
-          )
-        injected_target_lang = LanguagePolicyEval::Util.extract_injected_target_lang(prompt_request.messages)
-
         transient_error = nil
 
         while retry_attempts_used < max_attempts
           retry_attempts_used += 1
 
           begin
-            result = prompt_runner.perform(prompt_request)
-            assistant_message = result.assistant_message
-            finish_reason = result.finish_reason
+            resp =
+              provider.chat(
+                messages: prompt_messages,
+                model: model,
+                tools: nil,
+                stream: false,
+                **llm_options_defaults,
+              )
+
+            body = resp.raw.is_a?(Hash) ? resp.raw : {}
+            assistant_message = body.dig("choices", 0, "message")
+            assistant_message = {} unless assistant_message.is_a?(Hash)
+            finish_reason = body.dig("choices", 0, "finish_reason")
             assistant_text = assistant_message.fetch("content", nil).to_s
             transient_error = nil
           rescue SimpleInference::Errors::TimeoutError => e
@@ -855,7 +850,7 @@ process_task =
       file_name = "#{safe_model}__#{safe_profile}__lang_#{safe_lang}__#{safe_scenario}__trial_#{format("%02d", trial_idx + 1)}.json"
       report_path = out_dir.join(file_name)
       File.write(report_path, JSON.pretty_generate(report))
-      report[:report_path] = report_path.relative_path_from(Rails.root).to_s
+      report[:report_path] = report_path.relative_path_from(root).to_s
 
       reports << report
     end
@@ -989,7 +984,7 @@ puts "language_policies: #{selected_language_policies.map(&:id).join(",")}"
 puts "trials_per_model: #{trials_per_model}"
 puts "scenarios: #{scenarios.map { |s| s[:id] }.join(",")}"
 puts "runs: #{reports.length} (ok=#{successes}, fail=#{failures})"
-puts "full report: #{out_dir.relative_path_from(Rails.root)}"
+puts "full report: #{out_dir.relative_path_from(root)}"
 puts
 
 header = ["model", "profile", "lang", "scenario", "runs", "ok", "rate", "sample"]
