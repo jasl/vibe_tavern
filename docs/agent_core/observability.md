@@ -85,7 +85,7 @@ Typical payload fields:
   `outcome` (`allow|deny|confirm`), `reason`, `stage` (`policy|confirmation`, optional)
 - `agent_core.tool.execute`: `tool_call_id`, `name`, `executed_name`, `source`
   (`native|mcp|skills|policy|runner|unknown`), `arguments_summary`,
-  `result_error`, `result_summary`
+  `result_error`, `result_summary`, `stage` (`external`, optional)
 
 ## TraceRecorder (in-memory)
 

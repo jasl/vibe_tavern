@@ -85,7 +85,7 @@ class ExecuteToolCallJob < ApplicationJob
 
   def perform(run_id:, tool_call_id:, name:, arguments:)
     registry = AppTools.registry
-    ctx = AgentCore::ExecutionContext.from({ run_id: run_id, user_id: Current.user&.id })
+    ctx = AgentCore::ExecutionContext.from({ user_id: Current.user&.id }).with(run_id: run_id)
 
     result = registry.execute(name: name, arguments: arguments, context: ctx)
 

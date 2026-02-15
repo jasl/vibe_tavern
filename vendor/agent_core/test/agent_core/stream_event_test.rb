@@ -124,4 +124,12 @@ class AgentCore::StreamEventTest < Minitest::Test
     event = AgentCore::StreamEvent::ErrorEvent.new(error: RuntimeError.new("x"))
     refute event.recoverable?
   end
+
+  def test_tool_execution_required
+    pending = [AgentCore::PromptRunner::PendingToolExecution.new(tool_call_id: "tc_1", name: "a", executed_name: "a", arguments: {}, arguments_summary: "{}", source: "native")]
+    event = AgentCore::StreamEvent::ToolExecutionRequired.new(run_id: "run_1", pending_tool_executions: pending)
+    assert_equal "run_1", event.run_id
+    assert_equal pending, event.pending_tool_executions
+    assert_equal :tool_execution_required, event.type
+  end
 end
