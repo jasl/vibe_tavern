@@ -163,7 +163,8 @@ AgentCore does not prescribe persistence; one workable Rails pattern is:
 
 1. Persist `continuation` keyed by `(run_id, continuation_id)`.
 2. Enqueue one job per `PendingToolExecution`.
-3. Persist `ToolResult` output keyed by `(run_id, continuation_id, tool_call_id)`.
+3. Persist `ToolResult` output keyed by `(run_id, tool_call_id)` (optionally
+   store `continuation_id` as an audit/debug field).
 4. When all tool results are ready, resume the run (or use `allow_partial: true` to resume incrementally).
 
 Example sketch (adapt to your persistence choices):
@@ -222,7 +223,7 @@ continuation_payload = ContinuationRecord.find_by!(run_id: run_id, status: "curr
 continuation = AgentCore::PromptRunner::ContinuationCodec.load(continuation_payload)
 
 tool_results =
-  ToolResultRecord.where(run_id: run_id, continuation_id: continuation_payload.fetch("continuation_id")).to_h do |r|
+  ToolResultRecord.where(run_id: run_id).to_h do |r|
     [
       r.tool_call_id,
       AgentCore::Resources::Tools::ToolResult.from_h(r.tool_result),
@@ -247,6 +248,10 @@ Notes:
 - Each pause generates a new `continuation_id`. Apps should treat continuations
   as single-use tokens and implement optimistic locking / CAS so stale
   continuations cannot be resumed concurrently.
+- If you use `allow_partial: true` and resume multiple times before all tools
+  finish, `continuation_id` will rotate. Prefer keying tool results by
+  `(run_id, tool_call_id)` to avoid losing results produced under an earlier
+  checkpoint, or aggregate results across the `parent_continuation_id` chain.
 - If `ContinuationCodec` rejects an old/new payload (`schema_version` mismatch),
   you must decide on an app-level migration or fail the resume attempt.
 - `resume_with_tool_results` only accepts `ToolResult` values (no Hash/String

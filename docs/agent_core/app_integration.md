@@ -166,7 +166,8 @@ implement optimistic locking / CAS.
 Recommended persistence shape:
 
 - Continuation record: `(run_id, continuation_id, parent_continuation_id, payload, status)`
-- Tool result record (deferred execution): `(run_id, continuation_id, tool_call_id, tool_result_payload, status)`
+- Tool result record (deferred execution): `(run_id, tool_call_id, tool_result_payload, status)`
+  - optionally store `continuation_id` as an audit/debug field
 
 Recommended flow:
 
@@ -179,8 +180,10 @@ Recommended flow:
 
 For `allow_partial: true` deferred tool execution:
 
-- Key tool results by `(run_id, continuation_id, tool_call_id)` (do not mix
-  results across continuation checkpoints).
+- Prefer keying tool results by `(run_id, tool_call_id)`.
+- If you also store `continuation_id`, treat it as an *observed at* checkpoint,
+  not as the primary key. `allow_partial: true` rotates continuation ids across
+  resumes.
 - Resume can be called multiple times; each pause produces a new
   `continuation_id`. This lets the app support concurrent workers and
   idempotent replays without cross-talk.

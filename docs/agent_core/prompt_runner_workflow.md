@@ -52,8 +52,10 @@ into a stable JSON-safe task payload for schedulers:
 Task payloads include **raw tool arguments**. Treat them as sensitive.
 
 Task payloads also carry `continuation_id` so app schedulers can key work and
-results by `(run_id, continuation_id, tool_call_id)` to avoid mixing results
-across pauses.
+results by `run_id` and associate them with a checkpoint. If you use
+`allow_partial: true`, continuation ids will rotate; prefer keying tool results
+by `(run_id, tool_call_id)` or aggregate across the `parent_continuation_id`
+chain.
 
 ## Resume
 
