@@ -67,6 +67,8 @@ Runner currently emits these events:
 - `agent_core.run`
 - `agent_core.turn`
 - `agent_core.llm.call`
+- `agent_core.pause`
+- `agent_core.resume`
 - `agent_core.tool.task.created`
 - `agent_core.tool.task.deferred`
 - `agent_core.tool.authorize`
@@ -83,6 +85,10 @@ Typical payload fields:
 - `agent_core.turn`: `turn_number`, `stop_reason`, `usage`
 - `agent_core.llm.call`: `model`, `stream`, `messages_count`, `tools_count`,
   `options_summary`, `stop_reason`, `usage`
+- `agent_core.pause`: `turn_number`, `pause_reason`, `continuation_id`,
+  `pending_confirmations_count`, `pending_executions_count`
+- `agent_core.resume`: `paused_turn_number`, `pause_reason`, `continuation_id`,
+  `resumed`
 - `agent_core.tool.authorize`: `tool_call_id`, `name`, `arguments_summary`,
   `outcome` (`allow|deny|confirm`), `reason`, `stage` (`policy|confirmation`, optional)
 - `agent_core.tool.task.created`: `tool_call_id`, `name`, `arguments_summary`,

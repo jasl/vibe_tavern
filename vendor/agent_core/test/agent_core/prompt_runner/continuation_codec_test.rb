@@ -42,15 +42,21 @@ class AgentCore::PromptRunner::ContinuationCodecTest < Minitest::Test
       )
 
     assert paused.awaiting_tool_results?
+    refute_nil paused.continuation.continuation_id
+    assert_nil paused.continuation.parent_continuation_id
 
     payload = AgentCore::PromptRunner::ContinuationCodec.dump(paused.continuation, include_traces: false)
     refute payload.key?("turn_traces")
+    assert_equal paused.continuation.continuation_id, payload.fetch("continuation_id")
+    refute payload.key?("parent_continuation_id")
 
     json = JSON.generate(payload)
     parsed = JSON.parse(json)
     loaded = AgentCore::PromptRunner::ContinuationCodec.load(parsed)
 
     assert_equal paused.run_id, loaded.run_id
+    assert_equal paused.continuation.continuation_id, loaded.continuation_id
+    assert_nil loaded.parent_continuation_id
     assert_equal :awaiting_tool_results, loaded.pause_reason
 
     resumed =
@@ -108,9 +114,15 @@ class AgentCore::PromptRunner::ContinuationCodecTest < Minitest::Test
 
     assert paused.awaiting_tool_confirmation?
     assert_equal 0, executed
+    refute_nil paused.continuation.continuation_id
+    assert_nil paused.continuation.parent_continuation_id
 
     payload = AgentCore::PromptRunner::ContinuationCodec.dump(paused.continuation)
+    assert_equal paused.continuation.continuation_id, payload.fetch("continuation_id")
+    refute payload.key?("parent_continuation_id")
     loaded = AgentCore::PromptRunner::ContinuationCodec.load(JSON.generate(payload))
+    assert_equal paused.continuation.continuation_id, loaded.continuation_id
+    assert_nil loaded.parent_continuation_id
 
     resumed =
       @runner.resume(

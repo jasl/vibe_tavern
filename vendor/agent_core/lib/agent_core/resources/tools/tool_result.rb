@@ -54,6 +54,48 @@ module AgentCore
           { content: content, error: error, metadata: metadata }
         end
 
+        # Build a ToolResult from a Hash (symbol or string keys) or JSON String.
+        #
+        # Intended for app-side persistence round-trips and job queues.
+        #
+        # @param value [Hash, String]
+        # @return [ToolResult]
+        def self.from_h(value)
+          h =
+            case value
+            when String
+              begin
+                require "json"
+                JSON.parse(value)
+              rescue JSON::ParserError => e
+                raise ArgumentError, "tool result is not valid JSON: #{e.message}"
+              end
+            when Hash
+              value
+            else
+              raise ArgumentError, "tool result must be a Hash or JSON String (got #{value.class})"
+            end
+
+          raise ArgumentError, "tool result must be a Hash" unless h.is_a?(Hash)
+
+          content = h.fetch("content", h.fetch(:content, nil))
+          raise ArgumentError, "tool result content must be an Array" unless content.is_a?(Array)
+
+          error = h.fetch("error", h.fetch(:error, false))
+
+          metadata = h.fetch("metadata", h.fetch(:metadata, {}))
+          metadata = {} if metadata.nil?
+          raise ArgumentError, "tool result metadata must be a Hash" unless metadata.is_a?(Hash)
+
+          metadata = AgentCore::Utils.symbolize_keys(metadata)
+
+          new(
+            content: content,
+            error: !!error,
+            metadata: metadata,
+          )
+        end
+
         # Build a successful text result.
         def self.success(text:, metadata: {})
           new(

@@ -23,6 +23,8 @@ When paused, the `RunResult` includes:
 - `stop_reason` (`awaiting_*`)
 - `pending_tool_confirmations` or `pending_tool_executions`
 - `continuation` (opaque resume token/state)
+  - `continuation.continuation_id` (checkpoint id; changes on each pause)
+  - `continuation.parent_continuation_id` (links pause→pause when resuming and pausing again)
 
 ## Persisting pause state (Continuation v1)
 
@@ -35,6 +37,10 @@ payload:
 Only persist explicitly allowlisted `context_keys` (tenant/user/workspace ids).
 Never persist secrets (tokens/headers/env).
 
+Each pause produces a new `continuation_id`. On resume, if the run pauses again
+(e.g. partial tool results), the next continuation will have a new
+`continuation_id` and set `parent_continuation_id` to the resumed token.
+
 ## Deriving deferred tool tasks
 
 When paused with `:awaiting_tool_results`, the continuation can be converted
@@ -44,6 +50,10 @@ into a stable JSON-safe task payload for schedulers:
 - `AgentCore::PromptRunner::ToolTaskCodec.load(payload)`
 
 Task payloads include **raw tool arguments**. Treat them as sensitive.
+
+Task payloads also carry `continuation_id` so app schedulers can key work and
+results by `(run_id, continuation_id, tool_call_id)` to avoid mixing results
+across pauses.
 
 ## Resume
 
@@ -60,8 +70,8 @@ payload (`Hash` / JSON `String`).
 
 Runner publishes structured pause/resume events (no raw tool args/results):
 
-- `agent_core.pause` — `{ run_id, turn_number, pause_reason, pending_*_count }`
-- `agent_core.resume` — `{ run_id, paused_turn_number, pause_reason, resumed: true }`
+- `agent_core.pause` — `{ run_id, turn_number, pause_reason, continuation_id, pending_*_count }`
+- `agent_core.resume` — `{ run_id, paused_turn_number, pause_reason, continuation_id, resumed: true }`
 - `agent_core.tool.task.created` / `.deferred` — per-tool lifecycle (no raw args)
 
 Use these for progress tracking, audits, and correlating out-of-band tool work.

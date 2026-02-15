@@ -96,6 +96,8 @@ module AgentCore
     Continuation =
       Data.define(
         :run_id,
+        :continuation_id,
+        :parent_continuation_id,
         :started_at,
         :duration_ms,
         :turn,

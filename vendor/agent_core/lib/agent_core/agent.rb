@@ -226,7 +226,7 @@ module AgentCore
     end
 
     # Resume a paused run after receiving external tool execution results.
-    def resume_with_tool_results(continuation:, tool_results:, context: nil, instrumenter: nil, events: nil)
+    def resume_with_tool_results(continuation:, tool_results:, context: nil, instrumenter: nil, events: nil, allow_partial: false)
       events = build_events(events)
       execution_context = ExecutionContext.from(context, instrumenter: instrumenter)
 
@@ -245,6 +245,7 @@ module AgentCore
           reserved_output_tokens: reserved_output_tokens,
           context: execution_context,
           events: events,
+          allow_partial: allow_partial,
         )
 
       result.messages.each { |msg| chat_history.append(msg) }
@@ -252,7 +253,7 @@ module AgentCore
     end
 
     # Streaming variant of {#resume_with_tool_results}.
-    def resume_stream_with_tool_results(continuation:, tool_results:, context: nil, instrumenter: nil, events: nil, &block)
+    def resume_stream_with_tool_results(continuation:, tool_results:, context: nil, instrumenter: nil, events: nil, allow_partial: false, &block)
       events = build_events(events)
       execution_context = ExecutionContext.from(context, instrumenter: instrumenter)
 
@@ -271,6 +272,7 @@ module AgentCore
           reserved_output_tokens: reserved_output_tokens,
           context: execution_context,
           events: events,
+          allow_partial: allow_partial,
           &block
         )
 
@@ -354,8 +356,10 @@ module AgentCore
         cont = value.continuation
         raise ArgumentError, "run_result has no continuation" unless cont
         cont
+      when Hash, String
+        value
       else
-        raise ArgumentError, "continuation must be a PromptRunner::Continuation or PromptRunner::RunResult (got #{value.class})"
+        raise ArgumentError, "continuation must be a PromptRunner::Continuation, PromptRunner::RunResult, Hash, or JSON String (got #{value.class})"
       end
     end
   end

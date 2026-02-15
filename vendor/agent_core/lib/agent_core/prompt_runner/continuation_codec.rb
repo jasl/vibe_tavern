@@ -56,6 +56,12 @@ module AgentCore
           payload["turn_traces"] = json_safe_array(serialize_turn_traces(Array(continuation.turn_traces)))
         end
 
+        continuation_id = continuation.continuation_id.to_s.strip
+        payload["continuation_id"] = continuation_id unless continuation_id.empty?
+
+        parent_continuation_id = continuation.parent_continuation_id.to_s.strip
+        payload["parent_continuation_id"] = parent_continuation_id unless parent_continuation_id.empty?
+
         payload.delete("buffered_tool_results") if payload.fetch("buffered_tool_results").empty?
 
         JSON.generate(payload)
@@ -86,6 +92,12 @@ module AgentCore
 
         run_id = fetch_required(h, "run_id", path: "run_id").to_s
         raise ArgumentError, "run_id is required" if run_id.strip.empty?
+
+        continuation_id = h.fetch("continuation_id", h.fetch(:continuation_id, nil)).to_s.strip
+        continuation_id = nil if continuation_id.empty?
+
+        parent_continuation_id = h.fetch("parent_continuation_id", h.fetch(:parent_continuation_id, nil)).to_s.strip
+        parent_continuation_id = nil if parent_continuation_id.empty?
 
         started_at = parse_time_utc(fetch_required(h, "started_at", path: "started_at").to_s)
         duration_ms = Float(fetch_required(h, "duration_ms", path: "duration_ms"))
@@ -147,6 +159,8 @@ module AgentCore
 
         AgentCore::PromptRunner::Continuation.new(
           run_id: run_id,
+          continuation_id: continuation_id,
+          parent_continuation_id: parent_continuation_id,
           started_at: started_at,
           duration_ms: duration_ms,
           turn: turn,

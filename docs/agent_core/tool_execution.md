@@ -131,7 +131,7 @@ paused = agent.chat("hi")
 
 if paused.awaiting_tool_results?
   tool_results = { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") }
-  final = agent.resume_with_tool_results(continuation: paused, tool_results: tool_results)
+  final = agent.resume_with_tool_results(continuation: paused, tool_results: tool_results, allow_partial: true)
 end
 ```
 
@@ -153,7 +153,7 @@ paused = session.chat("hi")
 
 if paused.awaiting_tool_results?
   tool_results = { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "ok") }
-  final = session.resume_with_tool_results(continuation: paused, tool_results: tool_results)
+  final = session.resume_with_tool_results(continuation: paused, tool_results: tool_results, allow_partial: true)
 end
 ```
 
@@ -161,10 +161,10 @@ end
 
 AgentCore does not prescribe persistence; one workable Rails pattern is:
 
-1. Persist `continuation` keyed by `run_id`.
+1. Persist `continuation` keyed by `(run_id, continuation_id)`.
 2. Enqueue one job per `PendingToolExecution`.
-3. Persist `ToolResult` output keyed by `run_id` + `tool_call_id`.
-4. When all tool results are ready, resume the run.
+3. Persist `ToolResult` output keyed by `(run_id, continuation_id, tool_call_id)`.
+4. When all tool results are ready, resume the run (or use `allow_partial: true` to resume incrementally).
 
 Example sketch (adapt to your persistence choices):
 
@@ -199,11 +199,18 @@ payload =
     include_traces: true,
   )
 
-ContinuationRecord.create!(run_id: run_id, payload: payload) # payload: jsonb
+ContinuationRecord.create!(
+  run_id: run_id,
+  continuation_id: payload.fetch("continuation_id"),
+  parent_continuation_id: payload.fetch("parent_continuation_id", nil),
+  status: "current", # app-defined; supports optimistic locking / single-consume
+  payload: payload,  # jsonb
+)
 
 result.pending_tool_executions.each do |p|
   ExecuteToolCallJob.perform_later(
     run_id: run_id,
+    continuation_id: payload.fetch("continuation_id"),
     tool_call_id: p.tool_call_id,
     name: p.executed_name,
     arguments: p.arguments,
@@ -211,19 +218,14 @@ result.pending_tool_executions.each do |p|
 end
 
 # Later, when all results are ready (polling or callback):
-continuation_payload = ContinuationRecord.find_by!(run_id: run_id).payload
+continuation_payload = ContinuationRecord.find_by!(run_id: run_id, status: "current").payload
 continuation = AgentCore::PromptRunner::ContinuationCodec.load(continuation_payload)
 
 tool_results =
-  ToolResultRecord.where(run_id: run_id).to_h do |r|
-    h = AgentCore::Utils.symbolize_keys(r.tool_result)
+  ToolResultRecord.where(run_id: run_id, continuation_id: continuation_payload.fetch("continuation_id")).to_h do |r|
     [
       r.tool_call_id,
-      AgentCore::Resources::Tools::ToolResult.new(
-        content: h.fetch(:content),
-        error: h.fetch(:error, false),
-        metadata: h.fetch(:metadata, {}),
-      ),
+      AgentCore::Resources::Tools::ToolResult.from_h(r.tool_result),
     ]
   end
 
@@ -242,10 +244,13 @@ Notes:
 
 - `continuation` is intended to be treated as **opaque**. For stable
   persistence, use `ContinuationCodec` (versioned, JSON-safe).
+- Each pause generates a new `continuation_id`. Apps should treat continuations
+  as single-use tokens and implement optimistic locking / CAS so stale
+  continuations cannot be resumed concurrently.
 - If `ContinuationCodec` rejects an old/new payload (`schema_version` mismatch),
   you must decide on an app-level migration or fail the resume attempt.
 - `resume_with_tool_results` only accepts `ToolResult` values (no Hash/String
-  coercion).
+  coercion). Use `ToolResult.from_h(...)` for persisted Hash/JSON payloads.
 
 ## Same-turn parallel execution (ThreadPool)
 

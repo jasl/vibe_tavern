@@ -155,3 +155,40 @@ Guidelines:
 - Never persist secrets (tokens/headers/env).
 - Prefer passing a **fresh** context on resume (current tenant/user/workspace),
   and treat stored `context_attributes` as an optional hint.
+
+## Production persistence and concurrency governance (stale continuation protection)
+
+AgentCore's `Runner` is intentionally stateless; it cannot know whether a stored
+continuation has already been consumed. For production, apps should treat
+continuations as **single-use checkpoint tokens** and use `continuation_id` to
+implement optimistic locking / CAS.
+
+Recommended persistence shape:
+
+- Continuation record: `(run_id, continuation_id, parent_continuation_id, payload, status)`
+- Tool result record (deferred execution): `(run_id, continuation_id, tool_call_id, tool_result_payload, status)`
+
+Recommended flow:
+
+1) On pause, persist the continuation payload and mark it as `current`.
+2) On resume request, require the caller to supply `continuation_id`.
+3) Atomically transition the continuation row from `current` → `consumed`
+   (or use a DB lock/version) before executing the resume.
+4) If the resume returns another pause continuation, persist the new payload as
+   `current` and link it via `parent_continuation_id`.
+
+For `allow_partial: true` deferred tool execution:
+
+- Key tool results by `(run_id, continuation_id, tool_call_id)` (do not mix
+  results across continuation checkpoints).
+- Resume can be called multiple times; each pause produces a new
+  `continuation_id`. This lets the app support concurrent workers and
+  idempotent replays without cross-talk.
+
+Integration notes:
+
+- `AgentCore::Agent#resume*` and `#resume*_with_tool_results` accept a
+  `Continuation`, a `RunResult`, or a serialized continuation payload
+  (`Hash` / JSON `String`).
+- Use `AgentCore::Resources::Tools::ToolResult.from_h(...)` to rehydrate tool
+  results from persisted Hash/JSON payloads.

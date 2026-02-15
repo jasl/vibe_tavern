@@ -15,6 +15,7 @@ module AgentCore
       ToolTaskBatch =
         Data.define(
           :run_id,
+          :continuation_id,
           :turn_number,
           :tasks,
           :context_attributes,
@@ -40,11 +41,14 @@ module AgentCore
         payload = {
           "schema_version" => SCHEMA_VERSION,
           "run_id" => cont.run_id.to_s,
+          "continuation_id" => normalize_optional_id(cont.continuation_id),
           "turn_number" => Integer(cont.turn),
           "tasks" => serialize_tasks(pending),
           "context_attributes" => serialize_context_attributes(context_attributes, context_keys: context_keys),
           "max_tool_output_bytes" => Integer(cont.max_tool_output_bytes),
         }
+
+        payload.delete("continuation_id") if payload.fetch("continuation_id").nil?
 
         JSON.generate(payload)
         payload
@@ -75,6 +79,8 @@ module AgentCore
         run_id = fetch_required(h, "run_id", path: "run_id").to_s
         raise ArgumentError, "run_id is required" if run_id.strip.empty?
 
+        continuation_id = normalize_optional_id(h.fetch("continuation_id", h.fetch(:continuation_id, nil)))
+
         turn_number = Integer(fetch_required(h, "turn_number", path: "turn_number"))
         tasks_raw = fetch_required(h, "tasks", path: "tasks")
         tasks = deserialize_tasks(tasks_raw)
@@ -86,6 +92,7 @@ module AgentCore
 
         ToolTaskBatch.new(
           run_id: run_id.freeze,
+          continuation_id: continuation_id&.freeze,
           turn_number: turn_number,
           tasks: tasks.freeze,
           context_attributes: context_attributes.freeze,
@@ -118,6 +125,12 @@ module AgentCore
           .uniq
       end
       private_class_method :normalize_context_keys
+
+      def self.normalize_optional_id(value)
+        id = value.to_s.strip
+        id.empty? ? nil : id
+      end
+      private_class_method :normalize_optional_id
 
       def self.serialize_context_attributes(attributes, context_keys:)
         return {} if context_keys.empty?

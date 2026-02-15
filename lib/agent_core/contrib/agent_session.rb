@@ -110,21 +110,21 @@ module AgentCore
         @agent.resume_stream(continuation: continuation, tool_confirmations: tool_confirmations, &block)
       end
 
-      def resume_with_tool_results(continuation:, tool_results:, language_policy: nil)
-        run_result = @agent.resume_with_tool_results(continuation: continuation, tool_results: tool_results)
+      def resume_with_tool_results(continuation:, tool_results:, language_policy: nil, allow_partial: false)
+        run_result = @agent.resume_with_tool_results(continuation: continuation, tool_results: tool_results, allow_partial: allow_partial)
         apply_language_policy_to_run_result(run_result, language_policy: language_policy)
       end
 
-      def resume_stream_with_tool_results(continuation:, tool_results:, language_policy: nil, &block)
+      def resume_stream_with_tool_results(continuation:, tool_results:, language_policy: nil, allow_partial: false, &block)
         policy = normalize_language_policy(language_policy)
 
         if policy.fetch(:enabled) && policy.fetch(:target_lang, nil)
-          result = resume_with_tool_results(continuation: continuation, tool_results: tool_results, language_policy: policy)
+          result = resume_with_tool_results(continuation: continuation, tool_results: tool_results, language_policy: policy, allow_partial: allow_partial)
           emit_final_only_stream_events(result, &block)
           return result
         end
 
-        @agent.resume_stream_with_tool_results(continuation: continuation, tool_results: tool_results, &block)
+        @agent.resume_stream_with_tool_results(continuation: continuation, tool_results: tool_results, allow_partial: allow_partial, &block)
       end
 
       def directives(language_policy: nil, structured_output_options: nil, result_validator: nil)

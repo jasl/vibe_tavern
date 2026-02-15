@@ -274,6 +274,8 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
       options: { model: "test" }
     )
 
+    instrumenter = AgentCore::Observability::TraceRecorder.new(capture: :full)
+
     paused =
       @runner.run(
         prompt: prompt,
@@ -281,10 +283,18 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
         tools_registry: registry,
         tool_policy: @allow_all,
         tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+        instrumenter: instrumenter,
       )
 
     assert paused.awaiting_tool_results?
     assert_equal 1, provider.calls.size
+    refute_nil paused.continuation.continuation_id
+    assert_nil paused.continuation.parent_continuation_id
+
+    pause_events = instrumenter.trace.select { |e| e.fetch(:name) == "agent_core.pause" }
+    assert_equal 1, pause_events.size
+    pause_cid_1 = pause_events.first.fetch(:payload).fetch("continuation_id")
+    assert_equal paused.continuation.continuation_id, pause_cid_1
 
     partial =
       @runner.resume_with_tool_results(
@@ -294,15 +304,29 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
         tools_registry: registry,
         tool_policy: @allow_all,
         allow_partial: true,
+        instrumenter: instrumenter,
       )
 
     assert partial.awaiting_tool_results?
     assert_equal 1, provider.calls.size
     assert_empty partial.messages
+    refute_nil partial.continuation.continuation_id
+    refute_equal paused.continuation.continuation_id, partial.continuation.continuation_id
+    assert_equal paused.continuation.continuation_id, partial.continuation.parent_continuation_id
 
     assert_equal 1, partial.pending_tool_executions.size
     assert_equal "tc_2", partial.pending_tool_executions.first.tool_call_id
     assert partial.continuation.buffered_tool_results.key?("tc_1")
+
+    pause_events = instrumenter.trace.select { |e| e.fetch(:name) == "agent_core.pause" }
+    assert_equal 2, pause_events.size
+    pause_cid_2 = pause_events.last.fetch(:payload).fetch("continuation_id")
+    assert_equal partial.continuation.continuation_id, pause_cid_2
+    refute_equal pause_cid_1, pause_cid_2
+
+    resume_events = instrumenter.trace.select { |e| e.fetch(:name) == "agent_core.resume" }
+    assert_equal 1, resume_events.size
+    assert_equal pause_cid_1, resume_events.first.fetch(:payload).fetch("continuation_id")
 
     payload = AgentCore::PromptRunner::ContinuationCodec.dump(partial.continuation, include_traces: false)
     loaded = AgentCore::PromptRunner::ContinuationCodec.load(JSON.generate(payload))
@@ -315,6 +339,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
         tools_registry: registry,
         tool_policy: @allow_all,
         allow_partial: true,
+        instrumenter: instrumenter,
       )
 
     assert_equal "Done", final.text
@@ -323,6 +348,10 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     tool_msgs = final.messages.select(&:tool_result?)
     assert_equal %w[tc_1 tc_2], tool_msgs.map(&:tool_call_id)
     assert_equal %w[r1 r2], tool_msgs.map(&:content)
+
+    resume_events = instrumenter.trace.select { |e| e.fetch(:name) == "agent_core.resume" }
+    assert_equal 2, resume_events.size
+    assert_equal pause_cid_2, resume_events.last.fetch(:payload).fetch("continuation_id")
   end
 
   def test_tool_task_created_and_deferred_events_do_not_include_raw_arguments
@@ -415,6 +444,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_equal paused.run_id, pause_event.fetch(:payload).fetch("run_id")
     assert_equal 1, pause_event.fetch(:payload).fetch("turn_number")
     assert_equal "awaiting_tool_results", pause_event.fetch(:payload).fetch("pause_reason")
+    assert_equal paused.continuation.continuation_id, pause_event.fetch(:payload).fetch("continuation_id")
     assert_equal 0, pause_event.fetch(:payload).fetch("pending_confirmations_count")
     assert_equal 1, pause_event.fetch(:payload).fetch("pending_executions_count")
 
@@ -435,6 +465,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_equal paused.run_id, resume_event.fetch(:payload).fetch("run_id")
     assert_equal 1, resume_event.fetch(:payload).fetch("paused_turn_number")
     assert_equal "awaiting_tool_results", resume_event.fetch(:payload).fetch("pause_reason")
+    assert_equal paused.continuation.continuation_id, resume_event.fetch(:payload).fetch("continuation_id")
     assert_equal true, resume_event.fetch(:payload).fetch("resumed")
   end
 

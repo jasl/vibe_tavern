@@ -43,11 +43,13 @@ class AgentCore::PromptRunner::ToolTaskCodecTest < Minitest::Test
       )
 
     assert paused.awaiting_tool_results?
+    refute_nil paused.continuation.continuation_id
 
     payload = AgentCore::PromptRunner::ToolTaskCodec.dump(paused.continuation, context_keys: %i[tenant_id])
 
     assert_equal 1, payload.fetch("schema_version")
     assert_equal paused.run_id, payload.fetch("run_id")
+    assert_equal paused.continuation.continuation_id, payload.fetch("continuation_id")
     assert_equal 1, payload.fetch("turn_number")
 
     attrs = payload.fetch("context_attributes")
@@ -63,6 +65,7 @@ class AgentCore::PromptRunner::ToolTaskCodecTest < Minitest::Test
     loaded = AgentCore::PromptRunner::ToolTaskCodec.load(JSON.parse(json))
 
     assert_equal paused.run_id, loaded.run_id
+    assert_equal paused.continuation.continuation_id, loaded.continuation_id
     assert_equal 1, loaded.turn_number
     assert_equal 1, loaded.tasks.size
     assert_equal({ "text" => "hello" }, loaded.tasks.first.arguments)

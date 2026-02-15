@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "json"
 
 class AgentCore::Resources::Tools::ToolResultTest < Minitest::Test
   ToolResult = AgentCore::Resources::Tools::ToolResult
@@ -108,5 +109,39 @@ class AgentCore::Resources::Tools::ToolResultTest < Minitest::Test
       content: [{ type: :image, source_type: "base64", data: "x", media_type: "image/png" }],
     )
     assert_equal :base64, result.content.first[:source_type]
+  end
+
+  def test_from_h_symbolizes_metadata_keys
+    input = {
+      "content" => [{ "type" => "text", "text" => "ok" }],
+      "error" => false,
+      "metadata" => { "duration_ms" => 1.5 },
+    }
+
+    result = ToolResult.from_h(input)
+
+    refute result.error?
+    assert_equal "ok", result.text
+    assert_equal 1.5, result.metadata.fetch(:duration_ms)
+  end
+
+  def test_from_h_accepts_json_string
+    json = JSON.generate({ content: [{ type: "text", text: "oops" }], error: true, metadata: {} })
+    result = ToolResult.from_h(json)
+
+    assert result.error?
+    assert_equal "oops", result.text
+  end
+
+  def test_from_h_raises_on_non_array_content
+    assert_raises(ArgumentError) do
+      ToolResult.from_h({ content: "nope", error: false, metadata: {} })
+    end
+  end
+
+  def test_from_h_raises_on_non_hash_metadata
+    assert_raises(ArgumentError) do
+      ToolResult.from_h({ content: [], error: false, metadata: "nope" })
+    end
   end
 end

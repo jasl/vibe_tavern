@@ -274,6 +274,7 @@ module AgentCore
                           run_id: run_id,
                           turn_number: turn,
                           pause_state: pause_state,
+                          parent_continuation_id: continuation&.continuation_id,
                         )
                         events.emit(:turn_end, turn, all_new_messages)
                         next :stop
@@ -347,6 +348,8 @@ module AgentCore
           )
 
         if pause_state
+          ensure_pause_state_ids!(pause_state)
+
           pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
           pending_tool_confirmations =
             pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
@@ -356,6 +359,8 @@ module AgentCore
           continuation =
             Continuation.new(
               run_id: run_id,
+              continuation_id: normalize_optional_id(pause_state[:continuation_id]),
+              parent_continuation_id: normalize_optional_id(pause_state[:parent_continuation_id]),
               started_at: run_started_at,
               duration_ms: run_duration_ms,
               turn: completed_turns,
@@ -687,6 +692,7 @@ module AgentCore
                           run_id: run_id,
                           turn_number: turn,
                           pause_state: pause_state,
+                          parent_continuation_id: continuation&.continuation_id,
                         )
 
                         case stop_reason
@@ -786,6 +792,8 @@ module AgentCore
         yield StreamEvent::Done.new(stop_reason: stop_reason, usage: aggregated_usage) if block
 
         if pause_state
+          ensure_pause_state_ids!(pause_state)
+
           pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
           pending_tool_confirmations =
             pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
@@ -795,6 +803,8 @@ module AgentCore
           continuation =
             Continuation.new(
               run_id: run_id,
+              continuation_id: normalize_optional_id(pause_state[:continuation_id]),
+              parent_continuation_id: normalize_optional_id(pause_state[:parent_continuation_id]),
               started_at: run_started_at,
               duration_ms: run_duration_ms,
               turn: completed_turns,
@@ -877,6 +887,7 @@ module AgentCore
           run_id: run_id,
           paused_turn_number: continuation.turn,
           pause_reason: continuation.pause_reason,
+          continuation_id: continuation.continuation_id,
         )
 
         messages = continuation.messages.dup
@@ -971,6 +982,7 @@ module AgentCore
                 run_id: run_id,
                 turn_number: turn,
                 pause_state: pause_state,
+                parent_continuation_id: continuation&.continuation_id,
               )
               next
             end
@@ -1158,6 +1170,7 @@ module AgentCore
                       run_id: run_id,
                       turn_number: turn,
                       pause_state: pause_state,
+                      parent_continuation_id: continuation&.continuation_id,
                     )
                     events.emit(:turn_end, turn, all_new_messages)
                     next :stop
@@ -1232,6 +1245,8 @@ module AgentCore
           )
 
         if pause_state
+          ensure_pause_state_ids!(pause_state, parent_continuation_id: continuation&.continuation_id)
+
           pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
           pending_tool_confirmations =
             pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
@@ -1241,6 +1256,8 @@ module AgentCore
           next_continuation =
             Continuation.new(
               run_id: run_id,
+              continuation_id: normalize_optional_id(pause_state[:continuation_id]),
+              parent_continuation_id: normalize_optional_id(pause_state[:parent_continuation_id]),
               started_at: run_started_at,
               duration_ms: run_duration_ms,
               turn: completed_turns,
@@ -1321,6 +1338,7 @@ module AgentCore
           run_id: run_id,
           paused_turn_number: continuation.turn,
           pause_reason: continuation.pause_reason,
+          continuation_id: continuation.continuation_id,
         )
 
         messages = continuation.messages.dup
@@ -1415,6 +1433,7 @@ module AgentCore
                   run_id: run_id,
                   turn_number: turn,
                   pause_state: pause_state,
+                  parent_continuation_id: continuation&.continuation_id,
                 )
 
                 case stop_reason
@@ -1659,6 +1678,7 @@ module AgentCore
                       run_id: run_id,
                       turn_number: turn,
                       pause_state: pause_state,
+                      parent_continuation_id: continuation&.continuation_id,
                     )
 
                     case stop_reason
@@ -1749,6 +1769,8 @@ module AgentCore
         yield StreamEvent::Done.new(stop_reason: stop_reason, usage: aggregated_usage) if block
 
         if pause_state
+          ensure_pause_state_ids!(pause_state, parent_continuation_id: continuation&.continuation_id)
+
           pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
           pending_tool_confirmations =
             pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
@@ -1758,6 +1780,8 @@ module AgentCore
           next_continuation =
             Continuation.new(
               run_id: run_id,
+              continuation_id: normalize_optional_id(pause_state[:continuation_id]),
+              parent_continuation_id: normalize_optional_id(pause_state[:parent_continuation_id]),
               started_at: run_started_at,
               duration_ms: run_duration_ms,
               turn: completed_turns,
@@ -1869,6 +1893,7 @@ module AgentCore
           run_id: run_id,
           paused_turn_number: continuation.turn,
           pause_reason: continuation.pause_reason,
+          continuation_id: continuation.continuation_id,
         )
 
         messages = continuation.messages.dup
@@ -2059,6 +2084,7 @@ module AgentCore
                 run_id: run_id,
                 turn_number: turn,
                 pause_state: pause_state,
+                parent_continuation_id: continuation&.continuation_id,
               )
               next
             end
@@ -2339,6 +2365,8 @@ module AgentCore
           )
 
         if pause_state
+          ensure_pause_state_ids!(pause_state, parent_continuation_id: continuation&.continuation_id)
+
           pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
           pending_tool_confirmations =
             pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
@@ -2348,6 +2376,8 @@ module AgentCore
           next_continuation =
             Continuation.new(
               run_id: run_id,
+              continuation_id: normalize_optional_id(pause_state[:continuation_id]),
+              parent_continuation_id: normalize_optional_id(pause_state[:parent_continuation_id]),
               started_at: run_started_at,
               duration_ms: run_duration_ms,
               turn: completed_turns,
@@ -2453,6 +2483,7 @@ module AgentCore
           run_id: run_id,
           paused_turn_number: continuation.turn,
           pause_reason: continuation.pause_reason,
+          continuation_id: continuation.continuation_id,
         )
 
         messages = continuation.messages.dup
@@ -2656,6 +2687,7 @@ module AgentCore
                 run_id: run_id,
                 turn_number: turn,
                 pause_state: pause_state,
+                parent_continuation_id: continuation&.continuation_id,
               )
               yield StreamEvent::ToolExecutionRequired.new(run_id: run_id, pending_tool_executions: remaining) if block
               next
@@ -2995,6 +3027,8 @@ module AgentCore
         yield StreamEvent::Done.new(stop_reason: stop_reason, usage: aggregated_usage) if block
 
         if pause_state
+          ensure_pause_state_ids!(pause_state, parent_continuation_id: continuation&.continuation_id)
+
           pause_reason = pause_state.fetch(:reason, :awaiting_tool_confirmation)
           pending_tool_confirmations =
             pause_reason == :awaiting_tool_confirmation ? pause_state.fetch(:pending_tool_confirmations) : []
@@ -3004,6 +3038,8 @@ module AgentCore
           next_continuation =
             Continuation.new(
               run_id: run_id,
+              continuation_id: normalize_optional_id(pause_state[:continuation_id]),
+              parent_continuation_id: normalize_optional_id(pause_state[:parent_continuation_id]),
               started_at: run_started_at,
               duration_ms: run_duration_ms,
               turn: completed_turns,
@@ -3060,6 +3096,26 @@ module AgentCore
         raise ArgumentError, "continuation must be a PromptRunner::Continuation, Hash, or JSON String (got #{value.class})"
       end
 
+      def normalize_optional_id(value)
+        id = value.to_s.strip
+        id.empty? ? nil : id
+      end
+
+      def ensure_pause_state_ids!(pause_state, parent_continuation_id: nil)
+        state = pause_state.is_a?(Hash) ? pause_state : {}
+
+        cid = normalize_optional_id(state[:continuation_id])
+        state[:continuation_id] = cid || SecureRandom.uuid
+
+        pid = normalize_optional_id(state[:parent_continuation_id])
+        pid ||= normalize_optional_id(parent_continuation_id)
+        state[:parent_continuation_id] = pid if pid
+
+        state
+      rescue StandardError
+        pause_state
+      end
+
       def buffered_tool_results_for(pause_state)
         state = pause_state.is_a?(Hash) ? pause_state : {}
         raw = state.fetch(:buffered_tool_results, {})
@@ -3069,8 +3125,11 @@ module AgentCore
         {}.freeze
       end
 
-      def publish_pause_event(instrumenter, run_id:, turn_number:, pause_state:)
+      def publish_pause_event(instrumenter, run_id:, turn_number:, pause_state:, parent_continuation_id: nil)
         state = pause_state.is_a?(Hash) ? pause_state : {}
+        ensure_pause_state_ids!(state, parent_continuation_id: parent_continuation_id)
+
+        continuation_id = normalize_optional_id(state[:continuation_id])
         reason = state.fetch(:reason, :awaiting_tool_confirmation)
 
         pending_confirmations_count =
@@ -3084,23 +3143,27 @@ module AgentCore
             run_id: run_id.to_s,
             turn_number: Integer(turn_number),
             pause_reason: reason.to_s,
+            continuation_id: continuation_id,
             pending_confirmations_count: pending_confirmations_count,
             pending_executions_count: pending_executions_count,
             duration_ms: 0.0,
-          }
+          }.compact
         )
       end
 
-      def publish_resume_event(instrumenter, run_id:, paused_turn_number:, pause_reason:)
+      def publish_resume_event(instrumenter, run_id:, paused_turn_number:, pause_reason:, continuation_id: nil)
+        continuation_id = normalize_optional_id(continuation_id)
+
         instrumenter.publish(
           "agent_core.resume",
           {
             run_id: run_id.to_s,
             paused_turn_number: Integer(paused_turn_number),
             pause_reason: pause_reason.to_s,
+            continuation_id: continuation_id,
             resumed: true,
             duration_ms: 0.0,
-          }
+          }.compact
         )
       end
 

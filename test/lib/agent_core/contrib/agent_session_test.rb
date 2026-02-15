@@ -230,4 +230,69 @@ class AgentCoreContribAgentSessionTest < ActiveSupport::TestCase
     assert_equal paused.run_id, resumed.run_id
     assert_equal 2, provider.requests.length
   end
+
+  test "resume_with_tool_results supports allow_partial" do
+    tool_call_1 = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
+    tool_call_2 = AgentCore::ToolCall.new(id: "tc_2", name: "echo", arguments: { "text" => "world" })
+    assistant_msg =
+      AgentCore::Message.new(
+        role: :assistant,
+        content: "calling tools",
+        tool_calls: [tool_call_1, tool_call_2],
+      )
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done.")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = ScriptedProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "echo", parameters: {}) do |_args, **|
+        raise "should not execute inline"
+      end
+    )
+
+    session =
+      AgentCore::Contrib::AgentSession.new(
+        provider: provider,
+        model: "m1",
+        system_prompt: "",
+        history: [],
+        tools_registry: registry,
+        tool_policy: AgentCore::Resources::Tools::Policy::AllowAll.new,
+        tool_executor: AgentCore::PromptRunner::ToolExecutor::DeferAll.new,
+      )
+
+    paused = session.chat("hi")
+    assert paused.awaiting_tool_results?
+    assert_equal 2, paused.pending_tool_executions.size
+    assert_equal 1, provider.requests.length
+
+    partial =
+      session.resume_with_tool_results(
+        continuation: paused,
+        tool_results: { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "r1") },
+        allow_partial: true,
+      )
+
+    assert partial.awaiting_tool_results?
+    assert_equal 1, provider.requests.length
+    assert_equal ["tc_2"], partial.pending_tool_executions.map(&:tool_call_id)
+    assert partial.continuation.buffered_tool_results.key?("tc_1")
+
+    final =
+      session.resume_with_tool_results(
+        continuation: partial,
+        tool_results: { "tc_2" => AgentCore::Resources::Tools::ToolResult.success(text: "r2") },
+        allow_partial: true,
+      )
+
+    assert_equal "Done.", final.text
+    assert_equal 2, provider.requests.length
+
+    tool_msgs = provider.requests.last.fetch(:messages).select(&:tool_result?)
+    assert_equal %w[tc_1 tc_2], tool_msgs.map(&:tool_call_id)
+  end
 end

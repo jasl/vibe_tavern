@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "json"
 
 class AgentCore::AgentTest < Minitest::Test
   def test_build_and_chat
@@ -133,6 +134,67 @@ class AgentCore::AgentTest < Minitest::Test
     assert_equal paused.run_id, resumed.run_id
     assert_equal 4, agent.chat_history.size
     assert_equal 1, executed.size
+  end
+
+  def test_resume_with_tool_results_supports_partial_and_continuation_payloads
+    tool_call_1 = AgentCore::ToolCall.new(id: "tc_1", name: "echo", arguments: { "text" => "hello" })
+    tool_call_2 = AgentCore::ToolCall.new(id: "tc_2", name: "echo", arguments: { "text" => "world" })
+    assistant_msg =
+      AgentCore::Message.new(
+        role: :assistant,
+        content: "calling tools",
+        tool_calls: [tool_call_1, tool_call_2],
+      )
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_msg, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done.")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "echo", description: "Echo", parameters: {}) do |_args, **|
+        raise "should not execute inline"
+      end
+    )
+
+    agent = AgentCore::Agent.build do |b|
+      b.provider = provider
+      b.model = "m1"
+      b.system_prompt = "You can use tools."
+      b.tools_registry = registry
+      b.tool_policy = AgentCore::Resources::Tools::Policy::AllowAll.new
+      b.tool_executor = AgentCore::PromptRunner::ToolExecutor::DeferAll.new
+    end
+
+    paused = agent.chat("hi")
+    assert paused.awaiting_tool_results?
+    assert_equal 1, provider.calls.size
+
+    partial =
+      agent.resume_with_tool_results(
+        continuation: paused,
+        tool_results: { "tc_1" => AgentCore::Resources::Tools::ToolResult.success(text: "r1") },
+        allow_partial: true,
+      )
+
+    assert partial.awaiting_tool_results?
+    assert_equal 1, provider.calls.size
+    assert_equal 2, agent.chat_history.size
+
+    payload = AgentCore::PromptRunner::ContinuationCodec.dump(partial.continuation, include_traces: false)
+
+    final =
+      agent.resume_with_tool_results(
+        continuation: JSON.generate(payload),
+        tool_results: { "tc_2" => AgentCore::Resources::Tools::ToolResult.success(text: "r2") },
+        allow_partial: true,
+      )
+
+    assert_equal "Done.", final.text
+    assert_equal 2, provider.calls.size
+    assert_equal 5, agent.chat_history.size
   end
 
   def test_chat_stream
