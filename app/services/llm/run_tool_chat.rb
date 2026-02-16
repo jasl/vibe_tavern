@@ -134,7 +134,7 @@ module LLM
             context_keys: persisted_context_keys,
           )
 
-        enqueue_missing_tool_tasks!(task_payload, tooling_key: normalized_tooling_key)
+        LLM::EnqueueToolTasks.call(task_payload: task_payload, tooling_key: normalized_tooling_key)
 
         return Result.success(
           value: {
@@ -331,35 +331,6 @@ module LLM
         next unless context_hash.key?(key)
 
         out[key] = context_hash.fetch(key)
-      end
-    end
-
-    def enqueue_missing_tool_tasks!(task_payload, tooling_key:)
-      run_id = task_payload.fetch("run_id").to_s
-      context_attributes = task_payload.fetch("context_attributes", {})
-      tasks = Array(task_payload.fetch("tasks"))
-
-      tasks.each do |t|
-        tool_call_id = t.fetch("tool_call_id").to_s
-        executed_name = t.fetch("executed_name").to_s
-
-        _record, reserved =
-          ToolResultRecord.reserve!(
-            run_id: run_id,
-            tool_call_id: tool_call_id,
-            executed_name: executed_name,
-          )
-
-        next unless reserved
-
-        LLM::ExecuteToolCallJob.perform_later(
-          run_id: run_id,
-          tooling_key: tooling_key,
-          tool_call_id: tool_call_id,
-          executed_name: executed_name,
-          arguments: t.fetch("arguments"),
-          context_attributes: context_attributes,
-        )
       end
     end
 

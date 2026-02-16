@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.2].define(version: 2026_02_16_100300) do
+ActiveRecord::Schema[8.2].define(version: 2026_02_16_100500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -43,6 +43,7 @@ ActiveRecord::Schema[8.2].define(version: 2026_02_16_100300) do
   end
 
   create_table "continuation_records", force: :cascade do |t|
+    t.datetime "cancelled_at"
     t.datetime "consumed_at"
     t.datetime "consuming_at"
     t.string "continuation_id", null: false
@@ -64,7 +65,7 @@ ActiveRecord::Schema[8.2].define(version: 2026_02_16_100300) do
     t.index ["run_id", "status"], name: "index_continuation_records_on_run_id_and_status"
     t.index ["run_id"], name: "index_continuation_records_on_run_id", unique: true, where: "((status)::text = 'current'::text)"
     t.index ["status"], name: "index_continuation_records_on_status"
-    t.check_constraint "status::text = ANY (ARRAY['current'::character varying, 'consuming'::character varying, 'consumed'::character varying]::text[])", name: "continuation_records_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['current'::character varying, 'consuming'::character varying, 'consumed'::character varying, 'cancelled'::character varying]::text[])", name: "continuation_records_status_check"
   end
 
   create_table "llm_models", force: :cascade do |t|
@@ -133,7 +134,7 @@ ActiveRecord::Schema[8.2].define(version: 2026_02_16_100300) do
     t.index ["run_id", "tool_call_id"], name: "index_tool_result_records_on_run_id_and_tool_call_id", unique: true
     t.index ["run_id"], name: "index_tool_result_records_on_run_id"
     t.check_constraint "(status::text = 'ready'::text) = (tool_result IS NOT NULL)", name: "tool_result_records_ready_tool_result_check"
-    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'executing'::character varying, 'ready'::character varying]::text[])", name: "tool_result_records_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'executing'::character varying, 'ready'::character varying, 'cancelled'::character varying]::text[])", name: "tool_result_records_status_check"
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"

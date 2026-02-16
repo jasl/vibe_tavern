@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
 class ToolResultRecord < ApplicationRecord
+  EXECUTING_RECLAIM_AFTER = 15.minutes
+  QUEUED_REENQUEUE_AFTER = 15.minutes
+
   validates :run_id, presence: true
   validates :tool_call_id, presence: true
-  validates :status, inclusion: { in: %w[queued executing ready] }
+  validates :status, inclusion: { in: %w[queued executing ready cancelled] }
 
   validate :validate_tool_result_matches_status
 
@@ -40,6 +43,43 @@ class ToolResultRecord < ApplicationRecord
           status: "executing",
           started_at: now,
           locked_by: job_id.to_s,
+          updated_at: now,
+        )
+
+    updated == 1
+  end
+
+  def self.reclaim_stale_executing!(run_id:, tool_call_id:, reclaim_after: EXECUTING_RECLAIM_AFTER)
+    rid = run_id.to_s
+    tcid = tool_call_id.to_s
+    now = Time.current
+    reclaim_before = now - reclaim_after
+
+    updated =
+      where(run_id: rid, tool_call_id: tcid, status: "executing")
+        .where("started_at IS NULL OR started_at < ?", reclaim_before)
+        .update_all(
+          status: "queued",
+          started_at: nil,
+          locked_by: nil,
+          enqueued_at: now,
+          updated_at: now,
+        )
+
+    updated == 1
+  end
+
+  def self.reenqueue_stale_queued!(run_id:, tool_call_id:, reenqueue_after: QUEUED_REENQUEUE_AFTER)
+    rid = run_id.to_s
+    tcid = tool_call_id.to_s
+    now = Time.current
+    reenqueue_before = now - reenqueue_after
+
+    updated =
+      where(run_id: rid, tool_call_id: tcid, status: "queued")
+        .where("enqueued_at IS NULL OR enqueued_at < ?", reenqueue_before)
+        .update_all(
+          enqueued_at: now,
           updated_at: now,
         )
 
@@ -92,6 +132,8 @@ class ToolResultRecord < ApplicationRecord
 
     record = find_by(run_id: rid, tool_call_id: tcid)
     if record
+      raise ArgumentError, "cancelled tool result: run_id=#{rid} tool_call_id=#{tcid}" if record.status == "cancelled"
+
       return record if record.status == "ready" && record.tool_result == payload
 
       if record.status != "ready" && record.tool_result.nil?
@@ -117,9 +159,26 @@ class ToolResultRecord < ApplicationRecord
     )
   rescue ActiveRecord::RecordNotUnique
     record = find_by!(run_id: rid, tool_call_id: tcid)
+    raise ArgumentError, "cancelled tool result: run_id=#{rid} tool_call_id=#{tcid}" if record.status == "cancelled"
     return record if record.tool_result == payload
 
     raise ArgumentError, "conflicting tool result: run_id=#{rid} tool_call_id=#{tcid}"
+  end
+
+  def self.cancel_run!(run_id:)
+    rid = run_id.to_s
+    now = Time.current
+
+    where(run_id: rid, status: %w[queued executing])
+      .update_all(
+        status: "cancelled",
+        locked_by: nil,
+        started_at: nil,
+        enqueued_at: nil,
+        finished_at: now,
+        tool_result: nil,
+        updated_at: now,
+      )
   end
 
   def self.canonicalize_tool_result_payload(result)

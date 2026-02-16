@@ -163,4 +163,53 @@ class ContinuationRecordTest < ActiveSupport::TestCase
     assert_equal "boom", record.last_resume_error_message
     assert record.last_resume_error_at
   end
+
+  test "cancel_run! marks current and consuming continuations as cancelled" do
+    provider =
+      LLMProvider.create!(
+        name: "P6",
+        base_url: "http://example.test",
+        api_prefix: "/v1",
+        headers: {},
+        llm_options_defaults: {},
+      )
+
+    llm_model = LLMModel.create!(llm_provider: provider, name: "M6", model: "m1", enabled: true)
+
+    current =
+      ContinuationRecord.create!(
+        run_id: "run_6",
+        continuation_id: "cont_current",
+        llm_model: llm_model,
+        tooling_key: "default",
+        status: "current",
+        payload: { "schema_version" => 1 },
+      )
+
+    consuming =
+      ContinuationRecord.create!(
+        run_id: "run_6",
+        continuation_id: "cont_consuming",
+        llm_model: llm_model,
+        tooling_key: "default",
+        status: "consuming",
+        consuming_at: 1.minute.ago,
+        resume_lock_token: "tok",
+        payload: { "schema_version" => 1 },
+      )
+
+    updated = ContinuationRecord.cancel_run!(run_id: "run_6", reason: "user_cancelled")
+    assert_equal 2, updated
+
+    current.reload
+    consuming.reload
+
+    assert_equal "cancelled", current.status
+    assert current.cancelled_at
+
+    assert_equal "cancelled", consuming.status
+    assert consuming.cancelled_at
+    assert_nil consuming.consuming_at
+    assert_nil consuming.resume_lock_token
+  end
 end

@@ -12,6 +12,8 @@ module LLM
       executed_name = executed_name.to_s
       tooling_key = tooling_key.to_s
 
+      return if ContinuationRecord.where(run_id: run_id, status: "cancelled").exists?
+
       args = arguments.is_a?(Hash) ? AgentCore::Utils.deep_stringify_keys(arguments) : {}
       ctx_attrs = normalize_context_attributes(context_attributes)
 
@@ -29,12 +31,14 @@ module LLM
           executed_name: executed_name,
         )
 
-      return if record.status == "ready"
+      return if record.status == "ready" || record.status == "cancelled"
 
       lock_id = self.job_id.to_s
       lock_id = SecureRandom.uuid if lock_id.empty?
 
       return unless ToolResultRecord.claim_for_execution!(run_id: run_id, tool_call_id: tool_call_id, job_id: lock_id)
+
+      return if ContinuationRecord.where(run_id: run_id, status: "cancelled").exists?
 
       result =
         begin
@@ -42,6 +46,9 @@ module LLM
         rescue => e
           AgentCore::Resources::Tools::ToolResult.error(text: "Tool execution failed: #{e.message}")
         end
+
+      current_record = ToolResultRecord.find_by(run_id: run_id, tool_call_id: tool_call_id)
+      return if ContinuationRecord.where(run_id: run_id, status: "cancelled").exists? || current_record&.status == "cancelled"
 
       begin
         ToolResultRecord.complete!(
@@ -51,6 +58,9 @@ module LLM
           tool_result: result,
         )
       rescue ArgumentError
+        current_record = ToolResultRecord.find_by(run_id: run_id, tool_call_id: tool_call_id)
+        return if ContinuationRecord.where(run_id: run_id, status: "cancelled").exists? || current_record&.status == "cancelled"
+
         ToolResultRecord.upsert_result!(
           run_id: run_id,
           tool_call_id: tool_call_id,

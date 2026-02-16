@@ -11,7 +11,7 @@ class ContinuationRecord < ApplicationRecord
   validates :run_id, presence: true
   validates :continuation_id, presence: true
   validates :tooling_key, presence: true
-  validates :status, inclusion: { in: %w[current consuming consumed] }
+  validates :status, inclusion: { in: %w[current consuming consumed cancelled] }
   validates :payload, presence: true
 
   def self.current_for_run!(run_id)
@@ -52,6 +52,7 @@ class ContinuationRecord < ApplicationRecord
 
     record = find_by(run_id: rid, continuation_id: cid)
     raise StaleContinuationError, "stale continuation: run_id=#{rid} continuation_id=#{cid}" if record.nil? || record.status == "consumed"
+    raise StaleContinuationError, "cancelled continuation: run_id=#{rid} continuation_id=#{cid}" if record.status == "cancelled"
 
     raise BusyContinuationError, "continuation is busy: run_id=#{rid} continuation_id=#{cid}"
   end
@@ -102,5 +103,20 @@ class ContinuationRecord < ApplicationRecord
     return true if updated == 1
 
     raise StaleContinuationError, "unable to release continuation: run_id=#{rid} continuation_id=#{cid}"
+  end
+
+  def self.cancel_run!(run_id:, reason: nil)
+    _reason = reason
+    rid = run_id.to_s
+    now = Time.current
+
+    where(run_id: rid, status: %w[current consuming])
+      .update_all(
+        status: "cancelled",
+        cancelled_at: now,
+        consuming_at: nil,
+        resume_lock_token: nil,
+        updated_at: now,
+      )
   end
 end

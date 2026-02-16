@@ -88,4 +88,47 @@ class ToolResultRecordTest < ActiveSupport::TestCase
       )
     end
   end
+
+  test "reclaim_stale_executing! moves stale executing back to queued" do
+    ToolResultRecord.reserve!(run_id: "run_6", tool_call_id: "tc_1", executed_name: "echo")
+    assert ToolResultRecord.claim_for_execution!(run_id: "run_6", tool_call_id: "tc_1", job_id: "j1")
+
+    record = ToolResultRecord.find_by!(run_id: "run_6", tool_call_id: "tc_1")
+    record.update!(started_at: 20.minutes.ago)
+
+    assert ToolResultRecord.reclaim_stale_executing!(run_id: "run_6", tool_call_id: "tc_1", reclaim_after: 15.minutes)
+
+    record.reload
+    assert_equal "queued", record.status
+    assert_nil record.locked_by
+    assert_nil record.started_at
+    assert record.enqueued_at
+  end
+
+  test "reenqueue_stale_queued! refreshes enqueued_at for stale queued" do
+    ToolResultRecord.reserve!(run_id: "run_7", tool_call_id: "tc_1", executed_name: "echo")
+
+    record = ToolResultRecord.find_by!(run_id: "run_7", tool_call_id: "tc_1")
+    record.update!(enqueued_at: 20.minutes.ago)
+
+    assert ToolResultRecord.reenqueue_stale_queued!(run_id: "run_7", tool_call_id: "tc_1", reenqueue_after: 15.minutes)
+
+    record.reload
+    assert_equal "queued", record.status
+    assert record.enqueued_at > 2.minutes.ago
+  end
+
+  test "upsert_result! raises when record is cancelled" do
+    ToolResultRecord.reserve!(run_id: "run_8", tool_call_id: "tc_1", executed_name: "echo")
+    ToolResultRecord.cancel_run!(run_id: "run_8")
+
+    assert_raises(ArgumentError) do
+      ToolResultRecord.upsert_result!(
+        run_id: "run_8",
+        tool_call_id: "tc_1",
+        executed_name: "echo",
+        tool_result: AgentCore::Resources::Tools::ToolResult.success(text: "ok"),
+      )
+    end
+  end
 end

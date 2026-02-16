@@ -197,17 +197,19 @@ ContinuationRecord.release_after_failure!(
 )
 ```
 
-This repo uses a 3-state continuation status machine:
+This repo uses a 4-state continuation status machine:
 
 - `current` — available to resume
 - `consuming` — claimed by a worker (locked by `resume_lock_token`)
 - `consumed` — already resumed (single-use token)
+- `cancelled` — run was cancelled (resume should stop)
 
 Semantics:
 
 - `claim_for_resume!` raises:
   - `BusyContinuationError` when another worker is actively consuming
   - `StaleContinuationError` when already consumed/not current
+  - `StaleContinuationError` when cancelled
 - if a worker crashes mid-resume, another worker can reclaim a `consuming`
   continuation after `reclaim_after` (default 5 minutes here).
 
@@ -219,7 +221,18 @@ this repo treats `tool_result_records` as the single source of truth:
 - `reserve!` creates a `(run_id, tool_call_id)` row in `queued` state (only once)
 - jobs `claim_for_execution!` (`queued` → `executing`) and then `complete!`
   (`executing` → `ready`)
-- repeated jobs exit early when already `executing`/`ready`
+- repeated jobs exit early when already `executing`/`ready`/`cancelled`
+
+### Stuck tool tasks (TTL reclaim / re-enqueue)
+
+If a worker crashes mid-tool execution, `tool_result_records` can get stuck in
+`executing`. This repo includes a minimal self-healing strategy:
+
+- stale `executing` can be reclaimed back to `queued` after a TTL (15 minutes)
+- stale `queued` can be re-enqueued after a TTL (15 minutes)
+
+Important: reclaiming `executing` means the tool may run again. Prefer
+idempotent tools, or add app-side safeguards for non-idempotent tools.
 
 ### Start (pause + enqueue tasks)
 
@@ -278,6 +291,16 @@ Notes:
   you must decide on an app-level migration or fail the resume attempt.
 - `resume_with_tool_results` only accepts `ToolResult` values (no Hash/String
   coercion). Use `ToolResult.from_h(...)` for persisted Hash/JSON payloads.
+
+### Cancel a run (best-effort cleanup)
+
+This repo includes `LLM::CancelToolChat` which:
+
+- marks any `continuation_records` in `current|consuming` as `cancelled`
+- marks any `tool_result_records` in `queued|executing` as `cancelled`
+
+After cancel, `LLM::ResumeToolChat` returns `RUN_CANCELLED`, and tool execution
+jobs will exit early and **discard** results if they race with cancellation.
 
 ## Same-turn parallel execution (ThreadPool)
 

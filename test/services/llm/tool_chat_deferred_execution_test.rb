@@ -168,4 +168,85 @@ class LLMToolChatDeferredExecutionTest < ActiveSupport::TestCase
     assert stale.failure?
     assert_equal "STALE_CONTINUATION", stale.code
   end
+
+  test "stale executing tool tasks are reclaimed and re-enqueued when resuming without results" do
+    provider =
+      LLMProvider.create!(
+        name: "Y",
+        base_url: "http://example.test",
+        api_prefix: "/v1",
+        headers: {},
+        llm_options_defaults: {},
+      )
+
+    llm_model = LLMModel.create!(llm_provider: provider, name: "M2", model: "m1", enabled: true)
+
+    client =
+      SequencedFakeClient.new(
+        [
+          {
+            "choices" => [
+              {
+                "message" => {
+                  "role" => "assistant",
+                  "content" => "",
+                  "tool_calls" => [
+                    {
+                      "id" => "tc_1",
+                      "type" => "function",
+                      "function" => { "name" => "echo", "arguments" => "{\"text\":\"hello\"}" },
+                    },
+                    {
+                      "id" => "tc_2",
+                      "type" => "function",
+                      "function" => { "name" => "noop", "arguments" => "{}" },
+                    },
+                  ],
+                },
+                "finish_reason" => "tool_calls",
+              },
+            ],
+          },
+        ],
+      )
+
+    started =
+      LLM::RunToolChat.call(
+        llm_model: llm_model,
+        user_text: "hi",
+        client: client,
+        context: { tenant_id: "t1" },
+        tooling_key: "default",
+        context_keys: %i[tenant_id],
+      )
+
+    assert started.success?, started.errors.inspect
+
+    run_id = started.value.fetch(:run_id)
+    continuation_id = started.value.fetch(:continuation_id)
+
+    assert_equal 2, ToolResultRecord.where(run_id: run_id, status: "queued").count
+
+    assert ToolResultRecord.claim_for_execution!(run_id: run_id, tool_call_id: "tc_1", job_id: "j1")
+    ToolResultRecord.find_by!(run_id: run_id, tool_call_id: "tc_1").update!(started_at: 20.minutes.ago)
+
+    clear_enqueued_jobs
+
+    resumed =
+      LLM::ResumeToolChat.call(
+        run_id: run_id,
+        continuation_id: continuation_id,
+        client: client,
+      )
+
+    assert resumed.failure?
+    assert_equal "NO_TOOL_RESULTS_AVAILABLE", resumed.code
+
+    assert_equal 1, enqueued_jobs.count { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
+
+    tc1 = ToolResultRecord.find_by!(run_id: run_id, tool_call_id: "tc_1")
+    assert_equal "queued", tc1.status
+    assert_nil tc1.locked_by
+    assert_nil tc1.started_at
+  end
 end

@@ -207,16 +207,20 @@ This Rails app includes a minimal, end-to-end implementation you can copy:
 
 - Persistence:
   - `app/models/continuation_record.rb` (`claim_for_resume!` / `mark_consumed!` / `release_after_failure!`)
-  - `app/models/tool_result_record.rb` (`reserve!` / `claim_for_execution!` / `complete!`)
+  - `app/models/tool_result_record.rb` (`reserve!` / `claim_for_execution!` / `complete!` + TTL reclaim/re-enqueue)
   - migrations in `db/migrate/*_create_continuation_records.rb` and `db/migrate/*_create_tool_result_records.rb`
 - Tooling reconstruction hook: `lib/llm/tooling.rb` (`tooling_key` → registry/policy)
 - Job (tool execution only): `app/jobs/llm/execute_tool_call_job.rb`
 - Services:
   - `app/services/llm/run_tool_chat.rb` (run → pause → persist → enqueue)
   - `app/services/llm/resume_tool_chat.rb` (claim → resume → consume/release → re-pause if needed)
+  - `app/services/llm/cancel_tool_chat.rb` (cancel → mark continuation/tools cancelled)
+  - `app/services/llm/enqueue_tool_tasks.rb` (single source for enqueue + TTL reclaim/re-enqueue)
 
 Production TODO (app-side, not provided by AgentCore):
 
 - Store `continuation_id` as a single-use checkpoint token and enforce single-consume via CAS/optimistic locking.
 - Decide your retry semantics and lock TTLs (this repo uses `consuming` + reclaim TTL for safe retries).
+- Decide your tool retry semantics: reclaiming a stale `executing` tool task can cause re-execution (prefer idempotent tools).
+- Decide your cancellation semantics: cancelled runs should stop resume and suppress/ignore racing tool results.
 - Ensure secrets never enter `context_attributes` / tool arguments, and never log raw tool args/results without redaction.
