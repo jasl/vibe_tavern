@@ -96,10 +96,9 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
     )
 
     server_id = "my.server"
-    local_name = AgentCore::MCP::ToolAdapter.local_tool_name(server_id: server_id, remote_tool_name: "tool.a")
-
     @registry.register_mcp_client(client, server_id: server_id)
 
+    local_name = AgentCore::MCP::ToolAdapter.local_tool_name(server_id: server_id, remote_tool_name: "tool.a")
     assert @registry.include?(local_name)
 
     result = @registry.execute(name: local_name, arguments: { "x" => 1 })
@@ -117,12 +116,11 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
       call_result: { "content" => [{ "type" => "text", "text" => "ok" }], "isError" => false },
     )
 
-    local_name = AgentCore::MCP::ToolAdapter.local_tool_name(server_id: "srv", remote_tool_name: "tool_a")
-
     assert_output(nil, /ignores prefix/) do
       @registry.register_mcp_client(client, prefix: "legacy_", server_id: "srv")
     end
 
+    local_name = AgentCore::MCP::ToolAdapter.local_tool_name(server_id: "srv", remote_tool_name: "tool_a")
     assert @registry.include?(local_name)
     refute @registry.include?("legacy_tool_a")
   end

@@ -335,20 +335,47 @@ module AgentCore
 
     private
 
+    SUMMARY_MESSAGE_TAG = "<conversation_summary>"
+    SUMMARY_MESSAGE_END_TAG = "</conversation_summary>"
+
+    DEFAULT_MEMORY_SEARCH_LIMIT = 5
+    DEFAULT_MAX_SUMMARY_BYTES = 20_000
+
     def build_prompt(user_message:, execution_context:)
-      manager =
-        ContextManagement::ContextManager.new(
-          agent: self,
+      prompt_mode = resolve_prompt_mode(execution_context)
+      prompt_injection_items =
+        collect_prompt_injection_items(
+          user_message: user_message,
+          execution_context: execution_context,
+          prompt_mode: prompt_mode
+        )
+
+      memory_results = fetch_memory_results(user_message)
+
+      budget_manager =
+        ContextManagement::BudgetManager.new(
+          chat_history: chat_history,
           conversation_state: conversation_state,
+          provider: provider,
+          model: model,
           token_counter: token_counter,
           context_window: context_window,
           reserved_output_tokens: reserved_output_tokens,
-          memory_search_limit: memory_search_limit,
           summary_max_output_tokens: summary_max_output_tokens,
           auto_compact: auto_compact,
         )
 
-      manager.build_prompt(user_message: user_message, execution_context: execution_context)
+      budget_manager.build_prompt(memory_results: memory_results) do |summary:, turns:, memory_results:|
+        build_prompt_with(
+          summary: summary,
+          turns: turns,
+          memory_results: memory_results,
+          user_message: user_message,
+          execution_context: execution_context,
+          prompt_mode: prompt_mode,
+          prompt_injection_items: prompt_injection_items
+        )
+      end
     end
 
     def build_events(events)
@@ -377,6 +404,98 @@ module AgentCore
       else
         raise ArgumentError, "continuation must be a PromptRunner::Continuation, PromptRunner::RunResult, Hash, or JSON String (got #{value.class})"
       end
+    end
+
+    def resolve_prompt_mode(execution_context)
+      mode = execution_context.attributes.fetch(:prompt_mode, :full)
+      mode = mode.to_sym
+      return mode if mode == :full || mode == :minimal
+
+      :full
+    rescue StandardError
+      :full
+    end
+
+    def collect_prompt_injection_items(user_message:, execution_context:, prompt_mode:)
+      sources = Array(prompt_injection_sources)
+      return [] if sources.empty?
+
+      items =
+        sources.flat_map do |source|
+          next [] unless source
+
+          begin
+            Array(
+              source.items(
+                agent: self,
+                user_message: user_message,
+                execution_context: execution_context,
+                prompt_mode: prompt_mode
+              )
+            )
+          rescue StandardError
+            []
+          end
+        end
+
+      items
+        .select { |item| item.is_a?(Resources::PromptInjections::Item) }
+        .select { |item| item.allowed_in_prompt_mode?(prompt_mode) }
+    rescue StandardError
+      []
+    end
+
+    def fetch_memory_results(user_message)
+      mem = memory
+      query = user_message.to_s
+      return [] unless mem && !query.strip.empty?
+
+      limit = Integer(memory_search_limit || DEFAULT_MEMORY_SEARCH_LIMIT, exception: false) || DEFAULT_MEMORY_SEARCH_LIMIT
+      limit = DEFAULT_MEMORY_SEARCH_LIMIT if limit <= 0
+
+      mem.search(query: query, limit: limit)
+    rescue StandardError
+      []
+    end
+
+    def build_prompt_with(summary:, turns:, memory_results:, user_message:, execution_context:, prompt_mode:, prompt_injection_items:)
+      history_messages = turns.flatten
+
+      if (s = summary.to_s).strip != ""
+        history_messages = [summary_message(s)] + history_messages
+      end
+
+      history_view = Resources::ChatHistory::InMemory.new(history_messages)
+
+      context =
+        PromptBuilder::Context.new(
+          system_prompt: system_prompt,
+          chat_history: history_view,
+          tools_registry: tools_registry,
+          memory_results: memory_results,
+          user_message: user_message,
+          variables: {},
+          agent_config: { llm_options: llm_options },
+          tool_policy: tool_policy,
+          execution_context: execution_context,
+          skills_store: skills_store,
+          include_skill_locations: include_skill_locations,
+          prompt_mode: prompt_mode,
+          prompt_injection_items: prompt_injection_items,
+        )
+
+      prompt_pipeline.build(context: context)
+    end
+
+    def summary_message(text)
+      safe = Utils.truncate_utf8_bytes(text.to_s.strip, max_bytes: DEFAULT_MAX_SUMMARY_BYTES)
+      wrapped = "#{SUMMARY_MESSAGE_TAG}\n#{safe}\n#{SUMMARY_MESSAGE_END_TAG}"
+
+      Message.new(
+        role: :assistant,
+        content: wrapped,
+        metadata: { kind: "conversation_summary" }
+      )
     end
   end
 end

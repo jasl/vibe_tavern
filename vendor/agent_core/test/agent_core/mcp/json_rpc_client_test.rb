@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "agent_core/mcp"
 require "timeout"
 
 class AgentCore::MCP::JsonRpcClientTest < Minitest::Test

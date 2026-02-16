@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "agent_core/mcp"
 require "agent_core/mcp/transport/streamable_http"
 
 class AgentCore::MCP::Transport::StreamableHttpTest < Minitest::Test

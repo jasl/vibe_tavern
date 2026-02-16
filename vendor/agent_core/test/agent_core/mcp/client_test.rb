@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "agent_core/mcp"
 
 class AgentCore::MCP::ClientTest < Minitest::Test
   # A mock transport that auto-responds to JSON-RPC messages.

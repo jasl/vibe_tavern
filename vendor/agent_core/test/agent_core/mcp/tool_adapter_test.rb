@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "agent_core/mcp"
 
 class AgentCore::MCP::ToolAdapterTest < Minitest::Test
   def test_local_tool_name_simple

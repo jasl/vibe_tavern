@@ -24,7 +24,7 @@ AgentCore 的 Prompt 注入以“生成若干 `Item`”为统一抽象：
 
 关键落点：
 
-- items 汇总：`vendor/agent_core/lib/agent_core/context_management/context_manager.rb`
+- items 汇总：`vendor/agent_core/lib/agent_core/agent.rb`（`collect_prompt_injection_items`）
 - 组装位置：`vendor/agent_core/lib/agent_core/prompt_builder/simple_pipeline.rb`
 
 ---
@@ -236,4 +236,3 @@ AgentCore 已有：
 - `repo_docs` v2：per-dir 单文件优先级 + 可配置 separator + 可选“无文件也注入默认说明”
 - `file_set` v2：支持 head/tail 比例、marker 模板（含 file name/统计）、以及流式读取避免大文件内存峰值
 - 注入可观测性：统一 emit “注入体积/来源/是否截断”事件，方便做类似 OpenClaw 的 /context 报告
-

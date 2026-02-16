@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "agent_core/mcp"
 
 class AgentCore::MCP::Transport::StdioTest < Minitest::Test
   def test_initialize_with_required_params

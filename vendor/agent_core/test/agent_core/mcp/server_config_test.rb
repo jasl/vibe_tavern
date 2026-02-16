@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "agent_core/mcp"
 
 class AgentCore::MCP::ServerConfigTest < Minitest::Test
   def test_stdio_minimal

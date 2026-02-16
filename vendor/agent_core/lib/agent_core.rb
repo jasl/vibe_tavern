@@ -47,9 +47,6 @@ require_relative "agent_core/resources/prompt_injections/sources/file_set"
 require_relative "agent_core/resources/prompt_injections/sources/repo_docs"
 require_relative "agent_core/resources/prompt_injections/factory"
 
-# MCP (Model Context Protocol)
-require_relative "agent_core/mcp"
-
 # Skills
 require_relative "agent_core/resources/skills/skill_metadata"
 require_relative "agent_core/resources/skills/skill"
@@ -76,7 +73,7 @@ require_relative "agent_core/prompt_runner/runner"
 
 # Context management (auto-compaction)
 require_relative "agent_core/context_management/summarizer"
-require_relative "agent_core/context_management/context_manager"
+require_relative "agent_core/context_management/budget_manager"
 
 # Agent (top-level)
 require_relative "agent_core/agent"

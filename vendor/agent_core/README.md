@@ -262,6 +262,15 @@ This adds native tools:
 
 ## MCP tools naming
 
+Note: MCP support is optional and is **not** loaded by default.
+
+To use MCP, require it explicitly:
+
+```ruby
+require "agent_core"
+require "agent_core/mcp"
+```
+
 When registering multiple MCP servers, prefer `server_id:` to get safe, stable
 local tool names:
 

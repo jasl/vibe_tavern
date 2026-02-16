@@ -9,6 +9,9 @@
 # It lazy-loads httpx and should only be loaded when explicitly needed.
 # Use: require "agent_core/mcp/transport/streamable_http"
 
+require_relative "errors"
+require_relative "utils"
+
 require_relative "mcp/constants"
 require_relative "mcp/sse_parser"
 require_relative "mcp/transport/base"

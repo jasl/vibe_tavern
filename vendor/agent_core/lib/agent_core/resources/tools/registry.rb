@@ -16,8 +16,8 @@ module AgentCore
       #   registry.register(read_tool)
       #   registry.register(write_tool)
       #
-      #   # Register MCP servers (tools discovered during init)
-      #   registry.register_mcp_server(mcp_client)
+      #   # Register MCP clients (tools discovered during init)
+      #   registry.register_mcp_client(mcp_client)
       #
       #   # List all available tools
       #   registry.definitions  # => Array of tool definitions
@@ -27,7 +27,6 @@ module AgentCore
       class Registry
         def initialize
           @native_tools = {}
-          @mcp_clients = {}
           @mcp_tools = {}   # name => { client:, definition: }
           @mutex = Mutex.new
         end
@@ -82,14 +81,14 @@ module AgentCore
         # @param server_id [String, nil] MCP server identifier for safe tool name mapping
         # @return [self]
         def register_mcp_client(client, prefix: nil, server_id: nil)
+          ensure_mcp_loaded!
+
           tools = list_all_mcp_tool_definitions(client)
           if server_id && prefix
             warn "[AgentCore::Registry] register_mcp_client(server_id:) ignores prefix=#{prefix.inspect}"
           end
 
           @mutex.synchronize do
-            @mcp_clients[client.object_id] = client
-
             tools.each do |tool_def|
               tool_name =
                 if server_id
@@ -201,7 +200,6 @@ module AgentCore
         def clear
           @mutex.synchronize do
             @native_tools.clear
-            @mcp_clients.clear
             @mcp_tools.clear
           end
           self
@@ -255,6 +253,14 @@ module AgentCore
           end
 
           out
+        end
+
+        def ensure_mcp_loaded!
+          return if defined?(::AgentCore::MCP::ToolAdapter)
+
+          require "agent_core/mcp"
+        rescue LoadError => e
+          raise LoadError, "MCP support requires `require \"agent_core/mcp\"` (#{e.message})", cause: e
         end
       end
     end
