@@ -22,6 +22,20 @@ module LLM
 
       registry = LLM::Tooling.registry(tooling_key: tooling_key, context_attributes: ctx_attrs)
 
+      record, _reserved =
+        ToolResultRecord.reserve!(
+          run_id: run_id,
+          tool_call_id: tool_call_id,
+          executed_name: executed_name,
+        )
+
+      return if record.status == "ready"
+
+      lock_id = self.job_id.to_s
+      lock_id = SecureRandom.uuid if lock_id.empty?
+
+      return unless ToolResultRecord.claim_for_execution!(run_id: run_id, tool_call_id: tool_call_id, job_id: lock_id)
+
       result =
         begin
           registry.execute(name: executed_name, arguments: args, context: context)
@@ -29,12 +43,21 @@ module LLM
           AgentCore::Resources::Tools::ToolResult.error(text: "Tool execution failed: #{e.message}")
         end
 
-      ToolResultRecord.upsert_result!(
-        run_id: run_id,
-        tool_call_id: tool_call_id,
-        executed_name: executed_name,
-        tool_result: result,
-      )
+      begin
+        ToolResultRecord.complete!(
+          run_id: run_id,
+          tool_call_id: tool_call_id,
+          job_id: lock_id,
+          tool_result: result,
+        )
+      rescue ArgumentError
+        ToolResultRecord.upsert_result!(
+          run_id: run_id,
+          tool_call_id: tool_call_id,
+          executed_name: executed_name,
+          tool_result: result,
+        )
+      end
     end
 
     private

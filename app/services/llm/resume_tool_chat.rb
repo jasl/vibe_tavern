@@ -20,7 +20,6 @@ module LLM
         ContinuationRecord.find_by(run_id: run_id, continuation_id: continuation_id)
 
       return Result.failure(errors: ["continuation not found"], code: "CONTINUATION_NOT_FOUND", value: { run_id: run_id }) unless record
-      return Result.failure(errors: ["continuation is not current"], code: "STALE_CONTINUATION", value: { run_id: run_id }) unless record.status == "current"
 
       continuation = AgentCore::PromptRunner::ContinuationCodec.load(record.payload)
 
@@ -35,11 +34,14 @@ module LLM
         )
       end
 
-      begin
-        ContinuationRecord.consume!(run_id: run_id, continuation_id: continuation_id)
-      rescue ContinuationRecord::StaleContinuationError => e
-        return Result.failure(errors: [e.message], code: "STALE_CONTINUATION", value: { run_id: run_id, continuation_id: continuation_id })
-      end
+      lock_token =
+        begin
+          ContinuationRecord.claim_for_resume!(run_id: run_id, continuation_id: continuation_id, reclaim_after: 5.minutes)
+        rescue ContinuationRecord::BusyContinuationError => e
+          return Result.failure(errors: [e.message], code: "CONTINUATION_BUSY", value: { run_id: run_id, continuation_id: continuation_id })
+        rescue ContinuationRecord::StaleContinuationError => e
+          return Result.failure(errors: [e.message], code: "STALE_CONTINUATION", value: { run_id: run_id, continuation_id: continuation_id })
+        end
 
       llm_model = record.llm_model
       tooling_key = record.tooling_key.to_s
@@ -65,48 +67,74 @@ module LLM
           capabilities: llm_model.capabilities_overrides,
         )
 
-      run_result =
-        session.resume_with_tool_results(
-          continuation: continuation,
-          tool_results: tool_results,
-          allow_partial: true,
-          context: continuation.context_attributes,
-        )
-
-      if run_result.respond_to?(:awaiting_tool_results?) && run_result.awaiting_tool_results?
-        persisted_context_keys = continuation.context_attributes.keys
-
-        continuation_payload =
-          AgentCore::PromptRunner::ContinuationCodec.dump(
-            run_result.continuation,
-            context_keys: persisted_context_keys,
-            include_traces: true,
+      begin
+        run_result =
+          session.resume_with_tool_results(
+            continuation: continuation,
+            tool_results: tool_results,
+            allow_partial: true,
+            context: continuation.context_attributes,
           )
 
-        ContinuationRecord.create!(
-          run_id: run_result.run_id,
-          continuation_id: continuation_payload.fetch("continuation_id"),
-          parent_continuation_id: continuation_payload.fetch("parent_continuation_id", nil),
-          llm_model: llm_model,
-          tooling_key: tooling_key,
-          status: "current",
-          payload: continuation_payload,
-        )
+        begin
+          ContinuationRecord.mark_consumed!(run_id: run_id, continuation_id: continuation_id, lock_token: lock_token)
+        rescue ContinuationRecord::StaleContinuationError => e
+          return Result.failure(errors: [e.message], code: "STALE_CONTINUATION", value: { run_id: run_id, continuation_id: continuation_id })
+        end
 
-        task_payload =
-          AgentCore::PromptRunner::ToolTaskCodec.dump(
-            run_result.continuation,
-            context_keys: persisted_context_keys,
+        if run_result.respond_to?(:awaiting_tool_results?) && run_result.awaiting_tool_results?
+          persisted_context_keys = continuation.context_attributes.keys
+
+          continuation_payload =
+            AgentCore::PromptRunner::ContinuationCodec.dump(
+              run_result.continuation,
+              context_keys: persisted_context_keys,
+              include_traces: true,
+            )
+
+          ContinuationRecord.create!(
+            run_id: run_result.run_id,
+            continuation_id: continuation_payload.fetch("continuation_id"),
+            parent_continuation_id: continuation_payload.fetch("parent_continuation_id", nil),
+            llm_model: llm_model,
+            tooling_key: tooling_key,
+            status: "current",
+            payload: continuation_payload,
           )
 
-        enqueue_missing_tool_tasks!(task_payload, tooling_key: tooling_key)
+          task_payload =
+            AgentCore::PromptRunner::ToolTaskCodec.dump(
+              run_result.continuation,
+              context_keys: persisted_context_keys,
+            )
+
+          enqueue_missing_tool_tasks!(task_payload, tooling_key: tooling_key)
+        end
+
+        Result.success(
+          value: {
+            run_result: run_result,
+          },
+        )
+      rescue AgentCore::ProviderError, SimpleInference::Errors::Error => e
+        begin
+          ContinuationRecord.release_after_failure!(run_id: run_id, continuation_id: continuation_id, lock_token: lock_token, error: e)
+        rescue ContinuationRecord::StaleContinuationError
+        end
+        Result.failure(errors: [e.message], code: "LLM_REQUEST_FAILED", value: { run_id: run_id })
+      rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotFound, ArgumentError => e
+        begin
+          ContinuationRecord.release_after_failure!(run_id: run_id, continuation_id: continuation_id, lock_token: lock_token, error: e)
+        rescue ContinuationRecord::StaleContinuationError
+        end
+        Result.failure(errors: [e.message], code: "INVALID_INPUT", value: { run_id: run_id })
+      rescue StandardError => e
+        begin
+          ContinuationRecord.release_after_failure!(run_id: run_id, continuation_id: continuation_id, lock_token: lock_token, error: e)
+        rescue ContinuationRecord::StaleContinuationError
+        end
+        raise
       end
-
-      Result.success(
-        value: {
-          run_result: run_result,
-        },
-      )
     rescue AgentCore::ProviderError, SimpleInference::Errors::Error => e
       Result.failure(errors: [e.message], code: "LLM_REQUEST_FAILED", value: { run_id: run_id })
     rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotFound, ArgumentError => e
@@ -139,6 +167,7 @@ module LLM
       return {} if ids.empty?
 
       ToolResultRecord
+        .ready
         .where(run_id: run_id, tool_call_id: ids)
         .to_h do |r|
           [r.tool_call_id, AgentCore::Resources::Tools::ToolResult.from_h(r.tool_result)]
@@ -150,19 +179,24 @@ module LLM
       context_attributes = task_payload.fetch("context_attributes", {})
       tasks = Array(task_payload.fetch("tasks"))
 
-      tool_call_ids = tasks.map { |t| t.fetch("tool_call_id").to_s }.uniq
-      existing_ids = ToolResultRecord.where(run_id: run_id, tool_call_id: tool_call_ids).pluck(:tool_call_id)
-      existing = existing_ids.each_with_object({}) { |id, out| out[id.to_s] = true }
-
       tasks.each do |t|
         tool_call_id = t.fetch("tool_call_id").to_s
-        next if existing.key?(tool_call_id)
+        executed_name = t.fetch("executed_name").to_s
+
+        _record, reserved =
+          ToolResultRecord.reserve!(
+            run_id: run_id,
+            tool_call_id: tool_call_id,
+            executed_name: executed_name,
+          )
+
+        next unless reserved
 
         LLM::ExecuteToolCallJob.perform_later(
           run_id: run_id,
           tooling_key: tooling_key,
           tool_call_id: tool_call_id,
-          executed_name: t.fetch("executed_name").to_s,
+          executed_name: executed_name,
           arguments: t.fetch("arguments"),
           context_attributes: context_attributes,
         )

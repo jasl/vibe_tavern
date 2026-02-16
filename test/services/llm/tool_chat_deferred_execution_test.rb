@@ -97,18 +97,32 @@ class LLMToolChatDeferredExecutionTest < ActiveSupport::TestCase
 
     assert_equal 2, enqueued_jobs.count { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
 
-    first_job = enqueued_jobs.find { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
-    assert first_job
+    assert_equal 2, ToolResultRecord.where(run_id: run_id).count
+    assert_equal 2, ToolResultRecord.where(run_id: run_id, status: "queued").count
+
+    tool_jobs =
+      enqueued_jobs
+        .select { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
+        .map do |j|
+          args = j.fetch(:args).first
+          args = args.is_a?(Hash) ? args.transform_keys { |k| k.to_s.to_sym } : {}
+          args.delete(:_aj_ruby2_keywords)
+          args.delete(:_aj_symbol_keys)
+          args
+        end
 
     clear_enqueued_jobs
-    first_args = first_job.fetch(:args).first
-    first_args = first_args.is_a?(Hash) ? first_args.transform_keys { |k| k.to_s.to_sym } : {}
-    first_args.delete(:_aj_ruby2_keywords)
-    first_args.delete(:_aj_symbol_keys)
+
+    first_args = tool_jobs.find { |a| a[:tool_call_id].to_s == "tc_1" }
+    second_args = tool_jobs.find { |a| a[:tool_call_id].to_s == "tc_2" }
+    assert first_args
+    assert second_args
 
     LLM::ExecuteToolCallJob.new.perform(**first_args)
 
-    assert_equal 1, ToolResultRecord.where(run_id: run_id).count
+    assert_equal 2, ToolResultRecord.where(run_id: run_id).count
+    assert_equal 1, ToolResultRecord.ready.where(run_id: run_id).count
+    assert_equal 1, ToolResultRecord.where(run_id: run_id, status: "queued").count
 
     resumed =
       LLM::ResumeToolChat.call(
@@ -126,10 +140,12 @@ class LLMToolChatDeferredExecutionTest < ActiveSupport::TestCase
     assert_equal record.continuation_id, next_record.parent_continuation_id
     assert_equal "t1", next_record.payload.dig("context_attributes", "tenant_id")
 
-    assert_equal 1, enqueued_jobs.count { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
-    perform_enqueued_jobs
+    assert_equal 0, enqueued_jobs.count { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
+
+    LLM::ExecuteToolCallJob.new.perform(**second_args)
 
     assert_equal 2, ToolResultRecord.where(run_id: run_id).count
+    assert_equal 2, ToolResultRecord.ready.where(run_id: run_id).count
 
     resumed_final =
       LLM::ResumeToolChat.call(

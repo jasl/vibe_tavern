@@ -165,20 +165,61 @@ copy/paste-ready Rails pattern:
 - Tables: `continuation_records` / `tool_result_records` (see
   `db/migrate/*_create_continuation_records.rb` and
   `db/migrate/*_create_tool_result_records.rb`)
-- Models: `ContinuationRecord` / `ToolResultRecord` (CAS consume + idempotent
-  upsert)
+- Models: `ContinuationRecord` / `ToolResultRecord` (resume claim/release +
+  tool result reservation)
 - Job: `LLM::ExecuteToolCallJob` (execute one tool call and store result)
 - Services: `LLM::RunToolChat` / `LLM::ResumeToolChat` (pause/resume orchestration)
 
-### CAS consume! (stale continuation protection)
+### Resume claim (stale protection + retry)
 
 ```ruby
-ContinuationRecord.consume!(run_id: run_id, continuation_id: continuation_id)
+lock_token =
+  ContinuationRecord.claim_for_resume!(
+    run_id: run_id,
+    continuation_id: continuation_id,
+    reclaim_after: 5.minutes,
+  )
+
+# ... call AgentSession#resume_with_tool_results ...
+
+ContinuationRecord.mark_consumed!(
+  run_id: run_id,
+  continuation_id: continuation_id,
+  lock_token: lock_token,
+)
+
+# On resume failure (LLM/provider error, invalid input, etc.)
+ContinuationRecord.release_after_failure!(
+  run_id: run_id,
+  continuation_id: continuation_id,
+  lock_token: lock_token,
+  error: e,
+)
 ```
 
-If the update affects 0 rows, `consume!` raises
-`ContinuationRecord::StaleContinuationError` (another worker already resumed it
-or it is not current).
+This repo uses a 3-state continuation status machine:
+
+- `current` — available to resume
+- `consuming` — claimed by a worker (locked by `resume_lock_token`)
+- `consumed` — already resumed (single-use token)
+
+Semantics:
+
+- `claim_for_resume!` raises:
+  - `BusyContinuationError` when another worker is actively consuming
+  - `StaleContinuationError` when already consumed/not current
+- if a worker crashes mid-resume, another worker can reclaim a `consuming`
+  continuation after `reclaim_after` (default 5 minutes here).
+
+### ToolResultRecord reservation (job dedup)
+
+To avoid duplicate enqueue/execution (and to make jobs strongly idempotent),
+this repo treats `tool_result_records` as the single source of truth:
+
+- `reserve!` creates a `(run_id, tool_call_id)` row in `queued` state (only once)
+- jobs `claim_for_execution!` (`queued` → `executing`) and then `complete!`
+  (`executing` → `ready`)
+- repeated jobs exit early when already `executing`/`ready`
 
 ### Start (pause + enqueue tasks)
 
@@ -200,12 +241,19 @@ run_id = started.value.fetch(:run_id)
 continuation_id = started.value.fetch(:continuation_id) # present when paused
 ```
 
-### Resume (consume + allow_partial)
+### Resume (claim + allow_partial)
 
-`LLM::ResumeToolChat` consumes the checkpoint (`continuation_id`), loads the
-continuation payload, gathers tool results, and resumes with
-`allow_partial: true`. If it pauses again, it persists the next continuation and
-enqueues any missing tool tasks.
+`LLM::ResumeToolChat`:
+
+- claims the checkpoint (`current` → `consuming`)
+- loads the continuation payload
+- gathers ready tool results
+- resumes with `allow_partial: true`
+- marks the checkpoint as `consumed` on success
+- releases it back to `current` on failure (so the resume can be retried)
+
+If the run pauses again, it persists the next continuation and enqueues any
+missing tool tasks.
 
 ```ruby
 resumed =

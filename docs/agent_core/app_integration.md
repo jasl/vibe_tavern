@@ -173,9 +173,14 @@ Recommended flow:
 
 1) On pause, persist the continuation payload and mark it as `current`.
 2) On resume request, require the caller to supply `continuation_id`.
-3) Atomically transition the continuation row from `current` → `consumed`
-   (or use a DB lock/version) before executing the resume.
-4) If the resume returns another pause continuation, persist the new payload as
+3) Atomically **claim** the continuation row (`current` → `consuming`) before
+   executing the resume (so only one worker proceeds).
+4) On success, transition `consuming` → `consumed`.
+5) On failure (LLM/provider error, invalid input, worker crash), transition
+   `consuming` → `current` so the resume can be retried.
+   - If a worker crashes mid-resume, allow reclaiming a stale `consuming` lock
+     after a TTL (this repo uses 5 minutes).
+6) If the resume returns another pause continuation, persist the new payload as
    `current` and link it via `parent_continuation_id`.
 
 For `allow_partial: true` deferred tool execution:
@@ -201,17 +206,17 @@ Integration notes:
 This Rails app includes a minimal, end-to-end implementation you can copy:
 
 - Persistence:
-  - `app/models/continuation_record.rb` (CAS `consume!`)
-  - `app/models/tool_result_record.rb` (idempotent `upsert_result!`)
+  - `app/models/continuation_record.rb` (`claim_for_resume!` / `mark_consumed!` / `release_after_failure!`)
+  - `app/models/tool_result_record.rb` (`reserve!` / `claim_for_execution!` / `complete!`)
   - migrations in `db/migrate/*_create_continuation_records.rb` and `db/migrate/*_create_tool_result_records.rb`
 - Tooling reconstruction hook: `lib/llm/tooling.rb` (`tooling_key` → registry/policy)
 - Job (tool execution only): `app/jobs/llm/execute_tool_call_job.rb`
 - Services:
   - `app/services/llm/run_tool_chat.rb` (run → pause → persist → enqueue)
-  - `app/services/llm/resume_tool_chat.rb` (CAS consume → resume → re-pause if needed)
+  - `app/services/llm/resume_tool_chat.rb` (claim → resume → consume/release → re-pause if needed)
 
 Production TODO (app-side, not provided by AgentCore):
 
 - Store `continuation_id` as a single-use checkpoint token and enforce single-consume via CAS/optimistic locking.
-- Decide your retry semantics: if the resume LLM call fails after consuming the checkpoint, you may want a separate status like `consuming` to support safe retries.
+- Decide your retry semantics and lock TTLs (this repo uses `consuming` + reclaim TTL for safe retries).
 - Ensure secrets never enter `context_attributes` / tool arguments, and never log raw tool args/results without redaction.

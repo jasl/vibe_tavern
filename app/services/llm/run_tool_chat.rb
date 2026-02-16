@@ -339,19 +339,24 @@ module LLM
       context_attributes = task_payload.fetch("context_attributes", {})
       tasks = Array(task_payload.fetch("tasks"))
 
-      tool_call_ids = tasks.map { |t| t.fetch("tool_call_id").to_s }
-      existing_ids = ToolResultRecord.where(run_id: run_id, tool_call_id: tool_call_ids).pluck(:tool_call_id)
-      existing = existing_ids.each_with_object({}) { |id, out| out[id.to_s] = true }
-
       tasks.each do |t|
         tool_call_id = t.fetch("tool_call_id").to_s
-        next if existing.key?(tool_call_id)
+        executed_name = t.fetch("executed_name").to_s
+
+        _record, reserved =
+          ToolResultRecord.reserve!(
+            run_id: run_id,
+            tool_call_id: tool_call_id,
+            executed_name: executed_name,
+          )
+
+        next unless reserved
 
         LLM::ExecuteToolCallJob.perform_later(
           run_id: run_id,
           tooling_key: tooling_key,
           tool_call_id: tool_call_id,
-          executed_name: t.fetch("executed_name").to_s,
+          executed_name: executed_name,
           arguments: t.fetch("arguments"),
           context_attributes: context_attributes,
         )
