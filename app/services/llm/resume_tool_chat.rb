@@ -70,6 +70,7 @@ module LLM
           continuation: continuation,
           tool_results: tool_results,
           allow_partial: true,
+          context: continuation.context_attributes,
         )
 
       if run_result.respond_to?(:awaiting_tool_results?) && run_result.awaiting_tool_results?

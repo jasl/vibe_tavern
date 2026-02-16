@@ -93,12 +93,22 @@ class LLMToolChatDeferredExecutionTest < ActiveSupport::TestCase
 
     record = ContinuationRecord.find_by!(run_id: run_id, continuation_id: continuation_id)
     assert_equal "current", record.status
+    assert_equal "t1", record.payload.dig("context_attributes", "tenant_id")
 
     assert_equal 2, enqueued_jobs.count { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
 
-    perform_enqueued_jobs
+    first_job = enqueued_jobs.find { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
+    assert first_job
 
-    assert_equal 2, ToolResultRecord.where(run_id: run_id).count
+    clear_enqueued_jobs
+    first_args = first_job.fetch(:args).first
+    first_args = first_args.is_a?(Hash) ? first_args.transform_keys { |k| k.to_s.to_sym } : {}
+    first_args.delete(:_aj_ruby2_keywords)
+    first_args.delete(:_aj_symbol_keys)
+
+    LLM::ExecuteToolCallJob.new.perform(**first_args)
+
+    assert_equal 1, ToolResultRecord.where(run_id: run_id).count
 
     resumed =
       LLM::ResumeToolChat.call(
@@ -108,15 +118,34 @@ class LLMToolChatDeferredExecutionTest < ActiveSupport::TestCase
       )
 
     assert resumed.success?, resumed.errors.inspect
-    final = resumed.value.fetch(:run_result)
-    assert_equal "done", final.final_message&.text
-
     assert_equal "consumed", record.reload.status
+    paused_again = resumed.value.fetch(:run_result)
+    assert paused_again.awaiting_tool_results?
+
+    next_record = ContinuationRecord.current_for_run!(run_id)
+    assert_equal record.continuation_id, next_record.parent_continuation_id
+    assert_equal "t1", next_record.payload.dig("context_attributes", "tenant_id")
+
+    assert_equal 1, enqueued_jobs.count { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
+    perform_enqueued_jobs
+
+    assert_equal 2, ToolResultRecord.where(run_id: run_id).count
+
+    resumed_final =
+      LLM::ResumeToolChat.call(
+        run_id: run_id,
+        continuation_id: next_record.continuation_id,
+        client: client,
+      )
+
+    assert resumed_final.success?, resumed_final.errors.inspect
+    final = resumed_final.value.fetch(:run_result)
+    assert_equal "done", final.final_message&.text
 
     stale =
       LLM::ResumeToolChat.call(
         run_id: run_id,
-        continuation_id: continuation_id,
+        continuation_id: next_record.continuation_id,
         client: client,
       )
 
