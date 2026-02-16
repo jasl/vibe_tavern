@@ -232,4 +232,3 @@ store =
 - Do not use `role: :system` for preamble messages. The runner applies the
   system prompt separately and may overwrite system messages in the messages array.
 - Prompt injections are deliberately **storage-agnostic**: the app owns IO and persistence.
-

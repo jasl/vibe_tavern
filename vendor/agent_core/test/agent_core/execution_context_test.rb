@@ -23,6 +23,13 @@ class AgentCore::ExecutionContextTest < Minitest::Test
     assert_equal({ user_id: 123 }, ctx.attributes)
   end
 
+  def test_from_accepts_keyword_attributes
+    ctx = AgentCore::ExecutionContext.from(user_id: 123, cwd: "/tmp")
+
+    assert_equal 123, ctx.attributes[:user_id]
+    assert_equal "/tmp", ctx.attributes[:cwd]
+  end
+
   def test_from_execution_context_can_override_instrumenter
     base = AgentCore::ExecutionContext.from({ user_id: 1 })
     recorder = AgentCore::Observability::TraceRecorder.new(capture: :none)

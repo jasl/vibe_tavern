@@ -54,15 +54,24 @@ module AgentCore
       # Build/normalize a context from nil / Hash / ExecutionContext.
       #
       # Hash input must use Symbol keys (internal API).
-      def self.from(value, instrumenter: nil)
+      def self.from(value = nil, instrumenter: nil, **attributes)
         case value
         when nil
-          new(instrumenter: instrumenter)
+          if attributes.any?
+            new(attributes: attributes, instrumenter: instrumenter)
+          else
+            new(instrumenter: instrumenter)
+          end
         when self
-          instrumenter ? value.with(instrumenter: instrumenter) : value
+          ctx = instrumenter ? value.with(instrumenter: instrumenter) : value
+          return ctx if attributes.empty?
+
+          merged = ctx.attributes.merge(attributes)
+          ctx.with(attributes: merged)
         when Hash
           AgentCore::Utils.assert_symbol_keys!(value, path: "context")
-          new(attributes: value, instrumenter: instrumenter)
+          merged = attributes.empty? ? value : value.merge(attributes)
+          new(attributes: merged, instrumenter: instrumenter)
         else
           raise ArgumentError, "context must be nil, a Hash (Symbol keys), or AgentCore::ExecutionContext (got #{value.class})"
         end
