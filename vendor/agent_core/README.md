@@ -55,6 +55,40 @@ result = agent.chat("hello")
 puts result.text
 ```
 
+## Config (structured v1)
+
+AgentCore agents are serializable. Config is **versioned** and **structured**.
+
+- Export: `agent.to_config`
+- Load: `AgentCore::Agent.from_config(config, provider: ..., ...)`
+- Select groups: `agent.to_config(only: [...])` / `agent.to_config(except: [...])`
+
+Top-level groups:
+
+- `:identity`
+- `:llm`
+- `:execution`
+- `:token_budget`
+- `:context_management`
+- `:prompt_injections`
+
+Example:
+
+```ruby
+config = agent.to_config
+
+restored =
+  AgentCore::Agent.from_config(
+    config,
+    provider: provider,
+    chat_history: MyChatHistoryStore.new,
+    conversation_state: MyConversationStateStore.new,
+    memory: MyMemoryStore.new,
+    tools_registry: registry,
+    tool_policy: AgentCore::Resources::Tools::Policy::AllowAll.new,
+  )
+```
+
 ## Context management (sliding window + auto-compaction)
 
 AgentCore treats **chat history** as the append-only transcript, and manages a
@@ -91,6 +125,66 @@ agent = AgentCore::Agent.build do |b|
   b.summary_max_output_tokens = 512
 end
 ```
+
+## Prompt injections (OpenClaw + Codex + app-provided)
+
+AgentCore supports an optional **prompt injections** subsystem:
+
+- `system_section`: append ordered sections to the system prompt
+- `preamble_message`: insert ordered messages **before** chat history (Codex-like `<user_instructions>`)
+
+Configure sources under `prompt_injections.sources` in config v1.
+
+### OpenClaw-style: inject a file set into `system_prompt`
+
+```ruby
+config = agent.to_config
+config[:prompt_injections][:sources] = [
+  {
+    type: "file_set",
+    section_header: "Project Context",
+    total_max_bytes: 30_000,
+    files: [
+      { path: "SOUL.md", max_bytes: 10_000, prompt_modes: [:full, :minimal] },
+      { path: "MEMORY.md", max_bytes: 10_000, prompt_modes: [:full] },
+    ],
+  },
+]
+```
+
+### Codex-style: inject layered `AGENTS.md` into preamble user message
+
+```ruby
+config[:prompt_injections][:sources] = [
+  {
+    type: "repo_docs",
+    filenames: ["AGENTS.md"],
+    max_total_bytes: 30_000,
+    wrapper_template: "<user_instructions>\n{{content}}\n</user_instructions>",
+  },
+]
+```
+
+### App-provided: load items per call (DB, cache, etc.)
+
+Use the `provided` source, and pass items via `ExecutionContext`:
+
+```ruby
+agent = AgentCore::Agent.from_config(config, provider: provider)
+
+ctx =
+  AgentCore::ExecutionContext.from(
+    prompt_mode: :minimal,
+    prompt_injections: [
+      { target: :preamble_message, role: :user, content: "..." , order: 10 },
+      { target: :system_section, content: "..." , order: 300 },
+    ],
+  )
+
+agent.chat("hi", context: ctx)
+```
+
+More details: see `docs/agent_core/prompt_injections.md`.
 
 ## Tool calling + pause/resume (confirm)
 

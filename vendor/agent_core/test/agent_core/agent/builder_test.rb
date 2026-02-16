@@ -81,35 +81,35 @@ class AgentCore::Agent::BuilderTest < Minitest::Test
 
     config = builder.to_config
 
-    assert_equal "MyAgent", config[:name]
-    assert_equal "A test agent", config[:description]
-    assert_equal "Be helpful", config[:system_prompt]
-    assert_equal "claude-sonnet", config[:model]
-    assert_equal 0.7, config[:temperature]
-    assert_equal 4096, config[:max_tokens]
-    assert_equal 5, config[:max_turns]
+    assert_equal 1, config[:version]
+    assert_equal "MyAgent", config[:identity][:name]
+    assert_equal "A test agent", config[:identity][:description]
+    assert_equal "Be helpful", config[:identity][:system_prompt]
+    assert_equal "claude-sonnet", config[:llm][:model]
+    assert_equal 0.7, config[:llm][:options][:temperature]
+    assert_equal 4096, config[:llm][:options][:max_tokens]
+    assert_equal 5, config[:execution][:max_turns]
   end
 
   def test_to_config_omits_nil_values
     builder = AgentCore::Agent::Builder.new
     config = builder.to_config
 
-    refute config.key?(:model)
-    refute config.key?(:temperature)
-    refute config.key?(:max_tokens)
-    refute config.key?(:top_p)
-    refute config.key?(:stop_sequences)
+    refute config[:llm].key?(:model)
+    refute config[:llm][:options].key?(:temperature)
+    refute config[:llm][:options].key?(:max_tokens)
+    refute config[:llm][:options].key?(:top_p)
+    refute config[:llm][:options].key?(:stop_sequences)
   end
 
   def test_load_config
     builder = AgentCore::Agent::Builder.new
     builder.load_config(
-      name: "Loaded",
-      model: "claude-opus",
-      temperature: 0.5,
-      max_turns: 20,
-      context_window: 128_000,
-      reserved_output_tokens: 4096,
+      version: 1,
+      identity: { name: "Loaded" },
+      llm: { model: "claude-opus", options: { temperature: 0.5 } },
+      execution: { max_turns: 20 },
+      token_budget: { context_window: 128_000, reserved_output_tokens: 4096 },
     )
 
     assert_equal "Loaded", builder.name
@@ -122,7 +122,11 @@ class AgentCore::Agent::BuilderTest < Minitest::Test
 
   def test_load_config_with_string_keys
     builder = AgentCore::Agent::Builder.new
-    builder.load_config("name" => "StringKeys", "model" => "test")
+    builder.load_config(
+      "version" => 1,
+      "identity" => { "name" => "StringKeys" },
+      "llm" => { "model" => "test" },
+    )
 
     assert_equal "StringKeys", builder.name
     assert_equal "test", builder.model
@@ -130,7 +134,7 @@ class AgentCore::Agent::BuilderTest < Minitest::Test
 
   def test_load_config_returns_self
     builder = AgentCore::Agent::Builder.new
-    result = builder.load_config(name: "X")
+    result = builder.load_config(version: 1, identity: { name: "X" })
     assert_same builder, result
   end
 
@@ -150,6 +154,23 @@ class AgentCore::Agent::BuilderTest < Minitest::Test
     assert_equal "claude-sonnet", new_builder.model
     assert_equal 0.8, new_builder.temperature
     assert_equal 15, new_builder.max_turns
+  end
+
+  def test_to_config_supports_only_group_selection
+    builder = AgentCore::Agent::Builder.new
+    config = builder.to_config(only: [:identity])
+
+    assert_equal({ version: 1, identity: builder.to_config[:identity] }, config)
+  end
+
+  def test_to_config_supports_except_group_selection
+    builder = AgentCore::Agent::Builder.new
+    config = builder.to_config(except: [:llm, :execution])
+
+    assert_equal 1, config[:version]
+    refute config.key?(:llm)
+    refute config.key?(:execution)
+    assert config.key?(:identity)
   end
 
   def test_llm_options

@@ -10,7 +10,8 @@ module AgentCore
       attr_reader :system_prompt, :chat_history, :tools_registry,
                   :memory_results, :user_message, :variables,
                   :agent_config, :tool_policy, :execution_context,
-                  :skills_store, :include_skill_locations
+                  :skills_store, :include_skill_locations,
+                  :prompt_mode, :prompt_injection_items
 
       # @param system_prompt [String] The system prompt template
       # @param chat_history [ChatHistory::Base] Conversation history
@@ -23,6 +24,8 @@ module AgentCore
       # @param execution_context [ExecutionContext, Hash, nil] Execution context (run_id, auth attributes, etc.)
       # @param skills_store [Resources::Skills::Store, nil] Optional skills store
       # @param include_skill_locations [Boolean] Whether to include skill locations in prompt fragments
+      # @param prompt_mode [Symbol] :full or :minimal
+      # @param prompt_injection_items [Array<Resources::PromptInjections::Item>] Prompt injection items
       def initialize(
         system_prompt: "",
         chat_history: nil,
@@ -34,7 +37,9 @@ module AgentCore
         tool_policy: nil,
         execution_context: nil,
         skills_store: nil,
-        include_skill_locations: false
+        include_skill_locations: false,
+        prompt_mode: :full,
+        prompt_injection_items: []
       )
         @system_prompt = system_prompt
         @chat_history = chat_history
@@ -47,6 +52,8 @@ module AgentCore
         @execution_context = ExecutionContext.from(execution_context)
         @skills_store = skills_store
         @include_skill_locations = include_skill_locations == true
+        @prompt_mode = (prompt_mode || :full).to_sym
+        @prompt_injection_items = Array(prompt_injection_items).freeze
       end
     end
   end

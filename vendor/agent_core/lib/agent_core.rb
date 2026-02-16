@@ -35,6 +35,18 @@ require_relative "agent_core/resources/tools/policy/allow_all"
 require_relative "agent_core/resources/token_counter/base"
 require_relative "agent_core/resources/token_counter/heuristic"
 
+# Prompt injections
+require_relative "agent_core/resources/prompt_injections/item"
+require_relative "agent_core/resources/prompt_injections/truncation"
+require_relative "agent_core/resources/prompt_injections/source/base"
+require_relative "agent_core/resources/prompt_injections/text_store/base"
+require_relative "agent_core/resources/prompt_injections/text_store/in_memory"
+require_relative "agent_core/resources/prompt_injections/sources/provided"
+require_relative "agent_core/resources/prompt_injections/sources/text_store_entries"
+require_relative "agent_core/resources/prompt_injections/sources/file_set"
+require_relative "agent_core/resources/prompt_injections/sources/repo_docs"
+require_relative "agent_core/resources/prompt_injections/factory"
+
 # MCP (Model Context Protocol)
 require_relative "agent_core/mcp"
 

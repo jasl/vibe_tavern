@@ -35,7 +35,8 @@ module AgentCore
                 :prompt_pipeline, :max_turns,
                 :token_counter, :context_window, :reserved_output_tokens,
                 :conversation_state, :auto_compact, :memory_search_limit,
-                :summary_max_output_tokens, :llm_options
+                :summary_max_output_tokens, :llm_options,
+                :prompt_injection_sources
 
     # Build an agent using the Builder DSL.
     # @yield [Builder]
@@ -57,7 +58,8 @@ module AgentCore
     # @param prompt_pipeline [PromptBuilder::Pipeline, nil]
     # @return [Agent]
     def self.from_config(config, provider:, chat_history: nil, memory: nil, conversation_state: nil,
-                         tools_registry: nil, tool_policy: nil, prompt_pipeline: nil, token_counter: nil)
+                         tools_registry: nil, tool_policy: nil, prompt_pipeline: nil, token_counter: nil,
+                         prompt_injection_text_store: nil)
       build do |b|
         b.load_config(config)
         b.provider = provider
@@ -68,6 +70,7 @@ module AgentCore
         b.tool_policy = tool_policy
         b.prompt_pipeline = prompt_pipeline
         b.token_counter = token_counter
+        b.prompt_injection_text_store = prompt_injection_text_store
       end
     end
 
@@ -98,6 +101,13 @@ module AgentCore
       @context_window = builder.context_window
       @reserved_output_tokens = builder.reserved_output_tokens || 0
       @tool_executor = builder.tool_executor
+
+      @prompt_injection_source_specs = Array(builder.prompt_injection_source_specs)
+      @prompt_injection_sources =
+        Resources::PromptInjections::Factory.build_sources(
+          specs: @prompt_injection_source_specs,
+          text_store: builder.prompt_injection_text_store
+        ).freeze
 
       # Internal
       @runner = PromptRunner::Runner.new
@@ -289,29 +299,31 @@ module AgentCore
       result
     end
 
-    # Export the agent's serializable config.
-    # Uses the same flat format as Builder#to_config so that
-    # Agent.from_config(agent.to_config, ...) round-trips correctly.
+    # Export the agent's structured serializable config (versioned).
     # @return [Hash]
-    def to_config
-      config = {
-        name: name,
-        description: description,
-        system_prompt: system_prompt,
-        model: model,
-        max_turns: max_turns,
-      }
-      # Include LLM options at top level (same as Builder#to_config)
-      config[:temperature] = @llm_options[:temperature] if @llm_options[:temperature]
-      config[:max_tokens] = @llm_options[:max_tokens] if @llm_options[:max_tokens]
-      config[:top_p] = @llm_options[:top_p] if @llm_options[:top_p]
-      config[:stop_sequences] = @llm_options[:stop_sequences] if @llm_options[:stop_sequences]
-      config[:context_window] = context_window if context_window
-      config[:reserved_output_tokens] = reserved_output_tokens if reserved_output_tokens.nonzero?
-      config[:auto_compact] = auto_compact
-      config[:memory_search_limit] = memory_search_limit if memory_search_limit
-      config[:summary_max_output_tokens] = summary_max_output_tokens if summary_max_output_tokens
-      config.compact
+    def to_config(only: nil, except: nil)
+      b = Builder.new
+
+      b.name = name
+      b.description = description
+      b.system_prompt = system_prompt
+      b.model = model
+      b.temperature = @llm_options[:temperature]
+      b.max_tokens = @llm_options[:max_tokens]
+      b.top_p = @llm_options[:top_p]
+      b.stop_sequences = @llm_options[:stop_sequences]
+      b.max_turns = max_turns
+
+      b.context_window = context_window
+      b.reserved_output_tokens = reserved_output_tokens
+
+      b.auto_compact = auto_compact
+      b.memory_search_limit = memory_search_limit
+      b.summary_max_output_tokens = summary_max_output_tokens
+
+      b.prompt_injection_source_specs = @prompt_injection_source_specs
+
+      b.to_config(only: only, except: except)
     end
 
     # Reset the conversation (clear history).

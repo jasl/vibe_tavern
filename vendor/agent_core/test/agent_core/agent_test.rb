@@ -442,9 +442,9 @@ class AgentCore::AgentTest < Minitest::Test
 
   def test_from_config_nil_reserved_output_tokens_is_treated_as_zero
     config = {
-      name: "NilReserved",
-      context_window: 10_000,
-      reserved_output_tokens: nil,
+      version: 1,
+      identity: { name: "NilReserved" },
+      token_budget: { context_window: 10_000, reserved_output_tokens: nil },
     }
 
     agent = AgentCore::Agent.from_config(config, provider: MockProvider.new)
@@ -461,8 +461,8 @@ class AgentCore::AgentTest < Minitest::Test
     end
 
     config = agent.to_config
-    assert_equal 200_000, config[:context_window]
-    assert_equal 8192, config[:reserved_output_tokens]
+    assert_equal 200_000, config[:token_budget][:context_window]
+    assert_equal 8192, config[:token_budget][:reserved_output_tokens]
 
     restored = AgentCore::Agent.from_config(config, provider: provider)
     assert_equal 200_000, restored.context_window

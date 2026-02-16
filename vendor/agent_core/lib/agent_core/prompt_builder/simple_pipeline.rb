@@ -28,17 +28,32 @@ module AgentCore
       private
 
       def build_system_prompt(context)
-        prompt = context.system_prompt.dup
+        memory_section_order = 200
+        skills_section_order = 800
 
-        # Inject memory context if available
+        base = substitute_variables(context.system_prompt.to_s, context.variables)
+
+        sections = []
+
         if context.memory_results.any?
           memory_text = context.memory_results.map(&:content).join("\n\n")
-          prompt = "#{prompt}\n\n<relevant_context>\n#{memory_text}\n</relevant_context>"
+          sections << { order: memory_section_order, content: "<relevant_context>\n#{memory_text}\n</relevant_context>" }
         end
 
-        # Simple variable substitution: {{variable_name}}
-        context.variables.each do |key, value|
-          prompt = prompt.gsub("{{#{key}}}", value.to_s)
+        Array(context.prompt_injection_items).each do |item|
+          next unless item.respond_to?(:system_section?) && item.system_section?
+          if item.respond_to?(:allowed_in_prompt_mode?) && !item.allowed_in_prompt_mode?(context.prompt_mode)
+            next
+          end
+
+          content =
+            if item.respond_to?(:substitute_variables) && item.substitute_variables == true
+              substitute_variables(item.content.to_s, context.variables)
+            else
+              item.content.to_s
+            end
+
+          sections << { order: item.order.to_i, content: content }
         end
 
         if context.skills_store
@@ -48,17 +63,47 @@ module AgentCore
                 store: context.skills_store,
                 include_location: context.include_skill_locations
               )
-            prompt = "#{prompt}\n\n#{fragment}" unless fragment.to_s.empty?
+            unless fragment.to_s.empty?
+              sections << { order: skills_section_order, content: fragment.to_s }
+            end
           rescue StandardError
             # Skip skills fragment on any store/prompt rendering error.
           end
         end
 
-        prompt
+        sections
+          .each_with_index
+          .sort_by { |(section, idx)| [section.fetch(:order), idx] }
+          .each do |(section, _)|
+            content = section.fetch(:content).to_s
+            next if content.strip.empty?
+
+            base = base.empty? ? content : "#{base}\n\n#{content}"
+          end
+
+        base
       end
 
       def build_messages(context)
         messages = []
+
+        Array(context.prompt_injection_items)
+          .select { |item| item.respond_to?(:preamble_message?) && item.preamble_message? }
+          .each_with_index
+          .sort_by { |(item, idx)| [item.order.to_i, idx] }
+          .each do |(item, _)|
+            if item.respond_to?(:allowed_in_prompt_mode?) && !item.allowed_in_prompt_mode?(context.prompt_mode)
+              next
+            end
+
+            role = item.role.to_sym
+            next unless role == :user || role == :assistant
+
+            content = item.content.to_s
+            next if content.strip.empty?
+
+            messages << Message.new(role: role, content: content)
+          end
 
         # Include chat history
         if context.chat_history
@@ -71,6 +116,14 @@ module AgentCore
         end
 
         messages
+      end
+
+      def substitute_variables(template, variables)
+        out = template.to_s.dup
+        (variables || {}).each do |key, value|
+          out = out.gsub("{{#{key}}}", value.to_s)
+        end
+        out
       end
 
       def build_tools(context)

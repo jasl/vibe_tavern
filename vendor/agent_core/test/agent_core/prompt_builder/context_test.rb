@@ -14,20 +14,33 @@ class AgentCore::PromptBuilder::ContextTest < Minitest::Test
     assert_equal({}, ctx.variables)
     assert_equal({}, ctx.agent_config)
     assert_nil ctx.tool_policy
+    assert_equal :full, ctx.prompt_mode
+    assert_equal [], ctx.prompt_injection_items
   end
 
   def test_custom_values
+    injection =
+      AgentCore::Resources::PromptInjections::Item.new(
+        target: :system_section,
+        content: "Injected",
+        order: 10,
+      )
+
     ctx = AgentCore::PromptBuilder::Context.new(
       system_prompt: "Be helpful",
       user_message: "Hello",
       variables: { name: "Alice" },
       agent_config: { model: "claude" },
+      prompt_mode: :minimal,
+      prompt_injection_items: [injection],
     )
 
     assert_equal "Be helpful", ctx.system_prompt
     assert_equal "Hello", ctx.user_message
     assert_equal({ name: "Alice" }, ctx.variables)
     assert_equal({ model: "claude" }, ctx.agent_config)
+    assert_equal :minimal, ctx.prompt_mode
+    assert_equal [injection], ctx.prompt_injection_items
   end
 
   def test_variables_frozen

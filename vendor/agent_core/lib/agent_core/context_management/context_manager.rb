@@ -48,6 +48,14 @@ module AgentCore
       #
       # @return [PromptBuilder::BuiltPrompt]
       def build_prompt(user_message:, execution_context:)
+        prompt_mode = resolve_prompt_mode(execution_context)
+        prompt_injection_items =
+          collect_prompt_injection_items(
+            user_message: user_message,
+            execution_context: execution_context,
+            prompt_mode: prompt_mode
+          )
+
         memory_results = fetch_memory_results(user_message)
 
         state = safe_load_state
@@ -88,7 +96,9 @@ module AgentCore
             turns: turns,
             memory_results: memory_results,
             user_message: user_message,
-            execution_context: execution_context
+            execution_context: execution_context,
+            prompt_mode: prompt_mode,
+            prompt_injection_items: prompt_injection_items
           )
         end
 
@@ -109,7 +119,9 @@ module AgentCore
               turns: turns,
               memory_results: memory_results,
               user_message: user_message,
-              execution_context: execution_context
+              execution_context: execution_context,
+              prompt_mode: prompt_mode,
+              prompt_injection_items: prompt_injection_items
             )
 
           est = estimate_prompt_tokens(prompt)
@@ -290,7 +302,7 @@ module AgentCore
         turns
       end
 
-      def build_prompt_with(summary:, turns:, memory_results:, user_message:, execution_context:)
+      def build_prompt_with(summary:, turns:, memory_results:, user_message:, execution_context:, prompt_mode:, prompt_injection_items:)
         history_messages = turns.flatten
 
         if (s = summary.to_s).strip != ""
@@ -312,6 +324,8 @@ module AgentCore
             execution_context: execution_context,
             skills_store: @agent.skills_store,
             include_skill_locations: @agent.include_skill_locations,
+            prompt_mode: prompt_mode,
+            prompt_injection_items: prompt_injection_items,
           )
 
         @agent.prompt_pipeline.build(context: context)
@@ -381,6 +395,45 @@ module AgentCore
           message_tokens: msg_tokens,
           tool_tokens: tool_tokens,
         }
+      end
+
+      def resolve_prompt_mode(execution_context)
+        mode = execution_context.attributes.fetch(:prompt_mode, :full)
+        mode = mode.to_sym
+        return mode if mode == :full || mode == :minimal
+
+        :full
+      rescue StandardError
+        :full
+      end
+
+      def collect_prompt_injection_items(user_message:, execution_context:, prompt_mode:)
+        sources = Array(@agent.prompt_injection_sources)
+        return [] if sources.empty?
+
+        items =
+          sources.flat_map do |source|
+            next [] unless source
+
+            begin
+              Array(
+                source.items(
+                  agent: @agent,
+                  user_message: user_message,
+                  execution_context: execution_context,
+                  prompt_mode: prompt_mode
+                )
+              )
+            rescue StandardError
+              []
+            end
+          end
+
+        items
+          .select { |item| item.is_a?(Resources::PromptInjections::Item) }
+          .select { |item| item.allowed_in_prompt_mode?(prompt_mode) }
+      rescue StandardError
+        []
       end
     end
   end
