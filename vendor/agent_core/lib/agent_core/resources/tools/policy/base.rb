@@ -21,7 +21,7 @@ module AgentCore
 
           # Authorize a specific tool call.
           #
-          # @param name [String] Tool name
+          # @param name [String] Executed tool name (resolved name that will actually be executed)
           # @param arguments [Hash] Tool arguments
           # @param context [AgentCore::ExecutionContext] Execution context
           # @return [Decision]

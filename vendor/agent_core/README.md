@@ -55,6 +55,43 @@ result = agent.chat("hello")
 puts result.text
 ```
 
+## Context management (sliding window + auto-compaction)
+
+AgentCore treats **chat history** as the append-only transcript, and manages a
+separate **conversation state** for running summaries / compaction checkpoints.
+This lets the app persist full history however it wants (DB/file), while the
+agent can keep prompts within a token budget.
+
+Enable token budgeting by providing both:
+
+- `token_counter` (app-provided tokenizer or heuristic)
+- `context_window` (model context size)
+
+When `auto_compact` is enabled (default), the agent will:
+
+- Drop older turns (sliding window) when the prompt would overflow
+- Summarize dropped turns into `conversation_state` and inject the summary back
+  into the prompt on subsequent turns
+
+```ruby
+agent = AgentCore::Agent.build do |b|
+  b.provider = provider
+  b.model = "m1"
+  b.system_prompt = "You are helpful."
+
+  b.chat_history = MyChatHistoryStore.new # app decides persistence
+  b.conversation_state = MyConversationStateStore.new
+
+  b.token_counter = AgentCore::Resources::TokenCounter::Heuristic.new
+  b.context_window = 128_000
+  b.reserved_output_tokens = 4_096
+
+  b.auto_compact = true
+  b.memory_search_limit = 5
+  b.summary_max_output_tokens = 512
+end
+```
+
 ## Tool calling + pause/resume (confirm)
 
 A tool policy can return `Decision.confirm(...)` to pause the run before any

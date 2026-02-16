@@ -18,7 +18,7 @@ This enables product needs like:
 A tool policy implements:
 
 - `filter(tools:, context:)` — which tools are visible to the LLM
-- `authorize(name:, arguments:, context:)` — per-tool-call decision
+- `authorize(name:, arguments:, context:)` — per-tool-call decision (**name is the executed tool name**, resolved against the registry)
 
 Decisions are:
 
@@ -28,6 +28,15 @@ Decisions are:
 
 `context` is an `AgentCore::ExecutionContext` (contains `run_id` and app-provided
 `attributes`).
+
+Notes:
+
+- The runner resolves the assistant-requested tool name against the registry
+  (including a `.` → `_` fallback) and passes the resolved **executed name** to
+  `authorize(name:)`. This prevents aliasing from bypassing policy checks.
+- `PendingToolConfirmation#name` is the assistant-requested name (for UI
+  display). For audit/debugging, prefer using `tool_calls_made` (requested +
+  executed) and observability payloads which include `executed_name`.
 
 ## Runner pause/resume
 

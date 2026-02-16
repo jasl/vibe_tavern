@@ -222,6 +222,7 @@ class AgentCore::AgentTest < Minitest::Test
 
     agent.reset!
     assert agent.chat_history.empty?
+    assert_nil agent.conversation_state.load.summary
   end
 
   def test_convenience_build
@@ -320,6 +321,84 @@ class AgentCore::AgentTest < Minitest::Test
     result = agent.chat("Hello")
     assert_equal "Mock response", result.text
     assert_equal 1, provider.calls.size
+  end
+
+  def test_auto_compact_summarizes_dropped_turns_and_persists_state
+    counter = AgentCore::Resources::TokenCounter::Heuristic.new
+
+    summary_msg = AgentCore::Message.new(role: :assistant, content: "Compacted summary")
+    summary_resp = AgentCore::Resources::Provider::Response.new(message: summary_msg, stop_reason: :end_turn)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "ok")
+    final_resp = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [summary_resp, final_resp])
+
+    agent = AgentCore::Agent.build do |b|
+      b.provider = provider
+      b.model = "m1"
+      b.system_prompt = "Hi"
+      b.token_counter = counter
+      b.context_window = 120
+      b.reserved_output_tokens = 0
+      b.auto_compact = true
+      b.summary_max_output_tokens = 64
+    end
+
+    # Seed history with 3 user turns (each with an assistant reply).
+    3.times do |i|
+      agent.chat_history.append(AgentCore::Message.new(role: :user, content: "u#{i} " + ("a" * 50)))
+      agent.chat_history.append(AgentCore::Message.new(role: :assistant, content: "r#{i} " + ("b" * 50)))
+    end
+
+    result = agent.chat("next " + ("c" * 50))
+    assert_equal "ok", result.text
+
+    # First provider call is summary, second is the real chat.
+    assert_equal 2, provider.calls.size
+    assert_includes provider.calls.first[:messages].first.text, "maintains a running conversation summary"
+
+    main_call = provider.calls.last
+    assert_equal :system, main_call[:messages].first.role
+    assert main_call[:messages].any? { |m| m.assistant? && m.text.include?("<conversation_summary>") }
+
+    state = agent.conversation_state.load
+    assert_equal "Compacted summary", state.summary
+    assert_equal 2, state.cursor
+    assert_equal 1, state.compaction_count
+  end
+
+  def test_conversation_state_can_be_loaded_from_hash
+    conversation_state =
+      Class.new(AgentCore::Resources::ConversationState::Base) do
+        def initialize(value)
+          @value = value
+        end
+
+        def load
+          @value
+        end
+
+        def save(state)
+          @value = state
+          self
+        end
+      end.new({ summary: "S", cursor: 0, compaction_count: 0 })
+
+    provider = MockProvider.new
+
+    agent = AgentCore::Agent.build do |b|
+      b.provider = provider
+      b.conversation_state = conversation_state
+    end
+
+    agent.chat_history.append(AgentCore::Message.new(role: :user, content: "u1"))
+    agent.chat_history.append(AgentCore::Message.new(role: :assistant, content: "a1"))
+
+    agent.chat("u2")
+
+    messages = provider.calls.first[:messages]
+    assert messages.any? { |m| m.assistant? && m.text.include?("<conversation_summary>") }
   end
 
   def test_build_rejects_invalid_token_budget_config

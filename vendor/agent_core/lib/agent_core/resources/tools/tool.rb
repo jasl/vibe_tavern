@@ -44,15 +44,24 @@ module AgentCore
         #
         # @param arguments [Hash] Tool arguments (from LLM)
         # @param context [ExecutionContext, Hash, nil] Execution context
+        # @param tool_error_mode [Symbol,String] :safe (default) or :debug
         # @return [ToolResult]
-        def call(arguments, context: nil)
+        def call(arguments, context: nil, tool_error_mode: :safe)
           raise AgentCore::Error, "No handler defined for tool '#{name}'" unless @handler
           execution_context = ExecutionContext.from(context)
           @handler.call(arguments, context: execution_context)
         rescue AgentCore::Error
           raise
         rescue => e
-          ToolResult.error(text: "Tool '#{name}' failed: #{e.message}")
+          mode = tool_error_mode.to_s.strip.downcase.tr("-", "_")
+          text =
+            if mode == "debug"
+              "Tool '#{name}' failed: #{e.class}: #{e.message}"
+            else
+              "Tool '#{name}' failed (#{e.class})."
+            end
+
+          ToolResult.error(text: text)
         end
 
         # Convert to the format expected by LLM APIs.

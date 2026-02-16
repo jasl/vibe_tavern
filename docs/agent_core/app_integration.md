@@ -38,14 +38,26 @@ For debugging, `LLM::RunChat` still returns an `AgentCore::PromptBuilder::BuiltP
 representing the effective prompt, but the run itself is executed through
 `AgentSession`.
 
-## Token budgeting (preflight)
+## Token budgeting (prune + preflight)
 
 `LLM::RunChat` keeps the existing `PROMPT_TOO_LONG` behavior by using
-`AgentCore::PromptRunner::Runner`'s preflight budget check:
+`AgentCore::PromptRunner::Runner`'s preflight budget check, but **AgentCore also
+tries to fit the prompt first** when token budgeting is enabled.
 
 - `context_window` comes from `LLMModel#context_window_tokens` (0 disables checks)
 - `reserved_output_tokens` comes from the effective `llm_options[:max_tokens]`
 - per-message overhead comes from `LLMModel#effective_message_overhead_tokens`
+
+When both `token_counter` and `context_window` are present, `AgentCore::Agent`
+will run a context manager before the runner:
+
+- drop order: memory results → oldest user turns (sliding window)
+- optional auto-compaction: summarize dropped turns into `conversation_state`
+  and inject the summary back into the prompt (`<conversation_summary>…</conversation_summary>`)
+
+If the prompt still exceeds the budget after pruning/compaction, the runner
+raises `AgentCore::ContextWindowExceededError` (and `LLM::RunChat` maps it to
+`PROMPT_TOO_LONG`).
 
 ### Supplying a real estimator
 
@@ -68,6 +80,21 @@ App-side wrappers:
 
 - `AgentCore::Contrib::TokenCounter::Estimator` wraps `token_estimator#estimate`
 - `AgentCore::Contrib::TokenCounter::HeuristicWithOverhead` is the fallback
+
+## Persisting context state (recommended)
+
+By default, `AgentCore::Agent` uses in-memory stores:
+
+- transcript: `AgentCore::Resources::ChatHistory::InMemory`
+- context state: `AgentCore::Resources::ConversationState::InMemory`
+
+That means auto-compaction summaries are only retained for the lifetime of the
+agent instance.
+
+For production, implement app-side adapters and inject them into the agent so
+summaries persist across web requests/jobs. See:
+
+- `docs/agent_core/app_storage.md`
 
 ## Directives (structured envelope)
 

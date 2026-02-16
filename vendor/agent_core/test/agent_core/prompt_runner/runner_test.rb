@@ -586,6 +586,92 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     assert_equal "ok", tool_result_msg.content
   end
 
+  def test_tool_policy_authorizes_executed_tool_name
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "foo.bar", arguments: {})
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    executed = []
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "foo_bar", description: "Foo", parameters: {}) do |_args, **|
+        executed << :foo_bar
+        AgentCore::Resources::Tools::ToolResult.success(text: "ok")
+      end
+    )
+
+    seen = []
+    policy =
+      Class.new(AgentCore::Resources::Tools::Policy::Base) do
+        def initialize(seen)
+          super()
+          @seen = seen
+        end
+
+        def authorize(name:, arguments: {}, context: {})
+          @seen << name
+          return AgentCore::Resources::Tools::Policy::Decision.allow if name == "foo_bar"
+
+          AgentCore::Resources::Tools::Policy::Decision.deny(reason: "not allowed")
+        end
+      end.new(seen)
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: policy)
+
+    assert_equal ["foo_bar"], seen
+    assert_equal [:foo_bar], executed
+    assert_equal "Done", result.text
+    assert_equal 1, result.tool_calls_made.size
+    assert_equal "foo.bar", result.tool_calls_made.first[:name]
+    assert_equal "foo_bar", result.tool_calls_made.first[:executed_name]
+  end
+
+  def test_tool_error_does_not_leak_exception_message_by_default
+    tool_call = AgentCore::ToolCall.new(id: "tc_1", name: "boom", arguments: {})
+    assistant_with_tool = AgentCore::Message.new(role: :assistant, content: "Calling tool", tool_calls: [tool_call])
+    tool_response = AgentCore::Resources::Provider::Response.new(message: assistant_with_tool, stop_reason: :tool_use)
+
+    final_msg = AgentCore::Message.new(role: :assistant, content: "Done")
+    final_response = AgentCore::Resources::Provider::Response.new(message: final_msg, stop_reason: :end_turn)
+
+    provider = MockProvider.new(responses: [tool_response, final_response])
+
+    registry = AgentCore::Resources::Tools::Registry.new
+    registry.register(
+      AgentCore::Resources::Tools::Tool.new(name: "boom", description: "Boom", parameters: {}) do |_args, **|
+        raise "SECRET"
+      end
+    )
+
+    prompt = AgentCore::PromptBuilder::BuiltPrompt.new(
+      system_prompt: "test",
+      messages: [AgentCore::Message.new(role: :user, content: "hi")],
+      tools: registry.definitions,
+      options: { model: "test" }
+    )
+
+    result = @runner.run(prompt: prompt, provider: provider, tools_registry: registry, tool_policy: @allow_all)
+
+    tool_result_msg = result.messages.find(&:tool_result?)
+    assert tool_result_msg
+    refute_includes tool_result_msg.text.to_s, "SECRET"
+
+    assert_equal 1, result.tool_calls_made.size
+    refute_includes result.tool_calls_made.first.fetch(:error).to_s, "SECRET"
+  end
+
   def test_max_tool_calls_per_turn_trims_and_records_ignored_calls
     tool_call1 = AgentCore::ToolCall.new(id: "tc_1", name: "a", arguments: {})
     tool_call2 = AgentCore::ToolCall.new(id: "tc_2", name: "b", arguments: {})

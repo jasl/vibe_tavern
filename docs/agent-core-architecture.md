@@ -130,4 +130,3 @@ vendor/agent_core/lib/agent_core/
         ├── tool.rb
         └── tool_result.rb
 ```
-

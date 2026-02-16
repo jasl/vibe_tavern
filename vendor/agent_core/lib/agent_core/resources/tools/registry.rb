@@ -135,9 +135,10 @@ module AgentCore
         # @param name [String] Tool name
         # @param arguments [Hash] Tool arguments
         # @param context [ExecutionContext, Hash, nil] Execution context
+        # @param tool_error_mode [Symbol,String] :safe (default) or :debug
         # @return [ToolResult]
         # @raise [ToolNotFoundError] If tool is not registered
-        def execute(name:, arguments:, context: nil)
+        def execute(name:, arguments:, context: nil, tool_error_mode: :safe)
           execution_context = ExecutionContext.from(context)
           tool_info = @mutex.synchronize { @native_tools[name] || @mcp_tools[name] }
 
@@ -145,7 +146,7 @@ module AgentCore
 
           case tool_info
           when Tool
-            tool_info.call(arguments, context: execution_context)
+            tool_info.call(arguments, context: execution_context, tool_error_mode: tool_error_mode)
           when Hash
             # MCP tool — wrap in rescue to normalize errors to ToolResult
             client = tool_info[:client]
@@ -158,7 +159,15 @@ module AgentCore
                 error: result_hash.fetch(:error, false)
               )
             rescue => e
-              ToolResult.error(text: "MCP tool '#{original_name}' failed: #{e.message}")
+              mode = tool_error_mode.to_s.strip.downcase.tr("-", "_")
+              text =
+                if mode == "debug"
+                  "MCP tool '#{original_name}' failed: #{e.class}: #{e.message}"
+                else
+                  "MCP tool '#{original_name}' failed (#{e.class})."
+                end
+
+              ToolResult.error(text: text)
             end
           end
         end

@@ -91,7 +91,7 @@ Typical payload fields:
 - `agent_core.resume`: `paused_turn_number`, `pause_reason`, `continuation_id`,
   `resumed`
 - `agent_core.tool.authorize`: `tool_call_id`, `name`, `arguments_summary`,
-  `outcome` (`allow|deny|confirm`), `reason`, `stage` (`policy|confirmation`, optional)
+  `executed_name`, `outcome` (`allow|deny|confirm`), `reason`, `stage` (`policy|confirmation`, optional)
 - `agent_core.tool.task.created`: `tool_call_id`, `name`, `arguments_summary`,
   `arguments_valid`, `arguments_parse_error`, `turn_number`
 - `agent_core.tool.task.deferred`: `tool_call_id`, `name`, `executed_name`,
@@ -99,6 +99,23 @@ Typical payload fields:
 - `agent_core.tool.execute`: `tool_call_id`, `name`, `executed_name`, `source`
   (`native|mcp|skills|policy|runner|unknown`), `arguments_summary`,
   `result_error`, `result_summary`, `stage` (`external`, optional)
+
+## Safe tool summaries (default)
+
+Tool-related events include `arguments_summary` and `result_summary`. By
+default, these are **safe summaries** that do not include raw values (only
+structure/type/byte counts) to reduce the risk of leaking secrets into logs.
+
+For local debugging, you can opt into value-bearing summaries by constructing
+your tool executor with debug modes:
+
+```ruby
+executor =
+  AgentCore::PromptRunner::ToolExecutor::Inline.new(
+    summary_mode: :debug,      # arguments_summary/result_summary include values (truncated)
+    tool_error_mode: :debug,   # StandardError tool failures include exception message
+  )
+```
 
 ## TraceRecorder (in-memory)
 
@@ -136,7 +153,7 @@ redactor =
       when "agent_core.llm.call"
         %w[run_id turn_number model stream messages_count tools_count options_summary stop_reason usage duration_ms]
       when "agent_core.tool.authorize"
-        %w[run_id tool_call_id name outcome reason duration_ms]
+        %w[run_id tool_call_id name executed_name outcome reason duration_ms]
       when "agent_core.tool.execute"
         %w[run_id tool_call_id name executed_name source result_error duration_ms]
       else

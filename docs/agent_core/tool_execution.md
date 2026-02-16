@@ -315,6 +315,10 @@ turn. To avoid thread-safety surprises, parallelism is **explicit opt-in**:
 - only tools with `Tool.metadata[:parallelizable] == true` are parallelized
 - all other tools still run sequentially
 - results (and streaming events) are emitted in the original tool_call order
+- `StandardError` raised by a tool is captured and returned as a `ToolResult.error`
+  (exception messages are omitted by default)
+- non-`StandardError` exceptions are treated as fatal (the run fails), but the
+  executor will not hang waiting for missing results
 
 ```ruby
 executor = AgentCore::PromptRunner::ToolExecutor::ThreadPool.new(max_concurrency: 4)
@@ -326,6 +330,18 @@ runner.run(
   tool_policy: policy,
   tool_executor: executor,
 )
+```
+
+For local debugging, you can opt into value-bearing summaries and exception
+messages:
+
+```ruby
+executor =
+  AgentCore::PromptRunner::ToolExecutor::ThreadPool.new(
+    max_concurrency: 4,
+    summary_mode: :debug,
+    tool_error_mode: :debug,
+  )
 ```
 
 MCP tools are not parallel by default. If you want parallel MCP calls, prefer an

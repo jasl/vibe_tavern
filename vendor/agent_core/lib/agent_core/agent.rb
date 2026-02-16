@@ -33,7 +33,9 @@ module AgentCore
                 :provider, :chat_history, :memory, :tools_registry,
                 :tool_policy, :skills_store, :include_skill_locations,
                 :prompt_pipeline, :max_turns,
-                :token_counter, :context_window, :reserved_output_tokens
+                :token_counter, :context_window, :reserved_output_tokens,
+                :conversation_state, :auto_compact, :memory_search_limit,
+                :summary_max_output_tokens, :llm_options
 
     # Build an agent using the Builder DSL.
     # @yield [Builder]
@@ -54,12 +56,14 @@ module AgentCore
     # @param tool_policy [Resources::Tools::Policy::Base, nil]
     # @param prompt_pipeline [PromptBuilder::Pipeline, nil]
     # @return [Agent]
-    def self.from_config(config, provider:, chat_history: nil, memory: nil, tools_registry: nil, tool_policy: nil, prompt_pipeline: nil, token_counter: nil)
+    def self.from_config(config, provider:, chat_history: nil, memory: nil, conversation_state: nil,
+                         tools_registry: nil, tool_policy: nil, prompt_pipeline: nil, token_counter: nil)
       build do |b|
         b.load_config(config)
         b.provider = provider
         b.chat_history = chat_history
         b.memory = memory
+        b.conversation_state = conversation_state
         b.tools_registry = tools_registry
         b.tool_policy = tool_policy
         b.prompt_pipeline = prompt_pipeline
@@ -75,11 +79,15 @@ module AgentCore
       @system_prompt = builder.system_prompt
       @model = builder.model
       @max_turns = builder.max_turns
+      @auto_compact = builder.auto_compact == true
+      @memory_search_limit = builder.memory_search_limit
+      @summary_max_output_tokens = builder.summary_max_output_tokens
 
       # Runtime dependencies
       @provider = builder.provider
       @chat_history = builder.chat_history || Resources::ChatHistory::InMemory.new
       @memory = builder.memory
+      @conversation_state = Resources::ConversationState.wrap(builder.conversation_state)
       @tools_registry = builder.tools_registry || Resources::Tools::Registry.new
       @tool_policy = builder.tool_policy
       @skills_store = builder.skills_store
@@ -94,6 +102,7 @@ module AgentCore
       # Internal
       @runner = PromptRunner::Runner.new
       @llm_options = builder.llm_options
+      @llm_options.freeze
     end
 
     # Send a message and get a response (synchronous).
@@ -299,40 +308,35 @@ module AgentCore
       config[:stop_sequences] = @llm_options[:stop_sequences] if @llm_options[:stop_sequences]
       config[:context_window] = context_window if context_window
       config[:reserved_output_tokens] = reserved_output_tokens if reserved_output_tokens.nonzero?
+      config[:auto_compact] = auto_compact
+      config[:memory_search_limit] = memory_search_limit if memory_search_limit
+      config[:summary_max_output_tokens] = summary_max_output_tokens if summary_max_output_tokens
       config.compact
     end
 
     # Reset the conversation (clear history).
     def reset!
       chat_history.clear
+      conversation_state.clear
       self
     end
 
     private
 
     def build_prompt(user_message:, execution_context:)
-      # Query memory for relevant context
-      memory_results = if memory && user_message
-        memory.search(query: user_message)
-      else
-        []
-      end
+      manager =
+        ContextManagement::ContextManager.new(
+          agent: self,
+          conversation_state: conversation_state,
+          token_counter: token_counter,
+          context_window: context_window,
+          reserved_output_tokens: reserved_output_tokens,
+          memory_search_limit: memory_search_limit,
+          summary_max_output_tokens: summary_max_output_tokens,
+          auto_compact: auto_compact,
+        )
 
-      context = PromptBuilder::Context.new(
-        system_prompt: system_prompt,
-        chat_history: chat_history,
-        tools_registry: tools_registry,
-        memory_results: memory_results,
-        user_message: user_message,
-        variables: {},
-        agent_config: { llm_options: @llm_options },
-        tool_policy: tool_policy,
-        execution_context: execution_context,
-        skills_store: skills_store,
-        include_skill_locations: include_skill_locations,
-      )
-
-      prompt_pipeline.build(context: context)
+      manager.build_prompt(user_message: user_message, execution_context: execution_context)
     end
 
     def build_events(events)

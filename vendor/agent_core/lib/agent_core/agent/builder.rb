@@ -12,12 +12,16 @@ module AgentCore
                     :model, :temperature, :max_tokens, :top_p,
                     :stop_sequences, :max_turns
 
+      # Context management (serializable)
+      attr_accessor :auto_compact, :memory_search_limit, :summary_max_output_tokens
+
       # Runtime dependencies (not serialized)
       attr_accessor :provider, :chat_history, :memory,
                     :tools_registry, :tool_policy,
                     :skills_store, :include_skill_locations,
                     :prompt_pipeline, :on_event,
-                    :token_counter, :tool_executor
+                    :token_counter, :tool_executor,
+                    :conversation_state
 
       # Token budget (serializable)
       attr_accessor :context_window, :reserved_output_tokens
@@ -34,6 +38,11 @@ module AgentCore
         @stop_sequences = nil
         @max_turns = 10
 
+        # Context management
+        @auto_compact = true
+        @memory_search_limit = nil
+        @summary_max_output_tokens = nil
+
         # Token budget
         @context_window = nil
         @reserved_output_tokens = 0
@@ -42,6 +51,7 @@ module AgentCore
         @provider = nil
         @chat_history = nil
         @memory = nil
+        @conversation_state = nil
         @tools_registry = nil
         @tool_policy = Resources::Tools::Policy::DenyAll.new
         @skills_store = nil
@@ -74,6 +84,9 @@ module AgentCore
           max_turns: max_turns,
           context_window: context_window,
           reserved_output_tokens: reserved_output_tokens.nonzero?,
+          auto_compact: auto_compact,
+          memory_search_limit: memory_search_limit,
+          summary_max_output_tokens: summary_max_output_tokens,
         }.compact
       end
 
@@ -93,6 +106,9 @@ module AgentCore
         @max_turns = h[:max_turns] if h.key?(:max_turns)
         @context_window = h[:context_window] if h.key?(:context_window)
         @reserved_output_tokens = h[:reserved_output_tokens] || 0 if h.key?(:reserved_output_tokens)
+        @auto_compact = h[:auto_compact] unless h[:auto_compact].nil?
+        @memory_search_limit = h[:memory_search_limit] if h.key?(:memory_search_limit)
+        @summary_max_output_tokens = h[:summary_max_output_tokens] if h.key?(:summary_max_output_tokens)
         self
       end
 
@@ -132,6 +148,16 @@ module AgentCore
           unless token_counter.respond_to?(:count_messages) && token_counter.respond_to?(:count_tools)
             raise ConfigurationError, "token_counter must respond to #count_messages and #count_tools"
           end
+        end
+
+        if memory_search_limit
+          parsed = Integer(memory_search_limit, exception: false)
+          raise ConfigurationError, "memory_search_limit must be a positive Integer" if parsed.nil? || parsed <= 0
+        end
+
+        if summary_max_output_tokens
+          parsed = Integer(summary_max_output_tokens, exception: false)
+          raise ConfigurationError, "summary_max_output_tokens must be a positive Integer" if parsed.nil? || parsed <= 0
         end
       end
     end

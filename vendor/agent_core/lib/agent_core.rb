@@ -24,6 +24,8 @@ require_relative "agent_core/resources/chat_history/base"
 require_relative "agent_core/resources/chat_history/in_memory"
 require_relative "agent_core/resources/memory/base"
 require_relative "agent_core/resources/memory/in_memory"
+require_relative "agent_core/resources/conversation_state/base"
+require_relative "agent_core/resources/conversation_state/in_memory"
 require_relative "agent_core/resources/tools/tool"
 require_relative "agent_core/resources/tools/tool_result"
 require_relative "agent_core/resources/tools/registry"
@@ -59,6 +61,10 @@ require_relative "agent_core/prompt_runner/tool_executor"
 require_relative "agent_core/prompt_runner/continuation_codec"
 require_relative "agent_core/prompt_runner/tool_task_codec"
 require_relative "agent_core/prompt_runner/runner"
+
+# Context management (auto-compaction)
+require_relative "agent_core/context_management/summarizer"
+require_relative "agent_core/context_management/context_manager"
 
 # Agent (top-level)
 require_relative "agent_core/agent"

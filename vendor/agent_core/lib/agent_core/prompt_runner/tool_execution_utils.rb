@@ -10,12 +10,96 @@ module AgentCore
     module ToolExecutionUtils
       module_function
 
-      def summarize_tool_arguments(arguments)
-        json = safe_generate_json(arguments)
-        AgentCore::Utils.truncate_utf8_bytes(json, max_bytes: 2_000)
+      def summarize_tool_arguments(arguments, mode: :safe)
+        case normalize_summary_mode(mode)
+        when :debug
+          json = safe_generate_json(arguments)
+          AgentCore::Utils.truncate_utf8_bytes(json, max_bytes: 2_000)
+        else
+          safe_summarize_tool_arguments(arguments)
+        end
       end
 
-      def summarize_tool_result(result)
+      def summarize_tool_result(result, mode: :safe)
+        if normalize_summary_mode(mode) == :debug
+          return debug_summarize_tool_result(result)
+        end
+
+        safe_summarize_tool_result(result)
+      end
+
+      def safe_summarize_tool_arguments(arguments)
+        summary =
+          case arguments
+          when Hash
+            keys =
+              arguments.keys
+                .map { |k| k.to_s }
+                .uniq
+                .sort
+
+            preview = keys.first(50)
+            suffix = preview.any? ? " keys=#{preview.join(",")}" : ""
+            "type=Hash keys_count=#{keys.size}#{suffix}"
+          when Array
+            "type=Array size=#{arguments.size}"
+          when nil
+            "type=NilClass"
+          else
+            "type=#{arguments.class}"
+          end
+
+        AgentCore::Utils.truncate_utf8_bytes(summary, max_bytes: 2_000)
+      rescue StandardError
+        AgentCore::Utils.truncate_utf8_bytes("type=#{arguments.class}", max_bytes: 2_000)
+      end
+      private_class_method :safe_summarize_tool_arguments
+
+      def safe_summarize_tool_result(result)
+        unless result.is_a?(AgentCore::Resources::Tools::ToolResult)
+          return safe_summarize_non_tool_result(result)
+        end
+
+        types =
+          Array(result.content)
+            .map { |b| b.is_a?(Hash) ? b[:type].to_s : nil }
+            .compact
+            .uniq
+            .sort
+
+        blocks_count = Array(result.content).size
+        truncated = result.metadata.is_a?(Hash) && result.metadata[:truncated] == true
+        text_bytes = result.text.to_s.bytesize
+
+        summary = "types=#{types.join(",")} blocks=#{blocks_count} error=#{result.error?} text_bytes=#{text_bytes} truncated=#{truncated}"
+        AgentCore::Utils.truncate_utf8_bytes(summary, max_bytes: 2_000)
+      rescue StandardError
+        safe_summarize_non_tool_result(result)
+      end
+      private_class_method :safe_summarize_tool_result
+
+      def safe_summarize_non_tool_result(value)
+        summary =
+          case value
+          when nil
+            "type=NilClass"
+          when String
+            "type=String bytes=#{value.bytesize}"
+          when Array
+            "type=Array size=#{value.size}"
+          when Hash
+            "type=Hash size=#{value.size}"
+          else
+            "type=#{value.class}"
+          end
+
+        AgentCore::Utils.truncate_utf8_bytes(summary, max_bytes: 2_000)
+      rescue StandardError
+        AgentCore::Utils.truncate_utf8_bytes("type=#{value.class}", max_bytes: 2_000)
+      end
+      private_class_method :safe_summarize_non_tool_result
+
+      def debug_summarize_tool_result(result)
         unless result.is_a?(AgentCore::Resources::Tools::ToolResult)
           return AgentCore::Utils.truncate_utf8_bytes(result.to_s, max_bytes: 2_000)
         end
@@ -38,6 +122,17 @@ module AgentCore
       rescue StandardError
         AgentCore::Utils.truncate_utf8_bytes(result.to_s, max_bytes: 2_000)
       end
+      private_class_method :debug_summarize_tool_result
+
+      def normalize_summary_mode(value)
+        token = value.to_s.strip.downcase.tr("-", "_")
+        return :debug if token == "debug"
+
+        :safe
+      rescue StandardError
+        :safe
+      end
+      private_class_method :normalize_summary_mode
 
       def limit_tool_result(result, max_bytes:, tool_name:)
         return result unless result.is_a?(AgentCore::Resources::Tools::ToolResult)

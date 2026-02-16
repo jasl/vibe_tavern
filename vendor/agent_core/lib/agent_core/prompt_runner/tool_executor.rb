@@ -43,10 +43,45 @@ module AgentCore
         )
 
       class Base
+        MODES = %i[safe debug].freeze
+
+        attr_reader :summary_mode, :tool_error_mode
+
+        def initialize(summary_mode: :safe, tool_error_mode: :safe)
+          @summary_mode = normalize_mode(summary_mode, name: "summary_mode")
+          @tool_error_mode = normalize_mode(tool_error_mode, name: "tool_error_mode")
+        end
+
         def deferred? = false
 
         def execute(requests:, tools_registry:, execution_context:, max_tool_output_bytes:)
           raise AgentCore::NotImplementedError, "#{self.class}#execute must be implemented"
+        end
+
+        private
+
+        def normalize_mode(value, name:)
+          token = value.to_s.strip.downcase.tr("-", "_")
+          token = "safe" if token.empty?
+          mode = token.to_sym
+
+          unless MODES.include?(mode)
+            raise ArgumentError, "#{name} must be one of: #{MODES.join(", ")} (got #{value.inspect})"
+          end
+
+          mode
+        end
+
+        def tool_error_text(tool_name, error)
+          if tool_error_mode == :debug
+            "Tool '#{tool_name}' raised: #{error.class}: #{error.message}"
+          else
+            "Tool '#{tool_name}' raised an error (#{error.class})."
+          end
+        end
+
+        def summarize_tool_result(result)
+          ToolExecutionUtils.summarize_tool_result(result, mode: summary_mode)
         end
       end
 
@@ -87,18 +122,19 @@ module AgentCore
                   tools_registry.execute(
                     name: request.executed_name,
                     arguments: request.arguments,
-                    context: execution_context
+                    context: execution_context,
+                    tool_error_mode: tool_error_mode,
                   )
                 rescue ToolNotFoundError => e
                   Resources::Tools::ToolResult.error(text: e.message)
                 rescue StandardError => e
-                  Resources::Tools::ToolResult.error(text: "Tool '#{request.name}' raised: #{e.message}")
+                  Resources::Tools::ToolResult.error(text: tool_error_text(request.name, e))
                 end
 
               res = ToolExecutionUtils.limit_tool_result(res, max_bytes: max_tool_output_bytes, tool_name: request.executed_name)
 
               payload[:result_error] = res.error?
-              payload[:result_summary] = ToolExecutionUtils.summarize_tool_result(res)
+              payload[:result_summary] = summarize_tool_result(res)
               res
             end
 
@@ -139,7 +175,9 @@ module AgentCore
       class ThreadPool < Base
         DEFAULT_MAX_CONCURRENCY = 4
 
-        def initialize(max_concurrency: DEFAULT_MAX_CONCURRENCY)
+        def initialize(max_concurrency: DEFAULT_MAX_CONCURRENCY, summary_mode: :safe, tool_error_mode: :safe)
+          super(summary_mode: summary_mode, tool_error_mode: tool_error_mode)
+
           @max_concurrency = Integer(max_concurrency)
           raise ArgumentError, "max_concurrency must be positive" if @max_concurrency <= 0
         end
@@ -201,6 +239,7 @@ module AgentCore
           threads =
             workers.times.map do
               Thread.new do
+                Thread.current.report_on_exception = false if Thread.current.respond_to?(:report_on_exception=)
                 loop do
                   req = jobs.pop
                   break if req == :__stop__
@@ -218,8 +257,18 @@ module AgentCore
               end
             end
 
-          out = Array.new(requests.size) { results.pop }
           threads.each(&:join)
+          threads.each(&:value) # re-raise worker exceptions
+
+          out = []
+          requests.size.times do
+            begin
+              out << results.pop(true)
+            rescue ThreadError
+              raise "ThreadPool executor produced fewer results than expected " \
+                    "(expected #{requests.size}, got #{out.size})"
+            end
+          end
           out
         end
 
@@ -243,18 +292,19 @@ module AgentCore
                   tools_registry.execute(
                     name: request.executed_name,
                     arguments: request.arguments,
-                    context: execution_context
+                    context: execution_context,
+                    tool_error_mode: tool_error_mode,
                   )
                 rescue ToolNotFoundError => e
                   Resources::Tools::ToolResult.error(text: e.message)
                 rescue StandardError => e
-                  Resources::Tools::ToolResult.error(text: "Tool '#{request.name}' raised: #{e.message}")
+                  Resources::Tools::ToolResult.error(text: tool_error_text(request.name, e))
                 end
 
               res = ToolExecutionUtils.limit_tool_result(res, max_bytes: max_tool_output_bytes, tool_name: request.executed_name)
 
               payload[:result_error] = res.error?
-              payload[:result_summary] = ToolExecutionUtils.summarize_tool_result(res)
+              payload[:result_summary] = summarize_tool_result(res)
               res
             end
 

@@ -943,6 +943,7 @@ module AgentCore
               pending_tool_calls: pending_tool_calls,
               confirmation_traces: confirmation_traces,
               resumed: true,
+              tools_registry: tools_registry,
             )
 
             tool_result_messages, exec_traces, exec_pause_state =
@@ -1394,6 +1395,7 @@ module AgentCore
               pending_tool_calls: pending_tool_calls,
               confirmation_traces: confirmation_traces,
               resumed: true,
+              tools_registry: tools_registry,
             )
 
               tool_result_messages, exec_traces, exec_pause_state =
@@ -3278,6 +3280,7 @@ module AgentCore
           decisions, auth_traces, pending_confirmations =
             authorize_tool_calls(
               tool_calls: valid_tool_calls,
+              tools_registry: tools_registry,
               tool_policy: tool_policy,
               execution_context: execution_context,
               args_summaries: args_summaries,
@@ -3288,8 +3291,16 @@ module AgentCore
         if pending_confirmations.any?
           valid_tool_calls.each do |tc|
             d = decisions.fetch(tc.id)
+            requested_name = tc.name.to_s
+            executed_name =
+              if tools_registry
+                resolve_executed_tool_name(tools_registry, requested_name)
+              else
+                requested_name
+              end
             tool_calls_record << {
-              name: tc.name,
+              name: requested_name,
+              executed_name: executed_name,
               arguments: tc.arguments,
               pending: true,
               outcome: d.outcome,
@@ -3348,7 +3359,7 @@ module AgentCore
         }
       end
 
-      def authorize_tool_calls(tool_calls:, tool_policy:, execution_context:, args_summaries:)
+      def authorize_tool_calls(tool_calls:, tools_registry:, tool_policy:, execution_context:, args_summaries:)
         instrumenter = execution_context.instrumenter
         run_id = execution_context.run_id
 
@@ -3357,12 +3368,20 @@ module AgentCore
         pending_confirmations = []
 
         tool_calls.each do |tc|
+          requested_name = tc.name.to_s
+          executed_name =
+            if tools_registry
+              resolve_executed_tool_name(tools_registry, requested_name)
+            else
+              requested_name
+            end
           args_summary = args_summaries[tc.id] || ToolExecutionUtils.summarize_tool_arguments(tc.arguments)
 
           auth_payload = {
             run_id: run_id,
             tool_call_id: tc.id,
-            name: tc.name,
+            name: requested_name,
+            executed_name: executed_name,
             arguments_summary: args_summary,
           }
 
@@ -3371,12 +3390,12 @@ module AgentCore
               d =
                 begin
                   if tool_policy
-                    tool_policy.authorize(name: tc.name, arguments: tc.arguments, context: execution_context)
+                    tool_policy.authorize(name: executed_name, arguments: tc.arguments, context: execution_context)
                   else
                     Resources::Tools::Policy::Decision.deny(reason: "tool_policy is required")
                   end
                 rescue StandardError => e
-                  Resources::Tools::Policy::Decision.deny(reason: "tool_policy error: #{e.class}: #{e.message}")
+                  Resources::Tools::Policy::Decision.deny(reason: "tool_policy error: #{e.class}")
                 end
 
               auth_payload[:outcome] = d.outcome
@@ -3389,7 +3408,7 @@ module AgentCore
           authorization_traces <<
             ToolAuthorizationTrace.new(
               tool_call_id: tc.id,
-              name: tc.name,
+              name: requested_name,
               outcome: decision.outcome,
               reason: decision.reason,
               duration_ms: auth_payload[:duration_ms],
@@ -3399,7 +3418,7 @@ module AgentCore
             pending_confirmations <<
               PendingToolConfirmation.new(
                 tool_call_id: tc.id,
-                name: tc.name,
+                name: requested_name,
                 arguments: tc.arguments,
                 reason: decision.reason,
                 arguments_summary: args_summary,
@@ -3728,7 +3747,8 @@ module AgentCore
         end
       end
 
-      def publish_confirmation_authorizations!(instrumenter:, run_id:, paused_turn_number:, pending_tool_calls:, confirmation_traces:, resumed:)
+      def publish_confirmation_authorizations!(instrumenter:, run_id:, paused_turn_number:, pending_tool_calls:, confirmation_traces:, resumed:,
+                                               tools_registry: nil)
         return nil if confirmation_traces.nil? || confirmation_traces.empty?
         return nil unless instrumenter&.respond_to?(:publish)
 
@@ -3741,12 +3761,19 @@ module AgentCore
           next unless trace.respond_to?(:tool_call_id) && trace.respond_to?(:name)
 
           tc = tool_by_id[trace.tool_call_id]
+          executed_name =
+            if tc && tools_registry
+              resolve_executed_tool_name(tools_registry, tc.name.to_s)
+            else
+              nil
+            end
           args_summary = tc ? ToolExecutionUtils.summarize_tool_arguments(tc.arguments) : nil
 
           payload = {
             run_id: run_id,
             tool_call_id: trace.tool_call_id,
             name: trace.name.to_s,
+            executed_name: executed_name,
             arguments_summary: args_summary,
             outcome: trace.outcome,
             reason: trace.reason,

@@ -61,7 +61,12 @@ class AgentCore::Resources::Tools::ToolTest < Minitest::Test
 
     result = tool.call({})
     assert result.error?
-    assert_includes result.text, "boom"
+    refute_includes result.text, "boom"
+    assert_includes result.text, "RuntimeError"
+
+    debug_result = tool.call({}, tool_error_mode: :debug)
+    assert debug_result.error?
+    assert_includes debug_result.text, "boom"
   end
 
   def test_call_agent_core_error_reraises
