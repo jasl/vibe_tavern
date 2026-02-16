@@ -125,6 +125,27 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
     refute @registry.include?("legacy_tool_a")
   end
 
+  def test_register_mcp_client_with_server_id_raises_on_mapped_name_collision
+    client = FakeMcpClient.new(
+      pages: {
+        nil => {
+          "tools" => [
+            { "name" => "tool.a", "description" => "A", "inputSchema" => {} },
+            { "name" => "tool_a", "description" => "B", "inputSchema" => {} },
+          ],
+        },
+      },
+      call_result: { "content" => [{ "type" => "text", "text" => "ok" }], "isError" => false },
+    )
+
+    err =
+      assert_raises(ArgumentError) do
+        @registry.register_mcp_client(client, server_id: "srv")
+      end
+
+    assert_match(/MCP tool name collision/, err.message)
+  end
+
   def test_register_skills_store_registers_skills_tools
     store = AgentCore::Resources::Skills::FileSystemStore.new(dirs: [FIXTURES_DIR])
     @registry.register_skills_store(store)
@@ -156,6 +177,47 @@ class AgentCore::Resources::Tools::RegistryTest < Minitest::Test
 
     assert_equal "oops", result.text
     assert_equal true, result.error?
+  end
+
+  def test_execute_mcp_tool_preserves_structured_content_metadata
+    client = FakeMcpClient.new(
+      pages: {
+        nil => { "tools" => [{ "name" => "structured", "description" => "returns structured", "inputSchema" => {} }] },
+      },
+      call_result: {
+        "content" => [{ "type" => "text", "text" => "ok" }],
+        "structuredContent" => { "answer" => 42 },
+      },
+    )
+
+    @registry.register_mcp_client(client)
+    result = @registry.execute(name: "structured", arguments: {})
+
+    assert_equal({ structured_content: { "answer" => 42 } }, result.metadata)
+  end
+
+  def test_execute_mcp_tool_converts_image_blocks_to_content_blocks
+    client = FakeMcpClient.new(
+      pages: {
+        nil => { "tools" => [{ "name" => "image", "description" => "returns image", "inputSchema" => {} }] },
+      },
+      call_result: {
+        "content" => [
+          { "type" => "image", "data" => "QUJD", "mime_type" => "image/png" },
+        ],
+        "isError" => false,
+      },
+    )
+
+    @registry.register_mcp_client(client)
+    result = @registry.execute(name: "image", arguments: {})
+
+    assert result.has_non_text_content?
+    blocks = result.to_content_blocks
+    assert_instance_of AgentCore::ImageContent, blocks.first
+    assert_equal :base64, blocks.first.source_type
+    assert_equal "QUJD", blocks.first.data
+    assert_equal "image/png", blocks.first.media_type
   end
 
   def test_definitions_generic

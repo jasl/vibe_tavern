@@ -46,14 +46,41 @@ class AgentCore::UtilsTest < Minitest::Test
     raw = { "content" => [{ "type" => "text", "text" => "oops" }], "isError" => true }
     normalized = AgentCore::Utils.normalize_mcp_tool_call_result(raw)
 
-    assert_equal [{ "type" => "text", "text" => "oops" }], normalized[:content]
+    assert_equal [{ type: :text, text: "oops" }], normalized[:content]
     assert_equal true, normalized[:error]
+    assert_equal({}, normalized[:metadata])
   end
 
   def test_normalize_mcp_tool_call_result_falls_back_to_text
     normalized = AgentCore::Utils.normalize_mcp_tool_call_result("not a hash")
     assert_equal [{ type: :text, text: "not a hash" }], normalized[:content]
     assert_equal false, normalized[:error]
+    assert_equal({}, normalized[:metadata])
+  end
+
+  def test_normalize_mcp_tool_call_result_preserves_structured_content
+    raw = { "content" => [{ "type" => "text", "text" => "ok" }], "structuredContent" => { "answer" => 42 } }
+    normalized = AgentCore::Utils.normalize_mcp_tool_call_result(raw)
+
+    assert_equal({ structured_content: { "answer" => 42 } }, normalized[:metadata])
+  end
+
+  def test_normalize_mcp_tool_call_result_normalizes_image_blocks
+    raw = {
+      "content" => [
+        {
+          "type" => "image",
+          "data" => "QUJD",
+          "mime_type" => "image/png",
+        },
+      ],
+    }
+    normalized = AgentCore::Utils.normalize_mcp_tool_call_result(raw)
+
+    assert_equal(
+      [{ type: :image, source_type: :base64, data: "QUJD", media_type: "image/png" }],
+      normalized[:content],
+    )
   end
 
   def test_parse_tool_arguments_blank

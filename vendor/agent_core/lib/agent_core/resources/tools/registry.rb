@@ -98,10 +98,19 @@ module AgentCore
                 else
                   tool_def[:name]
                 end
+
+              if (existing = @mcp_tools[tool_name])
+                if existing[:original_name] != tool_def[:name] || existing[:client] != client
+                  raise ArgumentError,
+                        "MCP tool name collision: #{tool_name} " \
+                        "(existing original_name=#{existing[:original_name].inspect}, " \
+                        "new original_name=#{tool_def[:name].inspect}). " \
+                        "Consider using server_id: to namespace MCP tools."
+                end
+              end
+
               if @native_tools.key?(tool_name)
                 warn "[AgentCore::Registry] MCP tool '#{tool_name}' conflicts with existing native tool (native takes priority)"
-              elsif @mcp_tools.key?(tool_name)
-                warn "[AgentCore::Registry] MCP tool '#{tool_name}' overwrites previously registered MCP tool"
               end
               @mcp_tools[tool_name] = {
                 client: client,
@@ -155,7 +164,8 @@ module AgentCore
               result_hash = AgentCore::Utils.normalize_mcp_tool_call_result(mcp_result)
               ToolResult.new(
                 content: result_hash[:content],
-                error: result_hash.fetch(:error, false)
+                error: result_hash.fetch(:error, false),
+                metadata: result_hash.fetch(:metadata, {})
               )
             rescue => e
               mode = tool_error_mode.to_s.strip.downcase.tr("-", "_")

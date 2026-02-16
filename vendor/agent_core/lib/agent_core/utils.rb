@@ -212,17 +212,85 @@ module AgentCore
     # MCP uses "isError"; AgentCore uses "error".
     #
     # @param value [Hash, nil]
-    # @return [Hash] { content:, error: }
+    # @return [Hash] { content:, error:, metadata: }
     def normalize_mcp_tool_call_result(value)
-      return { content: [{ type: :text, text: value.to_s }], error: false } unless value.is_a?(Hash)
+      unless value.is_a?(Hash)
+        return { content: [{ type: :text, text: value.to_s }], error: false, metadata: {} }
+      end
 
-      content = value.fetch("content", nil)
+      content = value.fetch("content", value.fetch(:content, nil))
       content = [{ type: :text, text: value.to_s }] unless content.is_a?(Array)
+      content = normalize_mcp_tool_call_content(content)
 
-      error = value.fetch("isError", value.fetch("error", false))
+      error =
+        if value.key?("isError")
+          value.fetch("isError")
+        elsif value.key?(:isError)
+          value.fetch(:isError)
+        elsif value.key?("is_error")
+          value.fetch("is_error")
+        elsif value.key?(:is_error)
+          value.fetch(:is_error)
+        elsif value.key?("error")
+          value.fetch("error")
+        else
+          value.fetch(:error, false)
+        end
 
-      { content: content, error: !!error }
+      structured_content =
+        value.fetch("structuredContent",
+                    value.fetch(:structuredContent,
+                                value.fetch("structured_content",
+                                            value.fetch(:structured_content, nil))))
+
+      metadata = {}
+      metadata[:structured_content] = structured_content unless structured_content.nil?
+
+      { content: content, error: !!error, metadata: metadata }
     end
+
+    def normalize_mcp_tool_call_content(blocks)
+      Array(blocks).map do |block|
+        normalize_mcp_tool_call_block(block)
+      end
+    end
+    private_class_method :normalize_mcp_tool_call_content
+
+    def normalize_mcp_tool_call_block(block)
+      unless block.is_a?(Hash)
+        return { type: :text, text: block.to_s }
+      end
+
+      type = block.fetch("type", block.fetch(:type, nil)).to_s.strip
+
+      case type
+      when "text"
+        text = block.fetch("text", block.fetch(:text, "")).to_s
+        annotations = block.fetch("annotations", block.fetch(:annotations, nil))
+
+        out = { type: :text, text: text }
+        out[:annotations] = annotations if annotations
+        out
+      when "image"
+        data = block.fetch("data", block.fetch(:data, nil)).to_s
+        mime_type = block.fetch("mime_type", block.fetch(:mime_type, block.fetch("mimeType", block.fetch(:mimeType, nil))))
+        media_type = normalize_mime_type(mime_type)
+        annotations = block.fetch("annotations", block.fetch(:annotations, nil))
+
+        if data.strip.empty? || media_type.nil?
+          { type: :text, text: block.to_s }
+        else
+          out = { type: :image, source_type: :base64, data: data, media_type: media_type }
+          out[:annotations] = annotations if annotations
+          out
+        end
+      else
+        { type: :text, text: block.to_s }
+      end
+    rescue StandardError
+      { type: :text, text: block.to_s }
+    end
+    private_class_method :normalize_mcp_tool_call_block
 
     def normalize_json_schema(value)
       case value
