@@ -3,6 +3,7 @@
 class ToolResultRecord < ApplicationRecord
   EXECUTING_RECLAIM_AFTER = 15.minutes
   QUEUED_REENQUEUE_AFTER = 15.minutes
+  STALE_EXECUTION_NOT_RETRIED_MESSAGE = "Tool execution timed out and was not retried (tool is not marked retryable)."
 
   validates :run_id, presence: true
   validates :tool_call_id, presence: true
@@ -63,6 +64,38 @@ class ToolResultRecord < ApplicationRecord
           started_at: nil,
           locked_by: nil,
           enqueued_at: now,
+          updated_at: now,
+        )
+
+    updated == 1
+  end
+
+  def self.fail_stale_executing!(run_id:, tool_call_id:, reclaim_after: EXECUTING_RECLAIM_AFTER)
+    rid = run_id.to_s
+    tcid = tool_call_id.to_s
+    now = Time.current
+    reclaim_before = now - reclaim_after
+
+    error_result =
+      AgentCore::Resources::Tools::ToolResult.error(
+        text: STALE_EXECUTION_NOT_RETRIED_MESSAGE,
+        metadata: {
+          stale_execution: true,
+          retryable: false,
+          reclaim_after_s: reclaim_after.to_i,
+        },
+      )
+
+    payload = canonicalize_tool_result_payload(error_result)
+
+    updated =
+      where(run_id: rid, tool_call_id: tcid, status: "executing")
+        .where("started_at IS NULL OR started_at < ?", reclaim_before)
+        .update_all(
+          status: "ready",
+          tool_result: payload,
+          finished_at: now,
+          locked_by: nil,
           updated_at: now,
         )
 

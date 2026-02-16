@@ -105,6 +105,29 @@ class ToolResultRecordTest < ActiveSupport::TestCase
     assert record.enqueued_at
   end
 
+  test "fail_stale_executing! moves stale executing to ready with an error result" do
+    ToolResultRecord.reserve!(run_id: "run_6b", tool_call_id: "tc_1", executed_name: "echo")
+    assert ToolResultRecord.claim_for_execution!(run_id: "run_6b", tool_call_id: "tc_1", job_id: "j1")
+
+    record = ToolResultRecord.find_by!(run_id: "run_6b", tool_call_id: "tc_1")
+    record.update!(started_at: 20.minutes.ago)
+
+    assert ToolResultRecord.fail_stale_executing!(run_id: "run_6b", tool_call_id: "tc_1", reclaim_after: 15.minutes)
+
+    record.reload
+    assert_equal "ready", record.status
+    assert_nil record.locked_by
+    assert record.finished_at
+    assert record.tool_result
+
+    result = AgentCore::Resources::Tools::ToolResult.from_h(record.tool_result)
+    assert result.error?
+    assert_includes result.text, ToolResultRecord::STALE_EXECUTION_NOT_RETRIED_MESSAGE
+    assert_equal true, result.metadata[:stale_execution]
+    assert_equal false, result.metadata[:retryable]
+    assert_equal 900, result.metadata[:reclaim_after_s]
+  end
+
   test "reenqueue_stale_queued! refreshes enqueued_at for stale queued" do
     ToolResultRecord.reserve!(run_id: "run_7", tool_call_id: "tc_1", executed_name: "echo")
 

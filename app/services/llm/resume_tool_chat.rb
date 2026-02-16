@@ -44,17 +44,22 @@ module LLM
 
         enqueue_stats = LLM::EnqueueToolTasks.call(task_payload: task_payload, tooling_key: tooling_key)
 
-        return Result.failure(
-          errors: ["no tool results available"],
-          code: "NO_TOOL_RESULTS_AVAILABLE",
-          value: {
-            run_id: run_id,
-            continuation_id: continuation_id,
-            enqueued_tool_call_ids: enqueue_stats.fetch(:enqueued),
-            reclaimed_tool_call_ids: enqueue_stats.fetch(:reclaimed),
-            reenqueued_tool_call_ids: enqueue_stats.fetch(:reenqueued),
-          },
-        )
+        tool_results = load_tool_results(run_id: run_id, tool_call_ids: wanted_tool_call_ids)
+
+        if tool_results.empty?
+          return Result.failure(
+            errors: ["no tool results available"],
+            code: "NO_TOOL_RESULTS_AVAILABLE",
+            value: {
+              run_id: run_id,
+              continuation_id: continuation_id,
+              enqueued_tool_call_ids: enqueue_stats.fetch(:enqueued),
+              reclaimed_tool_call_ids: enqueue_stats.fetch(:reclaimed),
+              reenqueued_tool_call_ids: enqueue_stats.fetch(:reenqueued),
+              failed_tool_call_ids: enqueue_stats.fetch(:failed),
+            },
+          )
+        end
       end
 
       lock_token =

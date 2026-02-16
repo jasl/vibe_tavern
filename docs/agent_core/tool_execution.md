@@ -228,11 +228,16 @@ this repo treats `tool_result_records` as the single source of truth:
 If a worker crashes mid-tool execution, `tool_result_records` can get stuck in
 `executing`. This repo includes a minimal self-healing strategy:
 
-- stale `executing` can be reclaimed back to `queued` after a TTL (15 minutes)
+- stale `executing` can be reclaimed back to `queued` after a TTL (15 minutes),
+  **but only for tools explicitly marked** `metadata[:retryable] == true`
+- stale `executing` for non-retryable tools is failed to `ready` with an error
+  `ToolResult` (no re-execution)
 - stale `queued` can be re-enqueued after a TTL (15 minutes)
 
-Important: reclaiming `executing` means the tool may run again. Prefer
-idempotent tools, or add app-side safeguards for non-idempotent tools.
+Important: reclaiming `executing` means the tool may run again. Only mark tools
+as retryable when they are safe to re-run (idempotent or protected by
+idempotency keys). For non-retryable tools, the run can continue with an error
+tool result instead of risking duplicate side effects.
 
 ### Start (pause + enqueue tasks)
 

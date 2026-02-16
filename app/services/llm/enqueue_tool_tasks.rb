@@ -19,16 +19,19 @@ module LLM
           enqueued: [],
           reclaimed: [],
           reenqueued: [],
+          failed: [],
           skipped_cancelled: true,
         }
       end
 
       context_attributes = task_payload.fetch("context_attributes", {})
+      registry = LLM::Tooling.registry(tooling_key: tooling_key, context_attributes: context_attributes)
       tasks = Array(task_payload.fetch("tasks"))
 
       enqueued = []
       reclaimed = []
       reenqueued = []
+      failed = []
 
       tasks.each do |t|
         tool_call_id = t.fetch("tool_call_id").to_s
@@ -43,6 +46,9 @@ module LLM
 
         next if record.status == "ready" || record.status == "cancelled"
 
+        tool_info = registry.find(executed_name)
+        retryable = tool_info.is_a?(AgentCore::Resources::Tools::Tool) && tool_info.metadata[:retryable] == true
+
         if reserved
           enqueue_task!(
             run_id: run_id,
@@ -55,7 +61,7 @@ module LLM
           next
         end
 
-        if ToolResultRecord.reclaim_stale_executing!(run_id: run_id, tool_call_id: tool_call_id)
+        if retryable && ToolResultRecord.reclaim_stale_executing!(run_id: run_id, tool_call_id: tool_call_id)
           enqueue_task!(
             run_id: run_id,
             tool_call_id: tool_call_id,
@@ -65,6 +71,11 @@ module LLM
           )
           reclaimed << tool_call_id
           enqueued << tool_call_id
+          next
+        end
+
+        if !retryable && ToolResultRecord.fail_stale_executing!(run_id: run_id, tool_call_id: tool_call_id)
+          failed << tool_call_id
           next
         end
 
@@ -85,6 +96,7 @@ module LLM
         enqueued: enqueued,
         reclaimed: reclaimed,
         reenqueued: reenqueued,
+        failed: failed,
         skipped_cancelled: false,
       }
     end

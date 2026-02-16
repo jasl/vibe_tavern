@@ -49,6 +49,7 @@ module LLM
 
       current_record = ToolResultRecord.find_by(run_id: run_id, tool_call_id: tool_call_id)
       return if ContinuationRecord.where(run_id: run_id, status: "cancelled").exists? || current_record&.status == "cancelled"
+      return unless current_record&.status == "executing" && current_record.locked_by == lock_id
 
       begin
         ToolResultRecord.complete!(
@@ -60,6 +61,7 @@ module LLM
       rescue ArgumentError
         current_record = ToolResultRecord.find_by(run_id: run_id, tool_call_id: tool_call_id)
         return if ContinuationRecord.where(run_id: run_id, status: "cancelled").exists? || current_record&.status == "cancelled"
+        return unless current_record&.status == "executing" && current_record.locked_by == lock_id
 
         ToolResultRecord.upsert_result!(
           run_id: run_id,

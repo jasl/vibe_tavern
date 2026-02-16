@@ -40,6 +40,7 @@ module LLM
             },
             required: ["text"],
           },
+          metadata: { retryable: true },
         ) do |arguments, context:|
           text = arguments.fetch("text").to_s
           AgentCore::Resources::Tools::ToolResult.success(text: text, metadata: { duration_ms: 0.0 })
@@ -48,6 +49,7 @@ module LLM
           name: "noop",
           description: "No-op tool (returns ok).",
           parameters: { type: "object", properties: {} },
+          metadata: { retryable: true },
         ) do |_arguments, context:|
           AgentCore::Resources::Tools::ToolResult.success(text: "ok", metadata: { duration_ms: 0.0 })
         end,
