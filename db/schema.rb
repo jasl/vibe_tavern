@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.2].define(version: 2026_02_12_090200) do
+ActiveRecord::Schema[8.2].define(version: 2026_02_16_100100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -40,6 +40,24 @@ ActiveRecord::Schema[8.2].define(version: 2026_02_12_090200) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "continuation_records", force: :cascade do |t|
+    t.datetime "consumed_at"
+    t.string "continuation_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "llm_model_id", null: false
+    t.string "parent_continuation_id"
+    t.jsonb "payload", null: false
+    t.string "run_id", null: false
+    t.string "status", default: "current", null: false
+    t.string "tooling_key", null: false
+    t.datetime "updated_at", null: false
+    t.index ["llm_model_id"], name: "index_continuation_records_on_llm_model_id"
+    t.index ["run_id", "continuation_id"], name: "index_continuation_records_on_run_id_and_continuation_id", unique: true
+    t.index ["run_id"], name: "index_continuation_records_on_run_id", unique: true, where: "((status)::text = 'current'::text)"
+    t.index ["status"], name: "index_continuation_records_on_status"
+    t.check_constraint "status::text = ANY (ARRAY['current'::character varying, 'consumed'::character varying]::text[])", name: "continuation_records_status_check"
   end
 
   create_table "llm_models", force: :cascade do |t|
@@ -93,8 +111,21 @@ ActiveRecord::Schema[8.2].define(version: 2026_02_12_090200) do
     t.check_constraint "message_overhead_tokens >= 0", name: "llm_providers_message_overhead_tokens_non_negative"
   end
 
+  create_table "tool_result_records", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "executed_name"
+    t.string "run_id", null: false
+    t.string "status", default: "ready", null: false
+    t.string "tool_call_id", null: false
+    t.jsonb "tool_result", null: false
+    t.datetime "updated_at", null: false
+    t.index ["run_id", "tool_call_id"], name: "index_tool_result_records_on_run_id_and_tool_call_id", unique: true
+    t.index ["run_id"], name: "index_tool_result_records_on_run_id"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "continuation_records", "llm_models"
   add_foreign_key "llm_models", "llm_providers"
   add_foreign_key "llm_presets", "llm_models"
 end

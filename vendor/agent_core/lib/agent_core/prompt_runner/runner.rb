@@ -3130,6 +3130,7 @@ module AgentCore
         ensure_pause_state_ids!(state, parent_continuation_id: parent_continuation_id)
 
         continuation_id = normalize_optional_id(state[:continuation_id])
+        parent_continuation_id = normalize_optional_id(state[:parent_continuation_id])
         reason = state.fetch(:reason, :awaiting_tool_confirmation)
 
         pending_confirmations_count =
@@ -3144,6 +3145,7 @@ module AgentCore
             turn_number: Integer(turn_number),
             pause_reason: reason.to_s,
             continuation_id: continuation_id,
+            parent_continuation_id: parent_continuation_id,
             pending_confirmations_count: pending_confirmations_count,
             pending_executions_count: pending_executions_count,
             duration_ms: 0.0,

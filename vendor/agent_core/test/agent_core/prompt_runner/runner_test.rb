@@ -323,6 +323,7 @@ class AgentCore::PromptRunner::RunnerTest < Minitest::Test
     pause_cid_2 = pause_events.last.fetch(:payload).fetch("continuation_id")
     assert_equal partial.continuation.continuation_id, pause_cid_2
     refute_equal pause_cid_1, pause_cid_2
+    assert_equal pause_cid_1, pause_events.last.fetch(:payload).fetch("parent_continuation_id")
 
     resume_events = instrumenter.trace.select { |e| e.fetch(:name) == "agent_core.resume" }
     assert_equal 1, resume_events.size

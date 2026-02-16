@@ -1,0 +1,126 @@
+require "test_helper"
+
+class LLMToolChatDeferredExecutionTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
+  class SequencedFakeClient
+    attr_reader :requests
+
+    def initialize(bodies)
+      @requests = []
+      @bodies = Array(bodies).dup
+    end
+
+    def chat_completions(**params)
+      @requests << params
+      body = @bodies.shift || raise("fake client has no more responses")
+      SimpleInference::Response.new(status: 200, headers: {}, body: body, raw_body: "{}")
+    end
+  end
+
+  setup do
+    ActiveJob::Base.queue_adapter = :test
+    clear_enqueued_jobs
+    clear_performed_jobs
+  end
+
+  test "deferred tool execution can be resumed and is stale-protected by continuation_id" do
+    provider =
+      LLMProvider.create!(
+        name: "X",
+        base_url: "http://example.test",
+        api_prefix: "/v1",
+        headers: {},
+        llm_options_defaults: {},
+      )
+
+    llm_model = LLMModel.create!(llm_provider: provider, name: "M1", model: "m1", enabled: true)
+
+    client =
+      SequencedFakeClient.new(
+        [
+          {
+            "choices" => [
+              {
+                "message" => {
+                  "role" => "assistant",
+                  "content" => "",
+                  "tool_calls" => [
+                    {
+                      "id" => "tc_1",
+                      "type" => "function",
+                      "function" => { "name" => "echo", "arguments" => "{\"text\":\"hello\"}" },
+                    },
+                    {
+                      "id" => "tc_2",
+                      "type" => "function",
+                      "function" => { "name" => "noop", "arguments" => "{}" },
+                    },
+                  ],
+                },
+                "finish_reason" => "tool_calls",
+              },
+            ],
+          },
+          {
+            "choices" => [
+              {
+                "message" => { "role" => "assistant", "content" => "done" },
+                "finish_reason" => "stop",
+              },
+            ],
+          },
+        ],
+      )
+
+    started =
+      LLM::RunToolChat.call(
+        llm_model: llm_model,
+        user_text: "hi",
+        client: client,
+        context: { tenant_id: "t1" },
+        tooling_key: "default",
+        context_keys: %i[tenant_id],
+      )
+
+    assert started.success?, started.errors.inspect
+
+    started_run = started.value.fetch(:run_result)
+    assert started_run.awaiting_tool_results?
+
+    run_id = started.value.fetch(:run_id)
+    continuation_id = started.value.fetch(:continuation_id)
+
+    record = ContinuationRecord.find_by!(run_id: run_id, continuation_id: continuation_id)
+    assert_equal "current", record.status
+
+    assert_equal 2, enqueued_jobs.count { |j| j.fetch(:job) == LLM::ExecuteToolCallJob }
+
+    perform_enqueued_jobs
+
+    assert_equal 2, ToolResultRecord.where(run_id: run_id).count
+
+    resumed =
+      LLM::ResumeToolChat.call(
+        run_id: run_id,
+        continuation_id: continuation_id,
+        client: client,
+      )
+
+    assert resumed.success?, resumed.errors.inspect
+    final = resumed.value.fetch(:run_result)
+    assert_equal "done", final.final_message&.text
+
+    assert_equal "consumed", record.reload.status
+
+    stale =
+      LLM::ResumeToolChat.call(
+        run_id: run_id,
+        continuation_id: continuation_id,
+        client: client,
+      )
+
+    assert stale.failure?
+    assert_equal "STALE_CONTINUATION", stale.code
+  end
+end

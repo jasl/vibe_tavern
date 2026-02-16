@@ -159,86 +159,60 @@ end
 
 ### Rails ActiveJob example (offload tool execution)
 
-AgentCore does not prescribe persistence; one workable Rails pattern is:
+AgentCore does not prescribe persistence, but this repo includes a minimal,
+copy/paste-ready Rails pattern:
 
-1. Persist `continuation` keyed by `(run_id, continuation_id)`.
-2. Enqueue one job per `PendingToolExecution`.
-3. Persist `ToolResult` output keyed by `(run_id, tool_call_id)` (optionally
-   store `continuation_id` as an audit/debug field).
-4. When all tool results are ready, resume the run (or use `allow_partial: true` to resume incrementally).
+- Tables: `continuation_records` / `tool_result_records` (see
+  `db/migrate/*_create_continuation_records.rb` and
+  `db/migrate/*_create_tool_result_records.rb`)
+- Models: `ContinuationRecord` / `ToolResultRecord` (CAS consume + idempotent
+  upsert)
+- Job: `LLM::ExecuteToolCallJob` (execute one tool call and store result)
+- Services: `LLM::RunToolChat` / `LLM::ResumeToolChat` (pause/resume orchestration)
 
-Example sketch (adapt to your persistence choices):
+### CAS consume! (stale continuation protection)
 
 ```ruby
-# app/jobs/execute_tool_call_job.rb
-class ExecuteToolCallJob < ApplicationJob
-  queue_as :default
+ContinuationRecord.consume!(run_id: run_id, continuation_id: continuation_id)
+```
 
-  def perform(run_id:, tool_call_id:, name:, arguments:)
-    registry = AppTools.registry
-    ctx = AgentCore::ExecutionContext.from({ user_id: Current.user&.id }).with(run_id: run_id)
+If the update affects 0 rows, `consume!` raises
+`ContinuationRecord::StaleContinuationError` (another worker already resumed it
+or it is not current).
 
-    result = registry.execute(name: name, arguments: arguments, context: ctx)
+### Start (pause + enqueue tasks)
 
-    ToolResultRecord.create!(
-      run_id: run_id,
-      tool_call_id: tool_call_id,
-      tool_result: result.to_h, # app-defined serialization
-    )
-  end
-end
+`LLM::RunToolChat` runs the tool loop with `ToolExecutor::DeferAll`, persists
+the continuation, derives `ToolTaskCodec` payloads, and enqueues
+`LLM::ExecuteToolCallJob` jobs.
 
-# Somewhere in your controller/service when you get awaiting_tool_results:
-run_id = result.run_id
-
-payload =
-  AgentCore::PromptRunner::ContinuationCodec.dump(
-    result.continuation,
-    # Only persist explicitly allowlisted context attributes.
-    # Keep this minimal (avoid secrets) — it may be stored long-term.
-    context_keys: %i[tenant_id user_id workspace_id session_id],
-    include_traces: true,
+```ruby
+started =
+  LLM::RunToolChat.call(
+    llm_model: llm_model,
+    user_text: "hi",
+    tooling_key: "default",
+    context: { tenant_id: "t1" },
+    context_keys: %i[tenant_id],
   )
 
-ContinuationRecord.create!(
-  run_id: run_id,
-  continuation_id: payload.fetch("continuation_id"),
-  parent_continuation_id: payload.fetch("parent_continuation_id", nil),
-  status: "current", # app-defined; supports optimistic locking / single-consume
-  payload: payload,  # jsonb
-)
+run_id = started.value.fetch(:run_id)
+continuation_id = started.value.fetch(:continuation_id) # present when paused
+```
 
-result.pending_tool_executions.each do |p|
-  ExecuteToolCallJob.perform_later(
+### Resume (consume + allow_partial)
+
+`LLM::ResumeToolChat` consumes the checkpoint (`continuation_id`), loads the
+continuation payload, gathers tool results, and resumes with
+`allow_partial: true`. If it pauses again, it persists the next continuation and
+enqueues any missing tool tasks.
+
+```ruby
+resumed =
+  LLM::ResumeToolChat.call(
     run_id: run_id,
-    continuation_id: payload.fetch("continuation_id"),
-    tool_call_id: p.tool_call_id,
-    name: p.executed_name,
-    arguments: p.arguments,
+    continuation_id: continuation_id,
   )
-end
-
-# Later, when all results are ready (polling or callback):
-continuation_payload = ContinuationRecord.find_by!(run_id: run_id, status: "current").payload
-continuation = AgentCore::PromptRunner::ContinuationCodec.load(continuation_payload)
-
-tool_results =
-  ToolResultRecord.where(run_id: run_id).to_h do |r|
-    [
-      r.tool_call_id,
-      AgentCore::Resources::Tools::ToolResult.from_h(r.tool_result),
-    ]
-  end
-
-runner = AgentCore::PromptRunner::Runner.new
-runner.resume_with_tool_results(
-  # Runner also accepts the JSON payload Hash/String directly.
-  continuation: continuation,
-  tool_results: tool_results,
-  provider: provider,
-  tools_registry: AppTools.registry,
-  tool_policy: AppTools.policy,
-)
 ```
 
 Notes:

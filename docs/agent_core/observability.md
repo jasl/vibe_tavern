@@ -86,7 +86,8 @@ Typical payload fields:
 - `agent_core.llm.call`: `model`, `stream`, `messages_count`, `tools_count`,
   `options_summary`, `stop_reason`, `usage`
 - `agent_core.pause`: `turn_number`, `pause_reason`, `continuation_id`,
-  `pending_confirmations_count`, `pending_executions_count`
+  `parent_continuation_id` (optional), `pending_confirmations_count`,
+  `pending_executions_count`
 - `agent_core.resume`: `paused_turn_number`, `pause_reason`, `continuation_id`,
   `resumed`
 - `agent_core.tool.authorize`: `tool_call_id`, `name`, `arguments_summary`,

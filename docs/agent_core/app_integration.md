@@ -195,3 +195,23 @@ Integration notes:
   (`Hash` / JSON `String`).
 - Use `AgentCore::Resources::Tools::ToolResult.from_h(...)` to rehydrate tool
   results from persisted Hash/JSON payloads.
+
+## ActiveJob deferred tool execution (this repo)
+
+This Rails app includes a minimal, end-to-end implementation you can copy:
+
+- Persistence:
+  - `app/models/continuation_record.rb` (CAS `consume!`)
+  - `app/models/tool_result_record.rb` (idempotent `upsert_result!`)
+  - migrations in `db/migrate/*_create_continuation_records.rb` and `db/migrate/*_create_tool_result_records.rb`
+- Tooling reconstruction hook: `lib/llm/tooling.rb` (`tooling_key` → registry/policy)
+- Job (tool execution only): `app/jobs/llm/execute_tool_call_job.rb`
+- Services:
+  - `app/services/llm/run_tool_chat.rb` (run → pause → persist → enqueue)
+  - `app/services/llm/resume_tool_chat.rb` (CAS consume → resume → re-pause if needed)
+
+Production TODO (app-side, not provided by AgentCore):
+
+- Store `continuation_id` as a single-use checkpoint token and enforce single-consume via CAS/optimistic locking.
+- Decide your retry semantics: if the resume LLM call fails after consuming the checkpoint, you may want a separate status like `consuming` to support safe retries.
+- Ensure secrets never enter `context_attributes` / tool arguments, and never log raw tool args/results without redaction.

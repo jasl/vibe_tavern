@@ -61,70 +61,70 @@ module AgentCore
         @agent = build_agent
       end
 
-      def chat(user_text = nil, language_policy: nil)
+      def chat(user_text = nil, language_policy: nil, context: nil)
         text = user_text.to_s
 
         run_result =
           if text.strip.empty?
-            run_history_only
+            run_history_only(context: context)
           else
-            @agent.chat(text)
+            @agent.chat(text, context: context)
           end
 
         apply_language_policy_to_run_result(run_result, language_policy: language_policy)
       end
 
-      def chat_stream(user_text = nil, language_policy: nil, &block)
+      def chat_stream(user_text = nil, language_policy: nil, context: nil, &block)
         policy = normalize_language_policy(language_policy)
 
         if policy.fetch(:enabled) && policy.fetch(:target_lang, nil)
-          result = chat(user_text, language_policy: policy)
+          result = chat(user_text, language_policy: policy, context: context)
           emit_final_only_stream_events(result, &block)
           return result
         end
 
         text = user_text.to_s
         if text.strip.empty?
-          result = run_history_only
+          result = run_history_only(context: context)
           emit_final_only_stream_events(result, &block)
           return result
         end
 
-        @agent.chat_stream(text, &block)
+        @agent.chat_stream(text, context: context, &block)
       end
 
-      def resume(continuation:, tool_confirmations:, language_policy: nil)
-        run_result = @agent.resume(continuation: continuation, tool_confirmations: tool_confirmations)
+      def resume(continuation:, tool_confirmations:, language_policy: nil, context: nil)
+        run_result = @agent.resume(continuation: continuation, tool_confirmations: tool_confirmations, context: context)
         apply_language_policy_to_run_result(run_result, language_policy: language_policy)
       end
 
-      def resume_stream(continuation:, tool_confirmations:, language_policy: nil, &block)
+      def resume_stream(continuation:, tool_confirmations:, language_policy: nil, context: nil, &block)
         policy = normalize_language_policy(language_policy)
 
         if policy.fetch(:enabled) && policy.fetch(:target_lang, nil)
-          result = resume(continuation: continuation, tool_confirmations: tool_confirmations, language_policy: policy)
+          result = resume(continuation: continuation, tool_confirmations: tool_confirmations, language_policy: policy, context: context)
           emit_final_only_stream_events(result, &block)
           return result
         end
 
-        @agent.resume_stream(continuation: continuation, tool_confirmations: tool_confirmations, &block)
+        @agent.resume_stream(continuation: continuation, tool_confirmations: tool_confirmations, context: context, &block)
       end
 
-      def resume_with_tool_results(continuation:, tool_results:, language_policy: nil, allow_partial: false)
-        run_result = @agent.resume_with_tool_results(continuation: continuation, tool_results: tool_results, allow_partial: allow_partial)
+      def resume_with_tool_results(continuation:, tool_results:, language_policy: nil, allow_partial: false, context: nil)
+        run_result = @agent.resume_with_tool_results(continuation: continuation, tool_results: tool_results, allow_partial: allow_partial, context: context)
         apply_language_policy_to_run_result(run_result, language_policy: language_policy)
       end
 
-      def resume_stream_with_tool_results(continuation:, tool_results:, language_policy: nil, allow_partial: false, &block)
+      def resume_stream_with_tool_results(continuation:, tool_results:, language_policy: nil, allow_partial: false, context: nil, &block)
         policy = normalize_language_policy(language_policy)
 
         if policy.fetch(:enabled) && policy.fetch(:target_lang, nil)
-          result = resume_with_tool_results(continuation: continuation, tool_results: tool_results, language_policy: policy, allow_partial: allow_partial)
+          result = resume_with_tool_results(continuation: continuation, tool_results: tool_results, language_policy: policy, allow_partial: allow_partial, context: context)
           emit_final_only_stream_events(result, &block)
           return result
         end
 
-        @agent.resume_stream_with_tool_results(continuation: continuation, tool_results: tool_results, allow_partial: allow_partial, &block)
+        @agent.resume_stream_with_tool_results(continuation: continuation, tool_results: tool_results, allow_partial: allow_partial, context: context, &block)
       end
 
       def directives(language_policy: nil, structured_output_options: nil, result_validator: nil)
@@ -200,7 +200,7 @@ module AgentCore
         end
       end
 
-      def run_history_only
+      def run_history_only(context:)
         prompt =
           AgentCore::PromptBuilder::BuiltPrompt.new(
             system_prompt: @system_prompt,
@@ -218,6 +218,7 @@ module AgentCore
           token_counter: @token_counter,
           context_window: @context_window,
           reserved_output_tokens: @reserved_output_tokens,
+          context: context,
         )
       end
 
