@@ -60,7 +60,7 @@ may push directives into `prompt_only` via fallback. See:
 
 ## Current “stable” set (what `OPENROUTER_MODEL_FILTER=stable` means)
 
-The eval scripts currently treat these as “stable” (as of 2026-02-09):
+The eval scripts currently treat these as “stable” (as of 2026-02-16):
 
 - `google/gemini-2.5-flash:nitro`
 - `anthropic/claude-opus-4.6:nitro`
@@ -69,15 +69,16 @@ The eval scripts currently treat these as “stable” (as of 2026-02-09):
 - `qwen/qwen3-next-80b-a3b-instruct:nitro`
 - `qwen/qwen3-235b-a22b-2507:nitro`
 
-Known caveats from the 2026-02-09 smoke run:
+Known caveats from the 2026-02-16 smoke run:
 
-- Tool calling failures were entirely from `qwen/qwen3-next-80b-a3b-instruct:nitro`
-  returning empty final completions (no HTTP error).
-- Directives passed for all stable models, but some require workarounds (see the
-  `workarounds:` in `script/eval/support/openrouter_models.rb`).
-- Language policy had a single empty `assistant_text` case (`openai/gpt-5.2:nitro`
-  + `ja-JP` + `verbatim_zones`), which is why the eval harness retries empty
-  responses by default.
+- Tool calling (`production`): 360/360 OK (`happy_path` + `chat_only`, language matrix).
+  Report: `tmp/llm_tool_call_eval_reports/20260216T223418Z/`
+- Directives (`baseline`): 359/360 OK (`show_form` + `toast`).
+  One miss: `qwen/qwen3-235b-a22b-2507:nitro` + `ja-JP` + `show_form` (missing `ui.show_form`).
+  Report: `tmp/llm_directives_eval_reports/20260216T225900Z/`
+- Language policy: 357/360 OK (`verbatim_zones` + `roleplay_lang_span`).
+  Three `verbatim_zones` misses: 1× Liquid tag (Gemini, `off`), 2× code snippet (GPT-5.2, `ja-JP`).
+  Report: `tmp/llm_language_policy_eval_reports/20260216T231037Z/`
 
 ## How to read reports
 
