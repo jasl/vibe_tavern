@@ -83,25 +83,10 @@ module AgentCore
         def summarize_tool_result(result)
           ToolExecutionUtils.summarize_tool_result(result, mode: summary_mode)
         end
-      end
 
-      class Inline < Base
-        def execute(requests:, tools_registry:, execution_context:, max_tool_output_bytes:)
-          completed =
-            Array(requests).map do |req|
-              execute_one(
-                req,
-                tools_registry: tools_registry,
-                execution_context: execution_context,
-                max_tool_output_bytes: max_tool_output_bytes,
-              )
-            end
-
-          Result.new(completed: completed, deferred: [])
-        end
-
-        private
-
+        # Execute a single tool request with instrumentation and error handling.
+        #
+        # Shared by Inline and ThreadPool executors.
         def execute_one(request, tools_registry:, execution_context:, max_tool_output_bytes:)
           instrumenter = execution_context.instrumenter
           run_id = execution_context.run_id
@@ -149,6 +134,22 @@ module AgentCore
             error: payload[:result_error] == true,
             duration_ms: payload[:duration_ms],
           )
+        end
+      end
+
+      class Inline < Base
+        def execute(requests:, tools_registry:, execution_context:, max_tool_output_bytes:)
+          completed =
+            Array(requests).map do |req|
+              execute_one(
+                req,
+                tools_registry: tools_registry,
+                execution_context: execution_context,
+                max_tool_output_bytes: max_tool_output_bytes,
+              )
+            end
+
+          Result.new(completed: completed, deferred: [])
         end
       end
 
@@ -270,55 +271,6 @@ module AgentCore
             end
           end
           out
-        end
-
-        def execute_one(request, tools_registry:, execution_context:, max_tool_output_bytes:)
-          instrumenter = execution_context.instrumenter
-          run_id = execution_context.run_id
-
-          payload = {
-            run_id: run_id,
-            tool_call_id: request.tool_call_id,
-            name: request.name,
-            executed_name: request.executed_name,
-            source: request.source,
-            arguments_summary: request.arguments_summary,
-          }
-
-          result =
-            instrumenter.instrument("agent_core.tool.execute", payload) do
-              res =
-                begin
-                  tools_registry.execute(
-                    name: request.executed_name,
-                    arguments: request.arguments,
-                    context: execution_context,
-                    tool_error_mode: tool_error_mode,
-                  )
-                rescue ToolNotFoundError => e
-                  Resources::Tools::ToolResult.error(text: e.message)
-                rescue StandardError => e
-                  Resources::Tools::ToolResult.error(text: tool_error_text(request.name, e))
-                end
-
-              res = ToolExecutionUtils.limit_tool_result(res, max_bytes: max_tool_output_bytes, tool_name: request.executed_name)
-
-              payload[:result_error] = res.error?
-              payload[:result_summary] = summarize_tool_result(res)
-              res
-            end
-
-          CompletedExecution.new(
-            tool_call_id: request.tool_call_id,
-            name: request.name,
-            executed_name: request.executed_name,
-            source: request.source,
-            arguments_summary: request.arguments_summary,
-            result: result,
-            result_summary: payload[:result_summary],
-            error: payload[:result_error] == true,
-            duration_ms: payload[:duration_ms],
-          )
         end
 
         def parallelizable_tool?(tools_registry, tool_name)
